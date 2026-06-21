@@ -19,6 +19,7 @@ const priorityColors = {
 const cardClass = 'group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-900/78 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.24)] ring-1 ring-white/[0.025] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-white/[0.12] hover:bg-slate-900/90 hover:shadow-[0_26px_80px_rgba(0,0,0,0.36)]';
 const labelClass = 'text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500';
 const selectClass = 'h-10 w-full cursor-pointer rounded-lg border border-white/[0.06] bg-slate-950/80 px-3 text-sm font-semibold text-slate-100 outline-none transition hover:border-blue-400/50 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 md:w-auto md:min-w-40';
+const activeSelectClass = 'border-blue-400/45 bg-blue-500/[0.08] text-blue-100 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]';
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString('pt-BR');
@@ -26,6 +27,34 @@ function formatNumber(value) {
 
 function pct(part, total) {
   return total > 0 ? Math.round((part / total) * 100) : 0;
+}
+
+function filterLabel(filters, key, districts) {
+  const labels = {
+    distrito: filters.distrito === 'all' ? null : districts.find((district) => district === filters.distrito),
+    prioridade: filters.prioridade === 'all' ? null : priorityLabels[filters.prioridade],
+    vip: filters.vip === 'all' ? null : filters.vip === '1' ? 'Apenas VIPs' : 'Não VIPs',
+    telefone: filters.telefone === 'all' ? null : filters.telefone === '1' ? 'Com telefone' : 'Sem telefone',
+    estudos: filters.estudos === 'all' ? null : filters.estudos === '1' ? 'Com estudo ativo' : 'Sem estudo ativo',
+    genero: filters.genero === 'all' ? null : filters.genero === 'F' ? 'Feminino' : 'Masculino'
+  };
+  return labels[key];
+}
+
+function csvCell(value) {
+  const text = String(value ?? '');
+  return /[",\n\r;]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function FilterSelect({ label, value, onChange, children, active }) {
+  return (
+    <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+      {label}
+      <select className={`${selectClass} ${active ? activeSelectClass : ''}`} value={value} onChange={(event) => onChange(event.target.value)}>
+        {children}
+      </select>
+    </label>
+  );
 }
 
 function KpiCard({ accent, label, value, sub, onClick, children }) {
@@ -226,6 +255,92 @@ function DonutChart({ values }) {
   );
 }
 
+function ActionCard({ title, value, detail, tone, onClick }) {
+  return (
+    <button
+      className="group relative min-h-32 cursor-pointer overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-900/70 p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.18)] ring-1 ring-white/[0.025] transition duration-300 hover:-translate-y-1 hover:border-blue-300/20 hover:bg-slate-900/90 hover:shadow-[0_24px_70px_rgba(0,0,0,0.34)] focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+      onClick={onClick}
+      type="button"
+    >
+      <span className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full opacity-20 blur-3xl transition group-hover:opacity-40" style={{ background: tone }} />
+      <span className={labelClass}>{title}</span>
+      <strong className="mt-3 block truncate text-2xl font-black text-slate-50">{value}</strong>
+      <span className="mt-2 block text-sm leading-relaxed text-slate-400">{detail}</span>
+    </button>
+  );
+}
+
+function DetailStat({ label, value, color = 'text-slate-100' }) {
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-slate-950/50 p-4">
+      <span className={labelClass}>{label}</span>
+      <strong className={`mt-2 block text-2xl font-black tabular-nums ${color}`}>{value}</strong>
+    </div>
+  );
+}
+
+function DistrictDrawer({ district, onClose }) {
+  if (!district) return null;
+
+  const total = Math.max(1, district.total);
+  const mix = [
+    { label: 'Quente', value: district.hot, color: priorityColors.Hot },
+    { label: 'Potencial', value: district.warm, color: priorityColors.Warm },
+    { label: 'Morno', value: district.cool, color: priorityColors.Cool },
+    { label: 'Frio', value: district.cold, color: priorityColors.Cold }
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <button className="absolute inset-0 cursor-default bg-slate-950/70 backdrop-blur-sm" onClick={onClose} type="button" aria-label="Fechar detalhe" />
+      <aside className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-white/[0.08] bg-slate-950/96 p-6 shadow-[0_0_80px_rgba(0,0,0,0.55)]">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <span className={labelClass}>Análise Detalhada</span>
+            <h3 className="mt-2 text-2xl font-black text-slate-50">{district.nome}</h3>
+            <p className="mt-1 text-sm text-slate-400">Resumo operacional com base nos dados filtrados e prioridade ML.</p>
+          </div>
+          <button className="grid h-10 w-10 cursor-pointer place-items-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-xl font-bold text-slate-300 transition hover:border-blue-400/40 hover:bg-blue-500/10 hover:text-blue-200 focus:outline-none focus:ring-4 focus:ring-blue-500/10" onClick={onClose} type="button" aria-label="Fechar">×</button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <DetailStat label="Contatos" value={formatNumber(district.total)} />
+          <DetailStat label="Pontuação Média" value={district.score_medio.toLocaleString('pt-BR')} color={district.score_medio >= 14 ? 'text-orange-400' : 'text-amber-400'} />
+          <DetailStat label="WhatsApp" value={`${formatNumber(district.telefone)} (${pct(district.telefone, total)}%)`} color="text-emerald-300" />
+          <DetailStat label="VIPs" value={`${formatNumber(district.vips)} (${pct(district.vips, total)}%)`} color="text-amber-300" />
+          <DetailStat label="Estudos Ativos" value={`${formatNumber(district.estudos)} (${pct(district.estudos, total)}%)`} color="text-violet-300" />
+          <DetailStat label="5+ anos sem contato" value={formatNumber(district.semContato5Anos)} color="text-red-300" />
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-white/[0.06] bg-slate-900/70 p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h4 className="font-black text-slate-100">Composição de Prioridade</h4>
+            <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-400">ML</span>
+          </div>
+          <div className="grid gap-3">
+            {mix.map((item) => (
+              <div className="grid grid-cols-[5.5rem_1fr_4rem] items-center gap-3" key={item.label}>
+                <span className="text-sm text-slate-400">{item.label}</span>
+                <div className="h-2.5 overflow-hidden rounded-full bg-slate-950 ring-1 ring-white/[0.05]">
+                  <div className="h-full rounded-full" style={{ width: `${pct(item.value, total)}%`, background: item.color }} />
+                </div>
+                <strong className="text-right text-sm tabular-nums text-slate-100">{formatNumber(item.value)}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.06] p-5">
+          <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-300">Próxima ação sugerida</span>
+          <p className="mt-2 text-sm leading-relaxed text-slate-300">
+            Priorize contatos quentes com WhatsApp disponível. Em seguida, trate os potenciais com maior tempo sem contato para recuperar oportunidades antigas.
+          </p>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 function aggregate(records, filters) {
   const filtered = records.filter((row) => {
     if (filters.distrito !== 'all' && row.d !== filters.distrito) return false;
@@ -261,12 +376,28 @@ function aggregate(records, filters) {
     if (row.p === 'Cold') kpis.cold++;
 
     if (!districts.has(row.d)) {
-      districts.set(row.d, { nome: row.d, total: 0, telefone: 0, hot: 0, warm: 0, cool: 0, cold: 0, vips: 0, sumScore: 0 });
+      districts.set(row.d, {
+        nome: row.d,
+        total: 0,
+        telefone: 0,
+        hot: 0,
+        warm: 0,
+        cool: 0,
+        cold: 0,
+        vips: 0,
+        estudos: 0,
+        semContato2Anos: 0,
+        semContato5Anos: 0,
+        sumScore: 0
+      });
     }
     const district = districts.get(row.d);
     district.total++;
     district.telefone += row.t;
     district.vips += row.v;
+    district.estudos += row.e;
+    if (row.c !== null && row.c > 730) district.semContato2Anos++;
+    if (row.c !== null && row.c > 1825) district.semContato5Anos++;
     district.sumScore += row.s;
     district[row.p.toLowerCase()]++;
 
@@ -301,6 +432,7 @@ export default function DashboardClient({ payload }) {
   const [filters, setFilters] = useState({ distrito: 'all', prioridade: 'all', vip: 'all', telefone: 'all', estudos: 'all', genero: 'all', search: '' });
   const [sort, setSort] = useState({ col: 'total', asc: false });
   const [pointer, setPointer] = useState({ x: 50, y: 20 });
+  const [selectedDistrictName, setSelectedDistrictName] = useState(null);
 
   const data = useMemo(() => aggregate(records, filters), [records, filters]);
   const sortedDistricts = useMemo(() => {
@@ -313,10 +445,54 @@ export default function DashboardClient({ payload }) {
     });
     return rows;
   }, [data.districtList, sort]);
+  const selectedDistrict = useMemo(
+    () => data.districtList.find((district) => district.nome === selectedDistrictName) || null,
+    [data.districtList, selectedDistrictName]
+  );
+  const activeFilters = useMemo(() => (
+    ['distrito', 'prioridade', 'vip', 'telefone', 'estudos', 'genero']
+      .map((key) => ({ key, label: filterLabel(filters, key, districts) }))
+      .filter((item) => item.label)
+  ), [filters, districts]);
+  const actionInsights = useMemo(() => {
+    const byHot = [...data.districtList].sort((a, b) => b.hot - a.hot)[0];
+    const byWarm = [...data.districtList].sort((a, b) => b.warm - a.warm)[0];
+    const byVip = [...data.districtList].sort((a, b) => b.vips - a.vips)[0];
+    const byDormant = [...data.districtList].sort((a, b) => b.semContato5Anos - a.semContato5Anos)[0];
+    return [
+      byHot && { title: 'Atacar agora', value: byHot.nome, detail: `${formatNumber(byHot.hot)} contatos quentes para priorizar`, tone: priorityColors.Hot, district: byHot.nome },
+      byWarm && { title: 'Maior potencial', value: byWarm.nome, detail: `${formatNumber(byWarm.warm)} contatos potenciais no funil`, tone: priorityColors.Warm, district: byWarm.nome },
+      byVip && { title: 'Base VIP', value: byVip.nome, detail: `${formatNumber(byVip.vips)} VIPs para relacionamento`, tone: 'hsl(270, 70%, 62%)', district: byVip.nome },
+      byDormant && { title: 'Recuperação', value: byDormant.nome, detail: `${formatNumber(byDormant.semContato5Anos)} contatos há 5+ anos sem contato`, tone: 'hsl(0, 70%, 50%)', district: byDormant.nome }
+    ].filter(Boolean);
+  }, [data.districtList]);
 
   const setFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   const resetFilters = () => setFilters({ distrito: 'all', prioridade: 'all', vip: 'all', telefone: 'all', estudos: 'all', genero: 'all', search: '' });
   const clickSort = (col) => setSort((current) => current.col === col ? { col, asc: !current.asc } : { col, asc: col === 'nome' });
+  const exportCsv = () => {
+    const header = ['Distrito', 'Total', 'WhatsApp', 'Quente', 'Potencial', 'Morno', 'Frio', 'VIPs', 'Estudos Ativos', 'Pontuação Média'];
+    const rows = sortedDistricts.map((district) => [
+      district.nome,
+      district.total,
+      district.telefone,
+      district.hot,
+      district.warm,
+      district.cool,
+      district.cold,
+      district.vips,
+      district.estudos,
+      district.score_medio
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(csvCell).join(';')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'distritos-filtrados.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
   const onPointerMove = (event) => {
     setPointer({
       x: Math.round((event.clientX / window.innerWidth) * 100),
@@ -360,14 +536,59 @@ export default function DashboardClient({ payload }) {
       </header>
 
       <main className="mx-auto w-full max-w-[1440px] px-8 py-6 max-md:px-4">
-        <section className="mb-6 flex flex-wrap items-end gap-5 rounded-2xl border border-white/[0.06] bg-slate-900/78 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.20)] backdrop-blur-xl">
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Distrito<select className={selectClass} value={filters.distrito} onChange={(event) => setFilter('distrito', event.target.value)}><option value="all">Todos os Distritos</option>{districts.map((d) => <option key={d} value={d}>{d}</option>)}</select></label>
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Prioridade ML<select className={selectClass} value={filters.prioridade} onChange={(event) => setFilter('prioridade', event.target.value)}><option value="all">Todas as Prioridades</option>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>Prioridade: {label}</option>)}</select></label>
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Status VIP<select className={selectClass} value={filters.vip} onChange={(event) => setFilter('vip', event.target.value)}><option value="all">Todos</option><option value="1">Apenas VIPs</option><option value="0">Não VIPs</option></select></label>
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">WhatsApp<select className={selectClass} value={filters.telefone} onChange={(event) => setFilter('telefone', event.target.value)}><option value="all">Todos</option><option value="1">Com Telefone</option><option value="0">Sem Telefone</option></select></label>
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Estudos Ativos<select className={selectClass} value={filters.estudos} onChange={(event) => setFilter('estudos', event.target.value)}><option value="all">Todos</option><option value="1">Em Andamento</option><option value="0">Sem Estudo Ativo</option></select></label>
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Gênero<select className={selectClass} value={filters.genero} onChange={(event) => setFilter('genero', event.target.value)}><option value="all">Todos</option><option value="F">Feminino</option><option value="M">Masculino</option></select></label>
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Ações<button className="h-10 cursor-pointer rounded-lg border border-blue-400/15 px-5 text-sm font-bold text-blue-400 transition hover:border-blue-400/60 hover:bg-blue-500/10 hover:text-blue-300 focus:outline-none focus:ring-4 focus:ring-blue-500/10" onClick={resetFilters} type="button">Limpar Filtros</button></label>
+        <section className="sticky top-[77px] z-10 mb-6 rounded-2xl border border-white/[0.06] bg-slate-950/82 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-2xl max-md:static">
+          <div className="flex flex-wrap items-end gap-5">
+            <FilterSelect label="Distrito" value={filters.distrito} onChange={(value) => setFilter('distrito', value)} active={filters.distrito !== 'all'}>
+              <option value="all">Todos os Distritos</option>
+              {districts.map((d) => <option key={d} value={d}>{d}</option>)}
+            </FilterSelect>
+            <FilterSelect label="Prioridade ML" value={filters.prioridade} onChange={(value) => setFilter('prioridade', value)} active={filters.prioridade !== 'all'}>
+              <option value="all">Todas as Prioridades</option>
+              {Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>Prioridade: {label}</option>)}
+            </FilterSelect>
+            <FilterSelect label="Status VIP" value={filters.vip} onChange={(value) => setFilter('vip', value)} active={filters.vip !== 'all'}>
+              <option value="all">Todos</option>
+              <option value="1">Apenas VIPs</option>
+              <option value="0">Não VIPs</option>
+            </FilterSelect>
+            <FilterSelect label="WhatsApp" value={filters.telefone} onChange={(value) => setFilter('telefone', value)} active={filters.telefone !== 'all'}>
+              <option value="all">Todos</option>
+              <option value="1">Com Telefone</option>
+              <option value="0">Sem Telefone</option>
+            </FilterSelect>
+            <FilterSelect label="Estudos Ativos" value={filters.estudos} onChange={(value) => setFilter('estudos', value)} active={filters.estudos !== 'all'}>
+              <option value="all">Todos</option>
+              <option value="1">Em Andamento</option>
+              <option value="0">Sem Estudo Ativo</option>
+            </FilterSelect>
+            <FilterSelect label="Gênero" value={filters.genero} onChange={(value) => setFilter('genero', value)} active={filters.genero !== 'all'}>
+              <option value="all">Todos</option>
+              <option value="F">Feminino</option>
+              <option value="M">Masculino</option>
+            </FilterSelect>
+            <div className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+              Ações
+              <div className="flex gap-2">
+                <button className="h-10 cursor-pointer rounded-lg border border-blue-400/15 px-4 text-sm font-bold text-blue-400 transition hover:border-blue-400/60 hover:bg-blue-500/10 hover:text-blue-300 focus:outline-none focus:ring-4 focus:ring-blue-500/10" onClick={resetFilters} type="button">Limpar</button>
+                <button className="h-10 cursor-pointer rounded-lg border border-emerald-400/15 px-4 text-sm font-bold text-emerald-300 transition hover:border-emerald-400/60 hover:bg-emerald-500/10 hover:text-emerald-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/10" onClick={exportCsv} type="button">Exportar</button>
+              </div>
+            </div>
+          </div>
+          {activeFilters.length ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {activeFilters.map((item) => (
+                <button
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/[0.08] px-3 py-1 text-xs font-bold text-blue-200 transition hover:border-blue-300/50 hover:bg-blue-500/15"
+                  key={item.key}
+                  onClick={() => setFilter(item.key, 'all')}
+                  type="button"
+                >
+                  {item.label}
+                  <span className="text-blue-300">×</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         <section className="mb-6 grid grid-cols-5 gap-4 max-xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
@@ -376,6 +597,28 @@ export default function DashboardClient({ payload }) {
           <KpiCard accent="hsl(14, 100%, 57%)" label="Contatos Quentes" value={data.kpis.hot} sub={`${pct(data.kpis.hot, data.kpis.total)}% via ML`} onClick={() => setFilter('prioridade', 'Hot')}>△</KpiCard>
           <KpiCard accent="hsl(38, 92%, 50%)" label="VIPs" value={data.kpis.vips} sub={`${pct(data.kpis.vips, data.kpis.total)}%`} onClick={() => setFilter('vip', '1')}>☆</KpiCard>
           <KpiCard accent="hsl(270, 70%, 62%)" label="Estudos Ativos" value={data.kpis.estudos} sub={`${pct(data.kpis.estudos, data.kpis.total)}%`} onClick={() => setFilter('estudos', '1')}>□</KpiCard>
+        </section>
+
+        <section className="mb-6">
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-black text-slate-100">Prioridades de Ação</h2>
+              <p className="mt-1 text-sm text-slate-500">Atalhos gerados a partir dos dados filtrados e da priorização operacional.</p>
+            </div>
+            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-300">ML aplicado</span>
+          </div>
+          <div className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
+            {actionInsights.map((item) => (
+              <ActionCard
+                detail={item.detail}
+                key={item.title}
+                onClick={() => setSelectedDistrictName(item.district)}
+                title={item.title}
+                tone={item.tone}
+                value={item.value}
+              />
+            ))}
+          </div>
         </section>
 
         <section className="mb-6 grid grid-cols-[1.6fr_1fr] gap-4 max-xl:grid-cols-1">
@@ -421,20 +664,29 @@ export default function DashboardClient({ payload }) {
             </div>
             <input className="h-11 w-full rounded-xl border border-white/[0.06] bg-slate-950/80 px-4 text-sm font-semibold text-slate-100 outline-none transition placeholder:text-slate-600 hover:border-blue-400/40 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 md:w-80" value={filters.search} onChange={(event) => setFilter('search', event.target.value.toLowerCase())} placeholder="Buscar distrito..." />
           </div>
-          <div className="overflow-x-auto rounded-2xl">
+          <div className="max-h-[38rem] overflow-auto rounded-2xl">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
                   {[
                     ['nome', 'Distrito'], ['total', 'Total'], ['telefone', 'WhatsApp'], ['hot', 'Quente'],
                     ['warm', 'Potencial'], ['cool', 'Morno'], ['cold', 'Frio'], ['vips', 'VIPs'], ['score_medio', 'Pontuação Média']
-                  ].map(([key, label]) => <th className="cursor-pointer whitespace-nowrap border-b border-white/[0.06] px-4 py-3 text-left text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 transition hover:text-blue-400" key={key} onClick={() => clickSort(key)}>{label}</th>)}
+                  ].map(([key, label]) => (
+                    <th className="sticky top-0 z-[1] cursor-pointer whitespace-nowrap border-b border-white/[0.06] bg-slate-950/95 px-4 py-3 text-left text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 backdrop-blur-xl transition hover:text-blue-400" key={key} onClick={() => clickSort(key)}>
+                      <span className="inline-flex items-center gap-1">
+                        {label}
+                        {sort.col === key ? <span className="text-blue-400">{sort.asc ? '↑' : '↓'}</span> : null}
+                      </span>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {sortedDistricts.map((d) => (
                   <tr className="transition hover:bg-white/[0.035]" key={d.nome}>
-                    <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-black"><a className="cursor-pointer text-blue-400 no-underline transition hover:text-blue-300" href={`/distrito?id=${encodeURIComponent(d.nome)}`}>{d.nome} ↗</a></td>
+                    <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-black">
+                      <button className="cursor-pointer text-blue-400 no-underline transition hover:text-blue-300 focus:outline-none focus:ring-4 focus:ring-blue-500/10" onClick={() => setSelectedDistrictName(d.nome)} type="button">{d.nome} ↗</button>
+                    </td>
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-bold tabular-nums">{formatNumber(d.total)}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-bold tabular-nums">{formatNumber(d.telefone)}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-black tabular-nums text-orange-500">{formatNumber(d.hot)}</td>
@@ -454,7 +706,7 @@ export default function DashboardClient({ payload }) {
           Escola Bíblica Novo Tempo | Prioridade via ML ({formatNumber(meta.mlRecords)} rankings do notebook)
         </footer>
       </main>
+      <DistrictDrawer district={selectedDistrict} onClose={() => setSelectedDistrictName(null)} />
     </div>
   );
 }
-
