@@ -523,7 +523,7 @@ export default function DashboardClient({ payload }) {
 
       <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-white/[0.06] bg-slate-950/80 px-8 py-4 backdrop-blur-2xl max-md:flex-col max-md:items-start max-md:px-4">
         <div className="flex items-center gap-4">
-          <img src="/logo.png" alt="SEVENFLOW Logo" className="h-11 w-11 rounded-xl object-cover ring-1 ring-cyan-300/20" />
+          <img src="novo-tempo.jpg" alt="Novo Tempo" className="h-11 w-11 rounded-xl object-cover ring-1 ring-cyan-300/20" />
           <div>
             <h1 className="text-xl font-black tracking-normal text-slate-50">Escola Bíblica Novo Tempo</h1>
             <p className="text-sm text-slate-400">Associação Paulistana - Visão Geral</p>
