@@ -351,7 +351,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
 
   return (
     <aside className={`sidebar-shell sticky top-4 z-40 flex h-[calc(100vh-2rem)] shrink-0 flex-col rounded-[1.75rem] border p-4 text-slate-100 backdrop-blur-2xl transition-all duration-300 max-lg:relative max-lg:top-0 max-lg:h-auto max-lg:w-full ${compact ? 'w-24' : 'w-72'}`}>
-      <div className={`sidebar-brand mb-6 flex items-center gap-3 rounded-2xl border p-3 ${compact ? 'justify-center' : ''}`}>
+      <div className={`sidebar-brand mb-8 flex items-center gap-3 ${compact ? 'justify-center' : ''}`}>
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl overflow-hidden shadow-[0_16px_36px_rgba(226,232,240,0.12)]">
           <img src="/novo-tempo.jpg" alt="Logo Novo Tempo" className="h-full w-full object-cover" />
         </div>
@@ -938,7 +938,7 @@ function AppShell({ children, current, onNavigate, onLogout, theme, onToggleThem
                 <Bell size={18} />
               </button>
               <span className="hidden rounded-full border border-white/[0.08] bg-white/[0.035] px-4 py-2 text-sm font-bold text-slate-400 md:inline-flex">
-                {user?.name || 'Admin'} · Admin geral
+                {user?.name || 'Admin'}
               </span>
             </div>
           </div>
