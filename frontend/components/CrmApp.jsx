@@ -223,6 +223,13 @@ function LoginScreen({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [splashState, setSplashState] = useState('visible');
+
+  useEffect(() => {
+    const timer1 = setTimeout(() => setSplashState('fading'), 1500);
+    const timer2 = setTimeout(() => setSplashState('hidden'), 2200);
+    return () => { clearTimeout(timer1); clearTimeout(timer2); };
+  }, []);
 
   async function submitLogin(event) {
     event.preventDefault();
@@ -274,7 +281,14 @@ function LoginScreen({ onLogin }) {
           </div>
         </div>
       ) : null}
-      <section className="relative grid w-full max-w-6xl grid-cols-[1.1fr_0.9fr] gap-5 max-lg:grid-cols-1">
+      
+      {splashState !== 'hidden' ? (
+        <div className={`!fixed inset-0 z-[100] flex items-center justify-center bg-slate-50 transition-opacity duration-700 ease-in-out ${splashState === 'fading' ? 'opacity-0' : 'opacity-100'}`}>
+          <img src="/logo.png" alt="Logo Novo Tempo" className="h-64 object-contain splash-logo-anim" />
+        </div>
+      ) : null}
+
+      <section className={`relative grid w-full max-w-6xl grid-cols-[1.1fr_0.9fr] gap-5 max-lg:grid-cols-1 ${splashState === 'visible' ? 'opacity-0' : 'stagger-in'}`}>
         <div className={`${panelClass} flex min-h-[34rem] flex-col justify-between p-8 max-sm:p-5`}>
           <div>
 
@@ -305,7 +319,7 @@ function LoginScreen({ onLogin }) {
 
         <form className={`${panelClass} grid content-center gap-5 p-8 max-sm:p-5`} onSubmit={submitLogin}>
           <div>
-            <h2 className="mt-2 text-2xl font-black text-slate-50 text-center">Acesso ao Leads NT</h2>
+            <h2 className="mt-2 text-2xl font-black text-slate-50 text-center">Acesso aos Leads NT</h2>
           </div>
           <label className="grid gap-2 text-sm font-bold text-slate-300 text-center">
             Email
