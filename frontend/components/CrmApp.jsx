@@ -541,7 +541,7 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
                 <XAxis dataKey="etapa" stroke="#94a3b8" tickLine={false} />
                 <YAxis stroke="#94a3b8" tickFormatter={formatNumber} tickLine={false} width={70} />
-                <Tooltip cursor={{ stroke: '#2563eb', strokeWidth: 2, strokeDasharray: '4 4' }} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
+                <Tooltip cursor={{ stroke: '#2563eb', strokeWidth: 2, strokeDasharray: '4 4' }} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} itemStyle={{ color: '#fff' }} formatter={(value) => formatNumber(value)} />
                 <Area dataKey="leads" fill="url(#silverLeadGradient)" stroke="#e2e8f0" strokeWidth={3} type="monotone" />
               </AreaChart>
             </ResponsiveContainer>
@@ -606,7 +606,7 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
                   <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
                   <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} />
                   <YAxis hide />
-                  <Tooltip cursor={false} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
+                  <Tooltip cursor={false} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} itemStyle={{ color: '#fff' }} formatter={(value) => formatNumber(value)} />
                   <Bar dataKey="leads" fill="#1d4ed8" radius={[8, 8, 0, 0]} />
                   <Bar dataKey="quentes" fill="#06b6d4" radius={[8, 8, 0, 0]} />
                 </BarChart>
@@ -665,7 +665,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
                 <XAxis dataKey="etapa" stroke="#94a3b8" tickLine={false} />
                 <YAxis stroke="#94a3b8" tickFormatter={formatNumber} tickLine={false} width={70} />
-                <Tooltip cursor={{ stroke: '#2563eb', strokeWidth: 2, strokeDasharray: '4 4' }} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
+                <Tooltip cursor={{ stroke: '#2563eb', strokeWidth: 2, strokeDasharray: '4 4' }} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} itemStyle={{ color: '#fff' }} formatter={(value) => formatNumber(value)} />
                 <Area dataKey="leads" fill="url(#associationLeadGradient)" stroke="#93c5fd" strokeWidth={3} type="monotone" />
               </AreaChart>
             </ResponsiveContainer>
@@ -722,7 +722,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tickLine={false} type="category" width={115} />
-                <Tooltip cursor={false} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
+                <Tooltip cursor={false} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} itemStyle={{ color: '#fff' }} formatter={(value) => formatNumber(value)} />
                 <Bar className="transition duration-300 hover:brightness-125" dataKey="interessados" fill="#cbd5e1" radius={[0, 10, 10, 0]} />
               </BarChart>
             </ResponsiveContainer>
