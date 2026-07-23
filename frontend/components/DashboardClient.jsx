@@ -1,6 +1,7 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowUp } from 'lucide-react';
 
 const priorityLabels = {
   Hot: 'Quente',
@@ -18,7 +19,7 @@ const priorityColors = {
 
 const cardClass = 'interactive-card group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-900/78 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.24)] ring-1 ring-white/[0.025] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-white/[0.12] hover:bg-slate-900/90 hover:shadow-[0_26px_80px_rgba(0,0,0,0.36)]';
 const labelClass = 'text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500';
-const selectClass = 'h-10 w-full cursor-pointer rounded-lg border border-white/[0.06] bg-slate-950/80 px-3 text-sm font-semibold text-slate-100 outline-none transition hover:border-blue-400/50 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 md:w-auto md:min-w-40';
+const selectClass = 'h-10 w-full cursor-pointer rounded-lg border border-white/[0.06] bg-slate-950/80 px-3 text-sm font-semibold text-slate-100 outline-none transition hover:border-blue-400/50 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10';
 const activeSelectClass = 'border-blue-400/45 bg-blue-500/[0.08] text-blue-100 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]';
 
 function formatNumber(value) {
@@ -48,7 +49,7 @@ function csvCell(value) {
 
 function FilterSelect({ label, value, onChange, children, active }) {
   return (
-    <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+    <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 flex-1 min-w-[140px]">
       {label}
       <select className={`${selectClass} ${active ? activeSelectClass : ''}`} value={value} onChange={(event) => onChange(event.target.value)}>
         {children}
@@ -76,14 +77,14 @@ function MetricTooltip({ title, color, rows }) {
   return (
     <div className="pointer-events-none relative z-50 w-64 rounded-xl border border-white/[0.08] bg-slate-950/95 p-4 text-left shadow-[0_18px_60px_rgba(0,0,0,0.45)] ring-1 ring-white/[0.04] backdrop-blur-xl">
       <div className="mb-3 flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
-        <strong className="truncate text-sm font-black text-slate-100">{title}</strong>
+        <div className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
+        <div className="truncate text-sm font-black text-white">{title}</div>
       </div>
       <div className="grid gap-2">
         {rows.map((row) => (
           <div className="flex items-center justify-between gap-4 text-xs" key={row.label}>
-            <span className="text-slate-500">{row.label}</span>
-            <span className="font-black tabular-nums text-slate-100">{row.value}</span>
+            <div className="text-white">{row.label}</div>
+            <div className="font-black tabular-nums text-white">{row.value}</div>
           </div>
         ))}
       </div>
@@ -131,17 +132,15 @@ function BarChart({ data, horizontal = false, color = 'hsl(217, 91%, 60%)' }) {
           <MetricTooltip title={activeItem.label} color={activeItem.color || color} rows={activeItem.tooltipRows} />
         </div>
       ) : null}
-      <div className="grid min-h-72 grid-flow-col items-end gap-3 overflow-visible">
+      <div className="grid min-h-72 grid-flow-col items-end gap-3 overflow-visible" onMouseLeave={() => setActiveBar(null)}>
       {data.map((item, index) => (
-          <div className="relative grid h-72 min-w-0 grid-rows-[1fr_auto] gap-3" key={`${item.label}-${index}`}>
+          <div className="relative grid h-72 min-w-0 grid-rows-[1fr_auto] gap-3" key={`${item.label}-${index}`} onMouseEnter={() => setActiveBar(index)}>
             <div className="relative flex items-end rounded-b-lg border-b border-white/15 bg-[linear-gradient(to_top,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:100%_52px]">
               <div
                 className="group/bar relative z-10 w-full cursor-pointer rounded-lg shadow-[0_0_28px_rgba(59,130,246,0.20)] transition-all duration-500 hover:z-20 hover:brightness-110 focus:z-20 focus:brightness-110"
                 style={{ height: `${Math.max(2, (item.value / max) * 100)}%`, background: item.color || color }}
                 onBlur={() => setActiveBar(null)}
                 onFocus={() => setActiveBar(index)}
-                onMouseEnter={() => setActiveBar(index)}
-                onMouseLeave={() => setActiveBar(null)}
                 tabIndex={0}
               >
                 <strong className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-black text-slate-400 transition group-hover/bar:text-slate-100">
@@ -199,31 +198,31 @@ function DonutChart({ values }) {
             />
           ))}
         </svg>
-        <div className="absolute inset-0 m-auto grid aspect-square w-[58%] place-items-center rounded-full bg-slate-900 text-center ring-1 ring-white/[0.06]">
-          <span className="text-base text-slate-500">{active ? active.label : 'Total'}</span>
-          <strong className="text-3xl font-black text-slate-50">{formatNumber(active ? active.value : total)}</strong>
+        <div className="absolute inset-0 m-auto grid aspect-square w-[58%] place-items-center rounded-full bg-slate-200 text-center ring-1 ring-slate-900/10 shadow-inner">
+          <span className="text-base font-bold text-slate-600">{active ? active.label : 'Total'}</span>
+          <strong className="text-3xl font-black text-slate-900">{formatNumber(active ? active.value : total)}</strong>
         </div>
       </div>
       <div className="min-h-[5.5rem] w-full max-w-md rounded-xl border border-white/[0.06] bg-slate-950/55 p-3 text-sm ring-1 ring-white/[0.03]">
         {active ? (
           <div>
             <div className="mb-2 flex items-center justify-between gap-4">
-              <span className="flex items-center gap-2 font-black text-slate-100">
+              <div className="flex items-center gap-2 font-black text-white">
                 <i className="h-2.5 w-2.5 rounded-full" style={{ background: active.color }} />
                 {active.label}
-              </span>
-              <span className="font-black tabular-nums text-slate-100">{pct(active.value, total)}%</span>
+              </div>
+              <div className="font-black tabular-nums text-white">{pct(active.value, total)}%</div>
             </div>
-            <p className="text-xs leading-relaxed text-slate-400">{active.description}</p>
+            <div className="text-xs leading-relaxed text-slate-300">{active.description}</div>
           </div>
         ) : (
-          <p className="text-xs leading-relaxed text-slate-500">Passe o mouse sobre uma fatia ou item da legenda para ver quantidade, percentual e descrição da prioridade.</p>
+          <div className="text-xs font-bold leading-relaxed text-white">Passe o mouse sobre uma fatia ou item da legenda para ver quantidade, percentual e descrição da prioridade.</div>
         )}
       </div>
       <div className="flex flex-wrap justify-center gap-4 text-sm text-slate-400">
         {values.map((item, index) => (
-          <span
-            className="group/legend relative inline-flex cursor-pointer items-center gap-2 rounded-full px-1 py-0.5 transition hover:text-slate-100 focus:text-slate-100"
+          <div
+            className="group/legend relative inline-flex cursor-pointer items-center gap-2 rounded-full px-1 py-0.5 transition hover:text-slate-100 focus:text-slate-100 outline-none"
             key={item.label}
             onBlur={() => setActiveIndex(null)}
             onFocus={() => setActiveIndex(index)}
@@ -233,22 +232,22 @@ function DonutChart({ values }) {
           >
             <i className="h-3 w-3 rounded-full ring-2 ring-white/40" style={{ background: item.color }} />
             {item.label}
-            <span className="pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-50 hidden w-56 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-slate-950/95 p-3 text-left shadow-[0_18px_60px_rgba(0,0,0,0.45)] ring-1 ring-white/[0.04] backdrop-blur-xl group-hover/legend:block group-focus/legend:block">
-              <span className="mb-2 flex items-center gap-2 text-sm font-black text-slate-100">
+            <div className="pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-50 hidden w-56 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-slate-950/95 p-3 text-left shadow-[0_18px_60px_rgba(0,0,0,0.45)] ring-1 ring-white/[0.04] backdrop-blur-xl group-hover/legend:block group-focus/legend:block">
+              <div className="mb-2 flex items-center gap-2 text-sm font-black text-white">
                 <i className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />
                 {item.label}
-              </span>
-              <span className="flex justify-between text-xs text-slate-500">
-                <span>Contatos</span>
-                <strong className="text-slate-100">{formatNumber(item.value)}</strong>
-              </span>
-              <span className="mt-1 flex justify-between text-xs text-slate-500">
-                <span>Participação</span>
-                <strong className="text-slate-100">{pct(item.value, total)}%</strong>
-              </span>
-              <span className="mt-2 block text-xs leading-relaxed text-slate-400">{item.description}</span>
-            </span>
-          </span>
+              </div>
+              <div className="flex justify-between text-xs text-white/80">
+                <div>Contatos</div>
+                <div className="font-bold text-white">{formatNumber(item.value)}</div>
+              </div>
+              <div className="mt-1 flex justify-between text-xs text-white/80">
+                <div>Participação</div>
+                <div className="font-bold text-white">{pct(item.value, total)}%</div>
+              </div>
+              <div className="mt-2 block text-xs leading-relaxed text-white/60">{item.description}</div>
+            </div>
+          </div>
         ))}
       </div>
     </div>
@@ -433,6 +432,7 @@ export default function DashboardClient({ payload, onBack }) {
   const [sort, setSort] = useState({ col: 'total', asc: false });
   const [pointer, setPointer] = useState({ x: 50, y: 20 });
   const [selectedDistrictName, setSelectedDistrictName] = useState(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const data = useMemo(() => aggregate(records, filters), [records, filters]);
   const sortedDistricts = useMemo(() => {
@@ -459,6 +459,10 @@ export default function DashboardClient({ payload, onBack }) {
       document.body.scrollTop = 0;
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     });
+
+    const handleScroll = () => setShowScrollTop(window.scrollY > 300);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const activeFilters = useMemo(() => (
@@ -559,7 +563,7 @@ export default function DashboardClient({ payload, onBack }) {
 
       <main className="mx-auto w-full max-w-[1440px] px-8 py-6 max-md:px-4">
         <section className="sticky top-[77px] z-10 mb-6 rounded-2xl border border-white/[0.06] bg-slate-950/82 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-2xl max-md:static">
-          <div className="flex flex-wrap items-end gap-5">
+          <div className="flex flex-wrap items-end gap-5 w-full">
             <FilterSelect label="Distrito" value={filters.distrito} onChange={(value) => setFilter('distrito', value)} active={filters.distrito !== 'all'}>
               <option value="all">Todos os Distritos</option>
               {districts.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -591,10 +595,18 @@ export default function DashboardClient({ payload, onBack }) {
             <div className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
               Ações
               <div className="flex gap-2">
-                <button className="h-10 cursor-pointer rounded-lg border border-blue-400/15 px-4 text-sm font-bold text-blue-400 transition hover:border-blue-400/60 hover:bg-blue-500/10 hover:text-blue-300 focus:outline-none focus:ring-4 focus:ring-blue-500/10" onClick={resetFilters} type="button">Limpar</button>
-                <button className="h-10 cursor-pointer rounded-lg border border-emerald-400/15 px-4 text-sm font-bold text-emerald-300 transition hover:border-emerald-400/60 hover:bg-emerald-500/10 hover:text-emerald-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/10" onClick={exportCsv} type="button">Exportar</button>
+                <button className="h-10 cursor-pointer rounded-lg bg-blue-500 px-5 text-sm font-bold text-white shadow-[0_4px_14px_0_rgba(59,130,246,0.39)] transition hover:bg-blue-600 hover:shadow-[0_6px_20px_rgba(59,130,246,0.23)] focus:outline-none focus:ring-4 focus:ring-blue-500/30" onClick={resetFilters} type="button">Limpar</button>
+                <button className="h-10 cursor-pointer rounded-lg bg-emerald-500 px-5 text-sm font-bold text-white shadow-[0_4px_14px_0_rgba(16,185,129,0.39)] transition hover:bg-emerald-600 hover:shadow-[0_6px_20px_rgba(16,185,129,0.23)] focus:outline-none focus:ring-4 focus:ring-emerald-500/30" onClick={exportCsv} type="button">Exportar</button>
               </div>
             </div>
+            
+            {onBack && (
+              <div className="ml-auto mb-1 max-md:ml-0 max-md:w-full">
+                <button className="interactive-card flex h-11 w-full items-center justify-center gap-2 cursor-pointer rounded-xl border border-white/[0.08] bg-slate-800/80 px-6 text-sm font-black text-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:bg-slate-700/80 hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] focus:outline-none focus:ring-4 focus:ring-slate-500/20" onClick={onBack} type="button">
+                  <span className="text-lg">←</span> Voltar
+                </button>
+              </div>
+            )}
           </div>
           {activeFilters.length ? (
             <div className="mt-4 flex flex-wrap gap-2">
@@ -627,7 +639,7 @@ export default function DashboardClient({ payload, onBack }) {
               <h2 className="text-base font-black text-slate-100">Prioridades de Ação</h2>
               <p className="mt-1 text-sm text-slate-500">Atalhos gerados a partir dos dados filtrados e da priorização operacional.</p>
             </div>
-            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-300">ML aplicado</span>
+            <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">ML aplicado</span>
           </div>
           <div className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
             {actionInsights.map((item) => (
@@ -644,7 +656,7 @@ export default function DashboardClient({ payload, onBack }) {
         </section>
 
         <section className="mb-6 grid grid-cols-[1.6fr_1fr] gap-4 max-xl:grid-cols-1">
-          <article className={`${cardClass} min-w-0`}>
+          <article className={`${cardClass} min-w-0 hover:z-50 focus-within:z-50`}>
             <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Top 15 Distritos por Volume (Filtrado)</h2><span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-400">Ranking</span></div>
             <BarChart data={data.districtList.slice(0, 15).map((d) => ({
               label: d.nome,
@@ -729,6 +741,17 @@ export default function DashboardClient({ payload, onBack }) {
         </footer>
       </main>
       <DistrictDrawer district={selectedDistrict} onClose={() => setSelectedDistrictName(null)} />
+      {showScrollTop && (
+        <button
+          className="fixed bottom-8 right-8 z-[999] grid h-12 w-12 place-items-center rounded-full bg-blue-600 text-white shadow-[0_10px_30px_rgba(37,99,235,0.4)] transition duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-blue-500"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="Subir ao topo"
+          title="Subir ao topo"
+          type="button"
+        >
+          <ArrowUp size={24} strokeWidth={3} />
+        </button>
+      )}
     </div>
   );
 }

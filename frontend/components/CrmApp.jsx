@@ -947,9 +947,59 @@ function AppShell({ children, current, onNavigate, onLogout, theme, onToggleThem
                 <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-blue-600 ring-2 ring-white" />
                 <Bell size={18} />
               </button>
-              <span className="hidden rounded-full border border-white/[0.08] bg-white/[0.035] px-4 py-2 text-sm font-bold text-slate-400 md:inline-flex">
-                {user?.name || 'Admin'}
-              </span>
+              <div className="group relative hidden md:block">
+                <button
+                  className="interactive-card inline-flex h-10 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/70 px-4 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
+                  type="button"
+                >
+                  <span className="grid h-6 w-6 place-items-center rounded bg-slate-900/10 text-slate-800">
+                    <UsersRound size={14} />
+                  </span>
+                  {user?.name || 'Admin'}
+                </button>
+                <div className="absolute right-0 top-full z-50 invisible pt-3 opacity-0 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                  <div className="w-[260px] rounded-2xl border border-slate-200/80 bg-white/90 p-2 shadow-[0_30px_60px_-15px_rgba(15,23,42,0.15)] ring-1 ring-slate-900/5 backdrop-blur-2xl">
+                    <div className="px-3 pb-2 pt-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Configurações</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
+                        <Crown size={16} className="text-slate-400 transition-colors group-hover/item:text-blue-500" />
+                        Perfil do sistema
+                      </button>
+                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
+                        <ShieldCheck size={16} className="text-slate-400 transition-colors group-hover/item:text-emerald-500" />
+                        Permissões e acessos
+                      </button>
+                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
+                        <MessageCircle size={16} className="text-slate-400 transition-colors group-hover/item:text-green-500" />
+                        Integração WhatsApp
+                      </button>
+                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
+                        <Gauge size={16} className="text-slate-400 transition-colors group-hover/item:text-violet-500" />
+                        Banco de dados
+                      </button>
+                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
+                        <Bell size={16} className="text-slate-400 transition-colors group-hover/item:text-amber-500" />
+                        Notificações
+                      </button>
+                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => { onNavigate('settings'); onToggleTheme(); }} type="button">
+                        <Sparkles size={16} className="text-slate-400 transition-colors group-hover/item:text-indigo-500" />
+                        Aparência
+                      </button>
+                    </div>
+                    <div className="my-1.5 h-px bg-slate-200/80" />
+                    <button
+                      className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                      onClick={onLogout}
+                      type="button"
+                    >
+                      <LogOut size={16} className="text-red-400 transition-colors group-hover/item:text-red-600" />
+                      Sair da conta
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </header>
