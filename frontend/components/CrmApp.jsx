@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Area,
   AreaChart,
@@ -33,6 +34,7 @@ import {
   Radio,
   Search,
   Send,
+  Settings,
   ShieldCheck,
   Sparkles,
   Sun,
@@ -48,7 +50,15 @@ const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap
 const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slate-950/60 shadow-[0_28px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.035] backdrop-blur-2xl';
 
 function AppToaster({ theme = 'light' }) {
-  return (
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <Toaster
       closeButton
       expand
@@ -67,7 +77,8 @@ function AppToaster({ theme = 'light' }) {
           closeButton: 'leads-toast-close'
         }
       }}
-    />
+    />,
+    document.body
   );
 }
 
@@ -267,6 +278,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
     ['automations', 'WhatsApp', MessageCircle],
     ['reports', 'Relatórios', Gauge]
   ];
+  items.push(['settings', 'Configurações', Settings]);
 
   return (
     <aside className={`sidebar-shell sticky top-4 z-40 flex h-[calc(100vh-2rem)] shrink-0 flex-col rounded-[1.75rem] border p-4 text-slate-100 backdrop-blur-2xl transition-all duration-300 max-lg:relative max-lg:top-0 max-lg:h-auto max-lg:w-full ${compact ? 'w-24' : 'w-72'}`}>
@@ -438,7 +450,7 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
               </button>
             </div>
           </div>
-          <div className="min-h-72 rounded-2xl border border-white/[0.07] bg-slate-950/50 p-4 transition duration-300 hover:border-slate-200/25">
+          <div className="interactive-card min-h-72 rounded-2xl border border-white/[0.07] bg-slate-950/50 p-4 transition duration-300 hover:border-slate-200/25">
             <ResponsiveContainer height="100%" width="100%">
               <AreaChart data={data.campaignTrend}>
                 <defs>
@@ -502,12 +514,12 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
 
         <aside className="grid gap-4">
           <AddAssociationForm onAdd={onAddAssociation} />
-          <div className={`${panelClass} p-5`}>
+          <div className={`${panelClass} interactive-card p-5`}>
             <span className={labelClass}>Governança</span>
             <h3 className="mt-2 text-xl font-black text-slate-50">Acesso por nível</h3>
             <p className="mt-2 text-sm leading-relaxed text-slate-500">Admin geral vê todas as associações. Gestores e voluntários entram apenas nos territórios e leads permitidos.</p>
           </div>
-          <div className={`${panelClass} p-5`}>
+          <div className={`${panelClass} interactive-card p-5`}>
             <span className={labelClass}>Comparativo</span>
             <div className="mt-4 h-60">
               <ResponsiveContainer height="100%" width="100%">
@@ -562,7 +574,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
               </button>
             </div>
           </div>
-          <div className="min-h-64 rounded-2xl border border-white/[0.07] bg-slate-950/50 p-4 transition duration-300 hover:border-slate-200/25">
+          <div className="interactive-card min-h-64 rounded-2xl border border-white/[0.07] bg-slate-950/50 p-4 transition duration-300 hover:border-slate-200/25">
             <ResponsiveContainer height="100%" width="100%">
               <AreaChart data={data.campaignTrend}>
                 <defs>
@@ -676,6 +688,124 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
             </div>
           ))}
         </div>
+      </section>
+    </div>
+  );
+}
+
+function SettingsView({ theme, onToggleTheme }) {
+  const settings = [
+    {
+      title: 'Perfil do sistema',
+      description: 'Nome Leads NT, identidade visual, domínio e dados institucionais.',
+      status: 'Configurado',
+      icon: Crown
+    },
+    {
+      title: 'Permissões e acessos',
+      description: 'Perfis de admin geral, gestor de associação, coordenador e voluntário.',
+      status: 'Prioritário',
+      icon: ShieldCheck
+    },
+    {
+      title: 'Integração WhatsApp',
+      description: 'Fornecedor oficial, templates, opt-out e controle de disparos.',
+      status: 'Pendente',
+      icon: MessageCircle
+    },
+    {
+      title: 'Banco de dados',
+      description: 'PostgreSQL, Prisma, auditoria e política de retenção dos interessados.',
+      status: 'Base criada',
+      icon: Gauge
+    },
+    {
+      title: 'Notificações',
+      description: 'Alertas para leads sem resposta, visitas pendentes e automações.',
+      status: 'Ativo',
+      icon: Bell
+    },
+    {
+      title: 'Aparência',
+      description: 'Modo light prateado como padrão e dark como alternativa.',
+      status: theme === 'light' ? 'Light ativo' : 'Dark ativo',
+      icon: Sparkles
+    }
+  ];
+
+  return (
+    <div className="grid gap-6">
+      <section className={`${panelClass} overflow-hidden p-6`}>
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <span className={labelClass}>Administração</span>
+            <h1 className="silver-title mt-2 text-5xl font-black leading-tight tracking-normal max-md:text-4xl">Configurações</h1>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
+              Centralize os ajustes críticos do Leads NT em um painel organizado, com foco em segurança, operação e consistência visual.
+            </p>
+          </div>
+          <button
+            className={primaryButtonClass}
+            onClick={() => {
+              onToggleTheme();
+              toast.message(theme === 'light' ? 'Modo dark ativado' : 'Modo light prateado ativado');
+            }}
+            type="button"
+          >
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            Alternar tema
+          </button>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-3 gap-4 max-xl:grid-cols-2 max-md:grid-cols-1">
+        {settings.map(({ title, description, status, icon: Icon }) => (
+          <article className={`${panelClass} interactive-card settings-card p-5`} key={title}>
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <span className="settings-icon grid h-12 w-12 place-items-center rounded-xl border">
+                <Icon size={22} />
+              </span>
+              <span className="settings-status rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide">{status}</span>
+            </div>
+            <h2 className="text-xl font-black text-slate-50">{title}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">{description}</p>
+            <button
+              className={`${ghostButtonClass} mt-5 h-10`}
+              onClick={() => toast.info(title, { description: 'Configuração detalhada será conectada ao backend nas próximas etapas.' })}
+              type="button"
+            >
+              Abrir ajuste
+              <ArrowRight size={16} />
+            </button>
+          </article>
+        ))}
+      </section>
+
+      <section className="grid grid-cols-[1fr_1fr] gap-4 max-lg:grid-cols-1">
+        <article className={`${panelClass} p-6`}>
+          <span className={labelClass}>Checklist técnico</span>
+          <div className="mt-5 grid gap-3">
+            {['Configurar DATABASE_URL de produção', 'Gerar AUTH_SECRET definitivo', 'Criar migrações iniciais no Prisma', 'Definir provedor oficial de WhatsApp'].map((item) => (
+              <div className="settings-row flex items-center gap-3 rounded-xl border p-3" key={item}>
+                <CheckCircle2 size={18} />
+                <span className="text-sm font-bold text-slate-600">{item}</span>
+              </div>
+            ))}
+          </div>
+        </article>
+        <article className={`${panelClass} p-6`}>
+          <span className={labelClass}>Preferências visuais</span>
+          <div className="mt-5 grid gap-3">
+            <button className={`${theme === 'light' ? primaryButtonClass : ghostButtonClass} justify-start`} onClick={() => theme !== 'light' && onToggleTheme()} type="button">
+              <Sun size={18} />
+              Light prateado
+            </button>
+            <button className={`${theme === 'dark' ? primaryButtonClass : ghostButtonClass} justify-start`} onClick={() => theme !== 'dark' && onToggleTheme()} type="button">
+              <Moon size={18} />
+              Dark premium
+            </button>
+          </div>
+        </article>
       </section>
     </div>
   );
@@ -795,6 +925,8 @@ export default function CrmApp({ payload }) {
     content = <AssociationDashboard association={selectedAssociation} data={data} onOpenDetails={() => setView('details')} />;
   } else if (view === 'automations') {
     content = <PlaceholderView icon={MessageCircle} subtitle="A próxima camada terá sequências, templates aprovados e gatilhos de envio por etapa do funil." title="Central WhatsApp" />;
+  } else if (view === 'settings') {
+    content = <SettingsView onToggleTheme={() => setTheme((current) => current === 'light' ? 'dark' : 'light')} theme={theme} />;
   } else {
     content = <PlaceholderView icon={Gauge} subtitle="Relatórios executivos por associação, campanha, distrito, voluntário, visita e resposta do WhatsApp." title="Relatórios Leads NT" />;
   }

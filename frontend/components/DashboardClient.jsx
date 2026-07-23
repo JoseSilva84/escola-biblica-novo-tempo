@@ -16,7 +16,7 @@ const priorityColors = {
   Cold: 'hsl(220, 15%, 45%)'
 };
 
-const cardClass = 'group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-900/78 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.24)] ring-1 ring-white/[0.025] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-white/[0.12] hover:bg-slate-900/90 hover:shadow-[0_26px_80px_rgba(0,0,0,0.36)]';
+const cardClass = 'interactive-card group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-900/78 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.24)] ring-1 ring-white/[0.025] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-white/[0.12] hover:bg-slate-900/90 hover:shadow-[0_26px_80px_rgba(0,0,0,0.36)]';
 const labelClass = 'text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500';
 const selectClass = 'h-10 w-full cursor-pointer rounded-lg border border-white/[0.06] bg-slate-950/80 px-3 text-sm font-semibold text-slate-100 outline-none transition hover:border-blue-400/50 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 md:w-auto md:min-w-40';
 const activeSelectClass = 'border-blue-400/45 bg-blue-500/[0.08] text-blue-100 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]';

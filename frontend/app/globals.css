@@ -121,9 +121,27 @@
     opacity: 0.82;
   }
 
+  .premium-panel::after {
+    content: "";
+    position: absolute;
+    inset: -45% auto -45% -80%;
+    width: 54%;
+    transform: rotate(18deg);
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.36), rgba(255,255,255,0.14), transparent);
+    opacity: 0;
+    transition: left 680ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms;
+    z-index: 1;
+  }
+
   .premium-panel > * {
     position: relative;
-    z-index: 1;
+    z-index: 2;
+  }
+
+  .premium-panel:hover::after {
+    left: 128%;
+    opacity: 1;
   }
 
   .interactive-card {
@@ -138,7 +156,7 @@
     inset: -40% auto -40% -75%;
     width: 56%;
     transform: rotate(18deg);
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.34), rgba(255,255,255,0.14), transparent);
     opacity: 0;
     transition: left 520ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms;
   }
@@ -153,6 +171,29 @@
   .interactive-card:hover::after {
     left: 124%;
     opacity: 1;
+  }
+
+  .settings-card {
+    min-height: 16rem;
+  }
+
+  .settings-icon {
+    border-color: rgba(30, 58, 138, 0.16) !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(219,234,254,0.72)) !important;
+    color: rgb(30 64 175) !important;
+    box-shadow: 0 14px 38px rgba(37,99,235,0.10), inset 0 1px 0 rgba(255,255,255,0.88);
+  }
+
+  .settings-status {
+    background: rgba(37, 99, 235, 0.10);
+    color: rgb(30 64 175);
+    border: 1px solid rgba(37, 99, 235, 0.14);
+  }
+
+  .settings-row {
+    border-color: rgba(71,85,105,0.12) !important;
+    background: rgba(255,255,255,0.52);
+    color: rgb(30 64 175);
   }
 
   .sidebar-shell {
@@ -224,8 +265,8 @@
 
   .app-light .premium-panel {
     border-color: rgba(71, 85, 105, 0.16) !important;
-    background: rgba(255, 255, 255, 0.58) !important;
-    box-shadow: 0 26px 80px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255,255,255,0.72) !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(241,245,249,0.58)) !important;
+    box-shadow: 0 28px 90px rgba(15, 23, 42, 0.13), inset 0 1px 0 rgba(255,255,255,0.78) !important;
   }
 
   .app-light aside,
@@ -252,7 +293,11 @@
   .app-light .text-slate-300,
   .app-light .text-slate-400,
   .app-light .text-slate-500 {
-    color: rgb(71 85 105) !important;
+    color: rgb(51 65 85) !important;
+  }
+
+  .app-light .text-slate-600 {
+    color: rgb(51 65 85) !important;
   }
 
   .app-light .bg-slate-950\/50,
@@ -279,7 +324,19 @@
     color: rgb(241 245 249);
     background:
       linear-gradient(120deg, rgba(226, 232, 240, 0.11), transparent 28%),
+      radial-gradient(circle at 84% 8%, rgba(59,130,246,0.12), transparent 28%),
       linear-gradient(145deg, #05070b 0%, #0b111d 38%, #061316 68%, #05070b 100%);
+  }
+
+  .app-dark .premium-panel {
+    border-color: rgba(226,232,240,0.10) !important;
+    background: linear-gradient(135deg, rgba(15,23,42,0.82), rgba(2,6,23,0.64)) !important;
+    box-shadow: 0 30px 96px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  }
+
+  .app-dark .premium-panel::after,
+  .app-dark .interactive-card::after {
+    background: linear-gradient(90deg, transparent, rgba(147,197,253,0.18), rgba(255,255,255,0.12), transparent);
   }
 
   .app-dark::before {
@@ -319,6 +376,34 @@
     color: white !important;
   }
 
+  .app-dark .interactive-card:hover {
+    border-color: rgba(226,232,240,0.18);
+    background-color: rgba(15,23,42,0.86);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.42), 0 0 0 1px rgba(226,232,240,0.04);
+  }
+
+  .app-dark .settings-icon {
+    border-color: rgba(147,197,253,0.18) !important;
+    background: linear-gradient(135deg, rgba(30,64,175,0.22), rgba(15,23,42,0.78)) !important;
+    color: rgb(147 197 253) !important;
+  }
+
+  .app-dark .settings-status {
+    background: rgba(59,130,246,0.12);
+    color: rgb(191 219 254);
+    border-color: rgba(147,197,253,0.16);
+  }
+
+  .app-dark .settings-row {
+    border-color: rgba(226,232,240,0.08) !important;
+    background: rgba(15,23,42,0.58);
+    color: rgb(147 197 253);
+  }
+
+  .app-dark .settings-row span {
+    color: rgb(203 213 225) !important;
+  }
+
   .app-dark .silver-title {
     background: linear-gradient(100deg, #ffffff 0%, #cbd5e1 32%, #94a3b8 50%, #f8fafc 68%, #93c5fd 100%);
     -webkit-background-clip: text;
@@ -337,12 +422,19 @@
   [data-sonner-toaster],
   [data-sonner-toaster][data-y-position],
   [data-sonner-toast] {
-    position: fixed !important;
     z-index: 2147483647 !important;
+  }
+
+  [data-sonner-toaster] {
+    position: fixed !important;
+    isolation: isolate !important;
+    pointer-events: none;
   }
 
   [data-sonner-toast] {
     position: absolute !important;
+    pointer-events: auto;
+    z-index: 2147483647 !important;
   }
 
   .leads-toast-title {
