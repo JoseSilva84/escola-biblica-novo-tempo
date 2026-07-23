@@ -27,6 +27,8 @@ import {
   LogOut,
   MessageCircle,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Radio,
   Search,
@@ -255,7 +257,7 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-function Sidebar({ current, onNavigate, onLogout, user }) {
+function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user }) {
   const items = [
     ['admin', 'Dashboard', LayoutDashboard],
     ['associations', 'Associações', Building2],
@@ -264,44 +266,50 @@ function Sidebar({ current, onNavigate, onLogout, user }) {
   ];
 
   return (
-    <aside className="sticky top-0 z-40 flex h-screen w-72 shrink-0 flex-col border-r border-white/[0.08] bg-slate-950/70 p-4 text-slate-100 shadow-[22px_0_80px_rgba(0,0,0,0.30)] backdrop-blur-2xl max-lg:relative max-lg:h-auto max-lg:w-full max-lg:border-r-0 max-lg:border-b">
-      <div className="mb-8 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3">
+    <aside className={`sidebar-shell sticky top-4 z-40 flex h-[calc(100vh-2rem)] shrink-0 flex-col rounded-[1.75rem] border p-4 text-slate-100 backdrop-blur-2xl transition-all duration-300 max-lg:relative max-lg:top-0 max-lg:h-auto max-lg:w-full ${compact ? 'w-24' : 'w-72'}`}>
+      <div className={`sidebar-brand mb-6 flex items-center gap-3 rounded-2xl border p-3 ${compact ? 'justify-center' : ''}`}>
         <div className="grid h-11 w-11 place-items-center rounded-xl bg-[linear-gradient(135deg,#f8fafc,#64748b_58%,#0f172a)] text-slate-950 shadow-[0_16px_36px_rgba(226,232,240,0.12)]">
           <Crown size={22} />
         </div>
-        <div>
+        <div className={compact ? 'hidden' : 'block'}>
           <strong className="silver-title block text-xl font-black">Leads NT</strong>
           <span className="text-xs font-bold text-slate-500">Admin central</span>
         </div>
       </div>
 
+      <button
+        className="sidebar-toggle mb-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl border text-sm font-black transition duration-300 hover:-translate-y-0.5 max-lg:hidden"
+        onClick={onToggleCompact}
+        type="button"
+      >
+        {compact ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        <span className={compact ? 'hidden' : 'inline'}>Recolher menu</span>
+      </button>
+
       <nav className="grid gap-2">
         {items.map(([id, label, Icon]) => (
           <button
-            className={`group flex h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition duration-300 ${
-              current === id
-                ? 'border border-slate-200/20 bg-white/[0.095] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_16px_38px_rgba(148,163,184,0.08)]'
-                : 'text-slate-500 hover:-translate-y-0.5 hover:bg-white/[0.055] hover:text-slate-100'
-            }`}
+            className={`sidebar-nav-item group flex h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition duration-300 ${compact ? 'justify-center' : ''} ${current === id ? 'nav-active' : 'nav-idle'}`}
             key={id}
             onClick={() => onNavigate(id)}
             type="button"
+            title={compact ? label : undefined}
           >
             <Icon className="transition group-hover:scale-110" size={19} />
-            {label}
+            <span className={compact ? 'hidden' : 'inline'}>{label}</span>
           </button>
         ))}
       </nav>
 
       <div className="mt-auto grid gap-3">
-        <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.055] p-4">
+        <div className={`session-card rounded-2xl border p-4 ${compact ? 'px-2 text-center' : ''}`}>
           <span className={labelClass}>Sessão</span>
           <strong className="mt-2 block text-sm text-emerald-100">{user?.name || 'Admin Leads NT'}</strong>
           <p className="mt-1 text-xs leading-relaxed text-emerald-200/70">Acesso geral para criar associações e acompanhar campanhas.</p>
         </div>
-        <button className={ghostButtonClass} onClick={onLogout} type="button">
+        <button className={`${ghostButtonClass} ${compact ? 'px-0' : ''}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
           <LogOut size={18} />
-          Sair
+          <span className={compact ? 'hidden' : 'inline'}>Sair</span>
         </button>
       </div>
     </aside>
@@ -685,13 +693,14 @@ function PlaceholderView({ title, subtitle, icon: Icon }) {
 
 function AppShell({ children, current, onNavigate, onLogout, theme, onToggleTheme, user }) {
   const isLight = theme === 'light';
+  const [sidebarCompact, setSidebarCompact] = useState(false);
 
   return (
     <div className={`silver-stage ${isLight ? 'app-light' : 'app-dark'} min-h-screen text-slate-100`}>
       <AppToaster theme={theme} />
-      <div className="flex min-h-screen max-lg:flex-col">
-      <Sidebar current={current} onLogout={onLogout} onNavigate={onNavigate} user={user} />
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div className="flex min-h-screen gap-4 p-4 max-lg:flex-col max-lg:p-0">
+      <Sidebar compact={sidebarCompact} current={current} onLogout={onLogout} onNavigate={onNavigate} onToggleCompact={() => setSidebarCompact((value) => !value)} user={user} />
+      <div className="flex min-h-[calc(100vh-2rem)] min-w-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] max-lg:min-h-screen max-lg:rounded-none">
         <header className="sticky top-0 z-30 border-b border-white/[0.07] bg-slate-950/60 px-8 py-4 backdrop-blur-2xl max-md:px-4">
           <div className="flex items-center justify-between gap-4">
             <div>
