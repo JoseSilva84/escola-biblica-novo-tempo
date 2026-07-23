@@ -52,10 +52,13 @@ function AppToaster({ theme = 'light' }) {
     <Toaster
       closeButton
       expand
+      offset="84px"
       position="top-right"
       richColors
+      style={{ position: 'fixed', zIndex: 2147483647 }}
       theme={theme}
       toastOptions={{
+        style: { zIndex: 2147483647 },
         classNames: {
           toast: 'leads-toast',
           title: 'leads-toast-title',
@@ -305,7 +308,6 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
         <div className={`session-card rounded-2xl border p-4 ${compact ? 'px-2 text-center' : ''}`}>
           <span className={labelClass}>Sessão</span>
           <strong className="mt-2 block text-sm text-emerald-100">{user?.name || 'Admin Leads NT'}</strong>
-          <p className="mt-1 text-xs leading-relaxed text-emerald-200/70">Acesso geral para criar associações e acompanhar campanhas.</p>
         </div>
         <button className={`${ghostButtonClass} ${compact ? 'px-0' : ''}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
           <LogOut size={18} />
@@ -448,7 +450,7 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
                 <XAxis dataKey="etapa" stroke="#94a3b8" tickLine={false} />
                 <YAxis stroke="#94a3b8" tickFormatter={formatNumber} tickLine={false} width={70} />
-                <Tooltip contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
+                <Tooltip cursor={{ stroke: '#2563eb', strokeWidth: 2, strokeDasharray: '4 4' }} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
                 <Area dataKey="leads" fill="url(#silverLeadGradient)" stroke="#e2e8f0" strokeWidth={3} type="monotone" />
               </AreaChart>
             </ResponsiveContainer>
@@ -513,9 +515,9 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
                   <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
                   <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} />
                   <YAxis hide />
-                  <Tooltip contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
-                  <Bar dataKey="leads" fill="#cbd5e1" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="quentes" fill="#60a5fa" radius={[8, 8, 0, 0]} />
+                  <Tooltip cursor={false} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
+                  <Bar dataKey="leads" fill="#1d4ed8" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="quentes" fill="#06b6d4" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -572,7 +574,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
                 <XAxis dataKey="etapa" stroke="#94a3b8" tickLine={false} />
                 <YAxis stroke="#94a3b8" tickFormatter={formatNumber} tickLine={false} width={70} />
-                <Tooltip contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
+                <Tooltip cursor={{ stroke: '#2563eb', strokeWidth: 2, strokeDasharray: '4 4' }} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
                 <Area dataKey="leads" fill="url(#associationLeadGradient)" stroke="#93c5fd" strokeWidth={3} type="monotone" />
               </AreaChart>
             </ResponsiveContainer>
@@ -629,7 +631,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tickLine={false} type="category" width={115} />
-                <Tooltip contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
+                <Tooltip cursor={false} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} formatter={(value) => formatNumber(value)} />
                 <Bar className="transition duration-300 hover:brightness-125" dataKey="interessados" fill="#cbd5e1" radius={[0, 10, 10, 0]} />
               </BarChart>
             </ResponsiveContainer>

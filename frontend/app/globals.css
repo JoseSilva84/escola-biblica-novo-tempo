@@ -68,9 +68,11 @@
     z-index: 0;
     background:
       repeating-linear-gradient(115deg, rgba(15,23,42,0.045) 0 1px, transparent 1px 16px),
-      linear-gradient(90deg, transparent, rgba(255,255,255,0.62), transparent);
+      linear-gradient(105deg, transparent 0%, rgba(255,255,255,0.78) 38%, rgba(148,163,184,0.18) 48%, transparent 62%);
+    background-size: auto, 260% 260%;
     mask-image: linear-gradient(to bottom, rgba(0,0,0,0.84), transparent 88%);
-    opacity: 0.52;
+    opacity: 0.72;
+    animation: silverSweep 9s ease-in-out infinite alternate;
   }
 
   .silver-stage::after {
@@ -80,15 +82,16 @@
     pointer-events: none;
     z-index: 0;
     background:
-      radial-gradient(circle at 16% 28%, rgba(255,255,255,0.72), transparent 15%),
-      radial-gradient(circle at 72% 18%, rgba(148,163,184,0.34), transparent 18%),
-      radial-gradient(circle at 56% 82%, rgba(59,130,246,0.14), transparent 20%);
-    filter: blur(28px);
-    opacity: 0.7;
-    animation: silverLights 16s ease-in-out infinite alternate;
+      radial-gradient(circle at 16% 28%, rgba(255,255,255,0.95), transparent 14%),
+      radial-gradient(circle at 72% 18%, rgba(148,163,184,0.52), transparent 18%),
+      radial-gradient(circle at 56% 82%, rgba(59,130,246,0.22), transparent 20%),
+      radial-gradient(circle at 28% 74%, rgba(255,255,255,0.62), transparent 16%);
+    filter: blur(22px);
+    opacity: 0.95;
+    animation: silverLights 11s ease-in-out infinite alternate;
   }
 
-  .silver-stage > * {
+  .silver-stage > :not([data-sonner-toaster]) {
     position: relative;
     z-index: 1;
   }
@@ -331,6 +334,17 @@
     backdrop-filter: blur(18px);
   }
 
+  [data-sonner-toaster],
+  [data-sonner-toaster][data-y-position],
+  [data-sonner-toast] {
+    position: fixed !important;
+    z-index: 2147483647 !important;
+  }
+
+  [data-sonner-toast] {
+    position: absolute !important;
+  }
+
   .leads-toast-title {
     color: rgb(15 23 42) !important;
     font-weight: 900 !important;
@@ -389,7 +403,17 @@
     }
   }
 
+  @keyframes silverSweep {
+    0% {
+      background-position: 0 0, 0% 50%;
+    }
+    100% {
+      background-position: 0 0, 100% 50%;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
+    .silver-stage::before,
     .silver-stage::after {
       animation: none;
     }
