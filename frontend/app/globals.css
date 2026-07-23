@@ -14,8 +14,8 @@
   body {
     min-height: 100vh;
     overflow-x: hidden;
-    background: hsl(222, 25%, 6%);
-    color: rgb(241 245 249);
+    background: #e7ebf0;
+    color: rgb(15 23 42);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -52,6 +52,207 @@
 }
 
 @layer utilities {
+  .silver-stage {
+    position: relative;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(255,255,255,0.88), transparent 30%),
+      radial-gradient(circle at 86% 10%, rgba(186, 196, 208, 0.38), transparent 32%),
+      linear-gradient(145deg, #f8fafc 0%, #e5e9ee 36%, #cfd6df 68%, #f4f7fa 100%);
+  }
+
+  .silver-stage::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      repeating-linear-gradient(115deg, rgba(15,23,42,0.045) 0 1px, transparent 1px 16px),
+      linear-gradient(90deg, transparent, rgba(255,255,255,0.62), transparent);
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,0.84), transparent 88%);
+    opacity: 0.52;
+  }
+
+  .silver-stage > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .silver-title {
+    background: linear-gradient(100deg, #0f172a 0%, #475569 32%, #94a3b8 50%, #111827 68%, #2563eb 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 18px 70px rgba(226, 232, 240, 0.10);
+  }
+
+  .premium-panel {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .premium-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.70), transparent 22%),
+      linear-gradient(315deg, rgba(148,163,184,0.18), transparent 30%);
+    opacity: 0.82;
+  }
+
+  .premium-panel > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .interactive-card {
+    position: relative;
+    overflow: hidden;
+    transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1), border-color 240ms, background-color 240ms, box-shadow 240ms, filter 240ms;
+  }
+
+  .interactive-card::after {
+    content: "";
+    position: absolute;
+    inset: -40% auto -40% -75%;
+    width: 56%;
+    transform: rotate(18deg);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+    opacity: 0;
+    transition: left 520ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms;
+  }
+
+  .interactive-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(71, 85, 105, 0.28);
+    background-color: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.38);
+  }
+
+  .interactive-card:hover::after {
+    left: 124%;
+    opacity: 1;
+  }
+
+  .app-light {
+    color: rgb(15 23 42);
+  }
+
+  .app-light .premium-panel {
+    border-color: rgba(71, 85, 105, 0.16) !important;
+    background: rgba(255, 255, 255, 0.58) !important;
+    box-shadow: 0 26px 80px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255,255,255,0.72) !important;
+  }
+
+  .app-light aside,
+  .app-light header {
+    border-color: rgba(71, 85, 105, 0.16) !important;
+    background: rgba(248, 250, 252, 0.70) !important;
+    box-shadow: 0 22px 70px rgba(15, 23, 42, 0.08);
+  }
+
+  .app-light .text-slate-50,
+  .app-light .text-slate-100,
+  .app-light .text-slate-200 {
+    color: rgb(15 23 42) !important;
+  }
+
+  .app-light .text-slate-300,
+  .app-light .text-slate-400,
+  .app-light .text-slate-500 {
+    color: rgb(71 85 105) !important;
+  }
+
+  .app-light .bg-slate-950\/50,
+  .app-light .bg-slate-950\/60,
+  .app-light .bg-slate-950\/70,
+  .app-light .bg-slate-950\/72,
+  .app-light .bg-slate-950\/80,
+  .app-light .bg-slate-900\/72 {
+    background-color: rgba(255, 255, 255, 0.58) !important;
+  }
+
+  .app-light input,
+  .app-light select {
+    background: rgba(255, 255, 255, 0.72) !important;
+    color: rgb(15 23 42) !important;
+    border-color: rgba(71, 85, 105, 0.16) !important;
+  }
+
+  .app-light .recharts-cartesian-grid line {
+    stroke: rgba(71, 85, 105, 0.12);
+  }
+
+  .app-dark {
+    color: rgb(241 245 249);
+    background:
+      linear-gradient(120deg, rgba(226, 232, 240, 0.11), transparent 28%),
+      linear-gradient(145deg, #05070b 0%, #0b111d 38%, #061316 68%, #05070b 100%);
+  }
+
+  .app-dark::before {
+    background:
+      repeating-linear-gradient(115deg, rgba(255,255,255,0.055) 0 1px, transparent 1px 16px),
+      linear-gradient(90deg, transparent, rgba(226,232,240,0.08), transparent);
+    opacity: 0.38;
+  }
+
+  .app-dark .silver-title {
+    background: linear-gradient(100deg, #ffffff 0%, #cbd5e1 32%, #94a3b8 50%, #f8fafc 68%, #93c5fd 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .leads-toast {
+    border: 1px solid rgba(71, 85, 105, 0.18) !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    color: rgb(15 23 42) !important;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255,255,255,0.8) !important;
+    backdrop-filter: blur(18px);
+  }
+
+  .leads-toast-title {
+    color: rgb(15 23 42) !important;
+    font-weight: 900 !important;
+  }
+
+  .leads-toast-description {
+    color: rgb(71 85 105) !important;
+    font-weight: 650 !important;
+  }
+
+  .leads-toast-action {
+    background: linear-gradient(135deg, #1e3a8a, #2563eb) !important;
+    color: white !important;
+    font-weight: 900 !important;
+    border-radius: 10px !important;
+  }
+
+  .leads-toast-close {
+    border-color: rgba(71, 85, 105, 0.20) !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: rgb(15 23 42) !important;
+  }
+
+  .app-dark .leads-toast {
+    border-color: rgba(226, 232, 240, 0.18) !important;
+    background: rgba(2, 6, 23, 0.92) !important;
+    color: rgb(241 245 249) !important;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  }
+
+  .app-dark .leads-toast-title {
+    color: rgb(248 250 252) !important;
+  }
+
+  .app-dark .leads-toast-description {
+    color: rgb(203 213 225) !important;
+  }
+
   .border-white\/6 {
     border-color: rgba(255, 255, 255, 0.06);
   }

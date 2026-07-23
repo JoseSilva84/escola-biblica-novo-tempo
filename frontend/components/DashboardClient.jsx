@@ -426,7 +426,7 @@ function aggregate(records, filters) {
   return { filtered, kpis, districtList, religionList, tempo };
 }
 
-export default function DashboardClient({ payload }) {
+export default function DashboardClient({ payload, onBack }) {
   const { records, meta } = payload;
   const districts = useMemo(() => Array.from(new Set(records.map((row) => row.d))).sort((a, b) => a.localeCompare(b)), [records]);
   const [filters, setFilters] = useState({ distrito: 'all', prioridade: 'all', vip: 'all', telefone: 'all', estudos: 'all', genero: 'all', search: '' });
@@ -513,20 +513,30 @@ export default function DashboardClient({ payload }) {
   }));
 
   return (
-    <div className="min-h-screen text-slate-100" onPointerMove={onPointerMove}>
+    <div className="silver-stage app-light min-h-screen text-slate-100" onPointerMove={onPointerMove}>
       <div
         className="pointer-events-none fixed inset-0 -z-10 transition duration-300"
         style={{
-          background: `radial-gradient(circle at ${pointer.x}% ${pointer.y}%, rgba(59,130,246,0.13), transparent 28%), radial-gradient(circle at 78% 14%, rgba(245,158,11,0.08), transparent 30%), hsl(222, 25%, 6%)`
+          background: `radial-gradient(circle at ${pointer.x}% ${pointer.y}%, rgba(255,255,255,0.72), transparent 26%), linear-gradient(145deg, #f8fafc 0%, #e4e8ee 42%, #cfd6df 100%)`
         }}
       />
 
       <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-white/[0.06] bg-slate-950/80 px-8 py-4 backdrop-blur-2xl max-md:flex-col max-md:items-start max-md:px-4">
         <div className="flex items-center gap-4">
+          {onBack ? (
+            <button
+              aria-label="Voltar para Associação Paulistana"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-lg font-black text-slate-300 transition hover:border-blue-400/40 hover:bg-blue-500/10 hover:text-blue-200"
+              onClick={onBack}
+              type="button"
+            >
+              ←
+            </button>
+          ) : null}
           <img src="novo-tempo.jpg" alt="Novo Tempo" className="h-11 w-11 rounded-xl object-cover ring-1 ring-cyan-300/20" />
           <div>
-            <h1 className="text-xl font-black tracking-normal text-slate-50">Escola Bíblica Novo Tempo</h1>
-            <p className="text-sm text-slate-400">Associação Paulistana - Visão Geral</p>
+            <h1 className="text-xl font-black tracking-normal text-slate-50">Detalhes dos interessados</h1>
+            <p className="text-sm text-slate-400">Associação Paulistana - Campanha Escola Bíblica Novo Tempo</p>
           </div>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.035] px-4 py-2 text-sm font-bold text-slate-400 max-md:w-full max-md:justify-center">

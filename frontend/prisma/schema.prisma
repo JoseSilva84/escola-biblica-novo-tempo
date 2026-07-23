@@ -1,0 +1,209 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN_GERAL
+  GESTOR_ASSOCIACAO
+  COORDENADOR_CAMPANHA
+  VOLUNTARIO
+}
+
+enum LeadPriority {
+  HOT
+  WARM
+  COOL
+  COLD
+}
+
+enum CampaignStatus {
+  PLANEJADA
+  ATIVA
+  PAUSADA
+  FINALIZADA
+}
+
+enum InteractionChannel {
+  WHATSAPP
+  VISITA
+  TELEFONE
+  EMAIL
+  SISTEMA
+}
+
+model User {
+  id             String      @id @default(cuid())
+  name           String
+  email          String      @unique
+  passwordHash   String
+  role           UserRole
+  associationId  String?
+  association    Association? @relation(fields: [associationId], references: [id])
+  visits         Visit[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Association {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  users     User[]
+  districts District[]
+  campaigns Campaign[]
+  leads     Lead[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model District {
+  id            String      @id @default(cuid())
+  name          String
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id])
+  churches      Church[]
+  leads         Lead[]
+
+  @@unique([associationId, name])
+}
+
+model Church {
+  id         String   @id @default(cuid())
+  name       String
+  districtId String
+  district   District @relation(fields: [districtId], references: [id])
+  leads      Lead[]
+}
+
+model Campaign {
+  id            String          @id @default(cuid())
+  name          String
+  slug          String
+  status        CampaignStatus  @default(PLANEJADA)
+  associationId String
+  association   Association     @relation(fields: [associationId], references: [id])
+  leads         CampaignLead[]
+  sequences     AutomationSequence[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([associationId, slug])
+}
+
+model Lead {
+  id             String            @id @default(cuid())
+  externalId     Int?
+  name           String
+  phone          String?
+  email          String?
+  gender         String?
+  age            Int?
+  address        String?
+  priority       LeadPriority      @default(COOL)
+  score          Decimal?          @db.Decimal(5, 2)
+  isVip          Boolean           @default(false)
+  hasActiveStudy Boolean           @default(false)
+  associationId  String
+  association    Association       @relation(fields: [associationId], references: [id])
+  districtId     String?
+  district       District?         @relation(fields: [districtId], references: [id])
+  churchId       String?
+  church         Church?           @relation(fields: [churchId], references: [id])
+  campaigns      CampaignLead[]
+  interactions   LeadInteraction[]
+  whatsAppSends   WhatsAppSend[]
+  visits         Visit[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([associationId, priority])
+  @@index([districtId])
+}
+
+model CampaignLead {
+  id         String   @id @default(cuid())
+  campaignId String
+  leadId     String
+  stage      String   @default("BASE")
+  status     String   @default("ATIVO")
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  lead       Lead     @relation(fields: [leadId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([campaignId, leadId])
+}
+
+model MessageTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  body      String
+  variables Json?
+  sequences AutomationStep[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AutomationSequence {
+  id         String           @id @default(cuid())
+  name       String
+  campaignId String
+  campaign   Campaign         @relation(fields: [campaignId], references: [id])
+  steps      AutomationStep[]
+  active     Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+}
+
+model AutomationStep {
+  id          String             @id @default(cuid())
+  sequenceId  String
+  templateId  String
+  delayHours  Int                @default(0)
+  sequence    AutomationSequence @relation(fields: [sequenceId], references: [id])
+  template    MessageTemplate    @relation(fields: [templateId], references: [id])
+  sends       WhatsAppSend[]
+}
+
+model WhatsAppSend {
+  id        String         @id @default(cuid())
+  stepId    String?
+  leadId    String
+  status    String         @default("PENDENTE")
+  provider  String?
+  sentAt    DateTime?
+  repliedAt DateTime?
+  step      AutomationStep? @relation(fields: [stepId], references: [id])
+  lead      Lead            @relation(fields: [leadId], references: [id])
+  createdAt DateTime        @default(now())
+}
+
+model LeadInteraction {
+  id        String             @id @default(cuid())
+  leadId    String
+  channel   InteractionChannel
+  summary   String
+  metadata  Json?
+  lead      Lead               @relation(fields: [leadId], references: [id])
+  createdAt DateTime           @default(now())
+}
+
+model Visit {
+  id          String   @id @default(cuid())
+  leadId      String
+  volunteerId String?
+  happened    Boolean?
+  reception   String?
+  accepted    String?
+  materials   String[]
+  notes       String?
+  lead        Lead     @relation(fields: [leadId], references: [id])
+  volunteer   User?    @relation(fields: [volunteerId], references: [id])
+  scheduledAt DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime @default(now())
+}

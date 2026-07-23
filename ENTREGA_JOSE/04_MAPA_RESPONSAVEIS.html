@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Responsáveis - 7Flow</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0B0E14;
+            color: #ffffff;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #151A23;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            max-width: 1200px;
+            width: 100%;
+            border: 1px solid rgba(197, 153, 58, 0.2);
+        }
+
+        h1 {
+            color: #C5993A;
+            font-size: 28px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        p.subtitle {
+            color: #8A94A6;
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 16px 20px;
+            text-align: left;
+            border-bottom: 1px solid #232A38;
+        }
+
+        th {
+            background-color: #1E2532;
+            color: #C5993A;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td.stage {
+            font-weight: 600;
+            color: #ffffff;
+            background-color: #1A202C;
+            border-right: 1px solid #232A38;
+            width: 160px;
+        }
+
+        td {
+            font-size: 14px;
+            color: #E2E8F0;
+            line-height: 1.5;
+        }
+
+        td:hover {
+            background-color: rgba(197, 153, 58, 0.05);
+        }
+
+        .empty {
+            color: #3A4354;
+            font-style: italic;
+            text-align: center;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .tag.mkt { background: rgba(197, 153, 58, 0.15); color: #C5993A; }
+        .tag.tech { background: rgba(56, 189, 248, 0.15); color: #38BDF8; }
+        .tag.ops { background: rgba(167, 139, 250, 0.15); color: #A78BFA; }
+        .tag.admin { background: rgba(244, 114, 182, 0.15); color: #F472B6; }
+        .tag.vol { background: rgba(52, 211, 153, 0.15); color: #34D399; }
+        .tag.ai { background: rgba(251, 191, 36, 0.15); color: #FBBF24; }
+
+        /* Animações */
+        h1, .subtitle {
+            opacity: 0;
+            animation: fadeIn 1s forwards;
+        }
+
+        .subtitle { animation-delay: 0.3s; }
+
+        tbody tr {
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        tbody tr.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Mapa de Responsáveis - 7Flow</h1>
+        <p class="subtitle">Matriz de operações: Quem faz o quê em cada etapa do funil</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Etapa do Funil</th>
+                    <th><span class="tag mkt">Marketing</span><br>Eduardo</th>
+                    <th><span class="tag tech">Tecnologia</span><br>José</th>
+                    <th><span class="tag ops">Operações</span><br>James</th>
+                    <th><span class="tag admin">Institucional</span><br>Jaime</th>
+                    <th><span class="tag vol">Campo</span><br>Voluntário</th>
+                    <th><span class="tag ai">IA Humanizada</span><br>Ana (Sistema)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="stage">1. Recepção de Dados</td>
+                    <td>Define critérios de priorização com o campo</td>
+                    <td>Limpa, trata a base bruta e aplica o Score</td>
+                    <td class="empty">—</td>
+                    <td class="empty">—</td>
+                    <td class="empty">—</td>
+                    <td class="empty">—</td>
+                </tr>
+                <tr>
+                    <td class="stage">2. Primeiro Contato</td>
+                    <td>Escreve e valida as 3 variações de mensagens</td>
+                    <td>Programa o disparo do Teste A/B/C</td>
+                    <td>Monitora a saúde do sistema de disparos</td>
+                    <td class="empty">—</td>
+                    <td class="empty">—</td>
+                    <td>Envia a mensagem e responde às interações</td>
+                </tr>
+                <tr>
+                    <td class="stage">3. Nutrição 21 Dias</td>
+                    <td>Define os conteúdos (vídeos, testemunhos)</td>
+                    <td>Programa os triggers de tempo (Dias 1 a 21)</td>
+                    <td>Monitora engajamento diário no dashboard</td>
+                    <td>Valida a psicologia dos vieses cognitivos</td>
+                    <td class="empty">—</td>
+                    <td>Executa a régua gerando respostas orgânicas</td>
+                </tr>
+                <tr>
+                    <td class="stage">4. Convite p/ Visita</td>
+                    <td class="empty">—</td>
+                    <td>Notifica o voluntário automaticamente</td>
+                    <td class="empty">—</td>
+                    <td>Coordena a recepção na igreja local</td>
+                    <td>Faz a visita presencial usando o script</td>
+                    <td>Faz o convite direto baseada no histórico</td>
+                </tr>
+                <tr>
+                    <td class="stage">5. Acompanhamento</td>
+                    <td>Analisa tendências de conversão da visita</td>
+                    <td>Mantém o sistema e banco de dados</td>
+                    <td>Cobra feedback do voluntário (se atrasar)</td>
+                    <td class="empty">—</td>
+                    <td>Preenche o CRM após a visita</td>
+                    <td>Envia follow-up ("Como foi a visita?")</td>
+                </tr>
+                <tr>
+                    <td class="stage">6. Integração</td>
+                    <td>Acompanha indicadores macro de retenção</td>
+                    <td class="empty">—</td>
+                    <td>Monitora frequência do lead na igreja</td>
+                    <td class="empty">—</td>
+                    <td>Insere a pessoa no pequeno grupo / Escola Sabatina</td>
+                    <td>Envia mensagem de encorajamento semanal</td>
+                </tr>
+                <tr>
+                    <td class="stage">7. Batismo</td>
+                    <td>Registra os números para o Case de Sucesso</td>
+                    <td>Atualiza o status para "Concluído" no sistema</td>
+                    <td class="empty">—</td>
+                    <td>Transfere o lead para o discipulado da igreja</td>
+                    <td>Acompanha o estudo final e batismo</td>
+                    <td>Envia mensagem de celebração e encerra contato</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const rows = document.querySelectorAll('tbody tr');
+            rows.forEach((row, index) => {
+                setTimeout(() => {
+                    row.classList.add('visible');
+                }, 500 + (index * 150));
+            });
+        });
+    </script>
+</body>
+</html>
