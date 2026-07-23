@@ -22,6 +22,8 @@ import {
   ChevronRight,
   ClipboardList,
   Crown,
+  Eye,
+  EyeOff,
   Gauge,
   LayoutDashboard,
   Lock,
@@ -172,9 +174,55 @@ function buildInitialAssociations(records) {
   ];
 }
 
+function BibleStudyAnimation() {
+  return (
+    <div className="bible-study-scene" aria-label="Duas pessoas conversando em um estudo biblico" role="img">
+      <div className="study-window">
+        <div className="window-sun" />
+        <div className="window-line window-line-one" />
+        <div className="window-line window-line-two" />
+      </div>
+      <div className="study-table">
+        <div className="bible-book">
+          <div className="bible-page bible-page-left">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="bible-center" />
+          <div className="bible-page bible-page-right">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+        <div className="study-light" />
+      </div>
+      <div className="teacher-person">
+        <div className="person-head" />
+        <div className="person-body" />
+        <div className="person-arm teacher-arm" />
+      </div>
+      <div className="student-person">
+        <div className="person-head" />
+        <div className="person-body" />
+        <div className="person-arm student-arm" />
+      </div>
+      <div className="speech-bubble teacher-bubble">
+        <span />
+        <span />
+      </div>
+      <div className="speech-bubble student-bubble">
+        <span />
+      </div>
+    </div>
+  );
+}
+
 function LoginScreen({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submitLogin(event) {
     event.preventDefault();
@@ -212,28 +260,38 @@ function LoginScreen({ onLogin }) {
   return (
     <main className="silver-stage app-light grid min-h-screen place-items-center overflow-hidden px-5 py-10 text-slate-100">
       <AppToaster />
+      {loading ? (
+        <div className="login-loading-overlay" role="status" aria-live="polite">
+          <div className="login-loading-card">
+            <div className="login-loading-spinner">
+              <Lock size={24} />
+            </div>
+            <strong>Entrando no sistema</strong>
+            <span>Aguarde um instante...</span>
+          </div>
+        </div>
+      ) : null}
       <section className="relative grid w-full max-w-6xl grid-cols-[1.1fr_0.9fr] gap-5 max-lg:grid-cols-1">
         <div className={`${panelClass} flex min-h-[34rem] flex-col justify-between p-8 max-sm:p-5`}>
           <div>
-            <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-slate-200/15 bg-white/[0.055] px-4 py-2 text-sm font-black text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
-              <ShieldCheck size={18} />
-              CRM missionário com acesso por associação
-            </div>
-            <h1 className="silver-title max-w-2xl text-6xl font-black leading-tight tracking-normal max-md:text-4xl">
+
+            <h1 className="silver-title max-w-2xl text-6xl font-black leading-tight tracking-normal max-md:text-4xl text-center">
               Leads NT
             </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-400">
-              Administre associações, campanhas, automações de WhatsApp e interessados da Novo Tempo.
+            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-400 text-center">
+              Administre Campanhas, Automações e Leads da Novo Tempo.
             </p>
           </div>
+
+          <BibleStudyAnimation />
 
           <div className="grid grid-cols-3 gap-3 max-sm:grid-cols-1">
             {[
               ['Associações', 'Gestão por território', Building2],
               ['Campanhas', 'Funis independentes', Radio],
               ['WhatsApp', 'Aquecimento inteligente', MessageCircle]
-            ].map(([title, detail, Icon]) => (
-              <div className="interactive-card rounded-xl border border-white/[0.07] bg-slate-950/50 p-4" key={title}>
+            ].map(([title, detail, Icon], index) => (
+              <div className="interactive-card login-feature-card rounded-xl border border-white/[0.07] bg-slate-950/50 p-4" key={title} style={{ '--card-delay': `${index * 0.55}s` }}>
                 <Icon className="mb-3 text-slate-200 drop-shadow-[0_0_16px_rgba(226,232,240,0.20)]" size={22} />
                 <strong className="block text-sm text-slate-100">{title}</strong>
                 <span className="mt-1 block text-xs leading-relaxed text-slate-500">{detail}</span>
@@ -244,17 +302,25 @@ function LoginScreen({ onLogin }) {
 
         <form className={`${panelClass} grid content-center gap-5 p-8 max-sm:p-5`} onSubmit={submitLogin}>
           <div>
-            <span className={labelClass}>Conta admin</span>
-            <h2 className="mt-2 text-2xl font-black text-slate-50">Acesso ao Leads NT</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-500">Login demonstrativo de administrador geral, pronto para migrar para usuários reais no PostgreSQL.</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-50 text-center">Acesso ao Leads NT</h2>
           </div>
-          <label className="grid gap-2 text-sm font-bold text-slate-300">
+          <label className="grid gap-2 text-sm font-bold text-slate-300 text-center">
             Email
-            <input className="h-12 rounded-xl border border-white/[0.08] bg-slate-950/70 px-4 text-slate-100 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10" defaultValue="admin@leadsnt.com.br" name="email" type="email" />
+            <input className="h-12 rounded-xl border border-white/[0.08] bg-slate-950/70 px-4 text-slate-100 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10 text-center" defaultValue="admin@leadsnt.com.br" name="email" type="email" />
           </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-300">
+          <label className="grid gap-2 text-sm font-bold text-slate-300 text-center">
             Senha
-            <input className="h-12 rounded-xl border border-white/[0.08] bg-slate-950/70 px-4 text-slate-100 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10" defaultValue="demo123" name="password" type="password" />
+            <span className="password-field">
+              <input className="h-12 w-full rounded-xl border border-white/[0.08] bg-slate-950/70 px-4 pr-12 text-center text-slate-100 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10" defaultValue="demo123" name="password" type={showPassword ? 'text' : 'password'} />
+              <button
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                className="password-toggle"
+                onClick={() => setShowPassword((value) => !value)}
+                type="button"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </span>
           </label>
           {error ? (
             <p className="rounded-xl border border-red-500/35 bg-red-50 px-4 py-3 text-sm font-black leading-relaxed text-red-800 shadow-[0_12px_34px_rgba(220,38,38,0.10)]">
@@ -263,7 +329,7 @@ function LoginScreen({ onLogin }) {
           ) : null}
           <button className={primaryButtonClass} disabled={loading} type="submit">
             <Lock size={18} />
-            {loading ? 'Entrando...' : 'Entrar como admin'}
+            {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
       </section>
