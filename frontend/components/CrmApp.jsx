@@ -32,6 +32,7 @@ import {
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  PieChart,
   Plus,
   Radio,
   Search,
@@ -359,7 +360,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
     ['admin', 'Dashboard', LayoutDashboard],
     ['associations', 'Associações', Building2],
     ['automations', 'WhatsApp', MessageCircle],
-    ['reports', 'Relatórios', Gauge]
+    ['reports', 'Relatórios', PieChart]
   ];
   items.push(['settings', 'Configurações', Settings]);
 
@@ -387,7 +388,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
       <nav className="grid gap-2">
         {items.map(([id, label, Icon]) => (
           <button
-            className={`sidebar-nav-item group flex h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition duration-300 ${compact ? 'justify-center' : ''} ${current === id ? 'nav-active' : 'nav-idle'}`}
+            className={`sidebar-nav-item group flex h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition-all duration-300 ${compact ? 'justify-center hover:-translate-y-1' : 'hover:translate-x-1.5'} ${current === id ? 'nav-active' : 'nav-idle'}`}
             key={id}
             onClick={() => onNavigate(id)}
             type="button"
@@ -400,8 +401,8 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
       </nav>
 
       <div className="mt-auto grid gap-3">
-        <button className={`${ghostButtonClass} ${compact ? 'px-0' : ''}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
-          <LogOut size={18} />
+        <button className={`${ghostButtonClass} group transition-all duration-300 ${compact ? 'px-0 hover:-translate-y-1' : 'hover:translate-x-1.5'}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
+          <LogOut className="transition duration-300 group-hover:scale-110" size={18} />
           <span className={compact ? 'hidden' : 'inline'}>Sair</span>
         </button>
       </div>

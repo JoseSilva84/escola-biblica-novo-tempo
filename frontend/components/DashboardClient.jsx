@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowUp } from 'lucide-react';
 
 const priorityLabels = {
@@ -213,7 +214,7 @@ function DonutChart({ values }) {
               </div>
               <div className="font-black tabular-nums text-white">{pct(active.value, total)}%</div>
             </div>
-            <div className="text-xs leading-relaxed text-slate-300">{active.description}</div>
+            <div className="text-xs leading-relaxed text-white/80">{active.description}</div>
           </div>
         ) : (
           <div className="text-xs font-bold leading-relaxed text-white">Passe o mouse sobre uma fatia ou item da legenda para ver quantidade, percentual e descrição da prioridade.</div>
@@ -433,6 +434,8 @@ export default function DashboardClient({ payload, onBack }) {
   const [pointer, setPointer] = useState({ x: 50, y: 20 });
   const [selectedDistrictName, setSelectedDistrictName] = useState(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const topAnchorRef = useRef(null);
 
   const data = useMemo(() => aggregate(records, filters), [records, filters]);
   const sortedDistricts = useMemo(() => {
@@ -451,6 +454,7 @@ export default function DashboardClient({ payload, onBack }) {
   );
 
   useEffect(() => {
+    setIsMounted(true);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -460,9 +464,13 @@ export default function DashboardClient({ payload, onBack }) {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     });
 
-    const handleScroll = () => setShowScrollTop(window.scrollY > 300);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    const handleScroll = (e) => {
+      const scrollY = window.scrollY || document.documentElement.scrollTop || (e.target && e.target.scrollTop) || 0;
+      setShowScrollTop(scrollY > 200);
+    };
+
+    window.addEventListener('scroll', handleScroll, { capture: true });
+    return () => window.removeEventListener('scroll', handleScroll, { capture: true });
   }, []);
 
   const activeFilters = useMemo(() => (
@@ -529,7 +537,8 @@ export default function DashboardClient({ payload, onBack }) {
   }));
 
   return (
-    <div className="silver-stage app-light details-light min-h-screen text-slate-100" onPointerMove={onPointerMove}>
+    <div className="relative silver-stage app-light details-light min-h-screen text-slate-100" onPointerMove={onPointerMove}>
+      <div ref={topAnchorRef} className="absolute top-0 h-1 w-full" />
       <div
         className="pointer-events-none fixed inset-0 -z-10 transition duration-300"
         style={{
@@ -741,16 +750,25 @@ export default function DashboardClient({ payload, onBack }) {
         </footer>
       </main>
       <DistrictDrawer district={selectedDistrict} onClose={() => setSelectedDistrictName(null)} />
-      {showScrollTop && (
+      {isMounted && createPortal(
         <button
-          className="fixed bottom-8 right-8 z-[999] grid h-12 w-12 place-items-center rounded-full bg-blue-600 text-white shadow-[0_10px_30px_rgba(37,99,235,0.4)] transition duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-blue-500"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className={`fixed bottom-8 right-8 z-[99999] grid h-12 w-12 place-items-center rounded-full bg-blue-600 text-white shadow-[0_10px_30px_rgba(37,99,235,0.4)] transition-all duration-300 hover:bg-blue-500 ${
+            showScrollTop ? 'translate-y-0 opacity-100 hover:-translate-y-1 hover:scale-105' : 'pointer-events-none translate-y-10 opacity-0'
+          }`}
+          onClick={() => {
+            if (topAnchorRef.current) {
+              topAnchorRef.current.scrollIntoView({ behavior: 'smooth' });
+            } else {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }}
           aria-label="Subir ao topo"
           title="Subir ao topo"
           type="button"
         >
           <ArrowUp size={24} strokeWidth={3} />
-        </button>
+        </button>,
+        document.body
       )}
     </div>
   );
