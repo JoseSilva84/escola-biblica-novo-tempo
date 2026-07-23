@@ -411,27 +411,47 @@
 
   .app-light {
     color: rgb(15 23 42);
+    /* Soft pastel mesh background specifically for the light app */
+    background:
+      radial-gradient(circle at 15% 10%, rgba(219, 234, 254, 0.8), transparent 30%),
+      radial-gradient(circle at 85% 15%, rgba(209, 250, 229, 0.6), transparent 35%),
+      linear-gradient(145deg, #f8fafc 0%, #e2e8f0 36%, #cbd5e1 68%, #f1f5f9 100%);
   }
 
   .app-light .premium-panel {
-    border-color: rgba(71, 85, 105, 0.16) !important;
-    background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(241,245,249,0.58)) !important;
-    box-shadow: 0 28px 90px rgba(15, 23, 42, 0.13), inset 0 1px 0 rgba(255,255,255,0.78) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.85) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.75) !important;
+    border-right: 1px solid rgba(71, 85, 105, 0.1) !important;
+    border-bottom: 1px solid rgba(71, 85, 105, 0.15) !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.85), rgba(241,245,249,0.5)) !important;
+    box-shadow: 0 28px 90px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255,255,255,0.78) !important;
+    backdrop-filter: blur(28px) saturate(1.15) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(1.15) !important;
   }
 
   .app-light aside,
   .app-light header {
-    border-color: rgba(71, 85, 105, 0.16) !important;
-    background: rgba(248, 250, 252, 0.70) !important;
-    box-shadow: 0 22px 70px rgba(15, 23, 42, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.85) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.75) !important;
+    border-right: 1px solid rgba(71, 85, 105, 0.12) !important;
+    border-bottom: 1px solid rgba(71, 85, 105, 0.15) !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.85), rgba(248, 250, 252, 0.45)) !important;
+    box-shadow: 0 22px 70px rgba(15, 23, 42, 0.05);
+    backdrop-filter: blur(24px) saturate(1.1) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(1.1) !important;
   }
 
   .app-light .sidebar-shell {
-    border-color: rgba(71, 85, 105, 0.18) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.95) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.85) !important;
+    border-right: 1px solid rgba(71, 85, 105, 0.1) !important;
+    border-bottom: 1px solid rgba(71, 85, 105, 0.18) !important;
     background:
-      linear-gradient(180deg, rgba(255,255,255,0.88), rgba(241,245,249,0.76)),
-      linear-gradient(135deg, rgba(255,255,255,0.72), rgba(148,163,184,0.16)) !important;
-    box-shadow: 0 28px 90px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255,255,255,0.92) !important;
+      linear-gradient(180deg, rgba(255,255,255,0.92), rgba(241,245,249,0.65)),
+      linear-gradient(135deg, rgba(255,255,255,0.82), rgba(148,163,184,0.1)) !important;
+    box-shadow: 0 28px 90px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255,255,255,0.92) !important;
+    backdrop-filter: blur(32px) saturate(1.2) !important;
+    -webkit-backdrop-filter: blur(32px) saturate(1.2) !important;
   }
 
   .app-light .text-slate-50,
@@ -456,7 +476,72 @@
   .app-light .bg-slate-950\/72,
   .app-light .bg-slate-950\/80,
   .app-light .bg-slate-900\/72 {
-    background-color: rgba(255, 255, 255, 0.58) !important;
+    background-color: rgba(255, 255, 255, 0.65) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+  }
+
+  /* Enhancing interactive cards in light mode */
+  .app-light .interactive-card {
+    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 300ms, background-color 300ms;
+    border-top: 1px solid rgba(255,255,255,0.85);
+    border-left: 1px solid rgba(255,255,255,0.65);
+    border-bottom: 1px solid rgba(71, 85, 105, 0.08);
+    border-right: 1px solid rgba(71, 85, 105, 0.08);
+  }
+
+  .app-light .interactive-card:hover {
+    transform: translateY(-4px) scale(1.01);
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 32px 90px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.8) !important;
+  }
+
+  /* Adding shimmer effect to main button in light mode */
+  .app-light .primary-button-glow {
+    position: relative;
+    overflow: hidden;
+  }
+  .app-light .primary-button-glow::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 50%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.6s ease-in-out;
+  }
+  .app-light .primary-button-glow:hover::before {
+    left: 150%;
+  }
+
+  /* Sidebar Active item refinement */
+  .app-light .sidebar-nav-item.nav-active {
+    border: 1px solid rgba(37, 99, 235, 0.15) !important;
+    background: linear-gradient(135deg, rgba(219, 234, 254, 0.8), rgba(239, 246, 255, 0.6)) !important;
+    color: rgb(37 99 235) !important;
+    box-shadow: 0 12px 32px rgba(37, 99, 235, 0.12), inset 0 1px 0 rgba(255,255,255,0.8) !important;
+  }
+  .app-light .sidebar-nav-item.nav-active svg,
+  .app-light .sidebar-nav-item.nav-active span {
+    color: rgb(37 99 235) !important;
+  }
+
+  /* Animation Staggering */
+  .stagger-in {
+    opacity: 0;
+    transform: translateY(16px);
+    animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  
+  @keyframes fadeSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .app-light input,

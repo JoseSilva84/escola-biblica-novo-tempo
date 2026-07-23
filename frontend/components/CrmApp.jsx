@@ -47,7 +47,7 @@ import { Toaster, toast } from 'sonner';
 import DashboardClient from './DashboardClient';
 
 const labelClass = 'text-[11px] font-black uppercase tracking-[0.16em] text-slate-500';
-const primaryButtonClass = 'group relative inline-flex h-11 items-center justify-center gap-2 overflow-hidden rounded-xl bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_52%,#0f172a_100%)] px-4 text-sm font-black text-white shadow-[0_18px_46px_rgba(37,99,235,0.34)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_24px_70px_rgba(37,99,235,0.30)] focus:outline-none focus:ring-4 focus:ring-blue-500/25 disabled:cursor-not-allowed disabled:opacity-70';
+const primaryButtonClass = 'primary-button-glow group relative inline-flex h-11 items-center justify-center gap-2 overflow-hidden rounded-xl bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_52%,#0f172a_100%)] px-4 text-sm font-black text-white shadow-[0_18px_46px_rgba(37,99,235,0.34)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_24px_70px_rgba(37,99,235,0.30)] focus:outline-none focus:ring-4 focus:ring-blue-500/25 disabled:cursor-not-allowed disabled:opacity-70';
 const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-black text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
 const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slate-950/60 shadow-[0_28px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.035] backdrop-blur-2xl';
 
@@ -351,9 +351,9 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
 
   return (
     <aside className={`sidebar-shell sticky top-4 z-40 flex h-[calc(100vh-2rem)] shrink-0 flex-col rounded-[1.75rem] border p-4 text-slate-100 backdrop-blur-2xl transition-all duration-300 max-lg:relative max-lg:top-0 max-lg:h-auto max-lg:w-full ${compact ? 'w-24' : 'w-72'}`}>
-      <div className={`sidebar-brand mb-8 flex items-center gap-3 ${compact ? 'justify-center' : ''}`}>
+      <div className={`mb-8 flex items-center gap-3 ${compact ? 'justify-center' : ''}`}>
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl overflow-hidden shadow-[0_16px_36px_rgba(226,232,240,0.12)]">
-          <img src="/novo-tempo.jpg" alt="Logo Novo Tempo" className="h-full w-full object-cover" />
+          <img src="/novo-tempo.jpg" alt="Logo Novo Tempo" className="h-full w-full object-cover mix-blend-multiply dark:mix-blend-normal" />
         </div>
         <div className={compact ? 'hidden' : 'block'}>
           <strong className="silver-title block text-xl font-black">Leads NT</strong>
@@ -386,10 +386,6 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
       </nav>
 
       <div className="mt-auto grid gap-3">
-        <div className={`session-card rounded-2xl border p-4 ${compact ? 'px-2 text-center' : ''}`}>
-          <span className={labelClass}>Sessão</span>
-          <strong className="mt-2 block text-sm text-emerald-100">{user?.name || 'Admin Leads NT'}</strong>
-        </div>
         <button className={`${ghostButtonClass} ${compact ? 'px-0' : ''}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
           <LogOut size={18} />
           <span className={compact ? 'hidden' : 'inline'}>Sair</span>
@@ -492,7 +488,7 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
 
   return (
     <div className="grid gap-6">
-      <section className={`${panelClass} overflow-hidden p-6`}>
+      <section className={`${panelClass} overflow-hidden p-6 stagger-in`} style={{ animationDelay: '0ms' }}>
         <div className="grid grid-cols-[1.05fr_0.95fr] gap-6 max-xl:grid-cols-1">
           <div>
             <span className={labelClass}>Painel admin</span>
@@ -539,14 +535,14 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
         </div>
       </section>
 
-      <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
+      <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1 stagger-in" style={{ animationDelay: '100ms' }}>
         <MetricCard detail={`${associations.length} territórios cadastrados`} icon={Building2} label="Associações" value={formatNumber(associations.length)} />
         <MetricCard detail="campanhas mapeadas" icon={Radio} label="Campanhas" tone="green" value={formatNumber(totals.campaigns)} />
         <MetricCard detail="com prioridade alta" icon={Sparkles} label="Leads quentes" tone="orange" value={formatNumber(totals.hot)} />
         <MetricCard detail="em acompanhamento" icon={ClipboardList} label="Estudos ativos" tone="violet" value={formatNumber(totals.studies)} />
       </section>
 
-      <section className="grid grid-cols-[1fr_24rem] gap-4 max-xl:grid-cols-1">
+      <section className="grid grid-cols-[1fr_24rem] gap-4 max-xl:grid-cols-1 stagger-in" style={{ animationDelay: '200ms' }}>
         <article className={`${panelClass} p-6`}>
           <div className="mb-5 flex items-center justify-between gap-4 max-md:flex-col max-md:items-start">
             <div>
