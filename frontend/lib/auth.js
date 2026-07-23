@@ -3,7 +3,7 @@ import crypto from 'crypto';
 const encoder = new TextEncoder();
 const DEMO_USER = {
   id: 'usr_admin_leads_nt',
-  name: 'Admin Leads NT',
+  name: 'Admin',
   email: 'admin@leadsnt.com.br',
   role: 'ADMIN_GERAL',
   associationId: null,
