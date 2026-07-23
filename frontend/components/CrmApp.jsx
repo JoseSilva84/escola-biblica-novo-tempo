@@ -230,14 +230,17 @@ function LoginScreen({ onLogin }) {
     setError('');
 
     const form = new FormData(event.currentTarget);
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: form.get('email'),
-        password: form.get('password')
-      })
-    });
+    const [response] = await Promise.all([
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.get('email'),
+          password: form.get('password')
+        })
+      }),
+      new Promise((resolve) => setTimeout(resolve, 900))
+    ]);
 
     if (!response.ok) {
       setLoading(false);

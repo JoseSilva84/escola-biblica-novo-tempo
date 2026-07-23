@@ -228,25 +228,64 @@
     display: grid;
     place-items: center;
     padding: 1.5rem;
-    background: rgba(241,245,249,0.62);
-    backdrop-filter: blur(10px);
+    background:
+      radial-gradient(circle at 50% 44%, rgba(255,255,255,0.64), transparent 24rem),
+      rgba(226,232,240,0.52);
+    backdrop-filter: blur(14px) saturate(1.08);
+  }
+
+  .silver-stage > .login-loading-overlay {
+    position: fixed;
+    z-index: 80;
+  }
+
+  .login-loading-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(37,99,235,0.18), transparent 15rem),
+      linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.58) 48%, transparent 70%);
+    opacity: 0.88;
+    animation: loadingBackdropBreath 2.4s ease-in-out infinite;
   }
 
   .login-loading-card {
+    position: relative;
     display: grid;
     justify-items: center;
-    gap: 0.45rem;
-    min-width: min(20rem, 100%);
-    padding: 1.5rem;
-    border: 1px solid rgba(71,85,105,0.16);
-    border-radius: 18px;
-    background: rgba(255,255,255,0.86);
+    gap: 0.5rem;
+    min-width: min(22rem, 100%);
+    overflow: hidden;
+    padding: 1.85rem 1.6rem 1.65rem;
+    border: 1px solid rgba(255,255,255,0.76);
+    border-radius: 24px;
+    background:
+      linear-gradient(145deg, rgba(255,255,255,0.96), rgba(241,245,249,0.84)),
+      radial-gradient(circle at 50% 0%, rgba(219,234,254,0.86), transparent 54%);
     color: rgb(15 23 42);
-    box-shadow: 0 30px 90px rgba(15,23,42,0.18), inset 0 1px 0 rgba(255,255,255,0.86);
+    box-shadow: 0 34px 100px rgba(15,23,42,0.24), 0 0 0 1px rgba(37,99,235,0.06), inset 0 1px 0 rgba(255,255,255,0.92);
+  }
+
+  .login-loading-card::before {
+    content: "";
+    position: absolute;
+    inset: -45% auto -45% -70%;
+    width: 58%;
+    transform: rotate(18deg);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.86), transparent);
+    animation: loadingCardSweep 1.8s ease-in-out infinite;
+  }
+
+  .login-loading-card > * {
+    position: relative;
+    z-index: 1;
   }
 
   .login-loading-card strong {
-    font-size: 1rem;
+    margin-top: 0.35rem;
+    font-size: 1.05rem;
     font-weight: 900;
   }
 
@@ -257,16 +296,31 @@
   }
 
   .login-loading-spinner {
+    position: relative;
     display: grid;
-    width: 4rem;
-    height: 4rem;
-    margin-bottom: 0.35rem;
+    width: 4.7rem;
+    height: 4.7rem;
+    margin-bottom: 0.4rem;
     place-items: center;
-    border: 3px solid rgba(37,99,235,0.16);
-    border-top-color: #2563eb;
     border-radius: 999px;
+    background: radial-gradient(circle, rgba(255,255,255,0.96) 0 46%, rgba(219,234,254,0.86) 47% 100%);
     color: #1d4ed8;
+    box-shadow: 0 18px 42px rgba(37,99,235,0.20), inset 0 1px 0 rgba(255,255,255,0.9);
+  }
+
+  .login-loading-spinner::before {
+    content: "";
+    position: absolute;
+    inset: -0.18rem;
+    border: 3px solid rgba(37,99,235,0.14);
+    border-top-color: #2563eb;
+    border-right-color: rgba(5,150,105,0.55);
+    border-radius: inherit;
     animation: loginSpin 0.9s linear infinite;
+  }
+
+  .login-loading-spinner svg {
+    filter: drop-shadow(0 8px 16px rgba(37,99,235,0.18));
   }
 
   .settings-card {
@@ -1031,6 +1085,31 @@
     }
   }
 
+  @keyframes loadingBackdropBreath {
+    0%, 100% {
+      opacity: 0.72;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.03);
+    }
+  }
+
+  @keyframes loadingCardSweep {
+    0% {
+      left: -70%;
+      opacity: 0;
+    }
+    35%, 58% {
+      opacity: 0.9;
+    }
+    100% {
+      left: 132%;
+      opacity: 0;
+    }
+  }
+
   @media (max-width: 640px) {
     .bible-study-scene {
       height: 12rem;
@@ -1121,7 +1200,9 @@
     .speech-bubble,
     .login-feature-card,
     .login-feature-card::before,
-    .login-loading-spinner {
+    .login-loading-overlay::before,
+    .login-loading-card::before,
+    .login-loading-spinner::before {
       animation: none;
     }
 
