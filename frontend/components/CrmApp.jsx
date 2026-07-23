@@ -883,6 +883,18 @@ function AppShell({ children, current, onNavigate, onLogout, theme, onToggleThem
   );
 }
 
+function openDetailsView(setView) {
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  setView('details');
+  requestAnimationFrame(() => {
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  });
+}
+
 export default function CrmApp({ payload }) {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('login');
@@ -922,7 +934,7 @@ export default function CrmApp({ payload }) {
       />
     );
   } else if (view === 'association') {
-    content = <AssociationDashboard association={selectedAssociation} data={data} onOpenDetails={() => setView('details')} />;
+    content = <AssociationDashboard association={selectedAssociation} data={data} onOpenDetails={() => openDetailsView(setView)} />;
   } else if (view === 'automations') {
     content = <PlaceholderView icon={MessageCircle} subtitle="A próxima camada terá sequências, templates aprovados e gatilhos de envio por etapa do funil." title="Central WhatsApp" />;
   } else if (view === 'settings') {

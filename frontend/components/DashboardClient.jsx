@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const priorityLabels = {
   Hot: 'Quente',
@@ -258,7 +258,7 @@ function DonutChart({ values }) {
 function ActionCard({ title, value, detail, tone, onClick }) {
   return (
     <button
-      className="group relative min-h-32 cursor-pointer overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-900/70 p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.18)] ring-1 ring-white/[0.025] transition duration-300 hover:-translate-y-1 hover:border-blue-300/20 hover:bg-slate-900/90 hover:shadow-[0_24px_70px_rgba(0,0,0,0.34)] focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+      className="interactive-card group relative min-h-32 cursor-pointer overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-900/70 p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.18)] ring-1 ring-white/[0.025] transition duration-300 hover:-translate-y-1 hover:border-blue-300/20 hover:shadow-[0_24px_70px_rgba(0,0,0,0.18)] focus:outline-none focus:ring-4 focus:ring-blue-500/10"
       onClick={onClick}
       type="button"
     >
@@ -449,6 +449,18 @@ export default function DashboardClient({ payload, onBack }) {
     () => data.districtList.find((district) => district.nome === selectedDistrictName) || null,
     [data.districtList, selectedDistrictName]
   );
+
+  useEffect(() => {
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    requestAnimationFrame(() => {
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
+  }, []);
+
   const activeFilters = useMemo(() => (
     ['distrito', 'prioridade', 'vip', 'telefone', 'estudos', 'genero']
       .map((key) => ({ key, label: filterLabel(filters, key, districts) }))
@@ -513,7 +525,7 @@ export default function DashboardClient({ payload, onBack }) {
   }));
 
   return (
-    <div className="silver-stage app-light min-h-screen text-slate-100" onPointerMove={onPointerMove}>
+    <div className="silver-stage app-light details-light min-h-screen text-slate-100" onPointerMove={onPointerMove}>
       <div
         className="pointer-events-none fixed inset-0 -z-10 transition duration-300"
         style={{

@@ -320,6 +320,52 @@
     stroke: rgba(71, 85, 105, 0.12);
   }
 
+  .details-light .interactive-card,
+  .details-light button.interactive-card,
+  .details-light article.interactive-card,
+  .details-light section.interactive-card {
+    border-color: rgba(71, 85, 105, 0.14) !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.74), rgba(241,245,249,0.58)) !important;
+    color: rgb(15 23 42) !important;
+    box-shadow: 0 22px 70px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255,255,255,0.78) !important;
+  }
+
+  .details-light .interactive-card:hover,
+  .details-light button.interactive-card:hover,
+  .details-light article.interactive-card:hover,
+  .details-light section.interactive-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(37, 99, 235, 0.22) !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.88), rgba(239,246,255,0.72)) !important;
+    box-shadow: 0 28px 90px rgba(37,99,235,0.13), inset 0 1px 0 rgba(255,255,255,0.92) !important;
+  }
+
+  .details-light .interactive-card .text-slate-50,
+  .details-light .interactive-card .text-slate-100,
+  .details-light .interactive-card strong,
+  .details-light .interactive-card h2,
+  .details-light .interactive-card h3 {
+    color: rgb(15 23 42) !important;
+  }
+
+  .details-light .interactive-card .text-slate-400,
+  .details-light .interactive-card .text-slate-500,
+  .details-light .interactive-card p,
+  .details-light .interactive-card span {
+    color: rgb(51 65 85) !important;
+  }
+
+  .details-light .interactive-card [style*="background"] {
+    color: white !important;
+  }
+
+  .details-light .sticky,
+  .details-light header {
+    border-color: rgba(71,85,105,0.14) !important;
+    background: rgba(248,250,252,0.78) !important;
+    box-shadow: 0 18px 52px rgba(15,23,42,0.08);
+  }
+
   .app-dark {
     color: rgb(241 245 249);
     background:
