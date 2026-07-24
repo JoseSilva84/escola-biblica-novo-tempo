@@ -580,7 +580,7 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
                 <span>
                   <span className="flex flex-wrap items-center gap-2">
                     <strong className="text-xl font-black text-slate-50">{association.name}</strong>
-                    <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${association.status === 'Ativa' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-slate-500/10 text-slate-400'}`}>{association.status}</span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${association.status === 'Ativa' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>{association.status}</span>
                   </span>
                   <span className="mt-2 block text-sm text-slate-500">{association.region} · {formatNumber(association.leads)} leads · {association.campaigns} campanhas</span>
                 </span>
@@ -689,7 +689,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
               <span className={labelClass}>Campanhas</span>
               <h2 className="mt-1 text-xl font-black text-slate-50">Ambientes de captação</h2>
             </div>
-            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-300">{association.name}</span>
+            <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">{association.name}</span>
           </div>
           <div className="grid gap-3">
             <button className="interactive-card group grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-blue-400/20 bg-blue-500/[0.08] p-5 text-left" onClick={onOpenDetails} type="button">
@@ -708,7 +708,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
                   <span className={labelClass}>Próxima campanha</span>
                   <strong className="mt-2 block text-lg text-slate-200">{campaign}</strong>
                 </div>
-                <span className="rounded-full border border-white/[0.07] px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-500">Planejada</span>
+                <span className="rounded-full bg-slate-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Planejada</span>
               </div>
             ))}
           </div>
@@ -724,7 +724,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tickLine={false} type="category" width={115} />
                 <Tooltip cursor={false} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} itemStyle={{ color: '#fff' }} formatter={(value) => formatNumber(value)} />
-                <Bar className="transition duration-300 hover:brightness-125" dataKey="interessados" fill="#cbd5e1" radius={[0, 10, 10, 0]} />
+                <Bar activeBar={{ fill: '#64748b' }} className="transition duration-300" dataKey="interessados" fill="#cbd5e1" radius={[0, 10, 10, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -753,7 +753,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
             <div className="interactive-card rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5" key={automation.name}>
               <div className="mb-4 flex items-center justify-between gap-3">
                 <strong className="text-slate-100">{automation.name}</strong>
-                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${automation.status === 'Ativa' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-slate-500/10 text-slate-400'}`}>{automation.status}</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${automation.status === 'Ativa' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>{automation.status}</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

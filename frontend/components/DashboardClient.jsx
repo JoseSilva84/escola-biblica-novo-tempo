@@ -621,7 +621,7 @@ export default function DashboardClient({ payload, onBack }) {
             <div className="mt-4 flex flex-wrap gap-2">
               {activeFilters.map((item) => (
                 <button
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/[0.08] px-3 py-1 text-xs font-bold text-blue-200 transition hover:border-blue-300/50 hover:bg-blue-500/15"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500 px-3 py-1 text-xs font-bold text-white transition hover:border-blue-300/50 hover:bg-blue-600"
                   key={item.key}
                   onClick={() => setFilter(item.key, 'all')}
                   type="button"
@@ -666,7 +666,7 @@ export default function DashboardClient({ payload, onBack }) {
 
         <section className="mb-6 grid grid-cols-[1.6fr_1fr] gap-4 max-xl:grid-cols-1">
           <article className={`${cardClass} min-w-0 hover:z-50 focus-within:z-50`}>
-            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Top 15 Distritos por Volume (Filtrado)</h2><span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-400">Ranking</span></div>
+            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Top 15 Distritos por Volume (Filtrado)</h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Ranking</span></div>
             <BarChart data={data.districtList.slice(0, 15).map((d) => ({
               label: d.nome,
               value: d.total,
@@ -683,18 +683,18 @@ export default function DashboardClient({ payload, onBack }) {
             }))} />
           </article>
           <article className={`${cardClass} min-w-0`}>
-            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Distribuição de Prioridade ML</h2><span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-400">Pontuação</span></div>
+            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Distribuição de Prioridade ML</h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Pontuação</span></div>
             <DonutChart values={priorityValues} />
           </article>
         </section>
 
         <section className="mb-6 grid grid-cols-2 gap-4 max-xl:grid-cols-1">
           <article className={`${cardClass} min-w-0`}>
-            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Perfil Religioso</h2><span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-400">Top 10</span></div>
+            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Perfil Religioso</h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Top 10</span></div>
             <BarChart horizontal data={data.religionList.map((item, index) => ({ ...item, color: ['hsl(217,91%,60%)', 'hsl(195,80%,50%)', 'hsl(152,69%,53%)', 'hsl(38,92%,50%)', 'hsl(270,70%,62%)', 'hsl(340,70%,55%)'][index % 6] }))} />
           </article>
           <article className={`${cardClass} min-w-0`}>
-            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Tempo sem Contato</h2><span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-400">Recência</span></div>
+            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Tempo sem Contato</h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Recência</span></div>
             <BarChart data={tempoRows} />
           </article>
         </section>

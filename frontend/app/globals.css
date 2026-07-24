@@ -607,7 +607,7 @@
   .details-light .interactive-card .text-slate-400,
   .details-light .interactive-card .text-slate-500,
   .details-light .interactive-card p,
-  .details-light .interactive-card span {
+  .details-light .interactive-card span:not(.text-white) {
     color: rgb(51 65 85) !important;
   }
 
