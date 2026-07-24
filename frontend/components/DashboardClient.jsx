@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Info } from 'lucide-react';
 
 const priorityLabels = {
   Hot: 'Quente',
@@ -22,6 +22,65 @@ const cardClass = 'interactive-card group relative overflow-hidden rounded-2xl b
 const labelClass = 'text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500';
 const selectClass = 'h-10 w-full cursor-pointer rounded-lg border border-white/[0.06] bg-slate-950/80 px-3 text-sm font-semibold text-slate-100 outline-none transition hover:border-blue-400/50 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10';
 const activeSelectClass = 'border-blue-400/45 bg-blue-500/[0.08] text-blue-100 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]';
+
+const rules = {
+  total: 'Total de interessados que permanecem depois dos filtros aplicados nesta tela.',
+  telefone: 'Conta os interessados com telefone/WhatsApp cadastrado. O percentual usa o total filtrado como base.',
+  hot: 'Contatos classificados como Quente pelo modelo de prioridade ML. Sao os leads com maior urgencia operacional.',
+  vip: 'Interessados marcados como VIP na base filtrada. O percentual usa o total filtrado como base.',
+  estudos: 'Interessados com estudo ativo/em andamento na base filtrada.',
+  actionHot: 'Seleciona o distrito com maior quantidade de contatos Quentes entre os dados filtrados.',
+  actionWarm: 'Seleciona o distrito com maior quantidade de contatos Potenciais entre os dados filtrados.',
+  actionVip: 'Seleciona o distrito com maior quantidade de VIPs entre os dados filtrados.',
+  actionRecovery: 'Seleciona o distrito com mais contatos ha mais de 5 anos sem contato registrado.',
+  topDistricts: 'Ranking dos 15 distritos com maior total de interessados apos os filtros. Ao passar o mouse em uma barra, aparecem os indicadores que formam a leitura do distrito.',
+  priority: 'Distribui os interessados filtrados nas faixas do modelo ML: Quente, Potencial, Morno e Frio.',
+  religion: 'Mostra as 10 religioes mais frequentes entre os interessados filtrados.',
+  recency: 'Agrupa os interessados pelo tempo desde o ultimo contato. Quanto maior a faixa, maior a chance de recuperacao operacional.',
+  table: 'Tabela consolidada por distrito, sempre respeitando os filtros ativos.',
+  score: 'Pontuacao media = soma das pontuacoes ML individuais do distrito dividida pelo total de interessados do distrito. Quanto maior, maior a prioridade media.',
+  district: 'Abre a analise detalhada do distrito selecionado.'
+};
+
+function RulesModal({ onClose }) {
+  const mlRules = [
+    { label: 'Quente', color: priorityColors.Hot, score: '≥ 15 pts', desc: 'Maior prioridade operacional. Alta chance de engajamento baseada em score de ML, interação recente e contactabilidade (celular validado).' },
+    { label: 'Potencial', color: priorityColors.Warm, score: '10 a 14 pts', desc: 'Boa chance de abordagem. O modelo identifica sinais relevantes de interesse, ideal para manter no funil.' },
+    { label: 'Morno', color: priorityColors.Cool, score: '5 a 9 pts', desc: 'Prioridade intermediária. Úteis para campanhas de acompanhamento e nutrição de relacionamento.' },
+    { label: 'Frio', color: priorityColors.Cold, score: '< 5 pts', desc: 'Menor prioridade no momento. Geralmente com baixa recência ou baixa contactabilidade.' }
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+      <button className="absolute inset-0 cursor-default bg-slate-900/40 backdrop-blur-sm" onClick={onClose} type="button" aria-label="Fechar regras" />
+      <div className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-white bg-gradient-to-br from-white/95 to-slate-50/95 p-6 text-left shadow-[0_24px_50px_-12px_rgba(0,0,0,0.25)] ring-1 ring-slate-900/5 backdrop-blur-3xl">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-2xl font-black text-slate-900">Regras de Prioridade ML</h3>
+            <p className="mt-1 text-sm font-medium text-slate-600">Entenda como o modelo classifica cada interessado.</p>
+          </div>
+          <button className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-100 text-xl font-bold text-slate-400 transition hover:bg-slate-200 hover:text-slate-600 focus:outline-none" onClick={onClose} type="button" aria-label="Fechar">×</button>
+        </div>
+        
+        <div className="grid gap-4">
+          {mlRules.map((r) => (
+            <div key={r.label} className="rounded-2xl border border-white/50 bg-white/60 p-4 shadow-sm ring-1 ring-slate-900/5">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full shadow-inner ring-1 ring-black/10" style={{ background: r.color }} />
+                  <strong className="text-base font-black text-slate-800">{r.label}</strong>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-500">{r.score}</span>
+              </div>
+              <p className="text-sm font-medium leading-relaxed text-slate-600">{r.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString('pt-BR');
@@ -59,15 +118,59 @@ function FilterSelect({ label, value, onChange, children, active }) {
   );
 }
 
-function KpiCard({ accent, label, value, sub, onClick, children }) {
+function RuleTooltip({ children, side = 'top' }) {
+  const positionClass = side === 'right'
+    ? 'left-[calc(100%+0.75rem)] top-1/2 -translate-y-1/2'
+    : side === 'bottom'
+      ? 'left-1/2 top-[calc(100%+0.75rem)] -translate-x-1/2'
+      : side === 'bottom-right'
+        ? 'right-0 top-[calc(100%+0.75rem)]'
+        : side === 'top-right'
+          ? 'right-0 bottom-[calc(100%+0.75rem)]'
+          : 'bottom-[calc(100%+0.75rem)] left-1/2 -translate-x-1/2';
+
   return (
-    <button className={`${cardClass} cursor-pointer text-left`} onClick={onClick} type="button">
+    <span className={`pointer-events-none absolute ${positionClass} z-[9999] hidden w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white bg-gradient-to-br from-white/95 to-slate-50/90 p-4 text-left text-[11px] whitespace-normal font-medium leading-relaxed text-slate-600 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-slate-900/5 backdrop-blur-3xl group-hover/tip:block group-focus-within/tip:block`}>
+      {children}
+    </span>
+  );
+}
+
+function InfoHint({ text, side = 'top' }) {
+  return (
+    <span className="group/tip relative inline-flex align-middle">
+      <span
+        aria-label="Ver regra da analise"
+        role="img"
+        className="grid h-6 w-6 place-items-center rounded-full border border-slate-900/10 bg-white/70 text-slate-500 shadow-sm transition hover:border-blue-400/40 hover:bg-blue-50 hover:text-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+      >
+        <Info size={14} strokeWidth={2.6} />
+      </span>
+      <RuleTooltip side={side}>{text}</RuleTooltip>
+    </span>
+  );
+}
+
+function LabelWithHint({ children, hint }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      {children}
+      {hint ? <InfoHint text={hint} /> : null}
+    </span>
+  );
+}
+
+function KpiCard({ accent, label, value, sub, onClick, rule, children }) {
+  return (
+    <button className={`${cardClass} !overflow-visible cursor-pointer text-left hover:z-50 focus-within:z-50`} onClick={onClick} type="button">
       <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 transition group-hover:opacity-100" />
       <span className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-0 blur-3xl transition group-hover:opacity-30" style={{ background: accent }} />
       <span className="mb-4 grid h-12 w-12 place-items-center rounded-xl text-xl font-black text-white shadow-lg transition duration-300 group-hover:scale-105" style={{ background: accent }}>
         {children}
       </span>
-      <span className={labelClass}>{label}</span>
+      <span className={labelClass}>
+        <LabelWithHint hint={rule}>{label}</LabelWithHint>
+      </span>
       <span className="mt-2 block text-4xl font-black leading-none tracking-normal text-slate-50">{formatNumber(value)}</span>
       <span className="mt-2 block text-sm text-slate-500">{sub}</span>
     </button>
@@ -76,16 +179,16 @@ function KpiCard({ accent, label, value, sub, onClick, children }) {
 
 function MetricTooltip({ title, color, rows }) {
   return (
-    <div className="pointer-events-none relative z-50 w-64 rounded-xl border border-white/[0.08] bg-slate-950/95 p-4 text-left shadow-[0_18px_60px_rgba(0,0,0,0.45)] ring-1 ring-white/[0.04] backdrop-blur-xl">
-      <div className="mb-3 flex items-center gap-2">
-        <div className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
-        <div className="truncate text-sm font-black text-white">{title}</div>
+    <div className="pointer-events-none relative z-50 w-64 overflow-hidden rounded-2xl border border-white bg-gradient-to-br from-white/95 to-slate-50/90 p-5 text-left shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-slate-900/5 backdrop-blur-3xl">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="h-3 w-3 rounded-full shadow-inner ring-1 ring-black/10" style={{ background: color }} />
+        <div className="truncate text-base font-black text-slate-900">{title}</div>
       </div>
-      <div className="grid gap-2">
+      <div className="grid gap-2.5">
         {rows.map((row) => (
-          <div className="flex items-center justify-between gap-4 text-xs" key={row.label}>
-            <div className="text-white">{row.label}</div>
-            <div className="font-black tabular-nums text-white">{row.value}</div>
+          <div className="flex items-center justify-between gap-4 text-sm" key={row.label}>
+            <div className="font-semibold text-slate-600">{row.label}</div>
+            <div className="font-black tabular-nums text-slate-900">{row.value}</div>
           </div>
         ))}
       </div>
@@ -101,7 +204,7 @@ function BarChart({ data, horizontal = false, color = 'hsl(217, 91%, 60%)' }) {
     return (
       <div className="grid gap-3 pt-4">
         {data.map((item, index) => (
-          <div className="grid grid-cols-[minmax(7rem,11rem)_1fr] items-center gap-4" key={`${item.label}-${index}`}>
+          <div className="group/tip relative grid grid-cols-[minmax(7rem,11rem)_1fr] items-center gap-4" key={`${item.label}-${index}`}>
             <span className="truncate text-right text-sm text-slate-400" title={item.label}>{item.label}</span>
             <div className="h-7 overflow-hidden rounded-full bg-slate-950/70 ring-1 ring-white/5">
               <div
@@ -111,6 +214,18 @@ function BarChart({ data, horizontal = false, color = 'hsl(217, 91%, 60%)' }) {
                 {formatNumber(item.value)}
               </div>
             </div>
+            {(item.description || item.tooltipRows?.length) ? (
+              <RuleTooltip side="top">
+                <strong className="mb-2 block text-sm text-slate-900">{item.label}</strong>
+                {item.description ? <span className="block text-slate-600 font-medium">{item.description}</span> : null}
+                {item.tooltipRows?.map((row) => (
+                  <span className="mt-1.5 flex justify-between gap-4 text-slate-600 font-medium" key={row.label}>
+                    <span>{row.label}</span>
+                    <strong className="text-slate-900 font-black">{row.value}</strong>
+                  </span>
+                ))}
+              </RuleTooltip>
+            ) : null}
           </div>
         ))}
       </div>
@@ -121,19 +236,24 @@ function BarChart({ data, horizontal = false, color = 'hsl(217, 91%, 60%)' }) {
   const tooltipLeft = activeBar === null || data.length <= 1 ? 50 : (activeBar / (data.length - 1)) * 100;
 
   return (
-    <div className="relative min-h-80 overflow-visible pt-20">
+    <div className="relative min-h-80 overflow-visible pt-20" onMouseLeave={() => setActiveBar(null)}>
       {activeItem?.tooltipRows?.length ? (
         <div
-          className="absolute top-0 z-50 w-72 max-w-[calc(100vw-3rem)] transition-all duration-150"
+          className="pointer-events-none absolute top-0 z-50 w-72 max-w-[calc(100vw-3rem)] transition-all duration-300 ease-out"
           style={{
             left: `${Math.min(82, Math.max(18, tooltipLeft))}%`,
             transform: 'translateX(-50%)'
           }}
         >
           <MetricTooltip title={activeItem.label} color={activeItem.color || color} rows={activeItem.tooltipRows} />
+          {activeItem.description ? (
+            <div className="-mt-2 rounded-b-2xl border border-t-0 border-white bg-slate-50/95 px-5 pb-4 pt-4 text-xs font-medium leading-relaxed text-slate-600 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-slate-900/5 backdrop-blur-3xl">
+              {activeItem.description}
+            </div>
+          ) : null}
         </div>
       ) : null}
-      <div className="grid min-h-72 grid-flow-col items-end gap-3 overflow-visible" onMouseLeave={() => setActiveBar(null)}>
+      <div className="grid min-h-72 grid-flow-col items-end gap-3 overflow-visible">
       {data.map((item, index) => (
           <div className="relative grid h-72 min-w-0 grid-rows-[1fr_auto] gap-3" key={`${item.label}-${index}`} onMouseEnter={() => setActiveBar(index)}>
             <div className="relative flex items-end rounded-b-lg border-b border-white/15 bg-[linear-gradient(to_top,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:100%_52px]">
@@ -233,20 +353,20 @@ function DonutChart({ values }) {
           >
             <i className="h-3 w-3 rounded-full ring-2 ring-white/40" style={{ background: item.color }} />
             {item.label}
-            <div className="pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-50 hidden w-56 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-slate-950/95 p-3 text-left shadow-[0_18px_60px_rgba(0,0,0,0.45)] ring-1 ring-white/[0.04] backdrop-blur-xl group-hover/legend:block group-focus/legend:block">
-              <div className="mb-2 flex items-center gap-2 text-sm font-black text-white">
-                <i className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />
+            <div className="pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-[9999] hidden w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-white bg-gradient-to-br from-white/95 to-slate-50/90 p-4 text-left shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-slate-900/5 backdrop-blur-3xl group-hover/legend:block group-focus/legend:block">
+              <div className="mb-3 flex items-center gap-3 text-sm font-black text-slate-900">
+                <i className="h-3 w-3 rounded-full shadow-inner ring-1 ring-black/10" style={{ background: item.color }} />
                 {item.label}
               </div>
-              <div className="flex justify-between text-xs text-white/80">
+              <div className="flex justify-between text-xs text-slate-600 font-medium">
                 <div>Contatos</div>
-                <div className="font-bold text-white">{formatNumber(item.value)}</div>
+                <div className="font-black text-slate-900">{formatNumber(item.value)}</div>
               </div>
-              <div className="mt-1 flex justify-between text-xs text-white/80">
+              <div className="mt-1.5 flex justify-between text-xs text-slate-600 font-medium">
                 <div>Participação</div>
-                <div className="font-bold text-white">{pct(item.value, total)}%</div>
+                <div className="font-black text-slate-900">{pct(item.value, total)}%</div>
               </div>
-              <div className="mt-2 block text-xs leading-relaxed text-white/60">{item.description}</div>
+              <div className="mt-3 block text-xs leading-relaxed text-slate-500 font-medium">{item.description}</div>
             </div>
           </div>
         ))}
@@ -255,25 +375,29 @@ function DonutChart({ values }) {
   );
 }
 
-function ActionCard({ title, value, detail, tone, onClick }) {
+function ActionCard({ title, value, detail, tone, onClick, rule }) {
   return (
     <button
-      className="interactive-card group relative min-h-32 cursor-pointer overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-900/70 p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.18)] ring-1 ring-white/[0.025] transition duration-300 hover:-translate-y-1 hover:border-blue-300/20 hover:shadow-[0_24px_70px_rgba(0,0,0,0.18)] focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+      className="interactive-card group relative min-h-32 cursor-pointer !overflow-visible rounded-2xl border border-white/[0.06] bg-slate-900/70 p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.18)] ring-1 ring-white/[0.025] transition duration-300 hover:-translate-y-1 hover:border-blue-300/20 hover:shadow-[0_24px_70px_rgba(0,0,0,0.18)] focus:outline-none focus:ring-4 focus:ring-blue-500/10 hover:z-50 focus-within:z-50"
       onClick={onClick}
       type="button"
     >
       <span className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full opacity-20 blur-3xl transition group-hover:opacity-40" style={{ background: tone }} />
-      <span className={labelClass}>{title}</span>
+      <span className={labelClass}>
+        <LabelWithHint hint={rule}>{title}</LabelWithHint>
+      </span>
       <strong className="mt-3 block truncate text-2xl font-black text-slate-50">{value}</strong>
       <span className="mt-2 block text-sm leading-relaxed text-slate-400">{detail}</span>
     </button>
   );
 }
 
-function DetailStat({ label, value, color = 'text-slate-100' }) {
+function DetailStat({ label, value, color = 'text-slate-100', rule }) {
   return (
     <div className="rounded-xl border border-white/[0.06] bg-slate-950/50 p-4">
-      <span className={labelClass}>{label}</span>
+      <span className={labelClass}>
+        <LabelWithHint hint={rule}>{label}</LabelWithHint>
+      </span>
       <strong className={`mt-2 block text-2xl font-black tabular-nums ${color}`}>{value}</strong>
     </div>
   );
@@ -305,7 +429,7 @@ function DistrictDrawer({ district, onClose }) {
 
         <div className="grid grid-cols-2 gap-3">
           <DetailStat label="Contatos" value={formatNumber(district.total)} />
-          <DetailStat label="Pontuação Média" value={district.score_medio.toLocaleString('pt-BR')} color={district.score_medio >= 14 ? 'text-orange-400' : 'text-amber-400'} />
+          <DetailStat label="Pontuação Média" rule={rules.score} value={district.score_medio.toLocaleString('pt-BR')} color={district.score_medio >= 14 ? 'text-orange-400' : 'text-amber-400'} />
           <DetailStat label="WhatsApp" value={`${formatNumber(district.telefone)} (${pct(district.telefone, total)}%)`} color="text-emerald-300" />
           <DetailStat label="VIPs" value={`${formatNumber(district.vips)} (${pct(district.vips, total)}%)`} color="text-amber-300" />
           <DetailStat label="Estudos Ativos" value={`${formatNumber(district.estudos)} (${pct(district.estudos, total)}%)`} color="text-violet-300" />
@@ -434,6 +558,7 @@ export default function DashboardClient({ payload, onBack }) {
   const [pointer, setPointer] = useState({ x: 50, y: 20 });
   const [selectedDistrictName, setSelectedDistrictName] = useState(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const topAnchorRef = useRef(null);
 
@@ -484,10 +609,10 @@ export default function DashboardClient({ payload, onBack }) {
     const byVip = [...data.districtList].sort((a, b) => b.vips - a.vips)[0];
     const byDormant = [...data.districtList].sort((a, b) => b.semContato5Anos - a.semContato5Anos)[0];
     return [
-      byHot && { title: 'Atacar agora', value: byHot.nome, detail: `${formatNumber(byHot.hot)} contatos quentes para priorizar`, tone: priorityColors.Hot, district: byHot.nome },
-      byWarm && { title: 'Maior potencial', value: byWarm.nome, detail: `${formatNumber(byWarm.warm)} contatos potenciais no funil`, tone: priorityColors.Warm, district: byWarm.nome },
-      byVip && { title: 'Base VIP', value: byVip.nome, detail: `${formatNumber(byVip.vips)} VIPs para relacionamento`, tone: 'hsl(270, 70%, 62%)', district: byVip.nome },
-      byDormant && { title: 'Recuperação', value: byDormant.nome, detail: `${formatNumber(byDormant.semContato5Anos)} contatos há 5+ anos sem contato`, tone: 'hsl(0, 70%, 50%)', district: byDormant.nome }
+      byHot && { title: 'Atacar agora', value: byHot.nome, detail: `${formatNumber(byHot.hot)} contatos quentes para priorizar`, tone: priorityColors.Hot, district: byHot.nome, rule: rules.actionHot },
+      byWarm && { title: 'Maior potencial', value: byWarm.nome, detail: `${formatNumber(byWarm.warm)} contatos potenciais no funil`, tone: priorityColors.Warm, district: byWarm.nome, rule: rules.actionWarm },
+      byVip && { title: 'Base VIP', value: byVip.nome, detail: `${formatNumber(byVip.vips)} VIPs para relacionamento`, tone: 'hsl(270, 70%, 62%)', district: byVip.nome, rule: rules.actionVip },
+      byDormant && { title: 'Recuperação', value: byDormant.nome, detail: `${formatNumber(byDormant.semContato5Anos)} contatos há 5+ anos sem contato`, tone: 'hsl(0, 70%, 50%)', district: byDormant.nome, rule: rules.actionRecovery }
     ].filter(Boolean);
   }, [data.districtList]);
 
@@ -533,7 +658,8 @@ export default function DashboardClient({ payload, onBack }) {
   const tempoRows = Array.from(data.tempo.entries()).map(([label, value], index) => ({
     label,
     value,
-    color: ['hsl(152,69%,53%)', 'hsl(80,60%,50%)', 'hsl(38,92%,50%)', 'hsl(14,100%,57%)', 'hsl(0,70%,50%)', 'hsl(220,15%,45%)'][index]
+    color: ['hsl(152,69%,53%)', 'hsl(80,60%,50%)', 'hsl(38,92%,50%)', 'hsl(14,100%,57%)', 'hsl(0,70%,50%)', 'hsl(220,15%,45%)'][index],
+    description: `Quantidade de interessados filtrados na faixa "${label}" desde o último contato registrado.`
   }));
 
   return (
@@ -546,7 +672,7 @@ export default function DashboardClient({ payload, onBack }) {
         }}
       />
 
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-white/[0.06] bg-slate-950/80 px-8 py-4 backdrop-blur-2xl max-md:flex-col max-md:items-start max-md:px-4">
+      <header className="sticky top-0 z-[70] flex items-center justify-between gap-4 border-b border-white/[0.06] bg-slate-950/80 px-8 py-4 backdrop-blur-2xl max-md:flex-col max-md:items-start max-md:px-4">
         <div className="flex items-center gap-4">
           {onBack ? (
             <button
@@ -571,7 +697,7 @@ export default function DashboardClient({ payload, onBack }) {
       </header>
 
       <main className="mx-auto w-full max-w-[1440px] px-8 py-6 max-md:px-4">
-        <section className="sticky top-[77px] z-10 mb-6 rounded-2xl border border-white/[0.06] bg-slate-950/82 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-2xl max-md:static">
+        <section className="sticky top-[77px] z-[60] mb-6 rounded-2xl border border-white/[0.06] bg-slate-950/82 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-2xl max-md:static">
           <div className="flex flex-wrap items-end gap-5 w-full">
             <FilterSelect label="Distrito" value={filters.distrito} onChange={(value) => setFilter('distrito', value)} active={filters.distrito !== 'all'}>
               <option value="all">Todos os Distritos</option>
@@ -635,11 +761,11 @@ export default function DashboardClient({ payload, onBack }) {
         </section>
 
         <section className="mb-6 grid grid-cols-5 gap-4 max-xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
-          <KpiCard accent="hsl(217, 91%, 60%)" label="Contatos (Filtrados)" value={data.kpis.total} sub={`em ${data.districtList.length} distritos`} onClick={resetFilters}>◎</KpiCard>
-          <KpiCard accent="hsl(152, 69%, 53%)" label="Com Telefone" value={data.kpis.telefone} sub={`${pct(data.kpis.telefone, data.kpis.total)}% com zap`} onClick={() => setFilter('telefone', '1')}>☎</KpiCard>
-          <KpiCard accent="hsl(14, 100%, 57%)" label="Contatos Quentes" value={data.kpis.hot} sub={`${pct(data.kpis.hot, data.kpis.total)}% via ML`} onClick={() => setFilter('prioridade', 'Hot')}>△</KpiCard>
-          <KpiCard accent="hsl(38, 92%, 50%)" label="VIPs" value={data.kpis.vips} sub={`${pct(data.kpis.vips, data.kpis.total)}%`} onClick={() => setFilter('vip', '1')}>☆</KpiCard>
-          <KpiCard accent="hsl(270, 70%, 62%)" label="Estudos Ativos" value={data.kpis.estudos} sub={`${pct(data.kpis.estudos, data.kpis.total)}%`} onClick={() => setFilter('estudos', '1')}>□</KpiCard>
+          <KpiCard accent="hsl(217, 91%, 60%)" label="Contatos (Filtrados)" rule={rules.total} value={data.kpis.total} sub={`em ${data.districtList.length} distritos`} onClick={resetFilters}>◎</KpiCard>
+          <KpiCard accent="hsl(152, 69%, 53%)" label="Com Telefone" rule={rules.telefone} value={data.kpis.telefone} sub={`${pct(data.kpis.telefone, data.kpis.total)}% com zap`} onClick={() => setFilter('telefone', '1')}>☎</KpiCard>
+          <KpiCard accent="hsl(14, 100%, 57%)" label="Contatos Quentes" rule={rules.hot} value={data.kpis.hot} sub={`${pct(data.kpis.hot, data.kpis.total)}% via ML`} onClick={() => setFilter('prioridade', 'Hot')}>△</KpiCard>
+          <KpiCard accent="hsl(38, 92%, 50%)" label="VIPs" rule={rules.vip} value={data.kpis.vips} sub={`${pct(data.kpis.vips, data.kpis.total)}%`} onClick={() => setFilter('vip', '1')}>☆</KpiCard>
+          <KpiCard accent="hsl(270, 70%, 62%)" label="Estudos Ativos" rule={rules.estudos} value={data.kpis.estudos} sub={`${pct(data.kpis.estudos, data.kpis.total)}%`} onClick={() => setFilter('estudos', '1')}>□</KpiCard>
         </section>
 
         <section className="mb-6">
@@ -656,6 +782,7 @@ export default function DashboardClient({ payload, onBack }) {
                 detail={item.detail}
                 key={item.title}
                 onClick={() => setSelectedDistrictName(item.district)}
+                rule={item.rule}
                 title={item.title}
                 tone={item.tone}
                 value={item.value}
@@ -665,11 +792,12 @@ export default function DashboardClient({ payload, onBack }) {
         </section>
 
         <section className="mb-6 grid grid-cols-[1.6fr_1fr] gap-4 max-xl:grid-cols-1">
-          <article className={`${cardClass} min-w-0 hover:z-50 focus-within:z-50`}>
-            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Top 15 Distritos por Volume (Filtrado)</h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Ranking</span></div>
+          <article className={`${cardClass} !overflow-visible min-w-0 hover:z-50 focus-within:z-50`}>
+            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="inline-flex items-center gap-2 text-base font-black text-slate-100">Top 15 Distritos por Volume (Filtrado)<InfoHint text={rules.topDistricts} side="bottom" /></h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Ranking</span></div>
             <BarChart data={data.districtList.slice(0, 15).map((d) => ({
               label: d.nome,
               value: d.total,
+              description: rules.topDistricts,
               tooltipRows: [
                 { label: 'Contatos', value: formatNumber(d.total) },
                 { label: 'WhatsApp', value: `${formatNumber(d.telefone)} (${pct(d.telefone, d.total)}%)` },
@@ -678,47 +806,60 @@ export default function DashboardClient({ payload, onBack }) {
                 { label: 'Mornos', value: formatNumber(d.cool) },
                 { label: 'Frios', value: formatNumber(d.cold) },
                 { label: 'VIPs', value: formatNumber(d.vips) },
-                { label: 'Pontuação média', value: d.score_medio.toLocaleString('pt-BR') }
+                { label: 'Pontuação média', value: `${d.score_medio.toLocaleString('pt-BR')} - média dos scores ML dos contatos` }
               ]
             }))} />
           </article>
-          <article className={`${cardClass} min-w-0`}>
-            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Distribuição de Prioridade ML</h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Pontuação</span></div>
+          <article className={`${cardClass} !overflow-visible min-w-0 hover:z-50 focus-within:z-50`}>
+            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="inline-flex items-center gap-2 text-base font-black text-slate-100">Distribuição de Prioridade ML<InfoHint text={rules.priority} side="bottom" /></h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Pontuação</span></div>
             <DonutChart values={priorityValues} />
           </article>
         </section>
 
         <section className="mb-6 grid grid-cols-2 gap-4 max-xl:grid-cols-1">
-          <article className={`${cardClass} min-w-0`}>
-            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Perfil Religioso</h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Top 10</span></div>
-            <BarChart horizontal data={data.religionList.map((item, index) => ({ ...item, color: ['hsl(217,91%,60%)', 'hsl(195,80%,50%)', 'hsl(152,69%,53%)', 'hsl(38,92%,50%)', 'hsl(270,70%,62%)', 'hsl(340,70%,55%)'][index % 6] }))} />
+          <article className={`${cardClass} !overflow-visible min-w-0 hover:z-50 focus-within:z-50`}>
+            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="inline-flex items-center gap-2 text-base font-black text-slate-100">Perfil Religioso<InfoHint text={rules.religion} side="bottom" /></h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Top 10</span></div>
+            <BarChart horizontal data={data.religionList.map((item, index) => ({ ...item, color: ['hsl(217,91%,60%)', 'hsl(195,80%,50%)', 'hsl(152,69%,53%)', 'hsl(38,92%,50%)', 'hsl(270,70%,62%)', 'hsl(340,70%,55%)'][index % 6], description: `Total de interessados filtrados com perfil religioso "${item.label}".` }))} />
           </article>
-          <article className={`${cardClass} min-w-0`}>
-            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-base font-black text-slate-100">Tempo sem Contato</h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Recência</span></div>
+          <article className={`${cardClass} !overflow-visible min-w-0 hover:z-50 focus-within:z-50`}>
+            <div className="mb-5 flex items-center justify-between gap-4"><h2 className="inline-flex items-center gap-2 text-base font-black text-slate-100">Tempo sem Contato<InfoHint text={rules.recency} side="bottom" /></h2><span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Recência</span></div>
             <BarChart data={tempoRows} />
           </article>
         </section>
 
-        <section className={`${cardClass} p-6`}>
+        <section className={`${cardClass.replace('hover:-translate-y-1', '').replace('hover:z-50', '')} p-6 !overflow-visible focus-within:z-50`}>
           <div className="mb-5 flex items-center justify-between gap-4 max-md:flex-col max-md:items-stretch">
             <div>
-              <h2 className="text-base font-black text-slate-100">Distritos (Dados Filtrados)</h2>
+              <h2 className="inline-flex items-center gap-2 text-base font-black text-slate-100">Distritos (Dados Filtrados)<InfoHint text={rules.table} side="bottom" /></h2>
               <p className="mt-1 text-sm font-bold text-emerald-400">Dica: clique no nome do distrito para abrir a análise detalhada.</p>
             </div>
-            <input className="h-11 w-full rounded-xl border border-white/[0.06] bg-slate-950/80 px-4 text-sm font-semibold text-slate-100 outline-none transition placeholder:text-slate-600 hover:border-blue-400/40 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 md:w-80" value={filters.search} onChange={(event) => setFilter('search', event.target.value.toLowerCase())} placeholder="Buscar distrito..." />
+            <div className="flex w-full items-center gap-3 md:w-auto">
+              <button className="flex h-11 items-center justify-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 text-sm font-bold text-blue-500 transition hover:bg-blue-500/20 hover:text-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10" onClick={() => setShowRules(true)} type="button">
+                <Info size={16} strokeWidth={2.5} /> Regras
+              </button>
+              <input className="h-11 w-full rounded-xl border border-white/[0.06] bg-slate-950/80 px-4 text-sm font-semibold text-slate-100 outline-none transition placeholder:text-slate-600 hover:border-blue-400/40 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 md:w-80" value={filters.search} onChange={(event) => setFilter('search', event.target.value.toLowerCase())} placeholder="Buscar distrito..." />
+            </div>
           </div>
           <div className="max-h-[38rem] overflow-auto rounded-2xl">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
                   {[
-                    ['nome', 'Distrito'], ['total', 'Total'], ['telefone', 'WhatsApp'], ['hot', 'Quente'],
-                    ['warm', 'Potencial'], ['cool', 'Morno'], ['cold', 'Frio'], ['vips', 'VIPs'], ['score_medio', 'Pontuação Média']
-                  ].map(([key, label]) => (
+                    ['nome', 'Distrito', rules.district],
+                    ['total', 'Total', rules.total],
+                    ['telefone', 'WhatsApp', rules.telefone],
+                    ['hot', 'Quente', rules.hot],
+                    ['warm', 'Potencial', 'Contatos classificados como Potencial pelo modelo ML. Boa chance de abordagem, mas abaixo da prioridade Quente.'],
+                    ['cool', 'Morno', 'Contatos classificados como Morno pelo modelo ML. Prioridade intermediaria para acompanhamento.'],
+                    ['cold', 'Frio', 'Contatos classificados como Frio pelo modelo ML. Menor prioridade operacional no momento.'],
+                    ['vips', 'VIPs', rules.vip],
+                    ['score_medio', 'Pontuação Média', rules.score]
+                  ].map(([key, label, hint]) => (
                     <th className="sticky top-0 z-[1] cursor-pointer whitespace-nowrap border-b border-white/[0.06] bg-slate-950/95 px-4 py-3 text-left text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 backdrop-blur-xl transition hover:text-blue-400" key={key} onClick={() => clickSort(key)}>
                       <span className="inline-flex items-center gap-1">
                         {label}
                         {sort.col === key ? <span className="text-blue-400">{sort.asc ? '↑' : '↓'}</span> : null}
+                        <InfoHint text={hint} side={key === 'score_medio' || key === 'vips' ? 'bottom-right' : 'bottom'} />
                       </span>
                     </th>
                   ))}
@@ -737,7 +878,19 @@ export default function DashboardClient({ payload, onBack }) {
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-bold tabular-nums">{formatNumber(d.cool)}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-bold tabular-nums">{formatNumber(d.cold)}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-bold tabular-nums">{formatNumber(d.vips)}</td>
-                    <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4"><span className="inline-block min-w-10 rounded-full bg-amber-500/[0.12] px-2 py-1 text-center text-xs font-black" style={{ color: d.score_medio >= 14 ? priorityColors.Hot : d.score_medio >= 9 ? priorityColors.Warm : priorityColors.Cool }}>{d.score_medio}</span></td>
+                    <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4">
+                      <span className="group/tip relative inline-block min-w-10 rounded-full bg-amber-500/[0.12] px-2 py-1 text-center text-xs font-black" style={{ color: d.score_medio >= 14 ? priorityColors.Hot : d.score_medio >= 9 ? priorityColors.Warm : priorityColors.Cool }}>
+                        {d.score_medio}
+                        <RuleTooltip side="top-right">
+                          <strong className="mb-2 block text-sm text-slate-900">{d.nome}</strong>
+                          <span className="text-slate-600 font-medium">{rules.score}</span>
+                          <span className="mt-2.5 flex justify-between gap-4 text-slate-600 font-medium">
+                            <span>Total usado</span>
+                            <strong className="text-slate-900 font-black">{formatNumber(d.total)}</strong>
+                          </span>
+                        </RuleTooltip>
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -745,11 +898,12 @@ export default function DashboardClient({ payload, onBack }) {
           </div>
         </section>
 
-        <footer className="px-4 py-10 text-center text-sm text-slate-600">
+        <footer className="px-4 pt-8 pb-4 text-center text-sm text-slate-600">
           Escola Bíblica Novo Tempo | Prioridade via ML ({formatNumber(meta.mlRecords)} rankings do notebook)
         </footer>
       </main>
       <DistrictDrawer district={selectedDistrict} onClose={() => setSelectedDistrictName(null)} />
+      {showRules && <RulesModal onClose={() => setShowRules(false)} />}
       {isMounted && createPortal(
         <button
           className={`fixed bottom-8 right-8 z-[99999] grid h-12 w-12 place-items-center rounded-full bg-blue-600 text-white shadow-[0_10px_30px_rgba(37,99,235,0.4)] transition-all duration-300 hover:bg-blue-500 ${
