@@ -1150,6 +1150,19 @@
     }
   }
 
+  @keyframes logoFloat {
+    0%, 100% {
+      transform: translateY(0) scale(1);
+    }
+    50% {
+      transform: translateY(-8px) scale(1.02);
+    }
+  }
+
+  .animate-logo-float {
+    animation: logoFloat 5s ease-in-out infinite;
+  }
+
   @keyframes sunPulse {
     0%, 100% {
       opacity: 0.72;

@@ -319,7 +319,8 @@ function LoginScreen({ onLogin }) {
         </div>
 
         <form className={`${panelClass} grid content-center gap-5 p-8 max-sm:p-5`} onSubmit={submitLogin}>
-          <div>
+          <div className="flex flex-col items-center justify-center">
+            <img src="/logo.png" alt="Novo Tempo" className="animate-logo-float mb-4 h-28 object-contain drop-shadow-md" />
             <h2 className="mt-2 text-2xl font-black text-slate-50 text-center">Acesso aos Leads NT</h2>
           </div>
           <label className="grid gap-2 text-sm font-bold text-slate-300 text-center">
@@ -622,9 +623,9 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
 
 function AssociationDashboard({ association, data, onOpenDetails }) {
   const automations = [
-    { name: 'Boas-vindas', status: 'Ativa', sent: 1280, response: '18%' },
-    { name: 'Devocional 21 dias', status: 'Rascunho', sent: 0, response: '-' },
-    { name: 'Convite de visita', status: 'Ativa', sent: 312, response: '31%' }
+    { name: 'Boas-vindas', status: 'Ativa', sent: 1280, response: '18%', color: 'border-emerald-500/20 bg-emerald-500/[0.04]' },
+    { name: 'Devocional 21 dias', status: 'Rascunho', sent: 0, response: '-', color: 'border-slate-500/20 bg-slate-500/[0.04]' },
+    { name: 'Convite de visita', status: 'Ativa', sent: 312, response: '31%', color: 'border-blue-500/20 bg-blue-500/[0.04]' }
   ];
 
   return (
@@ -724,7 +725,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tickLine={false} type="category" width={115} />
                 <Tooltip cursor={false} contentStyle={{ background: '#020617', border: '1px solid rgba(226,232,240,0.16)', borderRadius: 12, color: '#e2e8f0' }} itemStyle={{ color: '#fff' }} formatter={(value) => formatNumber(value)} />
-                <Bar activeBar={{ fill: '#64748b' }} className="transition duration-300" dataKey="interessados" fill="#cbd5e1" radius={[0, 10, 10, 0]} />
+                <Bar activeBar={false} className="transition duration-300" dataKey="interessados" fill="#cbd5e1" radius={[0, 10, 10, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -750,7 +751,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
         </div>
         <div className="grid grid-cols-3 gap-3 max-lg:grid-cols-1">
           {automations.map((automation) => (
-            <div className="interactive-card rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5" key={automation.name}>
+            <div className={`interactive-card rounded-2xl border ${automation.color} p-5`} key={automation.name}>
               <div className="mb-4 flex items-center justify-between gap-3">
                 <strong className="text-slate-100">{automation.name}</strong>
                 <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${automation.status === 'Ativa' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>{automation.status}</span>
