@@ -694,11 +694,11 @@ export default function DashboardClient({ payload, onBack }) {
         <section className="sticky top-[77px] z-[60] mb-6 rounded-2xl border border-white/[0.06] bg-slate-950/82 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-2xl max-md:static">
           <div className="flex flex-wrap items-end gap-5 w-full">
             <FilterSelect label="Distrito" value={filters.distrito} onChange={(value) => setFilter('distrito', value)} active={filters.distrito !== 'all'}>
-              <option value="all">Todos os Distritos</option>
+              <option value="all">Distritos</option>
               {districts.map((d) => <option key={d} value={d}>{d}</option>)}
             </FilterSelect>
             <FilterSelect label="Prioridade ML" value={filters.prioridade} onChange={(value) => setFilter('prioridade', value)} active={filters.prioridade !== 'all'}>
-              <option value="all">Todas as Prioridades</option>
+              <option value="all">Prioridades</option>
               {Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>Prioridade: {label}</option>)}
             </FilterSelect>
             <FilterSelect label="Status VIP" value={filters.vip} onChange={(value) => setFilter('vip', value)} active={filters.vip !== 'all'}>

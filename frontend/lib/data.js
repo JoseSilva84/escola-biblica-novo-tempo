@@ -2,7 +2,12 @@ import fs from 'fs';
 import path from 'path';
 
 const DATA_REFERENCIA = new Date('2026-06-08T00:00:00');
-const DATASET_DIR = process.env.DATASET_DIR || path.resolve(process.cwd(), '..', 'dataset');
+const DATASET_DIR = resolveConfiguredPath(process.env.DATASET_DIR)
+  || firstExistingPath([
+    path.resolve(process.cwd(), 'dataset'),
+    path.resolve(process.cwd(), '..', 'dataset')
+  ])
+  || path.resolve(process.cwd(), 'dataset');
 const ML_RANKING_FILE = 'ranking_nao_vip_ml_pandas.csv';
 const ALUNOS_FILE = 'alunos.json';
 
