@@ -580,23 +580,17 @@ export default function DashboardClient({ payload, onBack }) {
 
   useEffect(() => {
     setIsMounted(true);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    topAnchorRef.current?.scrollIntoView({ behavior: 'auto' });
     requestAnimationFrame(() => {
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      topAnchorRef.current?.scrollIntoView({ behavior: 'auto' });
     });
 
-    const handleScroll = (e) => {
-      const scrollY = window.scrollY || document.documentElement.scrollTop || (e.target && e.target.scrollTop) || 0;
-      setShowScrollTop(scrollY > 200);
-    };
-
-    window.addEventListener('scroll', handleScroll, { capture: true });
-    return () => window.removeEventListener('scroll', handleScroll, { capture: true });
   }, []);
+
+  const handleScroll = (e) => {
+    const scrollY = e.currentTarget.scrollTop || 0;
+    setShowScrollTop(scrollY > 200);
+  };
 
   const activeFilters = useMemo(() => (
     ['distrito', 'prioridade', 'vip', 'telefone', 'estudos', 'genero']
@@ -663,7 +657,7 @@ export default function DashboardClient({ payload, onBack }) {
   }));
 
   return (
-    <div className="relative silver-stage app-light details-light min-h-screen text-slate-100" onPointerMove={onPointerMove}>
+    <div className="relative flex h-screen w-full flex-col overflow-y-auto overflow-x-hidden silver-stage app-light details-light text-slate-100" onPointerMove={onPointerMove} onScroll={handleScroll}>
       <div ref={topAnchorRef} className="absolute top-0 h-1 w-full" />
       <div
         className="pointer-events-none fixed inset-0 -z-10 transition duration-300"
@@ -696,7 +690,7 @@ export default function DashboardClient({ payload, onBack }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1440px] px-8 py-6 max-md:px-4">
+      <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-8 py-6 max-md:px-4">
         <section className="sticky top-[77px] z-[60] mb-6 rounded-2xl border border-white/[0.06] bg-slate-950/82 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-2xl max-md:static">
           <div className="flex flex-wrap items-end gap-5 w-full">
             <FilterSelect label="Distrito" value={filters.distrito} onChange={(value) => setFilter('distrito', value)} active={filters.distrito !== 'all'}>
@@ -898,12 +892,12 @@ export default function DashboardClient({ payload, onBack }) {
           </div>
         </section>
 
-        <footer className="px-4 pt-8 pb-4 text-center text-sm text-slate-600">
+        <footer className="mt-auto px-4 pb-4 pt-8 text-center text-sm text-slate-600">
           Escola Bíblica Novo Tempo | Prioridade via ML ({formatNumber(meta.mlRecords)} rankings do notebook)
         </footer>
       </main>
       <DistrictDrawer district={selectedDistrict} onClose={() => setSelectedDistrictName(null)} />
-      {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+      {showRules && isMounted && createPortal(<RulesModal onClose={() => setShowRules(false)} />, document.body)}
       {isMounted && createPortal(
         <button
           className={`fixed bottom-8 right-8 z-[99999] grid h-12 w-12 place-items-center rounded-full bg-blue-600 text-white shadow-[0_10px_30px_rgba(37,99,235,0.4)] transition-all duration-300 hover:bg-blue-500 ${
@@ -913,7 +907,7 @@ export default function DashboardClient({ payload, onBack }) {
             if (topAnchorRef.current) {
               topAnchorRef.current.scrollIntoView({ behavior: 'smooth' });
             } else {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
+              topAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
             }
           }}
           aria-label="Subir ao topo"
