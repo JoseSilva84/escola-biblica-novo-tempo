@@ -1,0 +1,5767 @@
+{
+  "schema_version": 1,
+  "objetivo": "Prever resultado real de contato, nao reproduzir o VIP historico.",
+  "distrito_piloto": "Alphaville",
+  "fonte": "ListagemCompleta (1).xlsx",
+  "data_referencia": "2026-06-08",
+  "total_registros": 151,
+  "alvos_disponiveis": [
+    "respondeu",
+    "demonstrou_interesse",
+    "aceitou_visita",
+    "participou"
+  ],
+  "campos_excluidos_modelo": [
+    "nome",
+    "telefone",
+    "email",
+    "sexo",
+    "religiao",
+    "idade",
+    "endereco",
+    "vip_historico",
+    "distrito",
+    "cidade",
+    "bairro"
+  ],
+  "registros": [
+    {
+      "id": "17322",
+      "contato": {
+        "nome": "Silmara Cristina Souza Santos",
+        "telefone": "",
+        "email": "silmara@pontoaponto.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "PRINCÍPIOS - Impresso | 22/09/2008",
+        "ultimo_contato": "2008-09-22",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.774776816043985,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "73049",
+      "contato": {
+        "nome": "Gilvandete Josefa de Souza",
+        "telefone": "+551156238476 +551145022586",
+        "email": "gilvandete@flytour.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "PRINCÍPIOS - Impresso | 11/05/2010*-*REVISTA VIVA COM ESPERANÇA - Impresso | 11/05/2010",
+        "ultimo_contato": "2010-05-11",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.67812085552252,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "167610",
+      "contato": {
+        "nome": "Iara Alves Godoy",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "",
+        "ultimo_contato": "2008-10-16",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.771059915373288,
+        "materiais_quantidade": 0,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "NAO INFORMADO"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "169043",
+      "contato": {
+        "nome": "Idalina .",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "REVISTA VIVA COM ESPERANÇA - Impresso | 14/11/2008*-*PRINCÍPIOS - Impresso | 14/11/2008",
+        "ultimo_contato": "2008-11-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.766550149546351,
+        "materiais_quantidade": 2,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "REVISTA VIVA COM ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "169047",
+      "contato": {
+        "nome": "Fernanda Silva",
+        "telefone": "",
+        "email": "nandi-silva@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "REVISTA VIVA COM ESPERANÇA - Impresso | 14/11/2008*-*PRINCÍPIOS - Impresso | 14/11/2008",
+        "ultimo_contato": "2008-11-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.766550149546351,
+        "materiais_quantidade": 2,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "REVISTA VIVA COM ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "169049",
+      "contato": {
+        "nome": "Ana Claudia",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "REVISTA VIVA COM ESPERANÇA - Impresso | 14/11/2008*-*PRINCÍPIOS - Impresso | 14/11/2008",
+        "ultimo_contato": "2008-11-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.766550149546351,
+        "materiais_quantidade": 2,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "REVISTA VIVA COM ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "169050",
+      "contato": {
+        "nome": "Priscilla .",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "REVISTA VIVA COM ESPERANÇA - Impresso | 14/11/2008*-*PRINCÍPIOS - Impresso | 14/11/2008",
+        "ultimo_contato": "2008-11-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.766550149546351,
+        "materiais_quantidade": 2,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "REVISTA VIVA COM ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "169054",
+      "contato": {
+        "nome": "Antonio ( Sindico)",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "REVISTA VIVA COM ESPERANÇA - Impresso | 14/11/2008*-*PRINCÍPIOS - Impresso | 14/11/2008",
+        "ultimo_contato": "2008-11-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.766550149546351,
+        "materiais_quantidade": 2,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "REVISTA VIVA COM ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "169057",
+      "contato": {
+        "nome": "Edna .",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "REVISTA VIVA COM ESPERANÇA - Impresso | 14/11/2008*-*PRINCÍPIOS - Impresso | 14/11/2008",
+        "ultimo_contato": "2008-11-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.766550149546351,
+        "materiais_quantidade": 2,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "REVISTA VIVA COM ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "169060",
+      "contato": {
+        "nome": "Jessica .",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "REVISTA VIVA COM ESPERANÇA - Impresso | 14/11/2008*-*PRINCÍPIOS - Impresso | 14/11/2008",
+        "ultimo_contato": "2008-11-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.766550149546351,
+        "materiais_quantidade": 2,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "REVISTA VIVA COM ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "169065",
+      "contato": {
+        "nome": "Eliane Schimidt Martinuzzi",
+        "telefone": "+5501141956708",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "REVISTA VIVA COM ESPERANÇA - Impresso | 14/11/2008*-*PRINCÍPIOS - Impresso | 14/11/2008",
+        "ultimo_contato": "2008-11-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.766550149546351,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "REVISTA VIVA COM ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "173048",
+      "contato": {
+        "nome": "Elaine Schimidt Martinuzi",
+        "telefone": "+551141956708",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "PRINCÍPIOS - Impresso | 15/01/2009",
+        "ultimo_contato": "2009-01-15",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.756839814829462,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "173095",
+      "contato": {
+        "nome": "Cláudia Aguiar Tostes",
+        "telefone": "+551140638391 +551193757522",
+        "email": "dimas_tostes@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "PRINCÍPIOS - Impresso | 16/01/2009",
+        "ultimo_contato": "2009-01-16",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.756682421266532,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "174329",
+      "contato": {
+        "nome": "Clovis Augusto Manfio",
+        "telefone": "+551183339720",
+        "email": "cmanfio@3sil.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "REVISTA VIVA COM ESPERANÇA - Impresso | 04/02/2009*-*A BÍBLIA ENSINA - Impresso | 04/02/2009",
+        "ultimo_contato": "2009-02-04",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.753687227098585,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "REVISTA VIVA COM ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "177733",
+      "contato": {
+        "nome": "Nair de Fatima Conceição",
+        "telefone": "+551141914174",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Comercial",
+        "material": "OUVINDO A VOZ DE DEUS (ESTUDO BÍBLICO) - Impresso | 22/03/2009",
+        "ultimo_contato": "2009-03-22",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.746398334109042,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE COMERCIAL",
+        "material_principal": "OUVINDO A VOZ DE DEUS (ESTUDO BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "182096",
+      "contato": {
+        "nome": "Augusto Steffen",
+        "telefone": "",
+        "email": "aassteffen@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "OUVINDO A VOZ DE DEUS (ESTUDO BÍBLICO) - Impresso | 08/05/2009*-*REVISTA VIVA COM ESPERANÇA - Impresso | 08/05/2009",
+        "ultimo_contato": "2009-05-08",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.738895704934043,
+        "materiais_quantidade": 2,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "OUVINDO A VOZ DE DEUS (ESTUDO BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "182100",
+      "contato": {
+        "nome": "Ariane Steffen",
+        "telefone": "+5541954822",
+        "email": "piari@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "REVISTA VIVA COM ESPERANÇA - Impresso | 08/05/2009*-*OUVINDO A VOZ DE DEUS (ESTUDO BÍBLICO) - Impresso | 08/05/2009",
+        "ultimo_contato": "2009-05-08",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.738895704934043,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "REVISTA VIVA COM ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "192050",
+      "contato": {
+        "nome": "Solange Rodrigues Fernandes",
+        "telefone": "+5541958436 +5571527780",
+        "email": "solange.imagem@terra.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE COMERCIAL",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 18/05/2011*-*A BÍBLIA ENSINA - Impresso | 16/07/2009",
+        "ultimo_contato": "2011-05-18",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.612685172875459,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE COMERCIAL",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "199552",
+      "contato": {
+        "nome": "Carolina Santos",
+        "telefone": "",
+        "email": "carol_park_@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Comercial",
+        "material": "PRINCÍPIOS - Impresso | 24/08/2009",
+        "ultimo_contato": "2009-08-24",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.721439305625983,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE COMERCIAL",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "206578",
+      "contato": {
+        "nome": "Cláudio Borges Pedroso",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "LIVRO SINAIS DE ESPERANÇA (ANO 2009) - Impresso | 25/09/2009*-*REVISTA VIVA COM ESPERANÇA - Impresso | 25/09/2009",
+        "ultimo_contato": "2009-09-25",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.716207971151853,
+        "materiais_quantidade": 2,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "LIVRO SINAIS DE ESPERANCA (ANO 2009)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "253515",
+      "contato": {
+        "nome": "Maria Olívia Dragão",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "FAMÍLIA FELIZ (ESTUDO BÍBLICO) - Impresso | 25/05/2010",
+        "ultimo_contato": "2010-05-25",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.675734219544788,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "FAMILIA FELIZ (ESTUDO BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "277524",
+      "contato": {
+        "nome": "Sônia Viotto",
+        "telefone": "+551146891267",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Zero",
+        "material": "Não utilizar este produto - Impresso | 15/09/2010",
+        "ultimo_contato": "2010-09-15",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.656259239539235,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL ZERO",
+        "material_principal": "NAO UTILIZAR ESTE PRODUTO"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "278618",
+      "contato": {
+        "nome": "giovanini Souza Nascimento",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "PRINCÍPIOS - Impresso | 21/09/2010",
+        "ultimo_contato": "2010-09-21",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.655214489313613,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "281118",
+      "contato": {
+        "nome": "Rosangela Lopesde Lima",
+        "telefone": "+551146881566 +5511947038563",
+        "email": "roclean@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Livro Esperança - Impresso | 25/05/2016*-*FAMÍLIA FELIZ (ESTUDO BÍBLICO) - Impresso | 06/01/2016*-*FIQUE LEVE - Impresso | 07/12/2015*-*Descobertas Bíblicas - On-line (em andamento) | 24/11/2015*-*CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 20/03/2014*-*Livro A Grande Esperança ( Digital - PDF ) - Impresso | 20/03/2014*-*VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 09/12/2013*-*Intimidade com Deus - On-line | 20/08/2012*-*A BÍBLIA ENSINA - Impresso | 08/02/2011",
+        "ultimo_contato": "2016-05-25",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.207129168071326,
+        "materiais_quantidade": 9,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "LIVRO ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "306271",
+      "contato": {
+        "nome": "Zeze De Camargo",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "DVD TEMPO DE ESPERANÇA (PR. LUIZ GONÇALVES) - Impresso | 24/11/2010",
+        "ultimo_contato": "2010-11-24",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.644002038279933,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "DVD TEMPO DE ESPERANCA (PR. LUIZ GONCALVES)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "306276",
+      "contato": {
+        "nome": "Luciano Camargo",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Cj 1407",
+        "material": "DVD TEMPO DE ESPERANÇA (PR. LUIZ GONÇALVES) - Impresso | 24/11/2010",
+        "ultimo_contato": "2010-11-24",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.644002038279933,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "CJ 1407",
+        "material_principal": "DVD TEMPO DE ESPERANCA (PR. LUIZ GONCALVES)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "331821",
+      "contato": {
+        "nome": "Maria Celia Felix Tostes Pereira",
+        "telefone": "+551181165960",
+        "email": "pra_mariacelia@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "PRINCÍPIOS - Impresso | 27/01/2011",
+        "ultimo_contato": "2011-01-27",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.632662441222351,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "337780",
+      "contato": {
+        "nome": "Jose Luis Alcarde",
+        "telefone": "+5501198095015",
+        "email": "jlalcarde@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 29/06/2011*-*OUVINDO A VOZ DE DEUS (ESTUDO BÍBLICO) - Impresso | 20/02/2011",
+        "ultimo_contato": "2011-06-29",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.605020901781758,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "359446",
+      "contato": {
+        "nome": "Bartolomeu Correa De Menezes",
+        "telefone": "+5541950673 +5583590215",
+        "email": "bartolomeu@rohlem.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 03/08/2011",
+        "ultimo_contato": "2011-08-03",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.598588829620232,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "398668",
+      "contato": {
+        "nome": "Heleni Sobreda",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "PRINCÍPIOS - Impresso | 15/06/2011",
+        "ultimo_contato": "2011-06-15",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.607582191143917,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "407762",
+      "contato": {
+        "nome": "Mirosmar Jose De Camargo",
+        "telefone": "",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "DVD TEMPO DE ESPERANÇA (PR. LUIZ GONÇALVES) - Impresso | 22/07/2011",
+        "ultimo_contato": "2011-07-22",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.600798775271034,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "DVD TEMPO DE ESPERANCA (PR. LUIZ GONCALVES)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "422848",
+      "contato": {
+        "nome": "Celia Hermann",
+        "telefone": "+551141931416",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Dois",
+        "material": "PRINCÍPIOS - Impresso | 25/08/2011",
+        "ultimo_contato": "2011-08-25",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.59452453435256,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL DOIS",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "424905",
+      "contato": {
+        "nome": "ANTONIO CARLOS DA CRUZ",
+        "telefone": "+5541953006",
+        "email": "CALUR@HOTMAIL.COM"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 30/08/2011",
+        "ultimo_contato": "2011-08-30",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.593598522618644,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "441094",
+      "contato": {
+        "nome": "Carla Beatriz Massing",
+        "telefone": "+5521842272 +551189478068",
+        "email": "carla.massing@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 02/11/2012*-*Intimidade com Deus - On-line (em andamento) | 01/11/2012*-*FAMÍLIA FELIZ (ESTUDO BÍBLICO) - Impresso | 12/11/2011*-*A BÍBLIA ENSINA PARA JOVENS (ESTUDO BÍBLICO) - Impresso | 12/11/2011*-*DVD TEMPO DE ESPERANÇA (PR. LUIZ GONÇALVES) - Impresso | 12/11/2011*-*PRINCÍPIOS - Impresso | 12/11/2011*-*VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 03/10/2011",
+        "ultimo_contato": "2012-11-02",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.51057131510735,
+        "materiais_quantidade": 7,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "441691",
+      "contato": {
+        "nome": "Creuza Ferreira da Silva",
+        "telefone": "+5541917488 +5587033281",
+        "email": "keuindependente@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 09/09/2011*-*VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 27/04/2011",
+        "ultimo_contato": "2011-09-09",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.591743922680534,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "452865",
+      "contato": {
+        "nome": "Rodrigo Pedrassi Ferreira De Jesus",
+        "telefone": "",
+        "email": "rodrigopedrassi@tutotec.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 13/10/2011",
+        "ultimo_contato": "2011-10-13",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.585412430393381,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "456760",
+      "contato": {
+        "nome": "EDUARDO GOMES",
+        "telefone": "+5541956052 +5575192883",
+        "email": "edu.dados@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "B",
+        "material": "OUVINDO A VOZ DE DEUS (ESTUDO BÍBLICO) - Impresso | 17/01/2012*-*PRINCÍPIOS - Impresso | 17/01/2012*-*CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 19/10/2011",
+        "ultimo_contato": "2012-01-17",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.567315800819449,
+        "materiais_quantidade": 3,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "B",
+        "material_principal": "OUVINDO A VOZ DE DEUS (ESTUDO BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "464522",
+      "contato": {
+        "nome": "Eleny De Almeida Sobreda",
+        "telefone": "+55(11)78784181",
+        "email": "sobreda9@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "O CONVITE – PR. IVAN SARAIVA - Impresso | 27/08/2018*-*VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 03/05/2012*-*DVD TEMPO DE ESPERANÇA (PR. LUIZ GONÇALVES) - Impresso | 02/11/2011*-*FAMÍLIA FELIZ (ESTUDO BÍBLICO) - Impresso | 02/11/2011",
+        "ultimo_contato": "2018-08-27",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.952615111651,
+        "materiais_quantidade": 4,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "O CONVITE – PR. IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "471337",
+      "contato": {
+        "nome": "Leonilde Barreto Andrade",
+        "telefone": "+551183839226",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "PRINCÍPIOS - Impresso | 16/11/2011",
+        "ultimo_contato": "2011-11-16",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.579040594742317,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "483937",
+      "contato": {
+        "nome": "Sandra Malvino",
+        "telefone": "",
+        "email": "rmalvino@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 29/01/2012",
+        "ultimo_contato": "2012-01-29",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.565030520830398,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "491025",
+      "contato": {
+        "nome": "Maria De Jesus De Sousa Lima",
+        "telefone": "+55(11)41914913 +55(11)83957128",
+        "email": "mjslima@live.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Um",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 18/08/2017*-*DVD TEMPO DE ESPERANÇA (PR. LUIZ GONÇALVES) - Impresso | 04/01/2012*-*PRINCÍPIOS - Impresso | 04/01/2012*-*CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 04/01/2012",
+        "ultimo_contato": "2017-08-18",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.076204527239026,
+        "materiais_quantidade": 4,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL UM",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "493734",
+      "contato": {
+        "nome": "Marisa Tastaldi",
+        "telefone": "",
+        "email": "mftastaldi@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Zero",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 11/01/2012",
+        "ultimo_contato": "2012-01-11",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.56845648535378,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL ZERO",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "540081",
+      "contato": {
+        "nome": "JOSE ROGERIO COSTA FRANÇA",
+        "telefone": "+551133368432",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "LIVRO A GRANDE ESPERANÇA (ANO 2012) - Impresso | 02/05/2012*-*PRINCÍPIOS - Impresso | 02/05/2012",
+        "ultimo_contato": "2012-05-02",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.546946149565585,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "LIVRO A GRANDE ESPERANCA (ANO 2012)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "541357",
+      "contato": {
+        "nome": "JULIO CESAR FELIPE",
+        "telefone": "+551142088000",
+        "email": "julio.felipe@tempoassist.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "LIVRO A GRANDE ESPERANÇA (ANO 2012) - Impresso | 05/05/2012*-*PRINCÍPIOS - Impresso | 05/05/2012",
+        "ultimo_contato": "2012-05-05",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.546363568716018,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "LIVRO A GRANDE ESPERANCA (ANO 2012)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "554221",
+      "contato": {
+        "nome": "HUMBERTO FERRAZ NETO",
+        "telefone": "+55415246675 +5591622307",
+        "email": "humberto.ferraz@ig.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 30/05/2012",
+        "ultimo_contato": "2012-05-30",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.541495483939203,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "583621",
+      "contato": {
+        "nome": "FABIO LUCAS ARAUJO ANDRADE SILVA",
+        "telefone": "+5501141910368 +5501173684446",
+        "email": "fabio.uranet@yahoo.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 03/08/2012",
+        "ultimo_contato": "2012-08-03",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.52872642722991,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "586635",
+      "contato": {
+        "nome": "Maria De Jesus De Souza Lima",
+        "telefone": "+551141914913",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Um",
+        "material": "BÍBLIA FÁCIL - Impresso | 09/08/2012*-*VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 09/08/2012",
+        "ultimo_contato": "2012-08-09",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.527539483470381,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL UM",
+        "material_principal": "BIBLIA FACIL"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "590242",
+      "contato": {
+        "nome": "Elza Perez Parrilo",
+        "telefone": "+55(11)41933791 +55(11)997319174",
+        "email": "elzaperez@globoemail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 26/02/2015",
+        "ultimo_contato": "2021-08-17",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.471363088187097,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "596769",
+      "contato": {
+        "nome": "Marco Aurélio Pires",
+        "telefone": "+5526807480 +55952714896",
+        "email": "marco.terranova1@yahoo.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 15/02/2015*-*VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 18/01/2013*-*CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 28/08/2012",
+        "ultimo_contato": "2015-02-15",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.326516830239528,
+        "materiais_quantidade": 3,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "626406",
+      "contato": {
+        "nome": "Marília Villas Boas Souza",
+        "telefone": "+5511999971944",
+        "email": "marciosouza@maketravel.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "SANTANA DE PARNAÍBA",
+        "bairro": "Alphaville 4",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 13/08/2013",
+        "ultimo_contato": "2013-08-13",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.451694209183541,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "SANTANA DE PARNAIBA",
+        "bairro": "ALPHAVILLE 4",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "635456",
+      "contato": {
+        "nome": "Elizabeth Mileide Rocha",
+        "telefone": "+55(11)42087759 +55(11)959300331",
+        "email": "elizabethmileide@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "Jesus - Restaurador da Vida - Impresso | 30/03/2021*-*PAULO - O Mensageiro da Cruz - Impresso | 06/02/2021*-*Ensinos de Jesus - On-line (em andamento) | 25/01/2021*-*Incríveis Milagres - Impresso | 14/10/2020*-*ENSINOS DE JESUS - PDF | 26/06/2020*-*ACORDES - Impresso | 25/06/2020*-*Divertir e Instruir - Impresso | 12/01/2020*-*FIQUE LEVE - Impresso | 08/08/2017*-*ENSINOS DE JESUS - Impresso | 27/07/2017*-*Sentimentos e Emoções - On-line (em andamento) | 16/11/2013*-*DANIEL - Profecias de Daniel - Impresso | 06/11/2013*-*Bíblia Fácil - Deletar - On-line | 03/11/2013*-*Intimidade com Deus - On-line | 11/11/2012",
+        "ultimo_contato": "2021-03-30",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.5480289699350145,
+        "materiais_quantidade": 13,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "JESUS - RESTAURADOR DA VIDA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "699024",
+      "contato": {
+        "nome": "Sara Menezes Lucio Dias",
+        "telefone": "+5541512043 +55982846568",
+        "email": "layslamenezes@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Sentimentos e Emoções - On-line (em andamento) | 27/05/2013*-*DVD TEMPO DE ESPERANÇA (PR. LUIZ GONÇALVES) - Impresso | 15/04/2013*-*VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 15/04/2013",
+        "ultimo_contato": "2013-05-27",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.46821300919452,
+        "materiais_quantidade": 3,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "SENTIMENTOS E EMOCOES - ON-LINE (EM ANDAMENTO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "712020",
+      "contato": {
+        "nome": "Wanderson Vieira Da Silva",
+        "telefone": "+5541512043 +55964436900",
+        "email": "andmusic2008@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "BÍBLIA FÁCIL - Impresso | 07/05/2013",
+        "ultimo_contato": "2013-05-07",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.472405008626103,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "BIBLIA FACIL"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "732466",
+      "contato": {
+        "nome": "Sandro Piazzi D'Ávila",
+        "telefone": "+5511983108522 +5511983108522",
+        "email": "spiazzidavila@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 14/06/2013",
+        "ultimo_contato": "2013-06-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.464425125877582,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "750476",
+      "contato": {
+        "nome": "Mauro Evangelista De Morais",
+        "telefone": "+551141933876 +5511981413691",
+        "email": "mauro_demorais@yahoo.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 22/08/2013*-*Intimidade com Deus - On-line (em andamento) | 21/08/2013*-*BÍBLIA FÁCIL - Impresso | 17/07/2013",
+        "ultimo_contato": "2013-08-27",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.448700194970938,
+        "materiais_quantidade": 3,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "763521",
+      "contato": {
+        "nome": "Gabriela Scalon",
+        "telefone": "+5512345677 +55999989891",
+        "email": "gabrielascalonb@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Dois",
+        "material": "Livro A Grande Esperança ( Digital - PDF ) - Impresso | 11/08/2013*-*CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 08/08/2013",
+        "ultimo_contato": "2013-08-11",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.452121194672523,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL DOIS",
+        "material_principal": "LIVRO A GRANDE ESPERANCA ( DIGITAL - PDF )"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "774951",
+      "contato": {
+        "nome": "Andreia Lopes Rodrigues",
+        "telefone": "+5578847919 +5578847919",
+        "email": "deiamayor@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 27/08/2013",
+        "ultimo_contato": "2013-08-27",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.448700194970938,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "785672",
+      "contato": {
+        "nome": "Marinalva Ferreira Vieira De Sousa",
+        "telefone": "+55(11)41913196 +55(11)959857495",
+        "email": "naldapb.1@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Um",
+        "material": "ENSINOS DE JESUS - Impresso | 13/02/2019*-*O CONVITE – PR. IVAN SARAIVA - Impresso | 26/07/2018*-*RESPOSTAS- IVAN SARAIVA - Impresso | 01/12/2016*-*CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 11/09/2013*-*DVD TEMPO DE ESPERANÇA (PR. LUIZ GONÇALVES) - Impresso | 11/09/2013",
+        "ultimo_contato": "2019-02-13",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.890956716138919,
+        "materiais_quantidade": 5,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL UM",
+        "material_principal": "ENSINOS DE JESUS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "799061",
+      "contato": {
+        "nome": "Erica Cristina Rezende Sater",
+        "telefone": "+551141936385 +5511948208714",
+        "email": "eccrezende@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 30/09/2013",
+        "ultimo_contato": "2013-09-30",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.441391477999955,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "847538",
+      "contato": {
+        "nome": "Valkiria Lorente",
+        "telefone": "+5541953564",
+        "email": "kialorente@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Livro A Grande Esperança ( Digital - PDF ) - Impresso | 08/12/2013",
+        "ultimo_contato": "2013-12-08",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.42639282708974,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "LIVRO A GRANDE ESPERANCA ( DIGITAL - PDF )"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "848806",
+      "contato": {
+        "nome": "Bianka Beatriz Straub Alcantara",
+        "telefone": "+55(41)99309341",
+        "email": "biankaalcantara.psicologia@gmail.com; biaqq2@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "Mente Feliz - PDF | 19/12/2024*-*Sentimentos a Ciência do Existir - Impresso | 31/07/2021*-*Sentimentos a Ciência do Existir - PDF | 31/07/2021*-*PRINCÍPIOS - Impresso | 10/12/2013",
+        "ultimo_contato": "2024-12-19",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.285998094508865,
+        "materiais_quantidade": 4,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "MENTE FELIZ"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "857001",
+      "contato": {
+        "nome": "Maria Victoria Simon Garcia",
+        "telefone": "+551141911407 +5511993856320",
+        "email": "marcelo.tomas02@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 27/12/2013*-*DANIEL - Profecias de Daniel - Impresso | 27/12/2013",
+        "ultimo_contato": "2013-12-27",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.42222295382501,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "861630",
+      "contato": {
+        "nome": "Rafael Avelino",
+        "telefone": "",
+        "email": "rafael.avelino90@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Apocalipse - O Fim Revelado - On-line (em andamento) | 05/01/2014",
+        "ultimo_contato": "2014-06-09",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.38548870041881,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "APOCALIPSE - O FIM REVELADO - ON-LINE (EM ANDAMENTO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "889990",
+      "contato": {
+        "nome": "Tânia Betley Soares",
+        "telefone": "+551142437236 +5511992265118",
+        "email": "barueri@righttime.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Comercial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 26/02/2014",
+        "ultimo_contato": "2014-02-26",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.408716715080153,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE COMERCIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "910270",
+      "contato": {
+        "nome": "Chélida Graziela Pereira De Vasconcelos",
+        "telefone": "+551135919831 +5511999781894",
+        "email": "graziela.aem@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 03/04/2014",
+        "ultimo_contato": "2014-04-03",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.400659375160286,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "910455",
+      "contato": {
+        "nome": "Roberto Pizarro",
+        "telefone": "+55(11)973777453",
+        "email": "pizarro.r@terra.com.br;pizarro.r7@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "O CONVITE – PR. IVAN SARAIVA - Impresso | 05/09/2018*-*RESPOSTAS- IVAN SARAIVA - Impresso | 12/02/2015*-*VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 03/06/2014*-*CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 03/04/2014",
+        "ultimo_contato": "2018-09-05",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.949444420250626,
+        "materiais_quantidade": 4,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "O CONVITE – PR. IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "913927",
+      "contato": {
+        "nome": "Maria Das Graças Lopes De Souza",
+        "telefone": "+551141912237 +5511999657445",
+        "email": "graca@alphastarimoveis.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "201",
+        "material": "Livro A Grande Esperança ( Digital - PDF ) - Impresso | 10/04/2014",
+        "ultimo_contato": "2014-04-10",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.399085102935908,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "201",
+        "material_principal": "LIVRO A GRANDE ESPERANCA ( DIGITAL - PDF )"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "939494",
+      "contato": {
+        "nome": "Anderson Silva Pereira",
+        "telefone": "+551121964651 +5511941997607",
+        "email": "anderson280712@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "10 Andar",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 22/05/2014",
+        "ultimo_contato": "2014-05-22",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.38958706681109,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "10 ANDAR",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "950019",
+      "contato": {
+        "nome": "CARLOS EDUARDO TEIXEIRA",
+        "telefone": "+551141662244 +551178570719",
+        "email": "teixeiracar@ig.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 05/06/2014",
+        "ultimo_contato": "2014-06-05",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.386400901166214,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "950494",
+      "contato": {
+        "nome": "Paulo Cesar Ruivo",
+        "telefone": "+5511984900085",
+        "email": "doidomilianos@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Comercial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 06/06/2014",
+        "ultimo_contato": "2014-06-06",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.386172928977834,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE COMERCIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "962607",
+      "contato": {
+        "nome": "Wagner Ignácio Da Silva Junior",
+        "telefone": "+551141938426 +5511964901528",
+        "email": "wisjr@ig.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 29/06/2014",
+        "ultimo_contato": "2014-06-29",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.38091517312361,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "963878",
+      "contato": {
+        "nome": "PATRICIA CRISTINA ARAUJO PACHECO",
+        "telefone": "",
+        "email": "pacheco.patricia@yahoo.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "O Espiritismo à luz da Bíblia - On-line (em andamento) | 02/07/2014*-*CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 01/07/2014",
+        "ultimo_contato": "2014-07-02",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.38022733634308,
+        "materiais_quantidade": 2,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "O ESPIRITISMO A LUZ DA BIBLIA - ON-LINE (EM ANDAMENTO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "978661",
+      "contato": {
+        "nome": "Luiz Otavio da Silva",
+        "telefone": "+55(11)947299648",
+        "email": "lo.car.sp@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "Educação Financeira à Luz da Bíblia - PDF | 06/08/2023*-*À procura da Verdade - PDF | 04/11/2022*-*FAMÍLIA FELIZ (ESTUDO BÍBLICO) - Impresso | 28/07/2014",
+        "ultimo_contato": "2023-08-06",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.945051063725834,
+        "materiais_quantidade": 3,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "EDUCACAO FINANCEIRA A LUZ DA BIBLIA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "996391",
+      "contato": {
+        "nome": "Soraya Saadi",
+        "telefone": "+5501141938426 +55011971511686",
+        "email": "sorayasaadi@hotmai.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 28/08/2014",
+        "ultimo_contato": "2014-08-28",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.3670677328386,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1000293",
+      "contato": {
+        "nome": "Roseli Moraes Silva Spaccaquerche",
+        "telefone": "+55(11)41958952 +55(11)997181616",
+        "email": "rosespacca@yahoo.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Santuário - Impresso | 12/05/2020*-*ENSINOS DE JESUS - Impresso | 18/04/2018*-*FIQUE LEVE - Impresso | 23/01/2018*-*Livro Esperança - Impresso | 23/05/2016*-*APOCALIPSE - Impresso | 11/12/2015*-*DANIEL - Profecias de Daniel - Impresso | 25/01/2015*-*PRINCÍPIOS - Impresso | 09/12/2014*-*RESPOSTAS- IVAN SARAIVA - Impresso | 09/12/2014*-*CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 05/09/2014",
+        "ultimo_contato": "2020-12-11",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.603897968521881,
+        "materiais_quantidade": 9,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "SANTUARIO"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1007051",
+      "contato": {
+        "nome": "Thais Ferreira",
+        "telefone": "+55983209584",
+        "email": "thais.fe.fe@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "PRINCÍPIOS - Impresso | 17/09/2014",
+        "ultimo_contato": "2014-09-17",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.36240897761537,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1025617",
+      "contato": {
+        "nome": "Jose Luis Alcarde",
+        "telefone": "+551141957568 +5511997285015",
+        "email": "jlalcarde@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 27/10/2014",
+        "ultimo_contato": "2014-10-27",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.353025845202325,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1037940",
+      "contato": {
+        "nome": "Silvia Cristina Bonifacio",
+        "telefone": "+551141936886",
+        "email": "scbonifacio@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 21/11/2014",
+        "ultimo_contato": "2014-11-21",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.34711636103872,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1056706",
+      "contato": {
+        "nome": "Jaqueline Dos Santos Almeida",
+        "telefone": "+551141913040 +5511947660622",
+        "email": "jaqueline_almeida94@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "A ULTIMA ESPERANÇA (ISRAEL) - Impresso | 17/12/2014",
+        "ultimo_contato": "2014-12-17",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.340933226000878,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "A ULTIMA ESPERANCA (ISRAEL)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1070765",
+      "contato": {
+        "nome": "CRISTIANA LIMA MANOJO LOURENÇO",
+        "telefone": "",
+        "email": "cristiana.manojo@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Intimidade com Deus - On-line (em andamento) | 19/01/2015",
+        "ultimo_contato": "2015-01-19",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.33302993974291,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "INTIMIDADE COM DEUS - ON-LINE (EM ANDAMENTO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1103510",
+      "contato": {
+        "nome": "Carlos Eduardo Bianco",
+        "telefone": "+551141531651 +5511999970540",
+        "email": "carlos.bianco@terra.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Dois",
+        "material": "Intimidade com Deus - On-line (em andamento) | 28/06/2016*-*APOCALIPSE - Impresso | 14/09/2015*-*Bíblia Fácil Apocalipse - On-line (em andamento) | 06/09/2015*-*RESPOSTAS- IVAN SARAIVA - Impresso | 03/03/2015",
+        "ultimo_contato": "2016-06-28",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.197814032221203,
+        "materiais_quantidade": 4,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL DOIS",
+        "material_principal": "INTIMIDADE COM DEUS - ON-LINE (EM ANDAMENTO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1118986",
+      "contato": {
+        "nome": "Eliane Santos Toja De Araujo",
+        "telefone": "",
+        "email": "eliane.tojal@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 25/03/2015",
+        "ultimo_contato": "2015-03-25",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.317277766221235,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1125520",
+      "contato": {
+        "nome": "Elnatan Borges Viana",
+        "telefone": "",
+        "email": "elnatanviana@live.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Descobertas Bíblicas - On-line (em andamento) | 02/04/2015",
+        "ultimo_contato": "2015-04-02",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.315321775377567,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "DESCOBERTAS BIBLICAS - ON-LINE (EM ANDAMENTO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1142054",
+      "contato": {
+        "nome": "Francisco Murilo Junior",
+        "telefone": "+5546641637 +55973836391",
+        "email": "franciscojr@chillibeans.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 25/04/2015",
+        "ultimo_contato": "2015-04-25",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.309676895987726,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1163462",
+      "contato": {
+        "nome": "ELIANE CRISTINA BUVCHI GALVAO",
+        "telefone": "+551141956268 +5511999669193",
+        "email": "li.eliane7@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "APOCALIPSE - Impresso | 22/05/2015",
+        "ultimo_contato": "2015-05-22",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.3030093814735,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "APOCALIPSE"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1227983",
+      "contato": {
+        "nome": "Charles Go",
+        "telefone": "",
+        "email": "charles.go.br@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Fique Leve - On-line (em andamento) | 17/08/2015",
+        "ultimo_contato": "2015-08-17",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.28121766128665,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "FIQUE LEVE - ON-LINE (EM ANDAMENTO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1238480",
+      "contato": {
+        "nome": "Jose Clemente Herculano",
+        "telefone": "",
+        "email": "pdr.cl@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Zero",
+        "material": "APOCALIPSE - Impresso | 31/08/2015",
+        "ultimo_contato": "2015-08-31",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.277666160851503,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL ZERO",
+        "material_principal": "APOCALIPSE"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1258339",
+      "contato": {
+        "nome": "Amanda Stela Lins Da Silva",
+        "telefone": "+5511946532941",
+        "email": "amandalins87@yahoo.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 27/09/2015",
+        "ultimo_contato": "2015-09-27",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.270781013162674,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1262655",
+      "contato": {
+        "nome": "Sebastião Batista De Oliveira",
+        "telefone": "+551146881500 +5511984216666",
+        "email": "s.oliveira10@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 02/10/2015",
+        "ultimo_contato": "2015-10-02",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.269500767180615,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1265705",
+      "contato": {
+        "nome": "Regina Casarim Alcarde",
+        "telefone": "+551141957568 +5511999354405",
+        "email": "personalregina@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 06/10/2015",
+        "ultimo_contato": "2015-10-06",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.268475388982598,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1266094",
+      "contato": {
+        "nome": "Jose Luis Alcarde",
+        "telefone": "+551136810131 +5511997285015",
+        "email": "jluisalcarde@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "O RESGATE DA VERDADE (ESTUDO BÍBLICO) - Impresso | 06/10/2015",
+        "ultimo_contato": "2015-10-06",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.268475388982598,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "O RESGATE DA VERDADE (ESTUDO BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1266101",
+      "contato": {
+        "nome": "Rudd Casarim Alcarde",
+        "telefone": "+551141957568 +5511993162662",
+        "email": "ruddcasarim88@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "DVD TEMPO DE ESPERANÇA (PR. LUIZ GONÇALVES) - Impresso | 06/10/2015",
+        "ultimo_contato": "2015-10-06",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.268475388982598,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "DVD TEMPO DE ESPERANCA (PR. LUIZ GONCALVES)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1282997",
+      "contato": {
+        "nome": "MICHAEL DE OLIVEIRA ROCHA",
+        "telefone": "+5511983720864",
+        "email": "michaelorocha1@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Nova Aldeinha",
+        "material": "CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 29/10/2015",
+        "ultimo_contato": "2015-10-29",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.262558973010657,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "NOVA ALDEINHA",
+        "material_principal": "CD VERDADES BIBLICAS (CID MOREIRA)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1312002",
+      "contato": {
+        "nome": "Arnaldo Serra De Oliveira",
+        "telefone": "+551141953564 +5511999573006",
+        "email": "abss.2400@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 19/12/2015",
+        "ultimo_contato": "2015-12-19",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.249313746260636,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1312134",
+      "contato": {
+        "nome": "Juliana De Freitas Araujo",
+        "telefone": "+551141931510 +5511999147072",
+        "email": "araujojulianaa@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Livro Esperança - Impresso | 14/05/2016*-*RESPOSTAS- IVAN SARAIVA - Impresso | 19/12/2015",
+        "ultimo_contato": "2016-05-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.210124405164267,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "LIVRO ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1338907",
+      "contato": {
+        "nome": "Diony VANDERLEI NOBRE Do Espírito Santo",
+        "telefone": "+55(11)974133525",
+        "email": "dionynobre@yahoo.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "Descobrindo Tesouros - Rodrigo Silva - Impresso | 28/10/2025*-*RESPOSTAS- IVAN SARAIVA - Impresso | 05/02/2016",
+        "ultimo_contato": "2025-10-28",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 5.4116460518550396,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "DESCOBRINDO TESOUROS - RODRIGO SILVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1350729",
+      "contato": {
+        "nome": "Flavio Eduardo De Souza",
+        "telefone": "+551143036879 +5511986012134",
+        "email": "flavioeduardofc@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "APOCALIPSE - Impresso | 26/02/2016",
+        "ultimo_contato": "2016-02-26",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.231109840328154,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "APOCALIPSE"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1353286",
+      "contato": {
+        "nome": "Luciana Cássia De Carvalho Oliveira",
+        "telefone": "+551146881500 +5511981163334",
+        "email": "lcc_oli@yahoo.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 29/02/2016",
+        "ultimo_contato": "2016-02-29",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.23031079913502,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1360379",
+      "contato": {
+        "nome": "Cristiano De Moraes",
+        "telefone": "+55996455077",
+        "email": "cmoraes@kiviks.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "BÍBLIA FÁCIL - Impresso | 14/03/2016",
+        "ultimo_contato": "2016-03-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.226573474977114,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "BIBLIA FACIL"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1367554",
+      "contato": {
+        "nome": "Marcelo Rodney Nogueira",
+        "telefone": "+5511986941543",
+        "email": "marcelorodney@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "FIQUE LEVE - Impresso | 02/07/2017*-*CD VERDADES BÍBLICAS (CID MOREIRA) - Impresso | 28/03/2016",
+        "ultimo_contato": "2017-07-02",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.090708716083997,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "FIQUE LEVE"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1375575",
+      "contato": {
+        "nome": "Nayara De Souza Dos Santos",
+        "telefone": "+551136035687 +5511997515410",
+        "email": "nay.publi@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "7 Andar",
+        "material": "FIQUE LEVE - Impresso | 14/04/2016",
+        "ultimo_contato": "2016-04-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.218247926685745,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "7 ANDAR",
+        "material_principal": "FIQUE LEVE"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1401398",
+      "contato": {
+        "nome": "Maria Conceição Brito Masetti",
+        "telefone": "+551141535958 +5511999265612",
+        "email": "mcmasetti@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "APOCALIPSE - Impresso | 27/05/2016",
+        "ultimo_contato": "2016-05-27",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.206583614320753,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "APOCALIPSE"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1423989",
+      "contato": {
+        "nome": "Douglas Rodrigues Ramos",
+        "telefone": "+5511960559046 +551146891552",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "PRINCÍPIOS - Impresso | 05/07/2016",
+        "ultimo_contato": "2016-07-19",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.192016914536875,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "PRINCIPIOS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1441848",
+      "contato": {
+        "nome": "Luciane Aparecida Corrêa Barros",
+        "telefone": "+551141954220 +5511986355220",
+        "email": "lucianebarros91@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "APOCALIPSE - Impresso | 06/08/2016*-*DANIEL - Profecias de Daniel - Impresso | 06/08/2016",
+        "ultimo_contato": "2016-08-06",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.187021067343505,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "APOCALIPSE"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1491544",
+      "contato": {
+        "nome": "Deborah Cunha",
+        "telefone": "+5521981061322",
+        "email": "deborahdanielle@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "VERDADES PARA O TEMPO DO FIM - Impresso | 04/11/2016",
+        "ultimo_contato": "2016-11-04",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.161660452056282,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1493439",
+      "contato": {
+        "nome": "Juliana Jesus Roma",
+        "telefone": "+5511961021389",
+        "email": "julianaroma428@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Evidências - PDF | 30/12/2020*-*Evidências - On-line (em andamento) | 23/12/2020*-*APOCALIPSE - Impresso | 08/11/2016",
+        "ultimo_contato": "2021-01-28",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.579678823090456,
+        "materiais_quantidade": 3,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "EVIDENCIAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1558583",
+      "contato": {
+        "nome": "Bruna De Fátima Machado Do Amaral",
+        "telefone": "+5549988445829",
+        "email": "blima561@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "APOCALIPSE - Impresso | 19/03/2017",
+        "ultimo_contato": "2017-03-19",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.122371243406553,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "APOCALIPSE"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1569175",
+      "contato": {
+        "nome": "Carlos Alberto Gonzalez",
+        "telefone": "+551143261122 +5511966091070",
+        "email": "carlos-gonzalez@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Dois",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 10/04/2017",
+        "ultimo_contato": "2017-04-10",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.115819701211327,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL DOIS",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1586642",
+      "contato": {
+        "nome": "José Neto Neves Dos Santos",
+        "telefone": "+5511987936834",
+        "email": "joseneto.epharma@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 16/05/2017",
+        "ultimo_contato": "2017-05-16",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.105005537547246,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1593194",
+      "contato": {
+        "nome": "Reginaldo Gonçalves Santana",
+        "telefone": "+551140661775 +5511951509206",
+        "email": "Reginaldosantana1@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 29/05/2017",
+        "ultimo_contato": "2017-05-29",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.101071503119543,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1602113",
+      "contato": {
+        "nome": "Marcos Vinicius De Sousa",
+        "telefone": "+551142015519 +5511961635655",
+        "email": "marcos.ecomerce@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Apocalipse-Revelações de Esperança - Impresso | 19/09/2020*-*VERDADES PARA O TEMPO DO FIM - Impresso | 19/06/2017",
+        "ultimo_contato": "2020-09-19",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.644440761556566,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "APOCALIPSE-REVELACOES DE ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1613012",
+      "contato": {
+        "nome": "TAYNARA CASAGRANDE",
+        "telefone": "+551126806569 +5511996826397",
+        "email": "recepcao@alphaodonto.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Comercial",
+        "material": "Apocalipse-Revelações de Esperança - Impresso | 30/03/2020*-*RESPOSTAS- IVAN SARAIVA - Impresso | 14/07/2017*-*FIQUE LEVE - Impresso | 14/07/2017",
+        "ultimo_contato": "2020-03-30",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.724004656676065,
+        "materiais_quantidade": 3,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE COMERCIAL",
+        "material_principal": "APOCALIPSE-REVELACOES DE ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1657512",
+      "contato": {
+        "nome": "Regina Conrado De Brito",
+        "telefone": "+55(11)940252770",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "RESPOSTAS- IVAN SARAIVA - Impresso | 16/10/2017",
+        "ultimo_contato": "2017-10-16",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.057694194815587,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "RESPOSTAS- IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1674037",
+      "contato": {
+        "nome": "Luiz David Andreatta",
+        "telefone": "+55(11)996349138",
+        "email": "andreatta11@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "O CONVITE – PR. IVAN SARAIVA - Impresso | 12/09/2018*-*RESPOSTAS- IVAN SARAIVA - Impresso | 29/11/2017",
+        "ultimo_contato": "2018-09-12",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.946971357693591,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "O CONVITE – PR. IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1720978",
+      "contato": {
+        "nome": "Ana Mondin",
+        "telefone": "+55(11)99484368",
+        "email": "Ana.mondin01@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "ENSINOS DE JESUS - Impresso | 14/05/2018",
+        "ultimo_contato": "2018-05-14",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.988882253309227,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "ENSINOS DE JESUS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1806395",
+      "contato": {
+        "nome": "Mariane Moraes",
+        "telefone": "+55(11)999344422",
+        "email": "mariane.moraes8@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Um",
+        "material": "O CONVITE – PR. IVAN SARAIVA - Impresso | 21/08/2018",
+        "ultimo_contato": "2018-08-21",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.954723334497908,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL UM",
+        "material_principal": "O CONVITE – PR. IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1828248",
+      "contato": {
+        "nome": "Igor Varone Justo",
+        "telefone": "+55(11)986163333",
+        "email": "igorvarone@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "O CONVITE – PR. IVAN SARAIVA - Impresso | 20/09/2018",
+        "ultimo_contato": "2018-09-20",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.9441374911141125,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "O CONVITE – PR. IVAN SARAIVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1883004",
+      "contato": {
+        "nome": "Julianna Franchi Jordao da Mota",
+        "telefone": "+55(11)994170182",
+        "email": "ju.fjmota@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Zero",
+        "material": "ENSINOS DE JESUS - Impresso | 13/02/2019",
+        "ultimo_contato": "2019-02-13",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.890956716138919,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL ZERO",
+        "material_principal": "ENSINOS DE JESUS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "1921299",
+      "contato": {
+        "nome": "Daniel Olivieri Reis",
+        "telefone": "+55(11)963153516",
+        "email": "daniel.olivieri.reis@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Evidências - PDF | 17/10/2021*-*Evidências - Impresso | 17/10/2021*-*ENSINOS DE JESUS - Impresso | 23/05/2019",
+        "ultimo_contato": "2021-10-17",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.4360278163518485,
+        "materiais_quantidade": 3,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "EVIDENCIAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2032555",
+      "contato": {
+        "nome": "Suzete Gomes Paes",
+        "telefone": "+55(11)997199116",
+        "email": "su_paes@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Apocalipse-Revelações de Esperança - Impresso | 06/12/2019",
+        "ultimo_contato": "2019-12-06",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.773594467360194,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "APOCALIPSE-REVELACOES DE ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2043689",
+      "contato": {
+        "nome": "Bruna Silva Santos Arcine",
+        "telefone": "+55(11)940060123",
+        "email": "brunasantos.mbs@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Apocalipse-Revelações de Esperança - Impresso | 25/06/2020*-*APOCALIPSE - Impresso | 10/01/2020",
+        "ultimo_contato": "2020-06-25",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.684783943522785,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "APOCALIPSE-REVELACOES DE ESPERANCA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2046807",
+      "contato": {
+        "nome": "Natalia Pereira dos Santos",
+        "telefone": "+55(11)951376257",
+        "email": "naute.shinohara@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "2° andar, 270,",
+        "material": "FIQUE LEVE - Impresso | 18/01/2020",
+        "ultimo_contato": "2020-01-18",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.755338812846501,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "2° ANDAR, 270,",
+        "material_principal": "FIQUE LEVE"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2056341",
+      "contato": {
+        "nome": "TATIANA ALVES",
+        "telefone": "",
+        "email": "tatisegundodpbarueri6@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Sentimentos e Emoções - On-line (em andamento) | 07/02/2020",
+        "ultimo_contato": "2020-02-07",
+        "vip_historico": true
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.746732907753622,
+        "materiais_quantidade": 1,
+        "tem_telefone": 0,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 1,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "SENTIMENTOS E EMOCOES - ON-LINE (EM ANDAMENTO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2134048",
+      "contato": {
+        "nome": "Dirceu Silva Carvalho",
+        "telefone": "+55(11)982990265",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Um",
+        "material": "BÍBLIA FACIL APOCALIPSE - PDF | 01/02/2021*-*Apocalipse-Revelações de Esperança - PDF | 01/02/2021*-*BÍBLIA FÁCIL - DANIEL - PDF | 01/02/2021*-*Evidências - PDF | 19/06/2020*-*Divertir e Instruir - Impresso | 26/05/2020",
+        "ultimo_contato": "2021-02-01",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.577633832602728,
+        "materiais_quantidade": 5,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL UM",
+        "material_principal": "BIBLIA FACIL APOCALIPSE"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2214346",
+      "contato": {
+        "nome": "Roberto Navarro",
+        "telefone": "+55(11)932095835",
+        "email": "robertonlp@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Dois",
+        "material": "Descobertas Bíblicas - PDF | 25/09/2020",
+        "ultimo_contato": "2020-09-25",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.641564441260972,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL DOIS",
+        "material_principal": "DESCOBERTAS BIBLICAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2347164",
+      "contato": {
+        "nome": "Sandra Paula Ferreira Sanches",
+        "telefone": "+55(11)988719079",
+        "email": "sandrapaulasanches@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Um",
+        "material": "Evidências - PDF | 29/04/2021*-*Evidências - Impresso | 29/04/2021",
+        "ultimo_contato": "2021-04-29",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.532088143541722,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL UM",
+        "material_principal": "EVIDENCIAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2350554",
+      "contato": {
+        "nome": "Márcia boulitreau",
+        "telefone": "+55(11)947934403",
+        "email": "ms.boulitreau@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Zero",
+        "material": "ENTRE FAMÍLIA - PDF | 07/05/2021",
+        "ultimo_contato": "2021-05-07",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.527793987721444,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL ZERO",
+        "material_principal": "ENTRE FAMILIA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2493257",
+      "contato": {
+        "nome": "Renata de Souza Buttelli Pierry",
+        "telefone": "+55(11)971376443",
+        "email": "renatabuttelli@icloud.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Zero",
+        "material": "Incríveis Milagres - Impresso | 16/01/2022",
+        "ultimo_contato": "2022-01-16",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.380879035564116,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL ZERO",
+        "material_principal": "INCRIVEIS MILAGRES"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2493265",
+      "contato": {
+        "nome": "Marli selma aparecida de souza buttelli",
+        "telefone": "+55(11)969260630",
+        "email": "buttelli@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Zero",
+        "material": "ENTRE FAMÍLIA - Impresso | 16/01/2022",
+        "ultimo_contato": "2022-01-16",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.380879035564116,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL ZERO",
+        "material_principal": "ENTRE FAMILIA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2574904",
+      "contato": {
+        "nome": "Flavia Caroline da Silva",
+        "telefone": "+55(11)993350252",
+        "email": "flavia_csilva@outlook.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "A Máquina Humana - Impresso | 18/10/2024*-*FIQUE LEVE - PDF | 13/09/2023*-*Marcadas Pela Fé - PDF | 14/07/2022",
+        "ultimo_contato": "2024-10-18",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.395261598115449,
+        "materiais_quantidade": 3,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "A MAQUINA HUMANA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2590992",
+      "contato": {
+        "nome": "Regina Estela De Morais Ferreira Silveira",
+        "telefone": "+55(11)994763952",
+        "email": "regina.estela.68@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "SANTANA DE PARNAÍBA",
+        "bairro": "Morada Das Flores (Aldeia Da Serra)",
+        "material": "Céu ou Inferno - Impresso | 29/04/2025*-*À procura da Verdade - Impresso | 06/08/2022",
+        "ultimo_contato": "2025-04-29",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.0063531596017325,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "SANTANA DE PARNAIBA",
+        "bairro": "MORADA DAS FLORES (ALDEIA DA SERRA)",
+        "material_principal": "CEU OU INFERNO"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2713787",
+      "contato": {
+        "nome": "Ralth Shoate",
+        "telefone": "+55(11)983722466",
+        "email": ""
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Um",
+        "material": "Evidências - Impresso | 19/12/2022",
+        "ultimo_contato": "2022-12-19",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.145196134997171,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 0,
+        "email_valido": 0,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL UM",
+        "material_principal": "EVIDENCIAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2716577",
+      "contato": {
+        "nome": "Maria Lucia Kfuri",
+        "telefone": "+55(11)991822847",
+        "email": "mlkfuri@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Um",
+        "material": "ENSINOS DE JESUS - Impresso | 26/12/2022",
+        "ultimo_contato": "2022-12-26",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.13966033596492,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL UM",
+        "material_principal": "ENSINOS DE JESUS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2754115",
+      "contato": {
+        "nome": "Carlos Barreto Ramos Junior",
+        "telefone": "+55(11)992087461",
+        "email": "carlosbarretojr@uol.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "A Cura do Pecado - Impresso | 02/03/2023*-*APOCALIPSE - Impresso | 02/03/2023",
+        "ultimo_contato": "2023-03-02",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 7.085901464365611,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "A CURA DO PECADO"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2924928",
+      "contato": {
+        "nome": "ROSA BRANDAO",
+        "telefone": "+55(11)965333612",
+        "email": "rosabranndao@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "Saldo Mais - PDF | 31/08/2023",
+        "ultimo_contato": "2023-08-31",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.920671504248683,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "SALDO MAIS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2955635",
+      "contato": {
+        "nome": "Joice Furquim",
+        "telefone": "+55(11)987409049",
+        "email": "joice_furkin@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "Sentimentos a Ciência do Existir - Impresso | 07/10/2023",
+        "ultimo_contato": "2023-10-07",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.883462586413092,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "SENTIMENTOS A CIENCIA DO EXISTIR"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "2982669",
+      "contato": {
+        "nome": "Débora Sousa",
+        "telefone": "+55(61)996374408",
+        "email": "debora-sousa.c@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Dois",
+        "material": "Evidências - PDF | 09/11/2023*-*Evidências - Impresso | 09/11/2023",
+        "ultimo_contato": "2023-11-09",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.849066282633458,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL DOIS",
+        "material_principal": "EVIDENCIAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3024858",
+      "contato": {
+        "nome": "Aline Andrade Brito de Almeida",
+        "telefone": "+55(11)945849845",
+        "email": "lylybrito@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "Evidências - PDF | 17/01/2024*-*Evidências - Impresso | 17/01/2024",
+        "ultimo_contato": "2024-01-17",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.773080375655535,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "EVIDENCIAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3079096",
+      "contato": {
+        "nome": "Tatiane Alecrim de Souza",
+        "telefone": "+55(11)947899319",
+        "email": "tatiane@pcmseguros.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Dois",
+        "material": "Sentimentos a Ciência do Existir - PDF | 16/03/2024",
+        "ultimo_contato": "2024-03-16",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.703188113240863,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL DOIS",
+        "material_principal": "SENTIMENTOS A CIENCIA DO EXISTIR"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3114896",
+      "contato": {
+        "nome": "Cintia Lima",
+        "telefone": "+55(11)970195794",
+        "email": "cinthiateles@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "Deus me ouve? - Impresso | 28/04/2024",
+        "ultimo_contato": "2024-04-28",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.648984550024776,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "DEUS ME OUVE?"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3119779",
+      "contato": {
+        "nome": "Priscila Richard Moreira",
+        "telefone": "+55(11)985344116",
+        "email": "prichard@mkom.tec.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "SANTANA DE PARNAÍBA",
+        "bairro": "Morada das Flores (Aldeia da Serra)",
+        "material": "Eu Creio - Revelando a palavra de Deus - Impresso | 07/05/2024",
+        "ultimo_contato": "2024-05-07",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.637258031284457,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "SANTANA DE PARNAIBA",
+        "bairro": "MORADA DAS FLORES (ALDEIA DA SERRA)",
+        "material_principal": "EU CREIO - REVELANDO A PALAVRA DE DEUS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3163804",
+      "contato": {
+        "nome": "Silmara Nascimento",
+        "telefone": "+55(11)959615514",
+        "email": "silmarajfidelis@yahoo.com.br"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "T3",
+        "material": "Pais preparados, filhos de caráter - PDF | 07/06/2024",
+        "ultimo_contato": "2024-06-07",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.595780513961311,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "T3",
+        "material_principal": "PAIS PREPARADOS, FILHOS DE CARATER"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3169929",
+      "contato": {
+        "nome": "Leandro de Sousa Medeiros",
+        "telefone": "+55(11)964323595",
+        "email": "sousa.leandro62@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Industrial",
+        "material": "Evidências - PDF | 12/06/2024*-*Evidências - Impresso | 12/06/2024",
+        "ultimo_contato": "2024-06-12",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.588926477533519,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE INDUSTRIAL",
+        "material_principal": "EVIDENCIAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3218638",
+      "contato": {
+        "nome": "Israel Silva",
+        "telefone": "+55(41)988526257",
+        "email": "infisrael@msn.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "A Origem de Tudo - Impresso | 02/08/2024",
+        "ultimo_contato": "2024-08-02",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 6.516193076042964,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "A ORIGEM DE TUDO"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3499136",
+      "contato": {
+        "nome": "Viviane Magalhães Palma Fernandes",
+        "telefone": "+55(19)974250770",
+        "email": "pavipa2008@hotmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "Educação Financeira à Luz da Bíblia - PDF | 11/02/2026*-*Educação Financeira à Luz da Bíblia - Impresso | 16/09/2025",
+        "ultimo_contato": "2026-02-11",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 4.770684624465665,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "EDUCACAO FINANCEIRA A LUZ DA BIBLIA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3547055",
+      "contato": {
+        "nome": "Danielle Camara Cotrim",
+        "telefone": "+55(11)987876439",
+        "email": "cotrim.danielle@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Residencial Um",
+        "material": "Evidências - PDF | 16/11/2025*-*Evidências - Impresso | 16/11/2025",
+        "ultimo_contato": "2025-11-16",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 5.3230099791384085,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE RESIDENCIAL UM",
+        "material_principal": "EVIDENCIAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3619645",
+      "contato": {
+        "nome": "Sandra Fusco",
+        "telefone": "+555511997808982",
+        "email": "sandrafusco12345@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "Evidências - PDF | 21/02/2026*-*Evidências - Impresso | 21/02/2026",
+        "ultimo_contato": "2026-02-21",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 4.68213122712422,
+        "materiais_quantidade": 2,
+        "tem_telefone": 1,
+        "telefone_valido": 0,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "EVIDENCIAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3704014",
+      "contato": {
+        "nome": "Michelle Balestero",
+        "telefone": "+55(11)952817800",
+        "email": "mibchelle@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "Sem Tabus - Impresso | 01/04/2026",
+        "ultimo_contato": "2026-04-01",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 4.23410650459726,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "SEM TABUS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3706845",
+      "contato": {
+        "nome": "Nicholas Setembre",
+        "telefone": "+55(11)940427969",
+        "email": "nicosetembre@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Aldeia da Serra",
+        "material": "Evidências - PDF | 06/04/2026",
+        "ultimo_contato": "2026-04-06",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 4.1588830833596715,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALDEIA DA SERRA",
+        "material_principal": "EVIDENCIAS"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "3763801",
+      "contato": {
+        "nome": "Weslley Rodrigues",
+        "telefone": "+55(11)974730534",
+        "email": "weslley.lourenco@outlook.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "Descobrindo Tesouros - Rodrigo Silva - Impresso | 05/06/2026",
+        "ultimo_contato": "2026-06-05",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 1.3862943611198906,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "DESCOBRINDO TESOUROS - RODRIGO SILVA"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    },
+    {
+      "id": "10024069",
+      "contato": {
+        "nome": "Claudia Furlan Bertini",
+        "telefone": "+551196218804",
+        "email": "claudiabertini@gmail.com"
+      },
+      "origem": {
+        "distrito": "Alphaville",
+        "cidade": "BARUERI",
+        "bairro": "Alphaville Empresarial",
+        "material": "VERDADES PARA O TEMPO DO FIM (EST. BÍBLICO) - Impresso | 19/03/2013",
+        "ultimo_contato": "2013-03-19",
+        "vip_historico": false
+      },
+      "atributos_modelo": {
+        "log_dias_desde_contato": 8.482601746646619,
+        "materiais_quantidade": 1,
+        "tem_telefone": 1,
+        "telefone_valido": 1,
+        "tem_email": 1,
+        "email_valido": 1,
+        "tem_descricao": 0,
+        "cidade": "BARUERI",
+        "bairro": "ALPHAVILLE EMPRESARIAL",
+        "material_principal": "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)"
+      },
+      "resultados": {
+        "tentativa_contato": false,
+        "data_tentativa": null,
+        "canal": null,
+        "respondeu": null,
+        "demonstrou_interesse": null,
+        "aceitou_visita": null,
+        "participou": null,
+        "observacao": null
+      }
+    }
+  ]
+}

@@ -2,8 +2,18 @@ import fs from 'fs';
 import path from 'path';
 
 const DATA_REFERENCIA = new Date('2026-06-08T00:00:00');
-const ML_RANKING_PADRAO = 'C:\\Users\\José Silva\\Downloads\\dados\\ranking_nao_vip_ml_pandas.csv';
+const DATASET_DIR = process.env.DATASET_DIR || path.resolve(process.cwd(), '..', 'dataset');
+const ML_RANKING_FILE = 'ranking_nao_vip_ml_pandas.csv';
+const ALUNOS_FILE = 'alunos.json';
 
+function resolveConfiguredPath(value) {
+  if (!value) return null;
+  return path.isAbsolute(value) ? value : path.resolve(process.cwd(), value);
+}
+
+function firstExistingPath(paths) {
+  return paths.find((candidate) => candidate && fs.existsSync(candidate)) || null;
+}
 function splitCsvLine(line) {
   const cells = [];
   let value = '';
@@ -29,8 +39,11 @@ function splitCsvLine(line) {
 }
 
 function readMlRanking() {
-  const rankingPath = process.env.ML_RANKING_PATH || ML_RANKING_PADRAO;
-  if (!fs.existsSync(rankingPath)) return { byId: new Map(), source: null };
+  const rankingPath = firstExistingPath([
+    resolveConfiguredPath(process.env.ML_RANKING_PATH),
+    path.join(DATASET_DIR, ML_RANKING_FILE)
+  ]);
+  if (!rankingPath) return { byId: new Map(), source: null };
 
   const lines = fs.readFileSync(rankingPath, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
   const headers = splitCsvLine(lines.shift());
@@ -154,7 +167,14 @@ function transformRecord(row, ml) {
 }
 
 export function getDashboardData() {
-  const alunosPath = path.resolve(process.cwd(), '..', 'dashboard-geral', 'alunos.json');
+  const alunosPath = firstExistingPath([
+    resolveConfiguredPath(process.env.ALUNOS_DATA_PATH),
+    path.join(DATASET_DIR, ALUNOS_FILE),
+    path.resolve(process.cwd(), '..', 'dashboard-geral', ALUNOS_FILE)
+  ]);
+  if (!alunosPath) {
+    throw new Error(`Arquivo ${ALUNOS_FILE} nao encontrado. Configure ALUNOS_DATA_PATH ou coloque o arquivo em ${DATASET_DIR}.`);
+  }
   const alunos = JSON.parse(fs.readFileSync(alunosPath, 'utf8'));
   const ranking = readMlRanking();
   const records = alunos.map((row) => transformRecord(row, ranking.byId));

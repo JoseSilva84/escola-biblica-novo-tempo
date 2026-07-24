@@ -1,0 +1,984 @@
+{
+  "source": "ListagemCompleta (1).xlsx",
+  "records": 45964,
+  "vip_records": 4009,
+  "reference_date": "2026-06-08",
+  "seed": 42,
+  "test_metrics": {
+    "roc_auc": 0.9003694434513169,
+    "average_precision": 0.46918995177156797,
+    "threshold": 0.7424946182823238,
+    "tp": 465,
+    "fp": 501,
+    "tn": 7890,
+    "fn": 337,
+    "precision": 0.4813664596273292,
+    "recall": 0.5798004987531172,
+    "f1": 0.5260180995475113
+  },
+  "bias": -0.5496678570271138,
+  "features": [
+    {
+      "name": "num:log_dias_desde_contato",
+      "weight": 0.2860551530233819
+    },
+    {
+      "name": "num:materiais_quantidade",
+      "weight": 0.9387425225683494
+    },
+    {
+      "name": "num:tem_telefone",
+      "weight": -0.3766632557009345
+    },
+    {
+      "name": "num:telefone_valido",
+      "weight": -0.2356783032652065
+    },
+    {
+      "name": "num:tem_email",
+      "weight": 0.22079749467833912
+    },
+    {
+      "name": "num:email_valido",
+      "weight": 0.1234861630183999
+    },
+    {
+      "name": "num:tem_descricao",
+      "weight": 0.3072334414535251
+    },
+    {
+      "name": "cidade:SAO PAULO",
+      "weight": -0.18955258956374496
+    },
+    {
+      "name": "cidade:CARAPICUIBA",
+      "weight": -0.06370274726197424
+    },
+    {
+      "name": "cidade:BARUERI",
+      "weight": -0.034983274127725866
+    },
+    {
+      "name": "cidade:OSASCO",
+      "weight": -0.04132673636534146
+    },
+    {
+      "name": "cidade:ITAPEVI",
+      "weight": -0.018972764923262005
+    },
+    {
+      "name": "cidade:COTIA",
+      "weight": -0.015463222743345268
+    },
+    {
+      "name": "cidade:SANTANA DE PARNAIBA",
+      "weight": -0.019861160998013185
+    },
+    {
+      "name": "cidade:JANDIRA",
+      "weight": -0.021045612349555154
+    },
+    {
+      "name": "cidade:VARGEM GRANDE PAULISTA",
+      "weight": -0.007753947874542694
+    },
+    {
+      "name": "cidade:MAIRINQUE",
+      "weight": -0.00872979626950825
+    },
+    {
+      "name": "cidade:PIEDADE",
+      "weight": -0.01025767098804657
+    },
+    {
+      "name": "cidade:ARACARIGUAMA",
+      "weight": -0.005080727548703355
+    },
+    {
+      "name": "cidade:SAO ROQUE",
+      "weight": -0.002018752322785408
+    },
+    {
+      "name": "cidade:ALUMINIO",
+      "weight": -0.00455269285011183
+    },
+    {
+      "name": "cidade:PILAR DO SUL",
+      "weight": -0.0002602231589914963
+    },
+    {
+      "name": "cidade:SAO MIGUEL ARCANJO",
+      "weight": -0.002296161779870893
+    },
+    {
+      "name": "cidade:PIRAPORA DO BOM JESUS",
+      "weight": 0.0015342050184581153
+    },
+    {
+      "name": "cidade:IBIUNA",
+      "weight": -0.002061902030260915
+    },
+    {
+      "name": "cidade:TAPIRAI",
+      "weight": 0.0009824560699769089
+    },
+    {
+      "name": "bairro:CENTRO",
+      "weight": -0.022519487455145856
+    },
+    {
+      "name": "bairro:AMERICANOPOLIS",
+      "weight": -0.012701255322892709
+    },
+    {
+      "name": "bairro:BELA VISTA",
+      "weight": -0.004975264983137026
+    },
+    {
+      "name": "bairro:IPIRANGA",
+      "weight": -0.0023760396564481007
+    },
+    {
+      "name": "bairro:VILA MARIANA",
+      "weight": -0.010850099520248674
+    },
+    {
+      "name": "bairro:CIDADE ARISTON ESTELA AZEVEDO",
+      "weight": -0.0075157705573312816
+    },
+    {
+      "name": "bairro:CAMBUCI",
+      "weight": -0.0052781202434715535
+    },
+    {
+      "name": "bairro:LIBERDADE",
+      "weight": -0.006498121764123753
+    },
+    {
+      "name": "bairro:PERDIZES",
+      "weight": -0.006333896121167348
+    },
+    {
+      "name": "bairro:PARQUE RESIDENCIAL COCAIA",
+      "weight": 0.008933248422040872
+    },
+    {
+      "name": "bairro:PINHEIROS",
+      "weight": 0.0009756314727206616
+    },
+    {
+      "name": "bairro:PARQUE DOS CAMARGOS",
+      "weight": -0.009421276033826627
+    },
+    {
+      "name": "bairro:ROCHDALE",
+      "weight": 0.002372230464238296
+    },
+    {
+      "name": "bairro:NOVO OSASCO",
+      "weight": -0.0039253521533286545
+    },
+    {
+      "name": "bairro:JARDIM VELOSO",
+      "weight": -0.0038801184743215322
+    },
+    {
+      "name": "bairro:VILA MENCK",
+      "weight": -0.0097341843486312
+    },
+    {
+      "name": "bairro:CONJ. HABIT. PRESIDENTE CASTELO BRANCO",
+      "weight": -0.0015385633805486852
+    },
+    {
+      "name": "bairro:PARQUE IMPERIAL",
+      "weight": -0.005568284131512626
+    },
+    {
+      "name": "bairro:JARDIM NOVO HORIZONTE",
+      "weight": -0.0053690146379441
+    },
+    {
+      "name": "bairro:VILA SILVIANIA",
+      "weight": -0.0027683019083056845
+    },
+    {
+      "name": "bairro:CONJUNTO HABITACIONAL PRESIDENTE CASTELO BRANCO",
+      "weight": -0.0028159852664143233
+    },
+    {
+      "name": "bairro:CONJUNTO HABITACIONAL",
+      "weight": 0.00046177305344591963
+    },
+    {
+      "name": "bairro:VILA SANTA CATARINA",
+      "weight": -0.0032014337049154256
+    },
+    {
+      "name": "bairro:VILA ENGENHO NOVO",
+      "weight": 0.0017899339154029896
+    },
+    {
+      "name": "bairro:JAGUARE",
+      "weight": -0.0067458183134115396
+    },
+    {
+      "name": "bairro:JARDIM D'ABRIL",
+      "weight": -0.0015189594691235064
+    },
+    {
+      "name": "bairro:SAO JOAO CLIMACO",
+      "weight": -0.002030247849327237
+    },
+    {
+      "name": "bairro:CIDADE SAO PEDRO",
+      "weight": 0.002145926917191389
+    },
+    {
+      "name": "bairro:BOM RETIRO",
+      "weight": -0.0015297602479398902
+    },
+    {
+      "name": "bairro:BARRA FUNDA",
+      "weight": 0.0007488830309041982
+    },
+    {
+      "name": "bairro:JARDIM MUTINGA",
+      "weight": -0.002342088748943085
+    },
+    {
+      "name": "bairro:JARDIM ANA ESTELA",
+      "weight": -0.006156108910603755
+    },
+    {
+      "name": "bairro:JARDIM TUPANCI",
+      "weight": 0.001180474315319728
+    },
+    {
+      "name": "bairro:ACLIMACAO",
+      "weight": 0.0018669139790390183
+    },
+    {
+      "name": "bairro:JARDIM BELVAL",
+      "weight": -0.0007484222909886784
+    },
+    {
+      "name": "bairro:JARDIM CONCEICAO",
+      "weight": 0.007333087157177571
+    },
+    {
+      "name": "bairro:VILA BUARQUE",
+      "weight": -0.0040683718756593405
+    },
+    {
+      "name": "bairro:VILA YOLANDA",
+      "weight": -0.005929463530590733
+    },
+    {
+      "name": "bairro:PARQUE SUBURBANO",
+      "weight": -0.00607532318818065
+    },
+    {
+      "name": "bairro:PARQUE VIANA",
+      "weight": -0.004193279742255903
+    },
+    {
+      "name": "bairro:JARDIM MUNHOZ JUNIOR",
+      "weight": -0.0009404652468473262
+    },
+    {
+      "name": "bairro:CONSOLACAO",
+      "weight": -0.0025278024447292708
+    },
+    {
+      "name": "bairro:JARDIM HELENA MARIA",
+      "weight": -0.003360912355532073
+    },
+    {
+      "name": "bairro:REPUBLICA",
+      "weight": -0.004442592801672487
+    },
+    {
+      "name": "bairro:JARDIM ROSEMARY",
+      "weight": -0.00510759526981085
+    },
+    {
+      "name": "bairro:CERQUEIRA CESAR",
+      "weight": -0.0034407721908657407
+    },
+    {
+      "name": "bairro:VILA LEOPOLDINA",
+      "weight": 0.0008646455086681755
+    },
+    {
+      "name": "bairro:ALTO DA RIVIERA",
+      "weight": -0.0030849729044793604
+    },
+    {
+      "name": "bairro:BROOKLIN PAULISTA",
+      "weight": -0.006302669010070455
+    },
+    {
+      "name": "bairro:JARDIM UMUARAMA",
+      "weight": 0.0009535580949278406
+    },
+    {
+      "name": "distrito:CARAPICUIBA",
+      "weight": -0.03500509566596562
+    },
+    {
+      "name": "distrito:BARUERI - CENTRAL",
+      "weight": -0.01694675604443788
+    },
+    {
+      "name": "distrito:AMERICANOPOLIS",
+      "weight": -0.013516974332514312
+    },
+    {
+      "name": "distrito:CENTRAL PAULISTANA",
+      "weight": -0.022746585309111028
+    },
+    {
+      "name": "distrito:JARDIM SILVIANIA",
+      "weight": -0.022522378481025025
+    },
+    {
+      "name": "distrito:JANDIRA",
+      "weight": -0.021171339073735883
+    },
+    {
+      "name": "distrito:ITAPEVI",
+      "weight": -0.00975439551353497
+    },
+    {
+      "name": "distrito:JARDIM HELENA MARIA",
+      "weight": -0.012542954009100106
+    },
+    {
+      "name": "distrito:SANTANA DE PARNAIBA",
+      "weight": -0.01906995451408788
+    },
+    {
+      "name": "distrito:JARDIM ROSEMARY",
+      "weight": -0.009218369409727032
+    },
+    {
+      "name": "distrito:RIO PEQUENO",
+      "weight": -0.011682582758557226
+    },
+    {
+      "name": "distrito:CAMPO GRANDE",
+      "weight": -0.008505083102070949
+    },
+    {
+      "name": "distrito:GRAJAU",
+      "weight": 0.0038992434240995495
+    },
+    {
+      "name": "distrito:LAPA",
+      "weight": -0.006113248581768026
+    },
+    {
+      "name": "distrito:IPIRANGA",
+      "weight": -0.005979378485305163
+    },
+    {
+      "name": "distrito:PINHEIROS",
+      "weight": 0.0032984020085965607
+    },
+    {
+      "name": "distrito:VILA BUARQUE",
+      "weight": -0.007486201382694175
+    },
+    {
+      "name": "distrito:VILA AYROSA",
+      "weight": -0.013847466633318579
+    },
+    {
+      "name": "distrito:OSASCO",
+      "weight": -0.011981338917895889
+    },
+    {
+      "name": "distrito:VILA RODRIGUES",
+      "weight": -0.003480518326731318
+    },
+    {
+      "name": "distrito:MAIRINQUE",
+      "weight": -0.013282489119620067
+    },
+    {
+      "name": "distrito:BROOKLIN",
+      "weight": -0.0005585795648441986
+    },
+    {
+      "name": "distrito:COTIA",
+      "weight": -0.0009554565373145855
+    },
+    {
+      "name": "distrito:CIDADE ADEMAR",
+      "weight": -0.009351496308153674
+    },
+    {
+      "name": "distrito:COMUNIDADE ARABE",
+      "weight": -0.013825142001762413
+    },
+    {
+      "name": "distrito:PARELHEIROS",
+      "weight": -0.009207833640004137
+    },
+    {
+      "name": "distrito:PARQUE DOROTEIA",
+      "weight": -0.0036507069939300313
+    },
+    {
+      "name": "distrito:JARDIM TRES CORACOES",
+      "weight": -0.0012261146085529831
+    },
+    {
+      "name": "distrito:MIRANDOPOLIS",
+      "weight": -0.0075018970843246475
+    },
+    {
+      "name": "distrito:JARDIM SAO BERNARDO",
+      "weight": -0.0045999789531688704
+    },
+    {
+      "name": "distrito:VARGEM GRANDE PAULISTA",
+      "weight": -0.007753947874542694
+    },
+    {
+      "name": "distrito:VILA SAO JOSE",
+      "weight": -0.00294972071982968
+    },
+    {
+      "name": "distrito:CIDADE SAO PEDRO",
+      "weight": 0.0008892138509449717
+    },
+    {
+      "name": "distrito:VILA YARA",
+      "weight": -0.011702851521388525
+    },
+    {
+      "name": "distrito:SAO ROQUE",
+      "weight": -0.00969734906596775
+    },
+    {
+      "name": "distrito:JAGUARE",
+      "weight": -0.00842171456309292
+    },
+    {
+      "name": "distrito:NOVA SEMENTE",
+      "weight": -0.00658620688279857
+    },
+    {
+      "name": "distrito:VILA GUARANI",
+      "weight": -0.00712066570587813
+    },
+    {
+      "name": "distrito:JARDIM BELA VISTA",
+      "weight": -0.0032639531601523124
+    },
+    {
+      "name": "distrito:JARDIM COLONIAL",
+      "weight": 0.006497629035124737
+    },
+    {
+      "name": "distrito:GRANJA VIANA",
+      "weight": -0.007713116992256411
+    },
+    {
+      "name": "distrito:CIDADE DUTRA - INTERLAGOS",
+      "weight": -0.00036817645520912355
+    },
+    {
+      "name": "distrito:JARDIM ARPOADOR",
+      "weight": -0.004064834266460654
+    },
+    {
+      "name": "distrito:PILAR DO SUL",
+      "weight": -0.00255638493886239
+    },
+    {
+      "name": "distrito:JARDIM GAIVOTAS",
+      "weight": -0.010580569690515374
+    },
+    {
+      "name": "distrito:PEDREIRA",
+      "weight": -0.0027008181236637166
+    },
+    {
+      "name": "distrito:SANTO AMARO",
+      "weight": -0.0034294146962512914
+    },
+    {
+      "name": "distrito:JARDINS",
+      "weight": -0.006842372210162672
+    },
+    {
+      "name": "distrito:PIEDADE",
+      "weight": -0.009275214918069671
+    },
+    {
+      "name": "distrito:MOEMA",
+      "weight": -0.004742485317506445
+    },
+    {
+      "name": "material:EVIDENCIAS",
+      "weight": -0.2143603237716051
+    },
+    {
+      "name": "material:RESPOSTAS- IVAN SARAIVA",
+      "weight": -0.025384461992628445
+    },
+    {
+      "name": "material:CD VERDADES BIBLICAS (CID MOREIRA)",
+      "weight": -0.03974381112543498
+    },
+    {
+      "name": "material:VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)",
+      "weight": -0.00496284185244469
+    },
+    {
+      "name": "material:PRINCIPIOS",
+      "weight": -0.03900407652891031
+    },
+    {
+      "name": "material:FIQUE LEVE",
+      "weight": 0.0064636493396177126
+    },
+    {
+      "name": "material:APOCALIPSE",
+      "weight": 0.1054463902564552
+    },
+    {
+      "name": "material:DEUS ME OUVE?",
+      "weight": -0.09178611459454525
+    },
+    {
+      "name": "material:DANIEL - PROFECIAS DE DANIEL",
+      "weight": 0.08874919384742377
+    },
+    {
+      "name": "material:ENSINOS DE JESUS",
+      "weight": 0.040833347692354235
+    },
+    {
+      "name": "material:VERDADES PARA O TEMPO DO FIM",
+      "weight": 0.02476243848615494
+    },
+    {
+      "name": "material:BIBLIA FACIL",
+      "weight": 0.10446930938503905
+    },
+    {
+      "name": "material:MENTE FELIZ",
+      "weight": -0.07079042903131288
+    },
+    {
+      "name": "material:SENTIMENTOS A CIENCIA DO EXISTIR",
+      "weight": -0.048152577411016834
+    },
+    {
+      "name": "material:O CONVITE – PR. IVAN SARAIVA",
+      "weight": -0.01985531479230576
+    },
+    {
+      "name": "material:DVD TEMPO DE ESPERANCA (PR. LUIZ GONCALVES)",
+      "weight": -0.0440901124858512
+    },
+    {
+      "name": "material:DESCOBRINDO TESOUROS - RODRIGO SILVA",
+      "weight": -0.047306790285186584
+    },
+    {
+      "name": "material:APOCALIPSE-REVELACOES DE ESPERANCA",
+      "weight": -0.027467618245107493
+    },
+    {
+      "name": "material:EDUCACAO FINANCEIRA A LUZ DA BIBLIA",
+      "weight": -0.04307913198876726
+    },
+    {
+      "name": "material:SUPER LUPA- A VOLTA AO MUNDO EM 7 DIAS",
+      "weight": -0.05616184209289544
+    },
+    {
+      "name": "material:ENTRE FAMILIA",
+      "weight": -0.009024386638093034
+    },
+    {
+      "name": "material:PAIS PREPARADOS, FILHOS DE CARATER",
+      "weight": -0.05087741571416494
+    },
+    {
+      "name": "material:MARCADAS PELA FE",
+      "weight": -0.04271127081387872
+    },
+    {
+      "name": "material:A MAQUINA HUMANA",
+      "weight": -0.038858379960767464
+    },
+    {
+      "name": "material:SALDO MAIS",
+      "weight": 0.01779602314960312
+    },
+    {
+      "name": "material:PAULO - O MENSAGEIRO DA CRUZ",
+      "weight": 0.004216125192191394
+    },
+    {
+      "name": "material:INCRIVEIS MILAGRES",
+      "weight": -0.0318148297461532
+    },
+    {
+      "name": "material:FAMILIA FELIZ (ESTUDO BIBLICO)",
+      "weight": -0.024806914243487382
+    },
+    {
+      "name": "material:SANTUARIO",
+      "weight": -0.01615618371792752
+    },
+    {
+      "name": "material:JESUS - RESTAURADOR DA VIDA",
+      "weight": -0.028271957090272914
+    },
+    {
+      "name": "material:ESPIRITO SANTO - O DEUS DOS BASTIDORES",
+      "weight": -0.017830626813894034
+    },
+    {
+      "name": "material:LIVRO ESPERANCA",
+      "weight": 0.015140671542405323
+    },
+    {
+      "name": "material:DIVERTIR E INSTRUIR",
+      "weight": -0.003386034201097321
+    },
+    {
+      "name": "material:REVISTA VIVA COM ESPERANCA",
+      "weight": -0.06255189066548994
+    },
+    {
+      "name": "material:A PROCURA DA VERDADE",
+      "weight": -0.020923942873497334
+    },
+    {
+      "name": "material:NA MIRA DA VERDADE",
+      "weight": -0.02689871570171939
+    },
+    {
+      "name": "material:A ULTIMA ESPERANCA (ISRAEL)",
+      "weight": 0.022000776058720896
+    },
+    {
+      "name": "material:A CURA DO PECADO",
+      "weight": -0.031909784894112864
+    },
+    {
+      "name": "material:INTIMIDADE COM DEUS - ON-LINE (EM ANDAMENTO)",
+      "weight": 0.2616166844760056
+    },
+    {
+      "name": "material:DVD O SENTIDO DA FE",
+      "weight": -0.01747798638429203
+    },
+    {
+      "name": "material:A ORIGEM DE TUDO",
+      "weight": -0.02345006896311112
+    },
+    {
+      "name": "material:APOCALIPSE - O FIM REVELADO - ON-LINE (EM ANDAMENTO)",
+      "weight": 0.24093522232054068
+    },
+    {
+      "name": "material:OUVINDO A VOZ DE DEUS (ESTUDO BIBLICO)",
+      "weight": -0.0013715920667939756
+    },
+    {
+      "name": "material:ACORDES",
+      "weight": 0.003455248669561608
+    },
+    {
+      "name": "material:SEM TABUS",
+      "weight": -0.016146988772598455
+    },
+    {
+      "name": "material:EU CREIO - REVELANDO A PALAVRA DE DEUS",
+      "weight": -0.02383735530018657
+    },
+    {
+      "name": "material:EU NO UNIVERSO",
+      "weight": -0.021089178443421657
+    },
+    {
+      "name": "material:O RESGATE DA VERDADE (ESTUDO BIBLICO)",
+      "weight": 0.017572819353449953
+    },
+    {
+      "name": "material:SENTIMENTOS E EMOCOES - ON-LINE (EM ANDAMENTO)",
+      "weight": 0.1762130876424189
+    },
+    {
+      "name": "material:DESCOBERTAS BIBLICAS - ON-LINE (EM ANDAMENTO)",
+      "weight": 0.15149602495566078
+    },
+    {
+      "name": "material:O SABADO DA CRIACAO",
+      "weight": -0.012993218377182572
+    },
+    {
+      "name": "material:CEU OU INFERNO",
+      "weight": -0.015225438681265436
+    },
+    {
+      "name": "material:DESCOBERTAS BIBLICAS",
+      "weight": -0.0066719802958547375
+    },
+    {
+      "name": "material:BIBLIA FACIL APOCALIPSE",
+      "weight": -0.006542565271696154
+    },
+    {
+      "name": "material:LIVRO A GRANDE ESPERANCA ( DIGITAL - PDF )",
+      "weight": -0.0024540466168909082
+    },
+    {
+      "name": "material:A BIBLIA ENSINA",
+      "weight": -0.022363818804408693
+    },
+    {
+      "name": "material:LAR DOCE LAR",
+      "weight": -0.015423328189556695
+    },
+    {
+      "name": "material:INTIMIDADE COM DEUS - ON-LINE",
+      "weight": 0.09677193200196613
+    },
+    {
+      "name": "material:BIBLIA FACIL - ON-LINE (EM ANDAMENTO)",
+      "weight": 0.131852651145795
+    },
+    {
+      "name": "material:A VERDADE",
+      "weight": -0.005852680231482033
+    }
+  ],
+  "preprocessing": {
+    "numeric_fields": [
+      "log_dias_desde_contato",
+      "materiais_quantidade",
+      "tem_telefone",
+      "telefone_valido",
+      "tem_email",
+      "email_valido",
+      "tem_descricao"
+    ],
+    "means": [
+      7.374383519938008,
+      2.041989611378532,
+      0.9180060373664028,
+      0.6530961899322836,
+      0.9215414321068233,
+      0.9092763318919801,
+      0.09102281689374779
+    ],
+    "stds": [
+      1.2142559059740947,
+      2.2014058470338083,
+      0.274355522498257,
+      0.4759848281490472,
+      0.26889183888197504,
+      0.2872157449601332,
+      0.287641554192757
+    ],
+    "categories": {
+      "cidade": [
+        "SAO PAULO",
+        "CARAPICUIBA",
+        "BARUERI",
+        "OSASCO",
+        "ITAPEVI",
+        "COTIA",
+        "SANTANA DE PARNAIBA",
+        "JANDIRA",
+        "VARGEM GRANDE PAULISTA",
+        "MAIRINQUE",
+        "PIEDADE",
+        "ARACARIGUAMA",
+        "SAO ROQUE",
+        "ALUMINIO",
+        "PILAR DO SUL",
+        "SAO MIGUEL ARCANJO",
+        "PIRAPORA DO BOM JESUS",
+        "IBIUNA",
+        "TAPIRAI"
+      ],
+      "bairro": [
+        "CENTRO",
+        "AMERICANOPOLIS",
+        "BELA VISTA",
+        "IPIRANGA",
+        "VILA MARIANA",
+        "CIDADE ARISTON ESTELA AZEVEDO",
+        "CAMBUCI",
+        "LIBERDADE",
+        "PERDIZES",
+        "PARQUE RESIDENCIAL COCAIA",
+        "PINHEIROS",
+        "PARQUE DOS CAMARGOS",
+        "ROCHDALE",
+        "NOVO OSASCO",
+        "JARDIM VELOSO",
+        "VILA MENCK",
+        "CONJ. HABIT. PRESIDENTE CASTELO BRANCO",
+        "PARQUE IMPERIAL",
+        "JARDIM NOVO HORIZONTE",
+        "VILA SILVIANIA",
+        "CONJUNTO HABITACIONAL PRESIDENTE CASTELO BRANCO",
+        "CONJUNTO HABITACIONAL",
+        "VILA SANTA CATARINA",
+        "VILA ENGENHO NOVO",
+        "JAGUARE",
+        "JARDIM D'ABRIL",
+        "SAO JOAO CLIMACO",
+        "CIDADE SAO PEDRO",
+        "BOM RETIRO",
+        "BARRA FUNDA",
+        "JARDIM MUTINGA",
+        "JARDIM ANA ESTELA",
+        "JARDIM TUPANCI",
+        "ACLIMACAO",
+        "JARDIM BELVAL",
+        "JARDIM CONCEICAO",
+        "VILA BUARQUE",
+        "VILA YOLANDA",
+        "PARQUE SUBURBANO",
+        "PARQUE VIANA",
+        "JARDIM MUNHOZ JUNIOR",
+        "CONSOLACAO",
+        "JARDIM HELENA MARIA",
+        "REPUBLICA",
+        "JARDIM ROSEMARY",
+        "CERQUEIRA CESAR",
+        "VILA LEOPOLDINA",
+        "ALTO DA RIVIERA",
+        "BROOKLIN PAULISTA",
+        "JARDIM UMUARAMA"
+      ],
+      "distrito": [
+        "CARAPICUIBA",
+        "BARUERI - CENTRAL",
+        "AMERICANOPOLIS",
+        "CENTRAL PAULISTANA",
+        "JARDIM SILVIANIA",
+        "JANDIRA",
+        "ITAPEVI",
+        "JARDIM HELENA MARIA",
+        "SANTANA DE PARNAIBA",
+        "JARDIM ROSEMARY",
+        "RIO PEQUENO",
+        "CAMPO GRANDE",
+        "GRAJAU",
+        "LAPA",
+        "IPIRANGA",
+        "PINHEIROS",
+        "VILA BUARQUE",
+        "VILA AYROSA",
+        "OSASCO",
+        "VILA RODRIGUES",
+        "MAIRINQUE",
+        "BROOKLIN",
+        "COTIA",
+        "CIDADE ADEMAR",
+        "COMUNIDADE ARABE",
+        "PARELHEIROS",
+        "PARQUE DOROTEIA",
+        "JARDIM TRES CORACOES",
+        "MIRANDOPOLIS",
+        "JARDIM SAO BERNARDO",
+        "VARGEM GRANDE PAULISTA",
+        "VILA SAO JOSE",
+        "CIDADE SAO PEDRO",
+        "VILA YARA",
+        "SAO ROQUE",
+        "JAGUARE",
+        "NOVA SEMENTE",
+        "VILA GUARANI",
+        "JARDIM BELA VISTA",
+        "JARDIM COLONIAL",
+        "GRANJA VIANA",
+        "CIDADE DUTRA - INTERLAGOS",
+        "JARDIM ARPOADOR",
+        "PILAR DO SUL",
+        "JARDIM GAIVOTAS",
+        "PEDREIRA",
+        "SANTO AMARO",
+        "JARDINS",
+        "PIEDADE",
+        "MOEMA"
+      ],
+      "material": [
+        "EVIDENCIAS",
+        "RESPOSTAS- IVAN SARAIVA",
+        "CD VERDADES BIBLICAS (CID MOREIRA)",
+        "VERDADES PARA O TEMPO DO FIM (EST. BIBLICO)",
+        "PRINCIPIOS",
+        "FIQUE LEVE",
+        "APOCALIPSE",
+        "DEUS ME OUVE?",
+        "DANIEL - PROFECIAS DE DANIEL",
+        "ENSINOS DE JESUS",
+        "VERDADES PARA O TEMPO DO FIM",
+        "BIBLIA FACIL",
+        "MENTE FELIZ",
+        "SENTIMENTOS A CIENCIA DO EXISTIR",
+        "O CONVITE – PR. IVAN SARAIVA",
+        "DVD TEMPO DE ESPERANCA (PR. LUIZ GONCALVES)",
+        "DESCOBRINDO TESOUROS - RODRIGO SILVA",
+        "APOCALIPSE-REVELACOES DE ESPERANCA",
+        "EDUCACAO FINANCEIRA A LUZ DA BIBLIA",
+        "SUPER LUPA- A VOLTA AO MUNDO EM 7 DIAS",
+        "ENTRE FAMILIA",
+        "PAIS PREPARADOS, FILHOS DE CARATER",
+        "MARCADAS PELA FE",
+        "A MAQUINA HUMANA",
+        "SALDO MAIS",
+        "PAULO - O MENSAGEIRO DA CRUZ",
+        "INCRIVEIS MILAGRES",
+        "FAMILIA FELIZ (ESTUDO BIBLICO)",
+        "SANTUARIO",
+        "JESUS - RESTAURADOR DA VIDA",
+        "ESPIRITO SANTO - O DEUS DOS BASTIDORES",
+        "LIVRO ESPERANCA",
+        "DIVERTIR E INSTRUIR",
+        "REVISTA VIVA COM ESPERANCA",
+        "A PROCURA DA VERDADE",
+        "NA MIRA DA VERDADE",
+        "A ULTIMA ESPERANCA (ISRAEL)",
+        "A CURA DO PECADO",
+        "INTIMIDADE COM DEUS - ON-LINE (EM ANDAMENTO)",
+        "DVD O SENTIDO DA FE",
+        "A ORIGEM DE TUDO",
+        "APOCALIPSE - O FIM REVELADO - ON-LINE (EM ANDAMENTO)",
+        "OUVINDO A VOZ DE DEUS (ESTUDO BIBLICO)",
+        "ACORDES",
+        "SEM TABUS",
+        "EU CREIO - REVELANDO A PALAVRA DE DEUS",
+        "EU NO UNIVERSO",
+        "O RESGATE DA VERDADE (ESTUDO BIBLICO)",
+        "SENTIMENTOS E EMOCOES - ON-LINE (EM ANDAMENTO)",
+        "DESCOBERTAS BIBLICAS - ON-LINE (EM ANDAMENTO)",
+        "O SABADO DA CRIACAO",
+        "CEU OU INFERNO",
+        "DESCOBERTAS BIBLICAS",
+        "BIBLIA FACIL APOCALIPSE",
+        "LIVRO A GRANDE ESPERANCA ( DIGITAL - PDF )",
+        "A BIBLIA ENSINA",
+        "LAR DOCE LAR",
+        "INTIMIDADE COM DEUS - ON-LINE",
+        "BIBLIA FACIL - ON-LINE (EM ANDAMENTO)",
+        "A VERDADE"
+      ]
+    }
+  }
+}

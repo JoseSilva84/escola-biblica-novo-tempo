@@ -1,0 +1,139 @@
+﻿posicao,id,nome,distrito,cidade,bairro,telefone,email,ultimo_contato,vip_atual,score_similaridade_vip,score_prioridade_operacional,faixa_prioridade
+1,2574904.0,Flavia Caroline da Silva,Alphaville,BARUERI,Alphaville Empresarial,+55(11)993350252,flavia_csilva@outlook.com,18/10/2024,Não,0.318641,0.696949,media
+2,2590992.0,Regina Estela De Morais Ferreira Silveira,Alphaville,SANTANA DE PARNAÍBA,Morada Das Flores (Aldeia Da Serra),+55(11)994763952,regina.estela.68@gmail.com,29/04/2025,Não,0.227235,0.650599,media
+3,978661.0,Luiz Otavio da Silva,Alphaville,BARUERI,Nova Aldeinha,+55(11)947299648,lo.car.sp@gmail.com,06/08/2023,Não,0.344296,0.646714,media
+4,3499136.0,Viviane Magalhães Palma Fernandes,Alphaville,BARUERI,Alphaville Empresarial,+55(19)974250770,pavipa2008@hotmail.com,11/02/2026,Não,0.176951,0.644386,media
+5,1338907.0,Diony VANDERLEI NOBRE Do Espírito Santo,Alphaville,BARUERI,Alphaville Empresarial,+55(11)974133525,dionynobre@yahoo.com.br,28/10/2025,Não,0.195328,0.637096,media
+6,848806.0,Bianka Beatriz Straub Alcantara,Alphaville,BARUERI,Alphaville Empresarial,+55(41)99309341,biankaalcantara.psicologia@gmail.com; biaqq2@hotmail.com,19/12/2024,Não,0.294814,0.624502,media
+7,3619645.0,Sandra Fusco,Alphaville,BARUERI,Alphaville Empresarial,+555511997808982,sandrafusco12345@gmail.com,21/02/2026,Não,0.225456,0.623664,media
+8,3547055.0,Danielle Camara Cotrim,Alphaville,BARUERI,Alphaville Residencial Um,+55(11)987876439,cotrim.danielle@gmail.com,16/11/2025,Não,0.171035,0.609466,media
+9,3704014.0,Michelle Balestero,Alphaville,BARUERI,Alphaville Empresarial,+55(11)952817800,mibchelle@gmail.com,01/04/2026,Não,0.112741,0.606558,media
+10,3763801.0,Weslley Rodrigues,Alphaville,BARUERI,Alphaville Empresarial,+55(11)974730534,weslley.lourenco@outlook.com,05/06/2026,Não,0.059240,0.603358,media
+11,3706845.0,Nicholas Setembre,Alphaville,BARUERI,Aldeia da Serra,+55(11)940427969,nicosetembre@gmail.com,06/04/2026,Não,0.092879,0.600537,media
+12,1921299.0,Daniel Olivieri Reis,Alphaville,BARUERI,Alphaville Industrial,+55(11)963153516,daniel.olivieri.reis@gmail.com,17/10/2021,Não,0.351316,0.587043,media
+13,464522.0,Eleny De Almeida Sobreda,Alphaville,BARUERI,Alphaville Industrial,+55(11)78784181,sobreda9@hotmail.com,27/08/2018,Não,0.503670,0.581993,media
+14,2754115.0,Carlos Barreto Ramos Junior,Alphaville,BARUERI,Alphaville Industrial,+55(11)992087461,carlosbarretojr@uol.com.br,02/03/2023,Não,0.294193,0.573484,media
+15,3169929.0,Leandro de Sousa Medeiros,Alphaville,BARUERI,Alphaville Industrial,+55(11)964323595,sousa.leandro62@gmail.com,12/06/2024,Não,0.217536,0.560116,media
+16,1000293.0,Roseli Moraes Silva Spaccaquerche,Alphaville,BARUERI,Alphaville Industrial,+55(11)41958952 +55(11)997181616,rosespacca@yahoo.com.br,11/12/2020,Não,0.942126,0.551333,media
+17,3024858.0,Aline Andrade Brito de Almeida,Alphaville,BARUERI,Alphaville Empresarial,+55(11)945849845,lylybrito@hotmail.com,17/01/2024,Não,0.225011,0.550268,media
+18,2982669.0,Débora Sousa,Alphaville,BARUERI,Alphaville Residencial Dois,+55(61)996374408,debora-sousa.c@hotmail.com,09/11/2023,Não,0.228148,0.545049,media
+19,2043689.0,Bruna Silva Santos Arcine,Alphaville,BARUERI,Alphaville Industrial,+55(11)940060123,brunasantos.mbs@hotmail.com,25/06/2020,Não,0.325287,0.526962,media
+20,337780.0,Jose Luis Alcarde,Alphaville,BARUERI,Alphaville Industrial,+5501198095015,jlalcarde@uol.com.br,29/06/2011,Não,0.355007,0.509616,media
+21,3218638.0,Israel Silva,Alphaville,BARUERI,Alphaville Empresarial,+55(41)988526257,infisrael@msn.com,02/08/2024,Não,0.177594,0.501763,media
+22,182100.0,Ariane Steffen,Alphaville,BARUERI,Alphaville Industrial,+5541954822,piari@uol.com.br,08/05/2009,Não,0.349064,0.499953,media
+23,785672.0,Marinalva Ferreira Vieira De Sousa,Alphaville,BARUERI,Alphaville Residencial Um,+55(11)41913196 +55(11)959857495,naldapb.1@hotmail.com,13/02/2019,Não,0.716506,0.499688,media
+24,910455.0,Roberto Pizarro,Alphaville,BARUERI,Alphaville Industrial,+55(11)973777453,pizarro.r@terra.com.br;pizarro.r7@gmail.com,05/09/2018,Não,0.398375,0.496068,media
+25,541357.0,JULIO CESAR FELIPE,Alphaville,BARUERI,Alphaville Industrial,+551142088000,julio.felipe@tempoassist.com.br,05/05/2012,Não,0.344435,0.495423,media
+26,1613012.0,TAYNARA CASAGRANDE,Alphaville,BARUERI,Alphaville Comercial,+551126806569 +5511996826397,recepcao@alphaodonto.com.br,30/03/2020,Não,0.519205,0.494733,media
+27,2347164.0,Sandra Paula Ferreira Sanches,Alphaville,BARUERI,Alphaville Residencial Um,+55(11)988719079,sandrapaulasanches@gmail.com,29/04/2021,Não,0.257713,0.494245,media
+28,174329.0,Clovis Augusto Manfio,Alphaville,BARUERI,Alphaville Industrial,+551183339720,cmanfio@3sil.com.br,04/02/2009,Não,0.345097,0.493828,media
+29,3119779.0,Priscila Richard Moreira,Alphaville,SANTANA DE PARNAÍBA,Morada das Flores (Aldeia da Serra),+55(11)985344116,prichard@mkom.tec.br,07/05/2024,Não,0.184000,0.493403,media
+30,1367554.0,Marcelo Rodney Nogueira,Alphaville,BARUERI,Alphaville Industrial,+5511986941543,marcelorodney@gmail.com,02/07/2017,Não,0.321866,0.489357,media
+31,3163804.0,Silmara Nascimento,Alphaville,BARUERI,T3,+55(11)959615514,silmarajfidelis@yahoo.com.br,07/06/2024,Não,0.176330,0.489319,media
+32,1674037.0,Luiz David Andreatta,Alphaville,BARUERI,Alphaville Industrial,+55(11)996349138,andreatta11@hotmail.com,12/09/2018,Não,0.311947,0.483963,media
+33,1602113.0,Marcos Vinicius De Sousa,Alphaville,BARUERI,Alphaville Industrial,+551142015519 +5511961635655,marcos.ecomerce@gmail.com,19/09/2020,Não,0.419548,0.482307,media
+34,3079096.0,Tatiane Alecrim de Souza,Alphaville,BARUERI,Alphaville Residencial Dois,+55(11)947899319,tatiane@pcmseguros.com.br,16/03/2024,Não,0.180438,0.479290,media
+35,3114896.0,Cintia Lima,Alphaville,BARUERI,Alphaville Empresarial,+55(11)970195794,cinthiateles@hotmail.com,28/04/2024,Não,0.172247,0.476954,media
+36,491025.0,Maria De Jesus De Sousa Lima,Alphaville,BARUERI,Alphaville Residencial Um,+55(11)41914913 +55(11)83957128,mjslima@live.com,18/08/2017,Não,0.618792,0.476496,media
+37,1238480.0,Jose Clemente Herculano,Alphaville,BARUERI,Alphaville Residencial Zero,,pdr.cl@hotmail.com,31/08/2015,Não,0.875150,0.473535,media
+38,2924928.0,ROSA BRANDAO,Alphaville,BARUERI,Alphaville Empresarial,+55(11)965333612,rosabranndao@hotmail.com,31/08/2023,Não,0.198420,0.473360,media
+39,1118986.0,Eliane Santos Toja De Araujo,Alphaville,BARUERI,Alphaville Industrial,,eliane.tojal@gmail.com,25/03/2015,Não,0.861259,0.468157,media
+40,182096.0,Augusto Steffen,Alphaville,BARUERI,Alphaville Industrial,,aassteffen@hotmail.com,08/05/2009,Não,0.909948,0.466945,media
+41,169047.0,Fernanda Silva,Alphaville,BARUERI,Alphaville Industrial,,nandi-silva@hotmail.com,14/11/2008,Não,0.907365,0.466509,media
+42,2716577.0,Maria Lucia Kfuri,Alphaville,BARUERI,Alphaville Residencial Um,+55(11)991822847,mlkfuri@uol.com.br,26/12/2022,Não,0.210556,0.465148,media
+43,493734.0,Marisa Tastaldi,Alphaville,BARUERI,Alphaville Residencial Zero,,mftastaldi@gmail.com,11/01/2012,Não,0.870499,0.465036,media
+44,452865.0,Rodrigo Pedrassi Ferreira De Jesus,Alphaville,BARUERI,Nova Aldeinha,,rodrigopedrassi@tutotec.com.br,13/10/2011,Não,0.870949,0.464864,media
+45,483937.0,Sandra Malvino,Alphaville,BARUERI,Alphaville Empresarial,,rmalvino@gmail.com,29/01/2012,Não,0.866434,0.463689,media
+46,199552.0,Carolina Santos,Alphaville,BARUERI,Alphaville Comercial,,carol_park_@hotmail.com,24/08/2009,Não,0.870724,0.463280,media
+47,17322.0,Silmara Cristina Souza Santos,Alphaville,BARUERI,Alphaville Industrial,,silmara@pontoaponto.com.br,22/09/2008,Não,0.872132,0.463118,media
+48,2955635.0,Joice Furquim,Alphaville,BARUERI,Alphaville Empresarial,+55(11)987409049,joice_furkin@hotmail.com,07/10/2023,Não,0.186803,0.461902,media
+49,596769.0,Marco Aurélio Pires,Alphaville,BARUERI,Nova Aldeinha,+5526807480 +55952714896,marco.terranova1@yahoo.com.br,15/02/2015,Não,0.548620,0.456808,media
+50,1441848.0,Luciane Aparecida Corrêa Barros,Alphaville,BARUERI,Alphaville Industrial,+551141954220 +5511986355220,lucianebarros91@gmail.com,06/08/2016,Não,0.500023,0.456722,media
+51,456760.0,EDUARDO GOMES,Alphaville,BARUERI,B,+5541956052 +5575192883,edu.dados@hotmail.com,17/01/2012,Não,0.560156,0.452342,media
+52,1312134.0,Juliana De Freitas Araujo,Alphaville,BARUERI,Alphaville Industrial,+551141931510 +5511999147072,araujojulianaa@gmail.com,14/05/2016,Não,0.450437,0.446688,baixa
+53,857001.0,Maria Victoria Simon Garcia,Alphaville,BARUERI,Alphaville Industrial,+551141911407 +5511993856320,marcelo.tomas02@gmail.com,27/12/2013,Não,0.477593,0.444849,baixa
+54,1558583.0,Bruna De Fátima Machado Do Amaral,Alphaville,BARUERI,Alphaville Industrial,+5549988445829,blima561@gmail.com,19/03/2017,Não,0.263966,0.444566,baixa
+55,1360379.0,Cristiano De Moraes,Alphaville,BARUERI,Alphaville Industrial,+55996455077,cmoraes@kiviks.com.br,14/03/2016,Não,0.268571,0.442104,baixa
+56,763521.0,Gabriela Scalon,Alphaville,BARUERI,Alphaville Residencial Dois,+5512345677 +55999989891,gabrielascalonb@gmail.com,11/08/2013,Não,0.456647,0.440013,baixa
+57,192050.0,Solange Rodrigues Fernandes,Alphaville,BARUERI,ALPHAVILLE COMERCIAL,+5541958436 +5571527780,solange.imagem@terra.com.br,18/05/2011,Não,0.469749,0.439986,baixa
+58,441691.0,Creuza Ferreira da Silva,Alphaville,BARUERI,Alphaville Industrial,+5541917488 +5587033281,keuindependente@hotmail.com,09/09/2011,Não,0.464195,0.439274,baixa
+59,73049.0,Gilvandete Josefa de Souza,Alphaville,BARUERI,Alphaville Industrial,+551156238476 +551145022586,gilvandete@flytour.com.br,11/05/2010,Não,0.455130,0.435881,baixa
+60,1883004.0,Julianna Franchi Jordao da Mota,Alphaville,BARUERI,Alphaville Residencial Zero,+55(11)994170182,ju.fjmota@gmail.com,13/02/2019,Não,0.241480,0.435830,baixa
+61,1720978.0,Ana Mondin,Alphaville,BARUERI,Alphaville Industrial,+55(11)99484368,Ana.mondin01@gmail.com,14/05/2018,Não,0.245730,0.434734,baixa
+62,2493265.0,Marli selma aparecida de souza buttelli,Alphaville,BARUERI,Alphaville Residencial Zero,+55(11)969260630,buttelli@uol.com.br,16/01/2022,Não,0.211717,0.433496,baixa
+63,1491544.0,Deborah Cunha,Alphaville,BARUERI,Alphaville Industrial,+5521981061322,deborahdanielle@hotmail.com,04/11/2016,Não,0.250325,0.430259,baixa
+64,424905.0,ANTONIO CARLOS DA CRUZ,Alphaville,BARUERI,Alphaville Industrial,+5541953006,CALUR@HOTMAIL.COM,30/08/2011,Não,0.264084,0.429087,baixa
+65,2350554.0,Márcia boulitreau,Alphaville,BARUERI,Alphaville Residencial Zero,+55(11)947934403,ms.boulitreau@uol.com.br,07/05/2021,Não,0.217551,0.427343,baixa
+66,1.0024069E7,Claudia Furlan Bertini,Alphaville,BARUERI,Alphaville Empresarial,+551196218804,claudiabertini@gmail.com,19/03/2013,Não,0.259033,0.427248,baixa
+67,847538.0,Valkiria Lorente,Alphaville,BARUERI,Alphaville Industrial,+5541953564,kialorente@uol.com.br,08/12/2013,Não,0.256978,0.427048,baixa
+68,2493257.0,Renata de Souza Buttelli Pierry,Alphaville,BARUERI,Alphaville Residencial Zero,+55(11)971376443,renatabuttelli@icloud.com,16/01/2022,Não,0.207939,0.425916,baixa
+69,1037940.0,Silvia Cristina Bonifacio,Alphaville,BARUERI,Alphaville Industrial,+551141936886,scbonifacio@uol.com.br,21/11/2014,Não,0.252954,0.425750,baixa
+70,2046807.0,Natalia Pereira dos Santos,Alphaville,BARUERI,"2° andar, 270,",+55(11)951376257,naute.shinohara@gmail.com,18/01/2020,Não,0.229541,0.425683,baixa
+71,2214346.0,Roberto Navarro,Alphaville,BARUERI,Alphaville Residencial Dois,+55(11)932095835,robertonlp@gmail.com,25/09/2020,Não,0.222555,0.425251,baixa
+72,331821.0,Maria Celia Felix Tostes Pereira,Alphaville,BARUERI,Alphaville Industrial,+551181165960,pra_mariacelia@hotmail.com,27/01/2011,Não,0.259285,0.424929,baixa
+73,626406.0,Marília Villas Boas Souza,Alphaville,SANTANA DE PARNAÍBA,Alphaville 4,+5511999971944,marciosouza@maketravel.com.br,13/08/2013,Não,0.253896,0.423675,baixa
+74,1401398.0,Maria Conceição Brito Masetti,Alphaville,BARUERI,Alphaville Industrial,+551141535958 +5511999265612,mcmasetti@hotmail.com,27/05/2016,Não,0.375082,0.422980,baixa
+75,1350729.0,Flavio Eduardo De Souza,Alphaville,BARUERI,Alphaville Industrial,+551143036879 +5511986012134,flavioeduardofc@hotmail.com,26/02/2016,Não,0.376437,0.422419,baixa
+76,1163462.0,ELIANE CRISTINA BUVCHI GALVAO,Alphaville,BARUERI,Alphaville Industrial,+551141956268 +5511999669193,li.eliane7@gmail.com,22/05/2015,Não,0.380421,0.420800,baixa
+77,1258339.0,Amanda Stela Lins Da Silva,Alphaville,BARUERI,Alphaville Industrial,+5511946532941,amandalins87@yahoo.com.br,27/09/2015,Não,0.245766,0.418950,baixa
+78,2134048.0,Dirceu Silva Carvalho,Alphaville,BARUERI,Alphaville Residencial Um,+55(11)982990265,,01/02/2021,Não,0.258007,0.418944,baixa
+79,712020.0,Wanderson Vieira Da Silva,Alphaville,BARUERI,Alphaville Industrial,+5541512043 +55964436900,andmusic2008@hotmail.com,07/05/2013,Não,0.389639,0.418801,baixa
+80,950494.0,Paulo Cesar Ruivo,Alphaville,BARUERI,Alphaville Comercial,+5511984900085,doidomilianos@hotmail.com,06/06/2014,Não,0.248151,0.418210,baixa
+81,590242.0,Elza Perez Parrilo,Alphaville,BARUERI,Alphaville Industrial,+55(11)41933791 +55(11)997319174,elzaperez@globoemail.com,17/08/2021,Não,0.306930,0.417802,baixa
+82,1007051.0,Thais Ferreira,Alphaville,BARUERI,Nova Aldeinha,+55983209584,thais.fe.fe@hotmail.com,17/09/2014,Não,0.247246,0.417642,baixa
+83,1586642.0,José Neto Neves Dos Santos,Alphaville,BARUERI,Alphaville Industrial,+5511987936834,joseneto.epharma@gmail.com,16/05/2017,Não,0.238599,0.415852,baixa
+84,1806395.0,Mariane Moraes,Alphaville,BARUERI,Alphaville Residencial Um,+55(11)999344422,mariane.moraes8@gmail.com,21/08/2018,Não,0.233214,0.415333,baixa
+85,1828248.0,Igor Varone Justo,Alphaville,BARUERI,Alphaville Industrial,+55(11)986163333,igorvarone@hotmail.com,20/09/2018,Não,0.232769,0.415214,baixa
+86,1282997.0,MICHAEL DE OLIVEIRA ROCHA,Alphaville,BARUERI,Nova Aldeinha,+5511983720864,michaelorocha1@gmail.com,29/10/2015,Não,0.242758,0.414603,baixa
+87,2032555.0,Suzete Gomes Paes,Alphaville,BARUERI,Alphaville Industrial,+55(11)997199116,su_paes@hotmail.com,06/12/2019,Não,0.224343,0.414414,baixa
+88,1056706.0,Jaqueline Dos Santos Almeida,Alphaville,BARUERI,Nova Aldeinha,+551141913040 +5511947660622,jaqueline_almeida94@hotmail.com,17/12/2014,Não,0.363022,0.412383,baixa
+89,1266094.0,Jose Luis Alcarde,Alphaville,BARUERI,Alphaville Industrial,+551136810131 +5511997285015,jluisalcarde@gmail.com,06/10/2015,Não,0.358066,0.411422,baixa
+90,359446.0,Bartolomeu Correa De Menezes,Alphaville,BARUERI,Alphaville Industrial,+5541950673 +5583590215,bartolomeu@rohlem.com.br,03/08/2011,Não,0.370858,0.410212,baixa
+91,554221.0,HUMBERTO FERRAZ NETO,Alphaville,BARUERI,Alphaville Industrial,+55415246675 +5591622307,humberto.ferraz@ig.com.br,30/05/2012,Não,0.367725,0.409914,baixa
+92,583621.0,FABIO LUCAS ARAUJO ANDRADE SILVA,Alphaville,BARUERI,Nova Aldeinha,+5501141910368 +5501173684446,fabio.uranet@yahoo.com.br,03/08/2012,Não,0.367026,0.409818,baixa
+93,913927.0,Maria Das Graças Lopes De Souza,Alphaville,BARUERI,201,+551141912237 +5511999657445,graca@alphastarimoveis.com.br,10/04/2014,Não,0.360539,0.408998,baixa
+94,173095.0,Cláudia Aguiar Tostes,Alphaville,BARUERI,Alphaville Empresarial,+551140638391 +551193757522,dimas_tostes@hotmail.com,16/01/2009,Não,0.371606,0.408824,baixa
+95,1025617.0,Jose Luis Alcarde,Alphaville,BARUERI,Alphaville Industrial,+551141957568 +5511997285015,jlalcarde@gmail.com,27/10/2014,Não,0.357464,0.407906,baixa
+96,1375575.0,Nayara De Souza Dos Santos,Alphaville,BARUERI,7 Andar,+551136035687 +5511997515410,nay.publi@gmail.com,14/04/2016,Não,0.352810,0.407564,baixa
+97,732466.0,Sandro Piazzi D'Ávila,Alphaville,BARUERI,Alphaville Industrial,+5511983108522 +5511983108522,spiazzidavila@gmail.com,14/06/2013,Não,0.355506,0.402867,baixa
+98,774951.0,Andreia Lopes Rodrigues,Alphaville,BARUERI,Nova Aldeinha,+5578847919 +5578847919,deiamayor@hotmail.com,27/08/2013,Não,0.354657,0.402101,baixa
+99,799061.0,Erica Cristina Rezende Sater,Alphaville,BARUERI,Alphaville Industrial,+551141936385 +5511948208714,eccrezende@hotmail.com,30/09/2013,Não,0.354263,0.401726,baixa
+100,1142054.0,Francisco Murilo Junior,Alphaville,BARUERI,Alphaville Industrial,+5546641637 +55973836391,franciscojr@chillibeans.com.br,25/04/2015,Não,0.350459,0.400439,baixa
+101,889990.0,Tânia Betley Soares,Alphaville,BARUERI,Alphaville Comercial,+551142437236 +5511992265118,barueri@righttime.com.br,26/02/2014,Não,0.352505,0.400189,baixa
+102,910270.0,Chélida Graziela Pereira De Vasconcelos,Alphaville,BARUERI,Alphaville Industrial,+551135919831 +5511999781894,graziela.aem@uol.com.br,03/04/2014,Não,0.352071,0.399744,baixa
+103,939494.0,Anderson Silva Pereira,Alphaville,BARUERI,10 Andar,+551121964651 +5511941997607,anderson280712@gmail.com,22/05/2014,Não,0.351477,0.399382,baixa
+104,950019.0,CARLOS EDUARDO TEIXEIRA,Alphaville,BARUERI,Alphaville Empresarial,+551141662244 +551178570719,teixeiracar@ig.com.br,05/06/2014,Não,0.351306,0.399246,baixa
+105,962607.0,Wagner Ignácio Da Silva Junior,Alphaville,BARUERI,Alphaville Industrial,+551141938426 +5511964901528,wisjr@ig.com.br,29/06/2014,Não,0.351011,0.398940,baixa
+106,1265705.0,Regina Casarim Alcarde,Alphaville,BARUERI,Alphaville Industrial,+551141957568 +5511999354405,personalregina@uol.com.br,06/10/2015,Não,0.348253,0.398875,baixa
+107,996391.0,Soraya Saadi,Alphaville,BARUERI,Alphaville Industrial,+5501141938426 +55011971511686,sorayasaadi@hotmai.com,28/08/2014,Não,0.350268,0.398206,baixa
+108,1312002.0,Arnaldo Serra De Oliveira,Alphaville,BARUERI,Alphaville Industrial,+551141953564 +5511999573006,abss.2400@gmail.com,19/12/2015,Não,0.347229,0.398040,baixa
+109,1353286.0,Luciana Cássia De Carvalho Oliveira,Alphaville,BARUERI,Alphaville Industrial,+551146881500 +5511981163334,lcc_oli@yahoo.com.br,29/02/2016,Não,0.346215,0.397208,baixa
+110,1569175.0,Carlos Alberto Gonzalez,Alphaville,BARUERI,Alphaville Residencial Dois,+551143261122 +5511966091070,carlos-gonzalez@uol.com.br,10/04/2017,Não,0.340136,0.395178,baixa
+111,1593194.0,Reginaldo Gonçalves Santana,Alphaville,BARUERI,Alphaville Industrial,+551140661775 +5511951509206,Reginaldosantana1@hotmail.com,29/05/2017,Não,0.339356,0.394953,baixa
+112,1262655.0,Sebastião Batista De Oliveira,Alphaville,BARUERI,Alphaville Industrial,+551146881500 +5511984216666,s.oliveira10@uol.com.br,02/10/2015,Não,0.345056,0.393857,baixa
+113,1266101.0,Rudd Casarim Alcarde,Alphaville,BARUERI,Alphaville Industrial,+551141957568 +5511993162662,ruddcasarim88@gmail.com,06/10/2015,Não,0.344019,0.392516,baixa
+114,206578.0,Cláudio Borges Pedroso,Alphaville,BARUERI,Alphaville Industrial,,,25/09/2009,Não,0.742298,0.377926,baixa
+115,169057.0,Edna .,Alphaville,BARUERI,Alphaville Industrial,,,14/11/2008,Não,0.737071,0.377021,baixa
+116,169043.0,Idalina .,Alphaville,BARUERI,Alphaville Industrial,,,14/11/2008,Não,0.737071,0.377011,baixa
+117,169060.0,Jessica .,Alphaville,BARUERI,Alphaville Industrial,,,14/11/2008,Não,0.737071,0.377002,baixa
+118,169049.0,Ana Claudia,Alphaville,BARUERI,Alphaville Industrial,,,14/11/2008,Não,0.737071,0.376992,baixa
+119,169050.0,Priscilla .,Alphaville,BARUERI,Alphaville Industrial,,,14/11/2008,Não,0.737071,0.376982,baixa
+120,169054.0,Antonio ( Sindico),Alphaville,BARUERI,Alphaville Industrial,,,14/11/2008,Não,0.737071,0.376973,baixa
+121,398668.0,Heleni Sobreda,Alphaville,BARUERI,Alphaville Industrial,,,15/06/2011,Não,0.652370,0.371678,baixa
+122,407762.0,Mirosmar Jose De Camargo,Alphaville,BARUERI,Alphaville Industrial,,,22/07/2011,Não,0.650853,0.371552,baixa
+123,253515.0,Maria Olívia Dragão,Alphaville,BARUERI,Nova Aldeinha,,,25/05/2010,Não,0.659199,0.371495,baixa
+124,278618.0,giovanini Souza Nascimento,Alphaville,BARUERI,Alphaville Industrial,,,21/09/2010,Não,0.654910,0.371322,baixa
+125,306276.0,Luciano Camargo,Alphaville,BARUERI,Cj 1407,,,24/11/2010,Não,0.653162,0.371288,baixa
+126,306271.0,Zeze De Camargo,Alphaville,BARUERI,Alphaville Industrial,,,24/11/2010,Não,0.653162,0.371278,baixa
+127,167610.0,Iara Alves Godoy,Alphaville,BARUERI,Alphaville Industrial,,,16/10/2008,Não,0.569684,0.361231,baixa
+128,2713787.0,Ralth Shoate,Alphaville,BARUERI,Alphaville Residencial Um,+55(11)983722466,,19/12/2022,Não,0.055906,0.259213,baixa
+129,586635.0,Maria De Jesus De Souza Lima,Alphaville,BARUERI,Alphaville Residencial Um,+551141914913,,09/08/2012,Não,0.146716,0.183424,baixa
+130,540081.0,JOSE ROGERIO COSTA FRANÇA,Alphaville,BARUERI,Alphaville Industrial,+551133368432,,02/05/2012,Não,0.130728,0.173623,baixa
+131,169065.0,Eliane Schimidt Martinuzzi,Alphaville,BARUERI,Alphaville Industrial,+5501141956708,,14/11/2008,Não,0.129504,0.170462,baixa
+132,1657512.0,Regina Conrado De Brito,Alphaville,BARUERI,Alphaville Industrial,+55(11)940252770,,16/10/2017,Não,0.081465,0.169613,baixa
+133,277524.0,Sônia Viotto,Alphaville,BARUERI,Alphaville Residencial Zero,+551146891267,,15/09/2010,Não,0.094815,0.155694,baixa
+134,177733.0,Nair de Fatima Conceição,Alphaville,BARUERI,Alphaville Comercial,+551141914174,,22/03/2009,Não,0.096534,0.155444,baixa
+135,471337.0,Leonilde Barreto Andrade,Alphaville,BARUERI,Nova Aldeinha,+551183839226,,16/11/2011,Não,0.090019,0.154725,baixa
+136,422848.0,Celia Hermann,Alphaville,BARUERI,Alphaville Residencial Dois,+551141931416,,25/08/2011,Não,0.090318,0.154660,baixa
+137,173048.0,Elaine Schimidt Martinuzi,Alphaville,BARUERI,Alphaville Industrial,+551141956708,,15/01/2009,Não,0.093510,0.154358,baixa
+138,1423989.0,Douglas Rodrigues Ramos,Alphaville,BARUERI,Alphaville Empresarial,+5511960559046 +551146891552,,19/07/2016,Não,0.129044,0.073858,baixa
