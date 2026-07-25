@@ -289,11 +289,22 @@ function LoginScreen({ onLogin }) {
     if (loginPayload.token) {
       window.localStorage.setItem('sevenflow_token', loginPayload.token);
     }
-    setLoading(false);
-    toast.success('Bem-vindo ao Leads NT', {
-      description: 'Dashboard admin carregado com sucesso.'
-    });
-    onLogin(loginPayload.user || loginPayload);
+
+    try {
+      await onLogin(loginPayload.user || loginPayload);
+      setLoading(false);
+      toast.success('Bem-vindo ao Leads NT', {
+        description: 'Dashboard admin carregado com sucesso.'
+      });
+    } catch {
+      window.localStorage.removeItem('sevenflow_token');
+      const message = 'Nao foi possivel carregar os dados do backend.';
+      setLoading(false);
+      setError(message);
+      toast.error('Backend nao foi lido', {
+        description: message
+      });
+    }
   }
 
   return (
@@ -379,33 +390,6 @@ function LoginScreen({ onLogin }) {
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-      </section>
-    </main>
-  );
-}
-
-function LoadingDashboard({ error, onRetry }) {
-  return (
-    <main className="silver-stage app-light grid min-h-screen place-items-center overflow-hidden px-5 py-10 text-slate-100">
-      <AppToaster />
-      <section className={`${panelClass} grid w-full max-w-lg gap-5 p-8 text-center`}>
-        <img src="/logo.png" alt="Novo Tempo" className="mx-auto h-24 object-contain drop-shadow-md" />
-        <div>
-          <h1 className="silver-title text-3xl font-black text-slate-50">Carregando dados</h1>
-          <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-400">
-            Conectando ao backend e preparando o painel.
-          </p>
-        </div>
-        {error ? (
-          <div className="grid gap-4">
-            <p className="rounded-xl border border-red-500/35 bg-red-50 px-4 py-3 text-sm font-black leading-relaxed text-red-800">
-              {error}
-            </p>
-            <button className={primaryButtonClass} onClick={onRetry} type="button">Tentar novamente</button>
-          </div>
-        ) : (
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-600 border-t-white" />
-        )}
       </section>
     </main>
   );
@@ -1087,14 +1071,12 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const [theme, setTheme] = useState('light');
   const [selectedAssociationId, setSelectedAssociationId] = useState('paulistana');
   const [payload, setPayload] = useState(initialPayload);
-  const [dashboardError, setDashboardError] = useState('');
   const [associations, setAssociations] = useState(() => initialPayload ? buildInitialAssociations(initialPayload.records) : []);
   const records = payload?.records || [];
   const data = useMemo(() => buildAssociationData(records), [records]);
   const selectedAssociation = associations.find((association) => association.id === selectedAssociationId) || associations[0];
 
   async function loadDashboard() {
-    setDashboardError('');
     const response = await apiFetch('/api/dashboard');
     if (!response.ok) {
       throw new Error('Nao foi possivel carregar os dados do backend.');
@@ -1118,18 +1100,14 @@ export default function CrmApp({ payload: initialPayload = null }) {
 
   if (view === 'login') {
     return <LoginScreen onLogin={async (loggedUser) => {
+      await loadDashboard();
       setUser(loggedUser);
       setView('admin');
-      try {
-        await loadDashboard();
-      } catch (error) {
-        setDashboardError(error.message);
-      }
     }} />;
   }
 
   if (!payload) {
-    return <LoadingDashboard error={dashboardError} onRetry={() => loadDashboard().catch((error) => setDashboardError(error.message))} />;
+    return null;
   }
 
   if (view === 'details') {
