@@ -61,7 +61,8 @@ export function validateDemoCredentials(email, password) {
 }
 
 export function requireAuth(request, response, next) {
-  const user = verifySessionToken(request.cookies?.sevenflow_session);
+  const bearerToken = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const user = verifySessionToken(request.cookies?.sevenflow_session) || verifySessionToken(bearerToken);
   if (!user) {
     response.status(401).json({ user: null });
     return;

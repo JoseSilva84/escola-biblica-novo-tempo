@@ -8,14 +8,21 @@ import { prisma } from './prisma.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+const allowedOrigins = new Set((process.env.FRONTEND_URL || 'http://localhost:3000')
   .split(',')
   .map((origin) => origin.trim())
-  .filter(Boolean);
+  .filter(Boolean));
+allowedOrigins.add('http://127.0.0.1:3000');
+allowedOrigins.add('http://localhost:3000');
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+      return;
+    }
+    const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin || '');
+    if (!origin || allowedOrigins.has(origin) || isLocalOrigin) {
       callback(null, true);
       return;
     }
@@ -43,8 +50,9 @@ app.post('/api/auth/login', (request, response) => {
     return;
   }
 
-  response.cookie('sevenflow_session', createSessionToken(user), sessionCookieOptions());
-  response.json(user);
+  const token = createSessionToken(user);
+  response.cookie('sevenflow_session', token, sessionCookieOptions());
+  response.json({ user, token });
 });
 
 app.post('/api/auth/logout', (_request, response) => {
@@ -53,7 +61,8 @@ app.post('/api/auth/logout', (_request, response) => {
 });
 
 app.get('/api/auth/me', (request, response) => {
-  const user = verifySessionToken(request.cookies?.sevenflow_session);
+  const bearerToken = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const user = verifySessionToken(request.cookies?.sevenflow_session) || verifySessionToken(bearerToken);
   if (!user) {
     response.status(401).json({ user: null });
     return;

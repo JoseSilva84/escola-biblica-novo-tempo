@@ -54,10 +54,12 @@ const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slat
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 function apiFetch(path, options = {}) {
+  const token = typeof window !== 'undefined' ? window.localStorage.getItem('sevenflow_token') : '';
   return fetch(`${API_BASE}${path}`, {
     ...options,
     credentials: 'include',
     headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {})
     }
   });
@@ -249,17 +251,29 @@ function LoginScreen({ onLogin }) {
     setError('');
 
     const form = new FormData(event.currentTarget);
-    const [response] = await Promise.all([
-      apiFetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: form.get('email'),
-          password: form.get('password')
-        })
-      }),
-      new Promise((resolve) => setTimeout(resolve, 900))
-    ]);
+    let response;
+
+    try {
+      [response] = await Promise.all([
+        apiFetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: form.get('email'),
+            password: form.get('password')
+          })
+        }),
+        new Promise((resolve) => setTimeout(resolve, 900))
+      ]);
+    } catch {
+      const message = 'Backend indisponivel. Confirme se a API esta rodando na porta 4000.';
+      setLoading(false);
+      setError(message);
+      toast.error('Nao foi possivel conectar', {
+        description: message
+      });
+      return;
+    }
 
     if (!response.ok) {
       setLoading(false);
@@ -271,12 +285,15 @@ function LoginScreen({ onLogin }) {
       return;
     }
 
-    const user = await response.json();
+    const loginPayload = await response.json();
+    if (loginPayload.token) {
+      window.localStorage.setItem('sevenflow_token', loginPayload.token);
+    }
     setLoading(false);
     toast.success('Bem-vindo ao Leads NT', {
       description: 'Dashboard admin carregado com sucesso.'
     });
-    onLogin(user);
+    onLogin(loginPayload.user || loginPayload);
   }
 
   return (
@@ -1089,6 +1106,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
 
   async function logout() {
     await apiFetch('/api/auth/logout', { method: 'POST' });
+    window.localStorage.removeItem('sevenflow_token');
     setUser(null);
     setView('login');
   }
