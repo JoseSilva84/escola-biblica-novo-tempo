@@ -174,8 +174,7 @@ function transformRecord(row, ml) {
 export function getDashboardData() {
   const alunosPath = firstExistingPath([
     resolveConfiguredPath(process.env.ALUNOS_DATA_PATH),
-    path.join(DATASET_DIR, ALUNOS_FILE),
-    path.resolve(process.cwd(), '..', 'dashboard-geral', ALUNOS_FILE)
+    path.join(DATASET_DIR, ALUNOS_FILE)
   ]);
   if (!alunosPath) {
     throw new Error(`Arquivo ${ALUNOS_FILE} nao encontrado. Configure ALUNOS_DATA_PATH ou coloque o arquivo em ${DATASET_DIR}.`);
