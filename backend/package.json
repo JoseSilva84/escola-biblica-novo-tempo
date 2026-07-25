@@ -1,0 +1,23 @@
+{
+  "name": "leads-nt-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "build": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "pg": "^8.22.0",
+    "prisma": "^7.9.0"
+  }
+}

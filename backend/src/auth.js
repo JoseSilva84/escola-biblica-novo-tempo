@@ -42,8 +42,13 @@ export function verifySessionToken(token) {
 
   const [header, payload, signature] = parts;
   const expected = sign(`${header}.${payload}`);
-  const valid = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  if (!valid) return null;
+
+  try {
+    const valid = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    if (!valid) return null;
+  } catch {
+    return null;
+  }
 
   const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
   if (!claims.exp || claims.exp < Math.floor(Date.now() / 1000)) return null;
@@ -53,4 +58,25 @@ export function verifySessionToken(token) {
 export function validateDemoCredentials(email, password) {
   const allowedEmails = new Set([DEMO_USER.email, 'jose@novotempo.org.br']);
   return allowedEmails.has(email) && password === 'demo123' ? DEMO_USER : null;
+}
+
+export function requireAuth(request, response, next) {
+  const user = verifySessionToken(request.cookies?.sevenflow_session);
+  if (!user) {
+    response.status(401).json({ user: null });
+    return;
+  }
+  request.user = user;
+  next();
+}
+
+export function sessionCookieOptions() {
+  const production = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    sameSite: production ? 'none' : 'lax',
+    secure: production,
+    maxAge: 60 * 60 * 8 * 1000,
+    path: '/'
+  };
 }

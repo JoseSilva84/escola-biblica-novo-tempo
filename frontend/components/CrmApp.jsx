@@ -51,6 +51,17 @@ const labelClass = 'text-[11px] font-black uppercase tracking-[0.16em] text-slat
 const primaryButtonClass = 'primary-button-glow group relative inline-flex h-11 items-center justify-center gap-2 overflow-hidden rounded-xl bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_52%,#0f172a_100%)] px-4 text-sm font-black text-white shadow-[0_18px_46px_rgba(37,99,235,0.34)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_24px_70px_rgba(37,99,235,0.30)] focus:outline-none focus:ring-4 focus:ring-blue-500/25 disabled:cursor-not-allowed disabled:opacity-70';
 const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-black text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
 const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slate-950/60 shadow-[0_28px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.035] backdrop-blur-2xl';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+
+function apiFetch(path, options = {}) {
+  return fetch(`${API_BASE}${path}`, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      ...(options.headers || {})
+    }
+  });
+}
 
 function AppToaster({ theme = 'light' }) {
   const [mounted, setMounted] = useState(false);
@@ -239,7 +250,7 @@ function LoginScreen({ onLogin }) {
 
     const form = new FormData(event.currentTarget);
     const [response] = await Promise.all([
-      fetch('/api/auth/login', {
+      apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -351,6 +362,33 @@ function LoginScreen({ onLogin }) {
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
+      </section>
+    </main>
+  );
+}
+
+function LoadingDashboard({ error, onRetry }) {
+  return (
+    <main className="silver-stage app-light grid min-h-screen place-items-center overflow-hidden px-5 py-10 text-slate-100">
+      <AppToaster />
+      <section className={`${panelClass} grid w-full max-w-lg gap-5 p-8 text-center`}>
+        <img src="/logo.png" alt="Novo Tempo" className="mx-auto h-24 object-contain drop-shadow-md" />
+        <div>
+          <h1 className="silver-title text-3xl font-black text-slate-50">Carregando dados</h1>
+          <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-400">
+            Conectando ao backend e preparando o painel.
+          </p>
+        </div>
+        {error ? (
+          <div className="grid gap-4">
+            <p className="rounded-xl border border-red-500/35 bg-red-50 px-4 py-3 text-sm font-black leading-relaxed text-red-800">
+              {error}
+            </p>
+            <button className={primaryButtonClass} onClick={onRetry} type="button">Tentar novamente</button>
+          </div>
+        ) : (
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-600 border-t-white" />
+        )}
       </section>
     </main>
   );
@@ -1026,17 +1064,31 @@ function openDetailsView(setView) {
   });
 }
 
-export default function CrmApp({ payload }) {
+export default function CrmApp({ payload: initialPayload = null }) {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('login');
   const [theme, setTheme] = useState('light');
   const [selectedAssociationId, setSelectedAssociationId] = useState('paulistana');
-  const [associations, setAssociations] = useState(() => buildInitialAssociations(payload.records));
-  const data = useMemo(() => buildAssociationData(payload.records), [payload.records]);
+  const [payload, setPayload] = useState(initialPayload);
+  const [dashboardError, setDashboardError] = useState('');
+  const [associations, setAssociations] = useState(() => initialPayload ? buildInitialAssociations(initialPayload.records) : []);
+  const records = payload?.records || [];
+  const data = useMemo(() => buildAssociationData(records), [records]);
   const selectedAssociation = associations.find((association) => association.id === selectedAssociationId) || associations[0];
 
+  async function loadDashboard() {
+    setDashboardError('');
+    const response = await apiFetch('/api/dashboard');
+    if (!response.ok) {
+      throw new Error('Nao foi possivel carregar os dados do backend.');
+    }
+    const nextPayload = await response.json();
+    setPayload(nextPayload);
+    setAssociations(buildInitialAssociations(nextPayload.records));
+  }
+
   async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await apiFetch('/api/auth/logout', { method: 'POST' });
     setUser(null);
     setView('login');
   }
@@ -1047,7 +1099,19 @@ export default function CrmApp({ payload }) {
   }
 
   if (view === 'login') {
-    return <LoginScreen onLogin={(loggedUser) => { setUser(loggedUser); setView('admin'); }} />;
+    return <LoginScreen onLogin={async (loggedUser) => {
+      setUser(loggedUser);
+      setView('admin');
+      try {
+        await loadDashboard();
+      } catch (error) {
+        setDashboardError(error.message);
+      }
+    }} />;
+  }
+
+  if (!payload) {
+    return <LoadingDashboard error={dashboardError} onRetry={() => loadDashboard().catch((error) => setDashboardError(error.message))} />;
   }
 
   if (view === 'details') {
