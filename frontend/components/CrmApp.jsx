@@ -1648,6 +1648,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const initialAssociations = initialPayload ? buildInitialAssociations(initialPayload.records) : [];
   const [user, setUser] = useState(null);
   const [view, setView] = useState('login');
+  const [authReady, setAuthReady] = useState(false);
   const [theme, setTheme] = useState('light');
   const [selectedAssociationId, setSelectedAssociationId] = useState('paulistana');
   const [payload, setPayload] = useState(initialPayload);
@@ -1662,6 +1663,41 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const records = payload?.records || [];
   const data = useMemo(() => buildAssociationData(records), [records]);
   const selectedAssociation = associations.find((association) => association.id === selectedAssociationId) || associations[0];
+
+  useEffect(() => {
+    let active = true;
+
+    async function restoreSession() {
+      try {
+        const response = await apiFetch('/api/auth/me');
+        if (!response.ok) {
+          window.localStorage.removeItem('sevenflow_token');
+          if (active) setView('login');
+          return;
+        }
+
+        const session = await response.json();
+        if (!session?.user) {
+          window.localStorage.removeItem('sevenflow_token');
+          if (active) setView('login');
+          return;
+        }
+
+        await loadDashboard();
+        if (!active) return;
+        setUser(session.user);
+        setView('admin');
+      } catch {
+        window.localStorage.removeItem('sevenflow_token');
+        if (active) setView('login');
+      } finally {
+        if (active) setAuthReady(true);
+      }
+    }
+
+    restoreSession();
+    return () => { active = false; };
+  }, []);
 
   async function loadDashboard() {
     const response = await apiFetch('/api/dashboard');
@@ -1686,6 +1722,23 @@ export default function CrmApp({ payload: initialPayload = null }) {
   function openAssociation(id) {
     setSelectedAssociationId(id);
     setView('association');
+  }
+
+  if (!authReady) {
+    return (
+      <div className="silver-stage min-h-screen">
+        <AppToaster theme={theme} />
+        <div className="login-loading-overlay" role="status" aria-live="polite">
+          <div className="login-loading-card">
+            <div className="login-loading-spinner">
+              <Gauge size={22} />
+            </div>
+            <strong>Restaurando acesso</strong>
+            <span>Verificando sua sessao administrativa...</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (view === 'login') {
