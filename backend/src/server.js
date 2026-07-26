@@ -8,9 +8,14 @@ import { prisma } from './prisma.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
+
+function normalizeOrigin(origin) {
+  return String(origin || '').trim().replace(/\/+$/, '');
+}
+
 const allowedOrigins = new Set((process.env.FRONTEND_URL || 'http://localhost:3000')
   .split(',')
-  .map((origin) => origin.trim())
+  .map(normalizeOrigin)
   .filter(Boolean));
 allowedOrigins.add('http://127.0.0.1:3000');
 allowedOrigins.add('http://localhost:3000');
@@ -22,7 +27,7 @@ app.use(cors({
       return;
     }
     const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin || '');
-    if (!origin || allowedOrigins.has(origin) || isLocalOrigin) {
+    if (!origin || allowedOrigins.has(normalizeOrigin(origin)) || isLocalOrigin) {
       callback(null, true);
       return;
     }
