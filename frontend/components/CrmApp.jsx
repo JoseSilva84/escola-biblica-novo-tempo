@@ -1233,7 +1233,7 @@ function AdminGeneralView({
                 {provider?.configured ? 'Configurado' : 'Pendente'}
               </span>
             </div>
-            <div className="grid gap-2 rounded-2xl border border-white/[0.08] bg-slate-950/45 p-4 text-sm text-slate-400">
+            <div className="hidden">
               <span>Provedor: {provider?.provider || 'zpro-baileys'}</span>
               <span>API ID: {provider?.apiId || 'configure ZPRO_API_ID'}</span>
               <span>Canal: {provider?.channelId || 'configure ZPRO_CHANNEL_ID'}</span>
@@ -1255,7 +1255,7 @@ function AdminGeneralView({
               </button>
             </form>
             {lastSend ? (
-              <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+              <div className="rounded-2xl border border-emerald-300/45 bg-emerald-600/80 p-4 text-sm font-semibold text-white shadow-lg shadow-emerald-900/15">
                 Mensagem aceita pelo provedor para {lastSend.phone} via {lastSend.transport || 'Z-PRO'}.
               </div>
             ) : null}
