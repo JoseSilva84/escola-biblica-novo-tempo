@@ -386,7 +386,8 @@ function LoginScreen({ onLogin }) {
         </div>
       ) : null}
 
-      <section className={`relative grid w-full max-w-6xl grid-cols-[1.1fr_0.9fr] gap-5 max-lg:grid-cols-1 ${splashState === 'visible' ? 'opacity-0' : 'stagger-in'}`}>
+      <div className={`relative grid w-full max-w-6xl gap-4 ${splashState === 'visible' ? 'opacity-0' : 'stagger-in'}`}>
+        <section className="grid grid-cols-[1.1fr_0.9fr] gap-5 max-lg:grid-cols-1">
         <div className={`${panelClass} flex min-h-[34rem] flex-col justify-between p-8 max-sm:p-5`}>
           <div>
 
@@ -443,7 +444,12 @@ function LoginScreen({ onLogin }) {
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-      </section>
+        </section>
+
+        <p className="text-center text-xs font-bold text-slate-500">
+          Sistema desenvolvido por @Seven Flow Tecnologia
+        </p>
+      </div>
     </main>
   );
 }
