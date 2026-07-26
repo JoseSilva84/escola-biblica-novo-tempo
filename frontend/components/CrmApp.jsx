@@ -235,7 +235,6 @@ function BibleStudyAnimation() {
 
 function LoginScreen({ onLogin }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [splashState, setSplashState] = useState('visible');
 
@@ -248,7 +247,6 @@ function LoginScreen({ onLogin }) {
   async function submitLogin(event) {
     event.preventDefault();
     setLoading(true);
-    setError('');
 
     const form = new FormData(event.currentTarget);
     let response;
@@ -266,21 +264,17 @@ function LoginScreen({ onLogin }) {
         new Promise((resolve) => setTimeout(resolve, 900))
       ]);
     } catch {
-      const message = 'Backend indisponivel. Confirme se a API esta rodando na porta 4000.';
       setLoading(false);
-      setError(message);
       toast.error('Nao foi possivel conectar', {
-        description: message
+        description: 'A API nao respondeu. Verifique a conexao e tente novamente.'
       });
       return;
     }
 
     if (!response.ok) {
       setLoading(false);
-      const message = 'Use admin@leadsnt.com.br e senha demo123.';
-      setError(message);
       toast.error('Não foi possível entrar', {
-        description: message
+        description: 'Confira o email e a senha informados.'
       });
       return;
     }
@@ -298,11 +292,9 @@ function LoginScreen({ onLogin }) {
       });
     } catch {
       window.localStorage.removeItem('sevenflow_token');
-      const message = 'Nao foi possivel carregar os dados do backend.';
       setLoading(false);
-      setError(message);
       toast.error('Backend nao foi lido', {
-        description: message
+        description: 'A autenticacao funcionou, mas os dados do dashboard nao foram carregados.'
       });
     }
   }
@@ -380,11 +372,6 @@ function LoginScreen({ onLogin }) {
               </button>
             </span>
           </label>
-          {error ? (
-            <p className="rounded-xl border border-red-500/35 bg-red-50 px-4 py-3 text-sm font-black leading-relaxed text-red-800 shadow-[0_12px_34px_rgba(220,38,38,0.10)]">
-              Não foi possível entrar. {error}
-            </p>
-          ) : null}
           <button className={primaryButtonClass} disabled={loading} type="submit">
             <Lock size={18} />
             {loading ? 'Entrando...' : 'Entrar'}
@@ -1147,3 +1134,4 @@ export default function CrmApp({ payload: initialPayload = null }) {
     </AppShell>
   );
 }
+
