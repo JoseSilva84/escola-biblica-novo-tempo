@@ -509,19 +509,19 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
 function MetricCard({ icon: Icon, label, value, detail, tone = 'silver' }) {
   const tones = {
     silver: {
-      card: 'border-blue-300/40 bg-gradient-to-br from-blue-600 to-cyan-500 text-white',
+      card: 'color-panel color-panel-blue text-white',
       icon: 'text-white bg-white/18 border-white/30'
     },
     green: {
-      card: 'border-emerald-300/40 bg-gradient-to-br from-emerald-600 to-teal-500 text-white',
+      card: 'color-panel color-panel-green text-white',
       icon: 'text-white bg-white/18 border-white/30'
     },
     orange: {
-      card: 'border-orange-300/40 bg-gradient-to-br from-red-600 to-orange-500 text-white',
+      card: 'color-panel color-panel-orange text-white',
       icon: 'text-white bg-white/18 border-white/30'
     },
     violet: {
-      card: 'border-violet-300/40 bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white',
+      card: 'color-panel color-panel-violet text-white',
       icon: 'text-white bg-white/18 border-white/30'
     }
   };
@@ -1070,7 +1070,7 @@ function AdminGeneralView({
                         <strong className="block text-slate-50">{item.name}</strong>
                         <span className="text-xs text-slate-500">{item.email}</span>
                       </td>
-                      <td className="px-4 py-4 font-black text-blue-300">{item.role.replaceAll('_', ' ')}</td>
+                      <td className="profile-role px-4 py-4">{item.role.replaceAll('_', ' ')}</td>
                       <td className="px-4 py-4 font-bold text-slate-400">{item.scope}</td>
                       <td className="px-4 py-4">
                         <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${item.status === 'Ativo' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>{item.status}</span>

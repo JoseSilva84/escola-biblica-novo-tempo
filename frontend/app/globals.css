@@ -179,6 +179,46 @@
     opacity: 1;
   }
 
+  .app-light .premium-panel.color-panel,
+  .premium-panel.color-panel {
+    border: 1px solid rgba(255,255,255,0.34) !important;
+    background: var(--color-panel-bg) !important;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255,255,255,0.20) !important;
+  }
+
+  .premium-panel.color-panel::before {
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.22), transparent 34%),
+      linear-gradient(315deg, rgba(255,255,255,0.12), transparent 38%);
+    opacity: 0.38;
+  }
+
+  .premium-panel.color-panel span,
+  .premium-panel.color-panel strong {
+    color: inherit;
+  }
+
+  .color-panel-blue {
+    --color-panel-bg: linear-gradient(135deg, #1d4ed8 0%, #2563eb 48%, #0891b2 100%);
+  }
+
+  .color-panel-green {
+    --color-panel-bg: linear-gradient(135deg, #047857 0%, #10b981 48%, #0f766e 100%);
+  }
+
+  .color-panel-orange {
+    --color-panel-bg: linear-gradient(135deg, #b91c1c 0%, #f97316 52%, #ea580c 100%);
+  }
+
+  .color-panel-violet {
+    --color-panel-bg: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 48%, #c026d3 100%);
+  }
+
+  .profile-role {
+    color: #1e3a8a !important;
+    font-weight: 650 !important;
+  }
+
   .interactive-card {
     position: relative;
     overflow: hidden;
