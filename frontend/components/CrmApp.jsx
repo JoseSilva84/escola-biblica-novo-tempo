@@ -1235,6 +1235,7 @@ function AdminGeneralView({
               <span>API ID: {provider?.apiId || 'configure ZPRO_API_ID'}</span>
               <span>Canal: {provider?.channelId || 'configure ZPRO_CHANNEL_ID'}</span>
               <span>Base: {provider?.baseUrl || 'configure ZPRO_API_URL'}</span>
+              <span>Token: {provider?.token?.loaded ? `${provider.token.length} caracteres · ${provider.token.prefix}` : 'não carregado'}</span>
             </div>
             <form className="grid gap-3" onSubmit={submitWhatsAppTest}>
               <label className="grid gap-2 text-sm font-medium text-slate-300">

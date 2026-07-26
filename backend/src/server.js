@@ -83,6 +83,15 @@ function zproConfig() {
   return { baseUrl, token, channelId, apiId, sendPath };
 }
 
+function tokenDiagnostic(token) {
+  if (!token) return { loaded: false, length: 0, prefix: null };
+  return {
+    loaded: true,
+    length: token.length,
+    prefix: `${token.slice(0, 8)}...`
+  };
+}
+
 function buildZproSendPayload({ phone, message, leadId, templateId, channelId, externalKey }) {
   return {
     channelId,
@@ -245,7 +254,8 @@ app.get('/api/whatsapp/provider', requireAuth, (_request, response) => {
     baseUrl: config.baseUrl || null,
     channelId: config.channelId || null,
     apiId: config.apiId || null,
-    sendPath: config.sendPath
+    sendPath: config.sendPath,
+    token: tokenDiagnostic(config.token)
   });
 });
 
