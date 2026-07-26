@@ -1,0 +1,171 @@
+# Leads NT - CRM de Interessados
+
+Sistema em desenvolvimento para organizar interessados da Novo Tempo, acompanhar campanhas por associacao/distrito e apoiar a priorizacao de contatos com dados operacionais e ranking de machine learning.
+
+## Estado atual
+
+O projeto ja possui:
+
+- Frontend em Next.js com tela de login, dashboard administrativo, visao por associacao, detalhes de interessados, tema claro/escuro e interface responsiva.
+- Backend em Node.js/Express com autenticacao, sessao por cookie/token, rota de saude, rota protegida de dashboard e integracao com Prisma.
+- Schema Prisma para PostgreSQL com usuarios, associacoes, distritos, igrejas, campanhas, leads, interacoes, visitas, templates, sequencias e disparos de WhatsApp.
+- Dataset local com arquivos de analise, base de alunos, rankings CSV e modelos de machine learning usados para priorizar interessados.
+- Separacao inicial entre `frontend`, `backend` e `dataset`.
+
+## Estrutura
+
+```text
+.
+|-- backend/
+|   |-- prisma/
+|   |   `-- schema.prisma
+|   |-- src/
+|   |   |-- auth.js
+|   |   |-- data.js
+|   |   |-- prisma.js
+|   |   |-- server.js
+|   |   `-- scripts/seedAdmin.js
+|   `-- package.json
+|-- frontend/
+|   |-- app/
+|   |-- components/
+|   |-- public/
+|   `-- package.json
+|-- dataset/
+`-- .gitignore
+```
+
+## Tecnologias
+
+- Next.js 15
+- React 19
+- Tailwind CSS
+- Recharts
+- Sonner
+- Lucide React
+- Node.js
+- Express
+- Prisma 7
+- PostgreSQL
+
+## Backend
+
+Entre na pasta do backend:
+
+```bash
+cd backend
+npm install
+```
+
+Crie um arquivo `.env` local dentro de `backend/`. Esse arquivo nao deve subir para o GitHub.
+
+Variaveis usadas ate o momento:
+
+```env
+DATABASE_URL="postgresql://usuario:senha@host:porta/banco"
+AUTH_SECRET="uma-chave-secreta-forte"
+FRONTEND_URL="http://localhost:3000"
+PORT=4000
+ADMIN_EMAIL="admin@leadsnt.com.br"
+ADMIN_PASSWORD="senha-com-no-minimo-8-caracteres"
+ADMIN_NAME="Admin"
+DATASET_DIR="../dataset"
+```
+
+Preparar Prisma e usuario admin:
+
+```bash
+npm run setup:db
+```
+
+Rodar o backend em desenvolvimento:
+
+```bash
+npm run dev
+```
+
+Rotas principais:
+
+- `GET /api/health`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `GET /api/dashboard`
+
+## Frontend
+
+Entre na pasta do frontend:
+
+```bash
+cd frontend
+npm install
+```
+
+Crie um arquivo `.env` local dentro de `frontend/`. Esse arquivo tambem nao deve subir para o GitHub.
+
+Variavel usada:
+
+```env
+NEXT_PUBLIC_API_URL="http://localhost:4000"
+```
+
+Rodar o frontend em desenvolvimento:
+
+```bash
+npm run dev
+```
+
+Acesse:
+
+```text
+http://127.0.0.1:3000
+```
+
+## Scripts
+
+Backend:
+
+- `npm run dev`: inicia o servidor com watch.
+- `npm run start`: inicia o servidor sem watch.
+- `npm run prisma:generate`: gera o Prisma Client.
+- `npm run prisma:push`: sincroniza o schema com o banco.
+- `npm run seed:admin`: cria ou atualiza o usuario admin.
+- `npm run setup:db`: executa generate, db push e seed admin.
+- `npm run build`: gera o Prisma Client.
+
+Frontend:
+
+- `npm run dev`: inicia o Next.js em desenvolvimento.
+- `npm run build`: gera build de producao.
+- `npm run start`: inicia o Next.js em modo producao.
+
+## Dados e machine learning
+
+A pasta `dataset/` concentra os dados e analises usadas pelo dashboard:
+
+- `alunos.json`: base principal lida pelo backend.
+- `ranking_nao_vip_ml_pandas.csv`: ranking usado para prioridade operacional.
+- notebooks e scripts Python para analise dos interessados.
+- arquivos Markdown e CSV com relatorios, contatos e rankings.
+
+O backend transforma esses dados em registros compactos para o dashboard e inclui metadados como total de registros, origem do ranking e data de referencia.
+
+## Seguranca
+
+Arquivos de ambiente nao devem ser enviados para o GitHub:
+
+- `.env`
+- `.env.*`
+- `backend/.env.example`
+- `frontend/.env.example`
+
+Caso algum segredo real tenha sido enviado anteriormente, o ideal e trocar essas chaves/senhas nos provedores correspondentes.
+
+## Proximos passos
+
+- Criar migrations formais do Prisma.
+- Conectar CRUD real de associacoes, campanhas, leads, visitas e automacoes.
+- Ajustar credenciais demo da tela de login para refletirem o admin criado pelo seed.
+- Definir provedor oficial de WhatsApp.
+- Criar politicas de permissao por perfil de usuario.
+- Preparar ambiente de producao com banco PostgreSQL, `AUTH_SECRET` definitivo e URLs oficiais.
