@@ -1,14 +1,8 @@
 import crypto from 'crypto';
 
 const encoder = new TextEncoder();
-const DEMO_USER = {
-  id: 'usr_admin_leads_nt',
-  name: 'Admin',
-  email: 'admin@leadsnt.com.br',
-  role: 'ADMIN_GERAL',
-  associationId: null,
-  associationName: null
-};
+const PASSWORD_HASH_PREFIX = 'scrypt';
+const PASSWORD_KEY_LENGTH = 64;
 
 function base64url(input) {
   return Buffer.from(input).toString('base64url');
@@ -19,7 +13,7 @@ function sign(input) {
   return crypto.createHmac('sha256', encoder.encode(secret)).update(input).digest('base64url');
 }
 
-export function createSessionToken(user = DEMO_USER) {
+export function createSessionToken(user) {
   const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const now = Math.floor(Date.now() / 1000);
   const payload = base64url(JSON.stringify({
@@ -34,6 +28,18 @@ export function createSessionToken(user = DEMO_USER) {
   }));
   const body = `${header}.${payload}`;
   return `${body}.${sign(body)}`;
+}
+
+export function publicUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    associationId: user.associationId,
+    associationName: user.association?.name || null
+  };
 }
 
 export function verifySessionToken(token) {
@@ -55,9 +61,36 @@ export function verifySessionToken(token) {
   return claims;
 }
 
-export function validateDemoCredentials(email, password) {
-  const allowedEmails = new Set([DEMO_USER.email, 'jose@novotempo.org.br']);
-  return allowedEmails.has(email) && password === 'demo123' ? DEMO_USER : null;
+export function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('base64url');
+  const hash = crypto.scryptSync(String(password), salt, PASSWORD_KEY_LENGTH).toString('base64url');
+  return `${PASSWORD_HASH_PREFIX}$${salt}$${hash}`;
+}
+
+export function verifyPassword(password, storedHash) {
+  const [algorithm, salt, hash] = String(storedHash || '').split('$');
+  if (algorithm !== PASSWORD_HASH_PREFIX || !salt || !hash) return false;
+
+  try {
+    const expected = Buffer.from(hash, 'base64url');
+    const actual = crypto.scryptSync(String(password), salt, expected.length);
+    return crypto.timingSafeEqual(actual, expected);
+  } catch {
+    return false;
+  }
+}
+
+export async function validateCredentials(prisma, email, password) {
+  const user = await prisma.user.findUnique({
+    where: { email: String(email || '').trim().toLowerCase() },
+    include: { association: true }
+  });
+
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    return null;
+  }
+
+  return publicUser(user);
 }
 
 export function requireAuth(request, response, next) {

@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { createSessionToken, requireAuth, sessionCookieOptions, validateDemoCredentials, verifySessionToken } from './auth.js';
+import { createSessionToken, requireAuth, sessionCookieOptions, validateCredentials, verifySessionToken } from './auth.js';
 import { getDashboardData } from './data.js';
 import { prisma } from './prisma.js';
 
@@ -42,8 +42,8 @@ app.get('/api/health', async (_request, response) => {
   }
 });
 
-app.post('/api/auth/login', (request, response) => {
-  const user = validateDemoCredentials(request.body?.email, request.body?.password);
+app.post('/api/auth/login', async (request, response) => {
+  const user = await validateCredentials(prisma, request.body?.email, request.body?.password);
 
   if (!user) {
     response.status(401).json({ message: 'Credenciais invalidas' });

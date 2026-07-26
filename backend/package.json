@@ -8,6 +8,8 @@
     "start": "node src/server.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "seed:admin": "node src/scripts/seedAdmin.js",
+    "setup:db": "prisma generate && prisma db push && node src/scripts/seedAdmin.js",
     "build": "prisma generate"
   },
   "dependencies": {
