@@ -446,9 +446,9 @@ function LoginScreen({ onLogin }) {
         </form>
         </section>
 
-        <p className="mt-5 justify-self-center rounded-full border border-white/70 bg-white/45 px-5 py-2 text-center text-[11px] font-semibold text-slate-500 shadow-[0_14px_42px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+        <p className="mt-8 text-center text-[11px] font-medium text-slate-500/85">
           Sistema desenvolvido por{' '}
-          <span className="font-black text-slate-700">@Seven Flow Tecnologia</span>
+          <span className="font-bold text-slate-700">@Seven Flow Tecnologia</span>
         </p>
       </div>
     </main>
