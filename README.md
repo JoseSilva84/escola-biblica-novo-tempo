@@ -68,7 +68,7 @@ FRONTEND_URL="http://localhost:3000"
 PORT=4000
 ZPRO_WEBHOOK_SECRET="uma-chave-para-webhook-zpro"
 ZPRO_API_URL="https://api.sevenflowia.tech"
-ZPRO_API_TOKEN="token-completo-gerado-no-zpro"
+ZPRO_API_TOKEN="token-completo-gerado-no-zpro-sem-escrever-Bearer"
 ZPRO_CHANNEL_ID="10"
 ZPRO_SEND_TEXT_PATH="/messages/sendText"
 ADMIN_EMAIL="admin@leadsnt.com.br"
@@ -123,12 +123,13 @@ Configure no backend:
 
 ```env
 ZPRO_API_URL="https://api.sevenflowia.tech"
-ZPRO_API_TOKEN="token-completo-gerado-no-zpro"
+ZPRO_API_TOKEN="token-completo-gerado-no-zpro-sem-escrever-Bearer"
 ZPRO_CHANNEL_ID="10"
 ZPRO_SEND_TEXT_PATH="/messages/sendText"
 ```
 
 O `ZPRO_CHANNEL_ID` deve ser o ID do canal Baileys conectado. Pelas telas do Zpro, o canal **Novo Tempo Seven** usa o ID `10`.
+No `ZPRO_API_TOKEN`, cole somente o token completo criado no Zpro. Nao coloque `Bearer` antes do token.
 
 Se a sua instalacao do Zpro usar outro caminho de envio, altere apenas `ZPRO_SEND_TEXT_PATH`. Ele aceita placeholders:
 

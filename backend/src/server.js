@@ -66,9 +66,17 @@ function applyPathParams(pathValue, params) {
   return String(pathValue || '').replace(/\{(\w+)\}/g, (_match, key) => encodeURIComponent(params[key] || ''));
 }
 
+function normalizeApiToken(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/^Bearer\s+/i, '')
+    .trim();
+}
+
 function zproConfig() {
   const baseUrl = String(process.env.ZPRO_API_URL || '').trim().replace(/\/+$/, '');
-  const token = String(process.env.ZPRO_API_TOKEN || '').trim();
+  const token = normalizeApiToken(process.env.ZPRO_API_TOKEN);
   const channelId = String(process.env.ZPRO_CHANNEL_ID || '').trim();
   const sendPath = String(process.env.ZPRO_SEND_TEXT_PATH || '/messages/sendText').trim();
   return { baseUrl, token, channelId, sendPath };
