@@ -1495,6 +1495,29 @@ function AppShell({ children, current, onNavigate, onLogout, theme, onToggleThem
   );
 }
 
+function DetailsShell({ payload, onBack, onLogout, onNavigate, user }) {
+  const [sidebarCompact, setSidebarCompact] = useState(true);
+
+  return (
+    <div className="silver-stage app-light min-h-screen text-slate-100">
+      <AppToaster theme="light" />
+      <div className="flex min-h-screen gap-4 p-4 max-lg:flex-col max-lg:p-0">
+        <Sidebar
+          compact={sidebarCompact}
+          current="associations"
+          onLogout={onLogout}
+          onNavigate={onNavigate}
+          onToggleCompact={() => setSidebarCompact((value) => !value)}
+          user={user}
+        />
+        <div className="min-w-0 flex-1 overflow-hidden rounded-[1.75rem] max-lg:rounded-none">
+          <DashboardClient onBack={onBack} payload={payload} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function openDetailsView(setView) {
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
@@ -1564,7 +1587,15 @@ export default function CrmApp({ payload: initialPayload = null }) {
   }
 
   if (view === 'details') {
-    return <DashboardClient onBack={() => setView('association')} payload={payload} />;
+    return (
+      <DetailsShell
+        onBack={() => setView('association')}
+        onLogout={logout}
+        onNavigate={setView}
+        payload={payload}
+        user={user}
+      />
+    );
   }
 
   const addAdminCampaign = (campaign) => {
