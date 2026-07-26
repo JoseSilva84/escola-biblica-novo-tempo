@@ -151,6 +151,65 @@ function InfoHint({ text, side = 'top' }) {
   );
 }
 
+function ScoreBadge({ district }) {
+  const [tooltip, setTooltip] = useState(null);
+  const badgeRef = useRef(null);
+
+  function showTooltip() {
+    const rect = badgeRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const filterRect = document.querySelector('[data-dashboard-filterbar]')?.getBoundingClientRect();
+    const filterBottom = filterRect?.bottom || 0;
+    const tooltipWidth = 288;
+    const tooltipHeight = 136;
+    const margin = 12;
+    const preferredTop = rect.top - tooltipHeight - margin;
+    const top = preferredTop > filterBottom + margin ? preferredTop : rect.bottom + margin;
+    const left = Math.min(
+      window.innerWidth - tooltipWidth - 16,
+      Math.max(16, rect.right - tooltipWidth)
+    );
+
+    setTooltip({ top, left, width: tooltipWidth });
+  }
+
+  function hideTooltip() {
+    setTooltip(null);
+  }
+
+  return (
+    <>
+      <span
+        className="group/tip relative inline-block min-w-10 rounded-full bg-amber-500/[0.12] px-2 py-1 text-center text-xs font-black"
+        onBlur={hideTooltip}
+        onFocus={showTooltip}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        ref={badgeRef}
+        style={{ color: district.score_medio >= 14 ? priorityColors.Hot : district.score_medio >= 9 ? priorityColors.Warm : priorityColors.Cool }}
+        tabIndex={0}
+      >
+        {district.score_medio}
+      </span>
+      {tooltip ? createPortal(
+        <span
+          className="pointer-events-none fixed z-[55] overflow-hidden rounded-2xl border border-white bg-gradient-to-br from-white/95 to-slate-50/90 p-4 text-left text-[11px] whitespace-normal font-medium leading-relaxed text-slate-600 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-slate-900/5 backdrop-blur-3xl"
+          style={{ top: tooltip.top, left: tooltip.left, width: tooltip.width }}
+        >
+          <strong className="mb-2 block text-sm text-slate-900">{district.nome}</strong>
+          <span className="text-slate-600 font-medium">{rules.score}</span>
+          <span className="mt-2.5 flex justify-between gap-4 text-slate-600 font-medium">
+            <span>Total usado</span>
+            <strong className="text-slate-900 font-black">{formatNumber(district.total)}</strong>
+          </span>
+        </span>,
+        document.body
+      ) : null}
+    </>
+  );
+}
+
 function LabelWithHint({ children, hint }) {
   return (
     <span className="inline-flex items-center gap-2">
@@ -691,7 +750,7 @@ export default function DashboardClient({ payload, onBack }) {
       </header>
 
       <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-8 py-6 max-md:px-4">
-        <section className="sticky top-[77px] z-[60] mb-6 rounded-2xl border border-white/[0.06] bg-slate-950/82 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-2xl max-md:static">
+        <section data-dashboard-filterbar className="sticky top-[77px] z-[60] mb-6 rounded-2xl border border-white/[0.06] bg-slate-950/82 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-2xl max-md:static">
           <div className="flex flex-wrap items-end gap-5 w-full">
             <FilterSelect label="Distrito" value={filters.distrito} onChange={(value) => setFilter('distrito', value)} active={filters.distrito !== 'all'}>
               <option value="all">Distritos</option>
@@ -873,17 +932,7 @@ export default function DashboardClient({ payload, onBack }) {
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-bold tabular-nums">{formatNumber(d.cold)}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-bold tabular-nums">{formatNumber(d.vips)}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4">
-                      <span className="group/tip relative inline-block min-w-10 rounded-full bg-amber-500/[0.12] px-2 py-1 text-center text-xs font-black" style={{ color: d.score_medio >= 14 ? priorityColors.Hot : d.score_medio >= 9 ? priorityColors.Warm : priorityColors.Cool }}>
-                        {d.score_medio}
-                        <RuleTooltip side="top-right">
-                          <strong className="mb-2 block text-sm text-slate-900">{d.nome}</strong>
-                          <span className="text-slate-600 font-medium">{rules.score}</span>
-                          <span className="mt-2.5 flex justify-between gap-4 text-slate-600 font-medium">
-                            <span>Total usado</span>
-                            <strong className="text-slate-900 font-black">{formatNumber(d.total)}</strong>
-                          </span>
-                        </RuleTooltip>
-                      </span>
+                      <ScoreBadge district={d} />
                     </td>
                   </tr>
                 ))}
