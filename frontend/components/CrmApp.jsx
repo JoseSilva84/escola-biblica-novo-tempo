@@ -188,6 +188,72 @@ function buildInitialAssociations(records) {
   ];
 }
 
+function buildAdminUsers(associations) {
+  return [
+    {
+      id: 'user-admin-central',
+      name: 'Admin central',
+      email: 'admin@leadsnt.com.br',
+      role: 'ADMIN_GERAL',
+      scope: 'Todas as associacoes',
+      status: 'Ativo'
+    },
+    {
+      id: 'user-paulistana',
+      name: 'Gestao Paulistana',
+      email: 'paulistana@leadsnt.com.br',
+      role: 'GESTOR_ASSOCIACAO',
+      scope: associations[0]?.name || 'Associacao Paulistana',
+      status: 'Ativo'
+    },
+    {
+      id: 'user-coord',
+      name: 'Coordenacao de campanha',
+      email: 'coordenacao@leadsnt.com.br',
+      role: 'COORDENADOR_CAMPANHA',
+      scope: 'Campanhas ativas',
+      status: 'Convite pendente'
+    },
+    {
+      id: 'user-volunteer',
+      name: 'Equipe de visitas',
+      email: 'visitas@leadsnt.com.br',
+      role: 'VOLUNTARIO',
+      scope: 'Leads atribuidos',
+      status: 'Ativo'
+    }
+  ];
+}
+
+function buildAdminCampaigns(associations) {
+  return [
+    {
+      id: 'campaign-escola-biblica',
+      name: 'Escola Biblica Novo Tempo',
+      association: associations[0]?.name || 'Associacao Paulistana',
+      status: 'Ativa',
+      owner: 'Gestao Paulistana',
+      goal: 1800
+    },
+    {
+      id: 'campaign-familia',
+      name: 'Curso Familia',
+      association: associations[0]?.name || 'Associacao Paulistana',
+      status: 'Planejada',
+      owner: 'Coordenacao de campanha',
+      goal: 600
+    },
+    {
+      id: 'campaign-reencontro',
+      name: 'Reencontro Novo Tempo',
+      association: associations[1]?.name || 'Associacao Paulista Sul',
+      status: 'Planejada',
+      owner: 'Admin central',
+      goal: 900
+    }
+  ];
+}
+
 function BibleStudyAnimation() {
   return (
     <div className="bible-study-scene" aria-label="Duas pessoas conversando em um estudo biblico" role="img">
@@ -385,7 +451,10 @@ function LoginScreen({ onLogin }) {
 function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user }) {
   const items = [
     ['admin', 'Dashboard', LayoutDashboard],
+    ['general-admin', 'Admin geral', ShieldCheck],
     ['associations', 'Associações', Building2],
+    ['users', 'Acessos', UsersRound],
+    ['campaigns', 'Campanhas', Radio],
     ['automations', 'WhatsApp', MessageCircle],
     ['reports', 'Relatórios', PieChart]
   ];
@@ -800,6 +869,375 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
   );
 }
 
+function AdminGeneralView({
+  associations,
+  data,
+  users,
+  campaigns,
+  auditEvents,
+  onAddUser,
+  onAddCampaign,
+  initialSection = 'overview'
+}) {
+  const [section, setSection] = useState(initialSection);
+  const [leadBatch, setLeadBatch] = useState(280);
+  const [targetUser, setTargetUser] = useState(users[3]?.name || users[0]?.name || 'Equipe');
+
+  useEffect(() => {
+    setSection(initialSection);
+  }, [initialSection]);
+
+  const adminSections = [
+    ['overview', 'Visão geral', Gauge],
+    ['users', 'Acessos', UsersRound],
+    ['territories', 'Territórios', Building2],
+    ['campaigns', 'Campanhas', Radio],
+    ['distribution', 'Distribuição', ClipboardList],
+    ['audit', 'Auditoria', ShieldCheck],
+    ['ml', 'Governança ML', Sparkles]
+  ];
+  const activeCampaigns = campaigns.filter((campaign) => campaign.status === 'Ativa').length;
+  const pendingUsers = users.filter((item) => item.status !== 'Ativo').length;
+  const topDistrict = data.topDistricts[0];
+
+  function submitUser(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get('name') || '').trim();
+    const email = String(form.get('email') || '').trim();
+    if (!name || !email) return;
+    onAddUser({
+      id: `user-${Date.now()}`,
+      name,
+      email,
+      role: String(form.get('role') || 'VOLUNTARIO'),
+      scope: String(form.get('scope') || 'Leads atribuidos'),
+      status: 'Convite pendente'
+    });
+    event.currentTarget.reset();
+    toast.success('Acesso preparado', {
+      description: `${name} entrou na lista de permissões do admin geral.`
+    });
+  }
+
+  function submitCampaign(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get('name') || '').trim();
+    if (!name) return;
+    onAddCampaign({
+      id: `campaign-${Date.now()}`,
+      name,
+      association: String(form.get('association') || associations[0]?.name || 'Todas as associacoes'),
+      status: String(form.get('status') || 'Planejada'),
+      owner: String(form.get('owner') || 'Admin central'),
+      goal: Number(form.get('goal') || 0)
+    });
+    event.currentTarget.reset();
+    toast.success('Campanha adicionada', {
+      description: `${name} ficou pronta para acompanhamento administrativo.`
+    });
+  }
+
+  return (
+    <div className="grid gap-6">
+      <section className={`${panelClass} overflow-hidden p-6`}>
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <span className={labelClass}>Admin geral</span>
+            <h1 className="silver-title mt-2 text-5xl font-black leading-tight tracking-normal max-md:text-4xl">Central de comando</h1>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
+              Controle acessos, territórios, campanhas, distribuição de interessados, auditoria e governança do ranking ML sem perder o painel que já foi construído.
+            </p>
+          </div>
+          <button
+            className={primaryButtonClass}
+            onClick={() => toast.success('Checklist revisado', {
+              description: 'Permissões, campanhas, distribuição, auditoria e ML estão visíveis para o admin geral.'
+            })}
+            type="button"
+          >
+            <ShieldCheck size={18} />
+            Revisar operação
+          </button>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-5 gap-4 max-xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
+        <MetricCard detail="perfis administrativos" icon={UsersRound} label="Usuários" value={formatNumber(users.length)} />
+        <MetricCard detail={`${activeCampaigns} em andamento`} icon={Radio} label="Campanhas" tone="green" value={formatNumber(campaigns.length)} />
+        <MetricCard detail="com prioridade alta" icon={Sparkles} label="Leads quentes" tone="orange" value={formatNumber(data.hot)} />
+        <MetricCard detail={`${associations.length} associações no painel`} icon={Building2} label="Territórios" value={formatNumber(data.districts)} />
+        <MetricCard detail={`${pendingUsers} convite pendente`} icon={ShieldCheck} label="Pendências" tone="violet" value={formatNumber(pendingUsers + 4)} />
+      </section>
+
+      <section className={`${panelClass} p-3`}>
+        <div className="flex flex-wrap gap-2">
+          {adminSections.map(([id, label, Icon]) => (
+            <button
+              className={`inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-black transition ${section === id ? 'bg-blue-600 text-white shadow-[0_14px_34px_rgba(37,99,235,0.28)]' : 'bg-white/60 text-slate-700 hover:bg-white'}`}
+              key={id}
+              onClick={() => setSection(id)}
+              type="button"
+            >
+              <Icon size={16} />
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {section === 'overview' ? (
+        <section className="grid grid-cols-[1.2fr_0.8fr] gap-4 max-xl:grid-cols-1">
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Mapa da operação</span>
+            <div className="mt-5 grid gap-3">
+              {[
+                ['Permissões por perfil', 'Admin geral, gestor de associação, coordenador e voluntário com escopos separados.', 'Pronto para backend'],
+                ['Territórios e igrejas', 'Admin geral organiza associações, distritos e igrejas antes de distribuir leads.', 'Camada visual'],
+                ['Campanhas e metas', 'Cada campanha ganha responsável, associação, status e meta de acompanhamento.', 'Operacional'],
+                ['Auditoria e segurança', 'Eventos sensíveis ficam visíveis para conferência administrativa.', 'Governança']
+              ].map(([title, detail, status]) => (
+                <div className="interactive-card grid grid-cols-[1fr_auto] gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/45 p-5" key={title}>
+                  <div>
+                    <strong className="text-lg text-slate-50">{title}</strong>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-500">{detail}</p>
+                  </div>
+                  <span className="self-start rounded-full bg-blue-600 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">{status}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Prioridade agora</span>
+            <h2 className="mt-2 text-2xl font-black text-slate-50">{topDistrict?.name || 'Distrito prioritário'}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">
+              Maior volume atual para ação do admin geral, combinando território, contatos quentes e capacidade de distribuição.
+            </p>
+            <div className="mt-5 grid gap-3">
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4">
+                <span className={labelClass}>Interessados</span>
+                <strong className="mt-1 block text-3xl font-black text-slate-50">{formatNumber(topDistrict?.interessados || 0)}</strong>
+              </div>
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4">
+                <span className={labelClass}>Quentes</span>
+                <strong className="mt-1 block text-3xl font-black text-orange-300">{formatNumber(topDistrict?.quentes || 0)}</strong>
+              </div>
+            </div>
+          </article>
+        </section>
+      ) : null}
+
+      {section === 'users' ? (
+        <section className="grid grid-cols-[1fr_24rem] gap-4 max-xl:grid-cols-1">
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Permissões e acessos</span>
+            <div className="mt-5 overflow-hidden rounded-2xl border border-white/[0.07]">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-slate-950/70 text-left">
+                    {['Nome', 'Perfil', 'Escopo', 'Status'].map((head) => (
+                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500" key={head}>{head}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((item) => (
+                    <tr className="border-t border-white/[0.05]" key={item.id}>
+                      <td className="px-4 py-4">
+                        <strong className="block text-slate-50">{item.name}</strong>
+                        <span className="text-xs text-slate-500">{item.email}</span>
+                      </td>
+                      <td className="px-4 py-4 font-black text-blue-300">{item.role.replaceAll('_', ' ')}</td>
+                      <td className="px-4 py-4 font-bold text-slate-400">{item.scope}</td>
+                      <td className="px-4 py-4">
+                        <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${item.status === 'Ativo' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>{item.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+          <form className={`${panelClass} grid content-start gap-3 p-5`} onSubmit={submitUser}>
+            <span className={labelClass}>Novo acesso</span>
+            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="name" placeholder="Nome do usuário" />
+            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="email" placeholder="email@dominio.com" type="email" />
+            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="role">
+              <option value="ADMIN_GERAL">Admin geral</option>
+              <option value="GESTOR_ASSOCIACAO">Gestor de associação</option>
+              <option value="COORDENADOR_CAMPANHA">Coordenador de campanha</option>
+              <option value="VOLUNTARIO">Voluntário</option>
+            </select>
+            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="scope" placeholder="Escopo de acesso" />
+            <button className={primaryButtonClass} type="submit">
+              <Plus size={18} />
+              Criar acesso
+            </button>
+          </form>
+        </section>
+      ) : null}
+
+      {section === 'territories' ? (
+        <section className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
+          {associations.map((association) => (
+            <article className={`${panelClass} interactive-card p-5`} key={association.id}>
+              <div className="flex items-start justify-between gap-4">
+                <span className="grid h-12 w-12 place-items-center rounded-xl border border-slate-200/20 bg-white/[0.07] text-slate-100">
+                  <Building2 size={22} />
+                </span>
+                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${association.status === 'Ativa' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>{association.status}</span>
+              </div>
+              <h2 className="mt-5 text-xl font-black text-slate-50">{association.name}</h2>
+              <p className="mt-2 text-sm text-slate-500">{association.region}</p>
+              <div className="mt-5 grid grid-cols-3 gap-3">
+                <div><span className={labelClass}>Distritos</span><strong className="mt-1 block text-2xl text-slate-50">{formatNumber(association.districts)}</strong></div>
+                <div><span className={labelClass}>Leads</span><strong className="mt-1 block text-2xl text-slate-50">{formatNumber(association.leads)}</strong></div>
+                <div><span className={labelClass}>Camp.</span><strong className="mt-1 block text-2xl text-slate-50">{formatNumber(association.campaigns)}</strong></div>
+              </div>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {section === 'campaigns' ? (
+        <section className="grid grid-cols-[1fr_24rem] gap-4 max-xl:grid-cols-1">
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Campanhas gerais</span>
+            <div className="mt-5 grid gap-3">
+              {campaigns.map((campaign) => (
+                <div className="interactive-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/45 p-5" key={campaign.id}>
+                  <div>
+                    <strong className="text-xl text-slate-50">{campaign.name}</strong>
+                    <span className="mt-2 block text-sm text-slate-500">{campaign.association} · {campaign.owner} · meta {formatNumber(campaign.goal)}</span>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${campaign.status === 'Ativa' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>{campaign.status}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+          <form className={`${panelClass} grid content-start gap-3 p-5`} onSubmit={submitCampaign}>
+            <span className={labelClass}>Nova campanha</span>
+            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="name" placeholder="Nome da campanha" />
+            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="association">
+              {associations.map((association) => <option key={association.id}>{association.name}</option>)}
+            </select>
+            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="status">
+              <option>Planejada</option>
+              <option>Ativa</option>
+              <option>Pausada</option>
+              <option>Finalizada</option>
+            </select>
+            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="owner" placeholder="Responsável" />
+            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" min="0" name="goal" placeholder="Meta de acompanhamentos" type="number" />
+            <button className={primaryButtonClass} type="submit">
+              <Plus size={18} />
+              Criar campanha
+            </button>
+          </form>
+        </section>
+      ) : null}
+
+      {section === 'distribution' ? (
+        <section className="grid grid-cols-[0.9fr_1.1fr] gap-4 max-xl:grid-cols-1">
+          <article className={`${panelClass} grid content-start gap-5 p-6`}>
+            <span className={labelClass}>Distribuição de trabalho</span>
+            <label className="grid gap-2 text-sm font-bold text-slate-300">
+              Lote de leads quentes
+              <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" max={data.hot} min="1" onChange={(event) => setLeadBatch(Number(event.target.value || 1))} type="number" value={leadBatch} />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-slate-300">
+              Responsável
+              <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" onChange={(event) => setTargetUser(event.target.value)} value={targetUser}>
+                {users.map((item) => <option key={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+            <button
+              className={primaryButtonClass}
+              onClick={() => toast.success('Lote atribuído', { description: `${formatNumber(leadBatch)} leads foram separados para ${targetUser}.` })}
+              type="button"
+            >
+              <ClipboardList size={18} />
+              Atribuir lote
+            </button>
+          </article>
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Filas sugeridas</span>
+            <div className="mt-5 grid gap-3">
+              {[
+                ['Leads quentes sem resposta', data.hot, 'Ação imediata'],
+                ['VIPs para relacionamento', data.vip, 'Nutrição'],
+                ['Estudos ativos para visita', data.studies, 'Acompanhamento'],
+                ['Com WhatsApp validado', data.phone, 'Automação']
+              ].map(([title, value, tag]) => (
+                <div className="interactive-card grid grid-cols-[1fr_auto] rounded-2xl border border-white/[0.07] bg-slate-950/45 p-5" key={title}>
+                  <div>
+                    <strong className="text-slate-50">{title}</strong>
+                    <span className="mt-1 block text-sm text-slate-500">{tag}</span>
+                  </div>
+                  <strong className="text-2xl text-slate-50">{formatNumber(value)}</strong>
+                </div>
+              ))}
+            </div>
+          </article>
+        </section>
+      ) : null}
+
+      {section === 'audit' ? (
+        <section className={`${panelClass} p-6`}>
+          <span className={labelClass}>Auditoria administrativa</span>
+          <div className="mt-5 grid gap-3">
+            {auditEvents.map((event) => (
+              <div className="interactive-card grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/45 p-5" key={event.id}>
+                <span className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200/20 bg-white/[0.07] text-slate-100">
+                  <ShieldCheck size={20} />
+                </span>
+                <div>
+                  <strong className="block text-slate-50">{event.action}</strong>
+                  <span className="text-sm text-slate-500">{event.user} · {event.detail}</span>
+                </div>
+                <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{event.when}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {section === 'ml' ? (
+        <section className="grid grid-cols-[1fr_1fr] gap-4 max-xl:grid-cols-1">
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Ranking ML</span>
+            <h2 className="mt-2 text-2xl font-black text-slate-50">Governança do modelo</h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-500">
+              O admin geral precisa saber quando a base foi calculada, quantos registros entraram no ranking e qual arquivo alimenta a prioridade operacional.
+            </p>
+            <div className="mt-5 grid gap-3">
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4"><span className={labelClass}>Registros ML</span><strong className="mt-1 block text-3xl text-slate-50">{formatNumber(data.total)}</strong></div>
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4"><span className={labelClass}>Leads quentes</span><strong className="mt-1 block text-3xl text-orange-300">{formatNumber(data.hot)}</strong></div>
+            </div>
+          </article>
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Controles do admin</span>
+            <div className="mt-5 grid gap-3">
+              {['Importar novo ranking CSV', 'Recalcular prioridade operacional', 'Registrar versão do modelo', 'Bloquear exportação sem permissão'].map((item) => (
+                <button
+                  className={`${ghostButtonClass} justify-start`}
+                  key={item}
+                  onClick={() => toast.info(item, { description: 'Controle preparado na interface do admin geral.' })}
+                  type="button"
+                >
+                  <Sparkles size={17} />
+                  {item}
+                </button>
+              ))}
+            </div>
+          </article>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 function SettingsView({ theme, onToggleTheme }) {
   const settings = [
     {
@@ -1053,12 +1491,20 @@ function openDetailsView(setView) {
 }
 
 export default function CrmApp({ payload: initialPayload = null }) {
+  const initialAssociations = initialPayload ? buildInitialAssociations(initialPayload.records) : [];
   const [user, setUser] = useState(null);
   const [view, setView] = useState('login');
   const [theme, setTheme] = useState('light');
   const [selectedAssociationId, setSelectedAssociationId] = useState('paulistana');
   const [payload, setPayload] = useState(initialPayload);
-  const [associations, setAssociations] = useState(() => initialPayload ? buildInitialAssociations(initialPayload.records) : []);
+  const [associations, setAssociations] = useState(() => initialAssociations);
+  const [adminUsers, setAdminUsers] = useState(() => buildAdminUsers(initialAssociations));
+  const [adminCampaigns, setAdminCampaigns] = useState(() => buildAdminCampaigns(initialAssociations));
+  const [auditEvents, setAuditEvents] = useState([
+    { id: 'audit-login', action: 'Login administrativo', user: 'Admin central', detail: 'Sessão aberta com perfil ADMIN_GERAL', when: 'Agora' },
+    { id: 'audit-export', action: 'Exportação controlada', user: 'Gestão Paulistana', detail: 'Relatório de distritos filtrados disponível', when: 'Hoje' },
+    { id: 'audit-ml', action: 'Ranking ML carregado', user: 'Sistema', detail: 'Prioridade operacional aplicada ao dashboard', when: 'Hoje' }
+  ]);
   const records = payload?.records || [];
   const data = useMemo(() => buildAssociationData(records), [records]);
   const selectedAssociation = associations.find((association) => association.id === selectedAssociationId) || associations[0];
@@ -1069,8 +1515,11 @@ export default function CrmApp({ payload: initialPayload = null }) {
       throw new Error('Nao foi possivel carregar os dados do backend.');
     }
     const nextPayload = await response.json();
+    const nextAssociations = buildInitialAssociations(nextPayload.records);
     setPayload(nextPayload);
-    setAssociations(buildInitialAssociations(nextPayload.records));
+    setAssociations(nextAssociations);
+    setAdminUsers(buildAdminUsers(nextAssociations));
+    setAdminCampaigns(buildAdminCampaigns(nextAssociations));
   }
 
   async function logout() {
@@ -1101,6 +1550,30 @@ export default function CrmApp({ payload: initialPayload = null }) {
     return <DashboardClient onBack={() => setView('association')} payload={payload} />;
   }
 
+  const addAdminCampaign = (campaign) => {
+    setAdminCampaigns((current) => [campaign, ...current]);
+    setAuditEvents((current) => [
+      { id: `audit-${Date.now()}`, action: 'Campanha criada', user: user?.name || 'Admin central', detail: campaign.name, when: 'Agora' },
+      ...current
+    ]);
+  };
+  const addAdminUser = (nextUser) => {
+    setAdminUsers((current) => [nextUser, ...current]);
+    setAuditEvents((current) => [
+      { id: `audit-${Date.now()}`, action: 'Acesso criado', user: user?.name || 'Admin central', detail: `${nextUser.name} · ${nextUser.role.replaceAll('_', ' ')}`, when: 'Agora' },
+      ...current
+    ]);
+  };
+  const adminGeneralProps = {
+    associations,
+    auditEvents,
+    campaigns: adminCampaigns,
+    data,
+    onAddCampaign: addAdminCampaign,
+    onAddUser: addAdminUser,
+    users: adminUsers
+  };
+
   let content = null;
   if (view === 'admin' || view === 'associations') {
     content = (
@@ -1111,14 +1584,21 @@ export default function CrmApp({ payload: initialPayload = null }) {
         onOpenAssociation={openAssociation}
       />
     );
+  } else if (['general-admin', 'users', 'campaigns'].includes(view)) {
+    content = (
+      <AdminGeneralView
+        {...adminGeneralProps}
+        initialSection={view === 'users' ? 'users' : view === 'campaigns' ? 'campaigns' : 'overview'}
+      />
+    );
   } else if (view === 'association') {
     content = <AssociationDashboard association={selectedAssociation} data={data} onOpenDetails={() => openDetailsView(setView)} />;
   } else if (view === 'automations') {
-    content = <PlaceholderView icon={MessageCircle} subtitle="A próxima camada terá sequências, templates aprovados e gatilhos de envio por etapa do funil." title="Central WhatsApp" />;
+    content = <AdminGeneralView {...adminGeneralProps} initialSection="distribution" />;
   } else if (view === 'settings') {
     content = <SettingsView onToggleTheme={() => setTheme((current) => current === 'light' ? 'dark' : 'light')} theme={theme} />;
   } else {
-    content = <PlaceholderView icon={Gauge} subtitle="Relatórios executivos por associação, campanha, distrito, voluntário, visita e resposta do WhatsApp." title="Relatórios Leads NT" />;
+    content = <AdminGeneralView {...adminGeneralProps} initialSection="audit" />;
   }
 
   return (
