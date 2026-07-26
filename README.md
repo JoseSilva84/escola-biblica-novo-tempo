@@ -66,6 +66,7 @@ DATABASE_URL="postgresql://usuario:senha@host:porta/banco"
 AUTH_SECRET="uma-chave-secreta-forte"
 FRONTEND_URL="http://localhost:3000"
 PORT=4000
+ZPRO_WEBHOOK_SECRET="uma-chave-para-webhook-zpro"
 ADMIN_EMAIL="admin@leadsnt.com.br"
 ADMIN_PASSWORD="senha-com-no-minimo-8-caracteres"
 ADMIN_NAME="Admin"
@@ -91,6 +92,26 @@ Rotas principais:
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
 - `GET /api/dashboard`
+- `GET /api/webhooks/zpro/whatsapp`
+- `POST /api/webhooks/zpro/whatsapp`
+
+### Webhook do Zpro / Baileys
+
+No Zpro, em **Webhook do Canal > URL de destino**, use a URL publica do backend:
+
+```text
+https://SEU_BACKEND_PUBLICO/api/webhooks/zpro/whatsapp?token=SUA_CHAVE_ZPRO_WEBHOOK_SECRET
+```
+
+Tambem e possivel enviar a chave no header `x-webhook-secret` ou `x-zpro-webhook-secret`.
+
+Para desenvolvimento local, o endpoint fica:
+
+```text
+http://localhost:4000/api/webhooks/zpro/whatsapp?token=SUA_CHAVE_ZPRO_WEBHOOK_SECRET
+```
+
+O campo do Zpro recebe eventos de entrada, como mensagens recebidas e status do canal. Para envio automatico de mensagens, o Leads NT devera chamar a API do Zpro usando as credenciais do provedor e registrar os disparos na tabela `WhatsAppSend`.
 
 ## Frontend
 

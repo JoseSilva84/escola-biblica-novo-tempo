@@ -20,6 +20,41 @@ const allowedOrigins = new Set((process.env.FRONTEND_URL || 'http://localhost:30
 allowedOrigins.add('http://127.0.0.1:3000');
 allowedOrigins.add('http://localhost:3000');
 
+function webhookAllowed(request) {
+  const secret = String(process.env.ZPRO_WEBHOOK_SECRET || '').trim();
+  if (!secret && process.env.NODE_ENV !== 'production') return true;
+  const received = String(
+    request.headers['x-webhook-secret']
+    || request.headers['x-zpro-webhook-secret']
+    || request.query?.token
+    || ''
+  ).trim();
+  return Boolean(secret && received === secret);
+}
+
+function readZproMessage(payload = {}) {
+  const data = payload.data || payload.message || payload;
+  const contact = data.contact || data.sender || data.from || {};
+  const rawPhone = data.remoteJid || data.from || data.phone || contact.phone || contact.number || '';
+  const phone = String(rawPhone).replace(/@s\.whatsapp\.net$/i, '').replace(/\D/g, '');
+  const text = data.text
+    || data.body
+    || data.message?.conversation
+    || data.message?.extendedTextMessage?.text
+    || data.messages?.[0]?.message?.conversation
+    || '';
+
+  return {
+    event: payload.event || payload.type || payload.action || 'zpro.webhook',
+    channelId: payload.channelId || payload.sessionId || data.channelId || data.sessionId || null,
+    messageId: data.id || data.messageId || data.key?.id || null,
+    fromMe: Boolean(data.fromMe || data.key?.fromMe),
+    phone,
+    name: contact.name || contact.pushName || data.pushName || null,
+    text: String(text || '').trim()
+  };
+}
+
 app.use(cors({
   origin(origin, callback) {
     if (process.env.NODE_ENV !== 'production') {
@@ -77,6 +112,32 @@ app.get('/api/auth/me', (request, response) => {
 
 app.get('/api/dashboard', requireAuth, (_request, response) => {
   response.json(getDashboardData());
+});
+
+app.get('/api/webhooks/zpro/whatsapp', (request, response) => {
+  if (!webhookAllowed(request)) {
+    response.status(401).json({ ok: false, message: 'Webhook nao autorizado' });
+    return;
+  }
+  response.json({ ok: true, provider: 'zpro-baileys', webhook: 'ready' });
+});
+
+app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
+  if (!webhookAllowed(request)) {
+    response.status(401).json({ ok: false, message: 'Webhook nao autorizado' });
+    return;
+  }
+
+  const event = readZproMessage(request.body);
+  console.log('[zpro:webhook]', JSON.stringify({
+    event: event.event,
+    channelId: event.channelId,
+    phone: event.phone,
+    fromMe: event.fromMe,
+    hasText: Boolean(event.text)
+  }));
+
+  response.json({ ok: true, received: true });
 });
 
 app.listen(port, '0.0.0.0', () => {
