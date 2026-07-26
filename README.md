@@ -67,6 +67,10 @@ AUTH_SECRET="uma-chave-secreta-forte"
 FRONTEND_URL="http://localhost:3000"
 PORT=4000
 ZPRO_WEBHOOK_SECRET="uma-chave-para-webhook-zpro"
+ZPRO_API_URL="https://api.sevenflowia.tech"
+ZPRO_API_TOKEN="token-completo-gerado-no-zpro"
+ZPRO_CHANNEL_ID="10"
+ZPRO_SEND_TEXT_PATH="/messages/sendText"
 ADMIN_EMAIL="admin@leadsnt.com.br"
 ADMIN_PASSWORD="senha-com-no-minimo-8-caracteres"
 ADMIN_NAME="Admin"
@@ -112,6 +116,31 @@ http://localhost:4000/api/webhooks/zpro/whatsapp?token=SUA_CHAVE_ZPRO_WEBHOOK_SE
 ```
 
 O campo do Zpro recebe eventos de entrada, como mensagens recebidas e status do canal. Para envio automatico de mensagens, o Leads NT devera chamar a API do Zpro usando as credenciais do provedor e registrar os disparos na tabela `WhatsAppSend`.
+
+### Envio de mensagens pelo Zpro
+
+Configure no backend:
+
+```env
+ZPRO_API_URL="https://api.sevenflowia.tech"
+ZPRO_API_TOKEN="token-completo-gerado-no-zpro"
+ZPRO_CHANNEL_ID="10"
+ZPRO_SEND_TEXT_PATH="/messages/sendText"
+```
+
+O `ZPRO_CHANNEL_ID` deve ser o ID do canal Baileys conectado. Pelas telas do Zpro, o canal **Novo Tempo Seven** usa o ID `10`.
+
+Se a sua instalacao do Zpro usar outro caminho de envio, altere apenas `ZPRO_SEND_TEXT_PATH`. Ele aceita placeholders:
+
+```env
+ZPRO_SEND_TEXT_PATH="/sessions/{channelId}/messages/sendText"
+```
+
+Rotas internas do Leads NT para disparo:
+
+- `GET /api/whatsapp/provider`
+- `POST /api/whatsapp/send`
+- `POST /api/whatsapp/send-batch`
 
 ## Frontend
 

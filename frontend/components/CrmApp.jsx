@@ -902,10 +902,27 @@ function AdminGeneralView({
   const [section, setSection] = useState(initialSection);
   const [leadBatch, setLeadBatch] = useState(280);
   const [targetUser, setTargetUser] = useState(users[3]?.name || users[0]?.name || 'Equipe');
+  const [provider, setProvider] = useState(null);
+  const [sendLoading, setSendLoading] = useState(false);
+  const [lastSend, setLastSend] = useState(null);
 
   useEffect(() => {
     setSection(initialSection);
   }, [initialSection]);
+
+  useEffect(() => {
+    if (section !== 'distribution') return;
+    let active = true;
+    apiFetch('/api/whatsapp/provider')
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => {
+        if (active && payload) setProvider(payload);
+      })
+      .catch(() => {
+        if (active) setProvider({ configured: false, provider: 'zpro-baileys' });
+      });
+    return () => { active = false; };
+  }, [section]);
 
   const adminSections = [
     ['overview', 'Visão geral', Gauge],
@@ -971,6 +988,37 @@ function AdminGeneralView({
     toast.success('Campanha adicionada', {
       description: `${name} ficou pronta para acompanhamento administrativo.`
     });
+  }
+
+  async function submitWhatsAppTest(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const phone = String(form.get('phone') || '').trim();
+    const message = String(form.get('message') || '').trim();
+    setSendLoading(true);
+    setLastSend(null);
+
+    try {
+      const response = await apiFetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, message })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
+      }
+      setLastSend(payload);
+      toast.success('Mensagem enviada', {
+        description: `Disparo feito para ${payload.phone}.`
+      });
+    } catch (error) {
+      toast.error('Falha no disparo', {
+        description: error.message
+      });
+    } finally {
+      setSendLoading(false);
+    }
   }
 
   return (
@@ -1168,7 +1216,46 @@ function AdminGeneralView({
       ) : null}
 
       {section === 'distribution' ? (
-        <section className="grid grid-cols-[0.9fr_1.1fr] gap-4 max-xl:grid-cols-1">
+        <section className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
+          <article className={`${panelClass} grid content-start gap-5 p-6`}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className={labelClass}>WhatsApp Zpro</span>
+                <h2 className="mt-2 text-2xl font-extrabold text-slate-50">Disparo de teste</h2>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                  Envie uma mensagem real pelo canal Baileys configurado antes de ativar filas maiores.
+                </p>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${provider?.configured ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+                {provider?.configured ? 'Configurado' : 'Pendente'}
+              </span>
+            </div>
+            <div className="grid gap-2 rounded-2xl border border-white/[0.08] bg-slate-950/45 p-4 text-sm text-slate-400">
+              <span>Provedor: {provider?.provider || 'zpro-baileys'}</span>
+              <span>Canal: {provider?.channelId || 'configure ZPRO_CHANNEL_ID'}</span>
+              <span>Base: {provider?.baseUrl || 'configure ZPRO_API_URL'}</span>
+            </div>
+            <form className="grid gap-3" onSubmit={submitWhatsAppTest}>
+              <label className="grid gap-2 text-sm font-medium text-slate-300">
+                Telefone do teste
+                <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="phone" placeholder="Ex.: 5511999999999" />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-slate-300">
+                Mensagem
+                <textarea className="min-h-28 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 py-3 text-slate-100 outline-none" name="message" defaultValue="Olá! Aqui é da Escola Bíblica Novo Tempo. Estamos felizes pelo seu interesse e queremos ajudar você a continuar seus estudos." />
+              </label>
+              <button className={primaryButtonClass} disabled={sendLoading} type="submit">
+                <Send size={18} />
+                {sendLoading ? 'Enviando...' : 'Enviar teste'}
+              </button>
+            </form>
+            {lastSend ? (
+              <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+                Mensagem aceita pelo provedor para {lastSend.phone}.
+              </div>
+            ) : null}
+          </article>
+
           <article className={`${panelClass} grid content-start gap-5 p-6`}>
             <span className={labelClass}>Distribuição de trabalho</span>
             <label className="grid gap-2 text-sm font-medium text-slate-300">
@@ -1190,7 +1277,7 @@ function AdminGeneralView({
               Atribuir lote
             </button>
           </article>
-          <article className={`${panelClass} p-6`}>
+          <article className={`${panelClass} p-6 max-xl:col-span-1 xl:col-span-2`}>
             <span className={labelClass}>Filas sugeridas</span>
             <div className="mt-5 grid gap-3">
               {queueCards.map(([title, value, tag, tone]) => (

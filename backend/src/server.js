@@ -55,6 +55,111 @@ function readZproMessage(payload = {}) {
   };
 }
 
+function normalizePhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length < 10 || digits.length > 13) return '';
+  if (digits.length <= 11) return `55${digits}`;
+  return digits;
+}
+
+function applyPathParams(pathValue, params) {
+  return String(pathValue || '').replace(/\{(\w+)\}/g, (_match, key) => encodeURIComponent(params[key] || ''));
+}
+
+function zproConfig() {
+  const baseUrl = String(process.env.ZPRO_API_URL || '').trim().replace(/\/+$/, '');
+  const token = String(process.env.ZPRO_API_TOKEN || '').trim();
+  const channelId = String(process.env.ZPRO_CHANNEL_ID || '').trim();
+  const sendPath = String(process.env.ZPRO_SEND_TEXT_PATH || '/messages/sendText').trim();
+  return { baseUrl, token, channelId, sendPath };
+}
+
+function buildZproSendPayload({ phone, message, leadId, templateId, channelId }) {
+  return {
+    channelId,
+    sessionId: channelId,
+    number: phone,
+    phone,
+    to: phone,
+    text: message,
+    message,
+    body: message,
+    leadId: leadId || null,
+    templateId: templateId || null
+  };
+}
+
+async function sendZproTextMessage({ phone, message, leadId = null, templateId = null }) {
+  const config = zproConfig();
+  if (!config.baseUrl || !config.token || !config.channelId) {
+    const missing = [
+      !config.baseUrl && 'ZPRO_API_URL',
+      !config.token && 'ZPRO_API_TOKEN',
+      !config.channelId && 'ZPRO_CHANNEL_ID'
+    ].filter(Boolean);
+    const error = new Error(`Configuracao Zpro incompleta: ${missing.join(', ')}`);
+    error.status = 500;
+    throw error;
+  }
+
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) {
+    const error = new Error('Telefone invalido. Use DDI + DDD + numero, ou DDD + numero brasileiro.');
+    error.status = 400;
+    throw error;
+  }
+
+  const cleanMessage = String(message || '').trim();
+  if (cleanMessage.length < 2) {
+    const error = new Error('Mensagem vazia ou muito curta.');
+    error.status = 400;
+    throw error;
+  }
+
+  const pathValue = applyPathParams(config.sendPath, { channelId: config.channelId, sessionId: config.channelId });
+  const url = pathValue.startsWith('http') ? pathValue : `${config.baseUrl}${pathValue.startsWith('/') ? '' : '/'}${pathValue}`;
+  const payload = buildZproSendPayload({
+    phone: normalizedPhone,
+    message: cleanMessage,
+    leadId,
+    templateId,
+    channelId: config.channelId
+  });
+
+  const providerResponse = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const text = await providerResponse.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!providerResponse.ok) {
+    const error = new Error(data?.message || data?.error || `Zpro respondeu com status ${providerResponse.status}`);
+    error.status = 502;
+    error.providerStatus = providerResponse.status;
+    error.providerResponse = data;
+    throw error;
+  }
+
+  return {
+    ok: true,
+    provider: 'zpro-baileys',
+    channelId: config.channelId,
+    phone: normalizedPhone,
+    providerResponse: data
+  };
+}
+
 app.use(cors({
   origin(origin, callback) {
     if (process.env.NODE_ENV !== 'production') {
@@ -112,6 +217,78 @@ app.get('/api/auth/me', (request, response) => {
 
 app.get('/api/dashboard', requireAuth, (_request, response) => {
   response.json(getDashboardData());
+});
+
+app.get('/api/whatsapp/provider', requireAuth, (_request, response) => {
+  const config = zproConfig();
+  response.json({
+    provider: 'zpro-baileys',
+    configured: Boolean(config.baseUrl && config.token && config.channelId),
+    baseUrl: config.baseUrl || null,
+    channelId: config.channelId || null,
+    sendPath: config.sendPath
+  });
+});
+
+app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
+  try {
+    const result = await sendZproTextMessage({
+      phone: request.body?.phone,
+      message: request.body?.message,
+      leadId: request.body?.leadId,
+      templateId: request.body?.templateId
+    });
+    response.json({
+      ...result,
+      sentBy: request.user?.email || request.user?.sub || null,
+      sentAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[zpro:send:error]', error.message, error.providerResponse || '');
+    response.status(error.status || 500).json({
+      ok: false,
+      message: error.message,
+      providerStatus: error.providerStatus || null,
+      providerResponse: error.providerResponse || null
+    });
+  }
+});
+
+app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
+  const recipients = Array.isArray(request.body?.recipients) ? request.body.recipients.slice(0, 50) : [];
+  const message = request.body?.message;
+  if (!recipients.length) {
+    response.status(400).json({ ok: false, message: 'Informe ao menos um destinatario.' });
+    return;
+  }
+
+  const results = [];
+  for (const recipient of recipients) {
+    try {
+      const result = await sendZproTextMessage({
+        phone: recipient.phone || recipient.tel || recipient,
+        message,
+        leadId: recipient.leadId || recipient.id || null,
+        templateId: request.body?.templateId || null
+      });
+      results.push({ ok: true, phone: result.phone, leadId: recipient.leadId || recipient.id || null });
+    } catch (error) {
+      results.push({
+        ok: false,
+        phone: recipient.phone || recipient.tel || recipient,
+        leadId: recipient.leadId || recipient.id || null,
+        message: error.message
+      });
+    }
+  }
+
+  response.json({
+    ok: results.some((item) => item.ok),
+    total: results.length,
+    sent: results.filter((item) => item.ok).length,
+    failed: results.filter((item) => !item.ok).length,
+    results
+  });
 });
 
 app.get('/api/webhooks/zpro/whatsapp', (request, response) => {
