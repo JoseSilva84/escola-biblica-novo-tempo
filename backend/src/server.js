@@ -92,7 +92,7 @@ function tokenDiagnostic(token) {
   };
 }
 
-function buildZproSendPayload({ phone, message, leadId, templateId, channelId, externalKey }) {
+function buildZproSendPayload({ phone, message, leadId, templateId, channelId, externalKey, token }) {
   return {
     channelId,
     sessionId: channelId,
@@ -103,10 +103,47 @@ function buildZproSendPayload({ phone, message, leadId, templateId, channelId, e
     text: message,
     message,
     externalKey,
+    bearertoken: token,
     isClosed: false,
     leadId: leadId || null,
     templateId: templateId || null
   };
+}
+
+function isInvalidTokenResponse(status, data) {
+  const text = JSON.stringify(data || {}).toLowerCase();
+  return status === 401 || text.includes('invalid token') || text.includes('invalid_token') || text.includes('err_auth_invalid_token');
+}
+
+async function parseProviderResponse(providerResponse) {
+  const text = await providerResponse.text();
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return { raw: text };
+  }
+}
+
+async function sendZproByParams({ config, phone, message, externalKey }) {
+  const paramsPath = applyPathParams('/v2/api/external/{apiId}/params/', {
+    apiId: config.apiId
+  });
+  const url = new URL(`${config.baseUrl}${paramsPath}`);
+  url.searchParams.set('body', message);
+  url.searchParams.set('number', phone);
+  url.searchParams.set('externalKey', externalKey);
+  url.searchParams.set('bearertoken', config.token);
+  url.searchParams.set('isClosed', 'false');
+
+  const providerResponse = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      Accept: 'application/json'
+    }
+  });
+  const data = await parseProviderResponse(providerResponse);
+  return { providerResponse, data, transport: 'params' };
 }
 
 async function sendZproTextMessage({ phone, message, leadId = null, templateId = null }) {
@@ -149,10 +186,12 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
     leadId,
     templateId,
     channelId: config.channelId || config.apiId,
-    externalKey
+    externalKey,
+    token: config.token
   });
 
-  const providerResponse = await fetch(url, {
+  let transport = 'post';
+  let providerResponse = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${config.token}`,
@@ -161,12 +200,17 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
     body: JSON.stringify(payload)
   });
 
-  const text = await providerResponse.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = { raw: text };
+  let data = await parseProviderResponse(providerResponse);
+  if (!providerResponse.ok && isInvalidTokenResponse(providerResponse.status, data)) {
+    const fallback = await sendZproByParams({
+      config,
+      phone: normalizedPhone,
+      message: cleanMessage,
+      externalKey
+    });
+    providerResponse = fallback.providerResponse;
+    data = fallback.data;
+    transport = fallback.transport;
   }
 
   if (!providerResponse.ok) {
@@ -183,6 +227,7 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
     channelId: config.channelId || null,
     apiId: config.apiId,
     phone: normalizedPhone,
+    transport,
     providerResponse: data
   };
 }
