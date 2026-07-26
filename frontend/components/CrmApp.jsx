@@ -47,9 +47,9 @@ import {
 import { Toaster, toast } from 'sonner';
 import DashboardClient from './DashboardClient';
 
-const labelClass = 'text-[11px] font-black uppercase tracking-[0.16em] text-slate-500';
-const primaryButtonClass = 'primary-button-glow group relative inline-flex h-11 items-center justify-center gap-2 overflow-hidden rounded-xl bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_52%,#0f172a_100%)] px-4 text-sm font-black text-white shadow-[0_18px_46px_rgba(37,99,235,0.34)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_24px_70px_rgba(37,99,235,0.30)] focus:outline-none focus:ring-4 focus:ring-blue-500/25 disabled:cursor-not-allowed disabled:opacity-70';
-const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-black text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
+const labelClass = 'text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500';
+const primaryButtonClass = 'primary-button-glow group relative inline-flex h-11 items-center justify-center gap-2 overflow-hidden rounded-xl bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_52%,#0f172a_100%)] px-4 text-sm font-bold text-white shadow-[0_18px_46px_rgba(37,99,235,0.34)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_24px_70px_rgba(37,99,235,0.30)] focus:outline-none focus:ring-4 focus:ring-blue-500/25 disabled:cursor-not-allowed disabled:opacity-70';
+const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-semibold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
 const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slate-950/60 shadow-[0_28px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.035] backdrop-blur-2xl';
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 
@@ -508,20 +508,33 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
 
 function MetricCard({ icon: Icon, label, value, detail, tone = 'silver' }) {
   const tones = {
-    silver: 'text-slate-100 bg-white/[0.07] border-slate-200/20',
-    green: 'text-emerald-300 bg-emerald-500/10 border-emerald-400/20',
-    orange: 'text-orange-300 bg-orange-500/10 border-orange-400/20',
-    violet: 'text-violet-300 bg-violet-500/10 border-violet-400/20'
+    silver: {
+      card: 'border-blue-300/40 bg-gradient-to-br from-blue-600 to-cyan-500 text-white',
+      icon: 'text-white bg-white/18 border-white/30'
+    },
+    green: {
+      card: 'border-emerald-300/40 bg-gradient-to-br from-emerald-600 to-teal-500 text-white',
+      icon: 'text-white bg-white/18 border-white/30'
+    },
+    orange: {
+      card: 'border-orange-300/40 bg-gradient-to-br from-red-600 to-orange-500 text-white',
+      icon: 'text-white bg-white/18 border-white/30'
+    },
+    violet: {
+      card: 'border-violet-300/40 bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white',
+      icon: 'text-white bg-white/18 border-white/30'
+    }
   };
+  const toneStyle = tones[tone] || tones.silver;
 
   return (
-    <article className={`${panelClass} interactive-card p-5`}>
-      <span className={`mb-5 grid h-12 w-12 place-items-center rounded-xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] ${tones[tone]}`}>
+    <article className={`${panelClass} interactive-card p-5 shadow-[0_20px_52px_rgba(15,23,42,0.16)] ${toneStyle.card}`}>
+      <span className={`mb-5 grid h-12 w-12 place-items-center rounded-xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] ${toneStyle.icon}`}>
         <Icon size={22} />
       </span>
-      <span className={labelClass}>{label}</span>
-      <strong className="mt-2 block text-3xl font-black text-slate-50">{value}</strong>
-      <span className="mt-2 block text-sm text-slate-500">{detail}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">{label}</span>
+      <strong className="mt-2 block text-3xl font-extrabold text-white">{value}</strong>
+      <span className="mt-2 block text-sm font-normal text-white/82">{detail}</span>
     </article>
   );
 }
@@ -899,6 +912,20 @@ function AdminGeneralView({
   const activeCampaigns = campaigns.filter((campaign) => campaign.status === 'Ativa').length;
   const pendingUsers = users.filter((item) => item.status !== 'Ativo').length;
   const topDistrict = data.topDistricts[0];
+  const operationCards = [
+    ['Permissões por perfil', 'Admin geral, gestor de associação, coordenador e voluntário com escopos separados.', 'Pronto para backend', 'from-blue-600 to-cyan-500', 'bg-blue-500/95'],
+    ['Territórios e igrejas', 'Admin geral organiza associações, distritos e igrejas antes de distribuir leads.', 'Camada visual', 'from-emerald-600 to-teal-500', 'bg-emerald-500/95'],
+    ['Campanhas e metas', 'Cada campanha ganha responsável, associação, status e meta de acompanhamento.', 'Operacional', 'from-amber-500 to-orange-500', 'bg-orange-500/95'],
+    ['Auditoria e segurança', 'Eventos sensíveis ficam visíveis para conferência administrativa.', 'Governança', 'from-violet-600 to-fuchsia-500', 'bg-violet-500/95']
+  ];
+  const campaignColors = ['from-emerald-600 to-teal-500', 'from-blue-600 to-indigo-500', 'from-violet-600 to-fuchsia-500', 'from-amber-500 to-orange-500'];
+  const queueCards = [
+    ['Leads quentes sem resposta', data.hot, 'Ação imediata', 'from-red-600 to-orange-500'],
+    ['VIPs para relacionamento', data.vip, 'Nutrição', 'from-violet-600 to-fuchsia-500'],
+    ['Estudos ativos para visita', data.studies, 'Acompanhamento', 'from-emerald-600 to-teal-500'],
+    ['Com WhatsApp validado', data.phone, 'Automação', 'from-blue-600 to-cyan-500']
+  ];
+  const auditColors = ['from-emerald-600 to-teal-500', 'from-blue-600 to-cyan-500', 'from-violet-600 to-fuchsia-500', 'from-amber-500 to-orange-500'];
 
   function submitUser(event) {
     event.preventDefault();
@@ -945,7 +972,7 @@ function AdminGeneralView({
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
             <span className={labelClass}>Admin geral</span>
-            <h1 className="silver-title mt-2 text-5xl font-black leading-tight tracking-normal max-md:text-4xl">Central de comando</h1>
+            <h1 className="silver-title mt-2 text-5xl font-extrabold leading-tight tracking-normal max-md:text-4xl">Central de comando</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
               Controle acessos, territórios, campanhas, distribuição de interessados, auditoria e governança do ranking ML sem perder o painel que já foi construído.
             </p>
@@ -975,7 +1002,7 @@ function AdminGeneralView({
         <div className="flex flex-wrap gap-2">
           {adminSections.map(([id, label, Icon]) => (
             <button
-              className={`inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-black transition ${section === id ? 'bg-blue-600 text-white shadow-[0_14px_34px_rgba(37,99,235,0.28)]' : 'bg-white/60 text-slate-700 hover:bg-white'}`}
+              className={`inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition ${section === id ? 'bg-blue-600 text-white shadow-[0_14px_34px_rgba(37,99,235,0.28)]' : 'bg-white/60 text-slate-700 hover:bg-white'}`}
               key={id}
               onClick={() => setSection(id)}
               type="button"
@@ -992,36 +1019,31 @@ function AdminGeneralView({
           <article className={`${panelClass} p-6`}>
             <span className={labelClass}>Mapa da operação</span>
             <div className="mt-5 grid gap-3">
-              {[
-                ['Permissões por perfil', 'Admin geral, gestor de associação, coordenador e voluntário com escopos separados.', 'Pronto para backend'],
-                ['Territórios e igrejas', 'Admin geral organiza associações, distritos e igrejas antes de distribuir leads.', 'Camada visual'],
-                ['Campanhas e metas', 'Cada campanha ganha responsável, associação, status e meta de acompanhamento.', 'Operacional'],
-                ['Auditoria e segurança', 'Eventos sensíveis ficam visíveis para conferência administrativa.', 'Governança']
-              ].map(([title, detail, status]) => (
-                <div className="interactive-card grid grid-cols-[1fr_auto] gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/45 p-5" key={title}>
+              {operationCards.map(([title, detail, status, tone, badge]) => (
+                <div className={`interactive-card grid grid-cols-[1fr_auto] gap-4 rounded-2xl border border-white/30 bg-gradient-to-br ${tone} p-5 text-white shadow-[0_18px_42px_rgba(15,23,42,0.16)]`} key={title}>
                   <div>
-                    <strong className="text-lg text-slate-50">{title}</strong>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-500">{detail}</p>
+                    <strong className="text-lg font-semibold text-white">{title}</strong>
+                    <p className="mt-1 text-sm leading-relaxed text-white/82">{detail}</p>
                   </div>
-                  <span className="self-start rounded-full bg-blue-600 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">{status}</span>
+                  <span className={`self-start rounded-full ${badge} px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm`}>{status}</span>
                 </div>
               ))}
             </div>
           </article>
           <article className={`${panelClass} p-6`}>
             <span className={labelClass}>Prioridade agora</span>
-            <h2 className="mt-2 text-2xl font-black text-slate-50">{topDistrict?.name || 'Distrito prioritário'}</h2>
+            <h2 className="mt-2 text-2xl font-extrabold text-slate-50">{topDistrict?.name || 'Distrito prioritário'}</h2>
             <p className="mt-2 text-sm leading-relaxed text-slate-500">
               Maior volume atual para ação do admin geral, combinando território, contatos quentes e capacidade de distribuição.
             </p>
             <div className="mt-5 grid gap-3">
-              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4">
-                <span className={labelClass}>Interessados</span>
-                <strong className="mt-1 block text-3xl font-black text-slate-50">{formatNumber(topDistrict?.interessados || 0)}</strong>
+              <div className="rounded-2xl border border-blue-300/40 bg-gradient-to-br from-blue-600 to-cyan-500 p-4 text-white shadow-[0_18px_42px_rgba(37,99,235,0.20)]">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">Interessados</span>
+                <strong className="mt-1 block text-3xl font-extrabold text-white">{formatNumber(topDistrict?.interessados || 0)}</strong>
               </div>
-              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4">
-                <span className={labelClass}>Quentes</span>
-                <strong className="mt-1 block text-3xl font-black text-orange-300">{formatNumber(topDistrict?.quentes || 0)}</strong>
+              <div className="rounded-2xl border border-orange-300/40 bg-gradient-to-br from-red-600 to-orange-500 p-4 text-white shadow-[0_18px_42px_rgba(239,68,68,0.18)]">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">Quentes</span>
+                <strong className="mt-1 block text-3xl font-extrabold text-white">{formatNumber(topDistrict?.quentes || 0)}</strong>
               </div>
             </div>
           </article>
@@ -1105,13 +1127,13 @@ function AdminGeneralView({
           <article className={`${panelClass} p-6`}>
             <span className={labelClass}>Campanhas gerais</span>
             <div className="mt-5 grid gap-3">
-              {campaigns.map((campaign) => (
-                <div className="interactive-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/45 p-5" key={campaign.id}>
+              {campaigns.map((campaign, index) => (
+                <div className={`interactive-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/30 bg-gradient-to-br ${campaignColors[index % campaignColors.length]} p-5 text-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]`} key={campaign.id}>
                   <div>
-                    <strong className="text-xl text-slate-50">{campaign.name}</strong>
-                    <span className="mt-2 block text-sm text-slate-500">{campaign.association} · {campaign.owner} · meta {formatNumber(campaign.goal)}</span>
+                    <strong className="text-xl font-semibold text-white">{campaign.name}</strong>
+                    <span className="mt-2 block text-sm text-white/80">{campaign.association} · {campaign.owner} · meta {formatNumber(campaign.goal)}</span>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${campaign.status === 'Ativa' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>{campaign.status}</span>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${campaign.status === 'Ativa' ? 'bg-emerald-400 text-emerald-950' : 'bg-white/22 text-white'}`}>{campaign.status}</span>
                 </div>
               ))}
             </div>
@@ -1142,11 +1164,11 @@ function AdminGeneralView({
         <section className="grid grid-cols-[0.9fr_1.1fr] gap-4 max-xl:grid-cols-1">
           <article className={`${panelClass} grid content-start gap-5 p-6`}>
             <span className={labelClass}>Distribuição de trabalho</span>
-            <label className="grid gap-2 text-sm font-bold text-slate-300">
+            <label className="grid gap-2 text-sm font-medium text-slate-300">
               Lote de leads quentes
               <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" max={data.hot} min="1" onChange={(event) => setLeadBatch(Number(event.target.value || 1))} type="number" value={leadBatch} />
             </label>
-            <label className="grid gap-2 text-sm font-bold text-slate-300">
+            <label className="grid gap-2 text-sm font-medium text-slate-300">
               Responsável
               <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" onChange={(event) => setTargetUser(event.target.value)} value={targetUser}>
                 {users.map((item) => <option key={item.id}>{item.name}</option>)}
@@ -1164,18 +1186,13 @@ function AdminGeneralView({
           <article className={`${panelClass} p-6`}>
             <span className={labelClass}>Filas sugeridas</span>
             <div className="mt-5 grid gap-3">
-              {[
-                ['Leads quentes sem resposta', data.hot, 'Ação imediata'],
-                ['VIPs para relacionamento', data.vip, 'Nutrição'],
-                ['Estudos ativos para visita', data.studies, 'Acompanhamento'],
-                ['Com WhatsApp validado', data.phone, 'Automação']
-              ].map(([title, value, tag]) => (
-                <div className="interactive-card grid grid-cols-[1fr_auto] rounded-2xl border border-white/[0.07] bg-slate-950/45 p-5" key={title}>
+              {queueCards.map(([title, value, tag, tone]) => (
+                <div className={`interactive-card grid grid-cols-[1fr_auto] rounded-2xl border border-white/30 bg-gradient-to-br ${tone} p-5 text-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]`} key={title}>
                   <div>
-                    <strong className="text-slate-50">{title}</strong>
-                    <span className="mt-1 block text-sm text-slate-500">{tag}</span>
+                    <strong className="font-semibold text-white">{title}</strong>
+                    <span className="mt-1 block text-sm text-white/78">{tag}</span>
                   </div>
-                  <strong className="text-2xl text-slate-50">{formatNumber(value)}</strong>
+                  <strong className="text-2xl font-extrabold text-white">{formatNumber(value)}</strong>
                 </div>
               ))}
             </div>
@@ -1187,16 +1204,16 @@ function AdminGeneralView({
         <section className={`${panelClass} p-6`}>
           <span className={labelClass}>Auditoria administrativa</span>
           <div className="mt-5 grid gap-3">
-            {auditEvents.map((event) => (
-              <div className="interactive-card grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/45 p-5" key={event.id}>
-                <span className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200/20 bg-white/[0.07] text-slate-100">
+            {auditEvents.map((event, index) => (
+              <div className={`interactive-card grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border border-white/30 bg-gradient-to-br ${auditColors[index % auditColors.length]} p-5 text-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]`} key={event.id}>
+                <span className="grid h-11 w-11 place-items-center rounded-xl border border-white/30 bg-white/18 text-white">
                   <ShieldCheck size={20} />
                 </span>
                 <div>
-                  <strong className="block text-slate-50">{event.action}</strong>
-                  <span className="text-sm text-slate-500">{event.user} · {event.detail}</span>
+                  <strong className="block font-semibold text-white">{event.action}</strong>
+                  <span className="text-sm text-white/78">{event.user} · {event.detail}</span>
                 </div>
-                <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{event.when}</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-white/75">{event.when}</span>
               </div>
             ))}
           </div>
@@ -1207,13 +1224,13 @@ function AdminGeneralView({
         <section className="grid grid-cols-[1fr_1fr] gap-4 max-xl:grid-cols-1">
           <article className={`${panelClass} p-6`}>
             <span className={labelClass}>Ranking ML</span>
-            <h2 className="mt-2 text-2xl font-black text-slate-50">Governança do modelo</h2>
+            <h2 className="mt-2 text-2xl font-extrabold text-slate-50">Governança do modelo</h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-500">
               O admin geral precisa saber quando a base foi calculada, quantos registros entraram no ranking e qual arquivo alimenta a prioridade operacional.
             </p>
             <div className="mt-5 grid gap-3">
-              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4"><span className={labelClass}>Registros ML</span><strong className="mt-1 block text-3xl text-slate-50">{formatNumber(data.total)}</strong></div>
-              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4"><span className={labelClass}>Leads quentes</span><strong className="mt-1 block text-3xl text-orange-300">{formatNumber(data.hot)}</strong></div>
+              <div className="rounded-2xl border border-violet-300/40 bg-gradient-to-br from-violet-600 to-fuchsia-500 p-4 text-white shadow-[0_18px_42px_rgba(124,58,237,0.18)]"><span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">Registros ML</span><strong className="mt-1 block text-3xl font-extrabold text-white">{formatNumber(data.total)}</strong></div>
+              <div className="rounded-2xl border border-orange-300/40 bg-gradient-to-br from-red-600 to-orange-500 p-4 text-white shadow-[0_18px_42px_rgba(239,68,68,0.18)]"><span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">Leads quentes</span><strong className="mt-1 block text-3xl font-extrabold text-white">{formatNumber(data.hot)}</strong></div>
             </div>
           </article>
           <article className={`${panelClass} p-6`}>
