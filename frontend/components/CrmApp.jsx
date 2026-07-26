@@ -356,12 +356,12 @@ function LoginScreen({ onLogin }) {
           </div>
           <label className="grid gap-2 text-sm font-bold text-slate-300 text-center">
             Email
-            <input className="h-12 rounded-xl border border-white/[0.08] bg-slate-950/70 px-4 text-slate-100 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10 text-center" defaultValue="admin@leadsnt.com.br" name="email" type="email" />
+            <input autoComplete="email" className="h-12 rounded-xl border border-white/[0.08] bg-slate-950/70 px-4 text-slate-100 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10 text-center" name="email" type="email" />
           </label>
           <label className="grid gap-2 text-sm font-bold text-slate-300 text-center">
             Senha
             <span className="password-field">
-              <input className="h-12 w-full rounded-xl border border-white/[0.08] bg-slate-950/70 px-4 pr-12 text-center text-slate-100 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10" defaultValue="demo123" name="password" type={showPassword ? 'text' : 'password'} />
+              <input autoComplete="current-password" className="h-12 w-full rounded-xl border border-white/[0.08] bg-slate-950/70 px-4 pr-12 text-center text-slate-100 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10" name="password" type={showPassword ? 'text' : 'password'} />
               <button
                 aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                 className="password-toggle"
