@@ -1,0 +1,10 @@
+.git
+.agents
+frontend
+**/node_modules
+**/.next
+**/.env
+**/.env.*
+**/*.log
+dataset/__pycache__
+dataset/*.pyc
