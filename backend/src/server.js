@@ -146,6 +146,14 @@ async function sendZproByParams({ config, phone, message, externalKey }) {
   return { providerResponse, data, transport: 'params' };
 }
 
+function summarizeZproAttempt({ transport, status, data }) {
+  return {
+    transport,
+    status,
+    message: data?.message || data?.error || data?.raw || null
+  };
+}
+
 async function sendZproTextMessage({ phone, message, leadId = null, templateId = null }) {
   const config = zproConfig();
   if (!config.baseUrl || !config.token || !config.apiId) {
@@ -191,6 +199,7 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
   });
 
   let transport = 'post';
+  const attempts = [];
   let providerResponse = await fetch(url, {
     method: 'POST',
     headers: {
@@ -201,6 +210,11 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
   });
 
   let data = await parseProviderResponse(providerResponse);
+  attempts.push(summarizeZproAttempt({
+    transport,
+    status: providerResponse.status,
+    data
+  }));
   if (!providerResponse.ok && isInvalidTokenResponse(providerResponse.status, data)) {
     const fallback = await sendZproByParams({
       config,
@@ -211,13 +225,22 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
     providerResponse = fallback.providerResponse;
     data = fallback.data;
     transport = fallback.transport;
+    attempts.push(summarizeZproAttempt({
+      transport,
+      status: providerResponse.status,
+      data
+    }));
   }
 
   if (!providerResponse.ok) {
-    const error = new Error(data?.message || data?.error || `Zpro respondeu com status ${providerResponse.status}`);
+    const invalidToken = isInvalidTokenResponse(providerResponse.status, data);
+    const error = new Error(invalidToken
+      ? 'Token recusado pelo Z-PRO. Gere um novo token de API no Z-PRO e atualize ZPRO_API_TOKEN no backend.'
+      : data?.message || data?.error || `Zpro respondeu com status ${providerResponse.status}`);
     error.status = 502;
     error.providerStatus = providerResponse.status;
     error.providerResponse = data;
+    error.providerAttempts = attempts;
     throw error;
   }
 
@@ -228,6 +251,7 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
     apiId: config.apiId,
     phone: normalizedPhone,
     transport,
+    attempts,
     providerResponse: data
   };
 }
@@ -323,7 +347,8 @@ app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
       ok: false,
       message: error.message,
       providerStatus: error.providerStatus || null,
-      providerResponse: error.providerResponse || null
+      providerResponse: error.providerResponse || null,
+      providerAttempts: error.providerAttempts || null
     });
   }
 });

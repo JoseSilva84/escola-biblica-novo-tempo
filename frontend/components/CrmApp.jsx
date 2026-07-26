@@ -905,6 +905,7 @@ function AdminGeneralView({
   const [provider, setProvider] = useState(null);
   const [sendLoading, setSendLoading] = useState(false);
   const [lastSend, setLastSend] = useState(null);
+  const [sendError, setSendError] = useState(null);
 
   useEffect(() => {
     setSection(initialSection);
@@ -997,6 +998,7 @@ function AdminGeneralView({
     const message = String(form.get('message') || '').trim();
     setSendLoading(true);
     setLastSend(null);
+    setSendError(null);
 
     try {
       const response = await apiFetch('/api/whatsapp/send', {
@@ -1006,11 +1008,12 @@ function AdminGeneralView({
       });
       const payload = await response.json();
       if (!response.ok) {
+        setSendError(payload);
         throw new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
       }
       setLastSend(payload);
       toast.success('Mensagem enviada', {
-        description: `Disparo feito para ${payload.phone}.`
+        description: `Disparo feito para ${payload.phone} via ${payload.transport || 'Z-PRO'}.`
       });
     } catch (error) {
       toast.error('Falha no disparo', {
@@ -1253,7 +1256,22 @@ function AdminGeneralView({
             </form>
             {lastSend ? (
               <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-                Mensagem aceita pelo provedor para {lastSend.phone}.
+                Mensagem aceita pelo provedor para {lastSend.phone} via {lastSend.transport || 'Z-PRO'}.
+              </div>
+            ) : null}
+            {sendError ? (
+              <div className="grid gap-3 rounded-2xl border border-red-400/35 bg-red-500/10 p-4 text-sm text-red-100">
+                <strong className="text-red-50">DiagnÃ³stico do envio</strong>
+                <span>{sendError.message || 'O provedor recusou o disparo.'}</span>
+                {sendError.providerAttempts?.length ? (
+                  <div className="grid gap-2 text-xs text-red-100/85">
+                    {sendError.providerAttempts.map((attempt, index) => (
+                      <span key={`${attempt.transport}-${index}`}>
+                        Tentativa {index + 1}: {attempt.transport} respondeu {attempt.status}{attempt.message ? ` - ${attempt.message}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </article>
