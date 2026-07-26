@@ -78,20 +78,23 @@ function zproConfig() {
   const baseUrl = String(process.env.ZPRO_API_URL || '').trim().replace(/\/+$/, '');
   const token = normalizeApiToken(process.env.ZPRO_API_TOKEN);
   const channelId = String(process.env.ZPRO_CHANNEL_ID || '').trim();
-  const sendPath = String(process.env.ZPRO_SEND_TEXT_PATH || '/messages/sendText').trim();
-  return { baseUrl, token, channelId, sendPath };
+  const apiId = String(process.env.ZPRO_API_ID || process.env.ZPRO_CHANNEL_ID || '').trim();
+  const sendPath = String(process.env.ZPRO_SEND_TEXT_PATH || '/v2/api/external/{apiId}').trim();
+  return { baseUrl, token, channelId, apiId, sendPath };
 }
 
-function buildZproSendPayload({ phone, message, leadId, templateId, channelId }) {
+function buildZproSendPayload({ phone, message, leadId, templateId, channelId, externalKey }) {
   return {
     channelId,
     sessionId: channelId,
     number: phone,
     phone,
     to: phone,
+    body: message,
     text: message,
     message,
-    body: message,
+    externalKey,
+    isClosed: false,
     leadId: leadId || null,
     templateId: templateId || null
   };
@@ -99,11 +102,11 @@ function buildZproSendPayload({ phone, message, leadId, templateId, channelId })
 
 async function sendZproTextMessage({ phone, message, leadId = null, templateId = null }) {
   const config = zproConfig();
-  if (!config.baseUrl || !config.token || !config.channelId) {
+  if (!config.baseUrl || !config.token || !config.apiId) {
     const missing = [
       !config.baseUrl && 'ZPRO_API_URL',
       !config.token && 'ZPRO_API_TOKEN',
-      !config.channelId && 'ZPRO_CHANNEL_ID'
+      !config.apiId && 'ZPRO_API_ID'
     ].filter(Boolean);
     const error = new Error(`Configuracao Zpro incompleta: ${missing.join(', ')}`);
     error.status = 500;
@@ -124,14 +127,20 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
     throw error;
   }
 
-  const pathValue = applyPathParams(config.sendPath, { channelId: config.channelId, sessionId: config.channelId });
+  const externalKey = `leadsnt-${leadId || normalizedPhone}-${Date.now()}`;
+  const pathValue = applyPathParams(config.sendPath, {
+    apiId: config.apiId,
+    channelId: config.channelId || config.apiId,
+    sessionId: config.channelId || config.apiId
+  });
   const url = pathValue.startsWith('http') ? pathValue : `${config.baseUrl}${pathValue.startsWith('/') ? '' : '/'}${pathValue}`;
   const payload = buildZproSendPayload({
     phone: normalizedPhone,
     message: cleanMessage,
     leadId,
     templateId,
-    channelId: config.channelId
+    channelId: config.channelId || config.apiId,
+    externalKey
   });
 
   const providerResponse = await fetch(url, {
@@ -162,7 +171,8 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
   return {
     ok: true,
     provider: 'zpro-baileys',
-    channelId: config.channelId,
+    channelId: config.channelId || null,
+    apiId: config.apiId,
     phone: normalizedPhone,
     providerResponse: data
   };
@@ -231,9 +241,10 @@ app.get('/api/whatsapp/provider', requireAuth, (_request, response) => {
   const config = zproConfig();
   response.json({
     provider: 'zpro-baileys',
-    configured: Boolean(config.baseUrl && config.token && config.channelId),
+    configured: Boolean(config.baseUrl && config.token && config.apiId),
     baseUrl: config.baseUrl || null,
     channelId: config.channelId || null,
+    apiId: config.apiId || null,
     sendPath: config.sendPath
   });
 });

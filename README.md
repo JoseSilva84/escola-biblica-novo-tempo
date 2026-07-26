@@ -67,10 +67,11 @@ AUTH_SECRET="uma-chave-secreta-forte"
 FRONTEND_URL="http://localhost:3000"
 PORT=4000
 ZPRO_WEBHOOK_SECRET="uma-chave-para-webhook-zpro"
-ZPRO_API_URL="https://api.sevenflowia.tech"
+ZPRO_API_URL="https://api.seu-provedor-zpro.com"
 ZPRO_API_TOKEN="token-completo-gerado-no-zpro-sem-escrever-Bearer"
+ZPRO_API_ID="id-da-api-criada-no-zpro"
 ZPRO_CHANNEL_ID="10"
-ZPRO_SEND_TEXT_PATH="/messages/sendText"
+ZPRO_SEND_TEXT_PATH="/v2/api/external/{apiId}"
 ADMIN_EMAIL="admin@leadsnt.com.br"
 ADMIN_PASSWORD="senha-com-no-minimo-8-caracteres"
 ADMIN_NAME="Admin"
@@ -122,19 +123,20 @@ O campo do Zpro recebe eventos de entrada, como mensagens recebidas e status do 
 Configure no backend:
 
 ```env
-ZPRO_API_URL="https://api.sevenflowia.tech"
+ZPRO_API_URL="https://api.seu-provedor-zpro.com"
 ZPRO_API_TOKEN="token-completo-gerado-no-zpro-sem-escrever-Bearer"
+ZPRO_API_ID="id-da-api-criada-no-zpro"
 ZPRO_CHANNEL_ID="10"
-ZPRO_SEND_TEXT_PATH="/messages/sendText"
+ZPRO_SEND_TEXT_PATH="/v2/api/external/{apiId}"
 ```
 
-O `ZPRO_CHANNEL_ID` deve ser o ID do canal Baileys conectado. Pelas telas do Zpro, o canal **Novo Tempo Seven** usa o ID `10`.
+O `ZPRO_API_ID` deve ser o ID da API criada na tela **API** do Zpro. O `ZPRO_CHANNEL_ID` pode continuar como referencia do canal Baileys conectado. Pelas telas do Zpro, o canal **Novo Tempo Seven** usa o ID `10`.
 No `ZPRO_API_TOKEN`, cole somente o token completo criado no Zpro. Nao coloque `Bearer` antes do token.
 
 Se a sua instalacao do Zpro usar outro caminho de envio, altere apenas `ZPRO_SEND_TEXT_PATH`. Ele aceita placeholders:
 
 ```env
-ZPRO_SEND_TEXT_PATH="/sessions/{channelId}/messages/sendText"
+ZPRO_SEND_TEXT_PATH="/v2/api/external/{apiId}"
 ```
 
 Rotas internas do Leads NT para disparo:

@@ -1232,6 +1232,7 @@ function AdminGeneralView({
             </div>
             <div className="grid gap-2 rounded-2xl border border-white/[0.08] bg-slate-950/45 p-4 text-sm text-slate-400">
               <span>Provedor: {provider?.provider || 'zpro-baileys'}</span>
+              <span>API ID: {provider?.apiId || 'configure ZPRO_API_ID'}</span>
               <span>Canal: {provider?.channelId || 'configure ZPRO_CHANNEL_ID'}</span>
               <span>Base: {provider?.baseUrl || 'configure ZPRO_API_URL'}</span>
             </div>
