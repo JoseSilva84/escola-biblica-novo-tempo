@@ -1321,53 +1321,42 @@ function AdminGeneralView({
   );
   const batchLimit = Math.min(Math.max(Number(leadBatch) || 1, 1), 50);
   const whatsappInbox = useMemo(
-    () => filteredWhatsappLeads.slice(0, 6).map((lead, index) => ({
-      ...lead,
-      status: ['Respondeu agora', 'Aguardando visita', 'Sem resposta 3 dias', 'Pediu estudo', 'Reativar contato', 'Novo interessado'][index % 6],
-      owner: users[index % Math.max(users.length, 1)]?.name || 'Admin central',
-      when: ['Agora', '18 min', '2 h', 'Hoje', 'Ontem', '3 dias'][index % 6]
-    })),
-    [filteredWhatsappLeads, users]
+    () => filteredWhatsappLeads
+      .filter((lead) => (lead.desc && lead.desc !== 'N/I') || lead.e || lead.c !== null)
+      .slice(0, 6)
+      .map((lead) => ({
+        ...lead,
+        status: lead.desc && lead.desc !== 'N/I'
+          ? 'Descrição importada'
+          : lead.e
+            ? 'Estudo ativo'
+            : `Último contato há ${formatNumber(lead.c)} dias`,
+        when: lead.c === null ? 'Sem data' : `${formatNumber(lead.c)} dias`
+      })),
+    [filteredWhatsappLeads]
   );
+  const leadsWithImportedDescription = records.filter((lead) => lead.t && lead.desc && lead.desc !== 'N/I').length;
+  const leadsWithRecentContact = records.filter((lead) => lead.t && lead.c !== null && lead.c <= 90).length;
+  const leadsWithoutFiveYears = records.filter((lead) => lead.t && lead.c !== null && lead.c > 1825).length;
+  const hotWithWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
   const whatsappFunnel = [
-    { label: 'Boas-vindas', value: Math.min(data.phone, 1280), detail: 'primeiro contato enviado', tone: 'from-blue-600 to-cyan-500' },
-    { label: 'Aguardando resposta', value: Math.max(0, Math.round(data.phone * 0.18)), detail: 'em acompanhamento', tone: 'from-amber-500 to-orange-500' },
-    { label: 'Respondeu', value: Math.max(0, Math.round(data.phone * 0.08)), detail: 'precisa de triagem', tone: 'from-emerald-600 to-teal-500' },
-    { label: 'Visita convidada', value: Math.max(0, Math.round(data.studies * 0.62)), detail: 'proxima acao', tone: 'from-violet-600 to-fuchsia-500' }
+    { label: 'Com WhatsApp', value: data.phone, detail: 'telefone válido na base', tone: 'from-blue-600 to-cyan-500' },
+    { label: 'Descrição importada', value: leadsWithImportedDescription, detail: 'campo de observação preenchido', tone: 'from-slate-700 to-slate-900' },
+    { label: 'Contato até 90 dias', value: leadsWithRecentContact, detail: 'último contato registrado', tone: 'from-emerald-600 to-teal-500' },
+    { label: 'Estudo ativo', value: data.studies, detail: 'material em andamento', tone: 'from-violet-600 to-fuchsia-500' }
   ];
-  const whatsappTemplates = [
-    { name: 'Boas-vindas', goal: 'Primeiro contato', body: 'Ola, {{nome}}! Aqui e da Escola Biblica Novo Tempo. Vimos seu interesse e queremos ajudar voce a continuar seus estudos.' },
-    { name: 'Reativacao', goal: 'Contato antigo', body: 'Ola, {{nome}}! Passando para saber se voce ainda deseja receber apoio nos estudos da Novo Tempo.' },
-    { name: 'Convite de visita', goal: 'Visita pastoral', body: 'Ola, {{nome}}! Podemos agendar uma visita ou uma conversa rapida para apoiar voce nessa caminhada?' },
-    { name: 'Estudo ativo', goal: 'Acompanhamento', body: 'Ola, {{nome}}! Como esta seu estudo? Posso ajudar com alguma duvida ou material desta semana?' }
-  ];
-  const whatsappRules = [
-    ['Respondeu "sim"', 'Mover para visita convidada', 'Ativa'],
-    ['Sem resposta em 3 dias', 'Enviar lembrete humanizado', 'Ativa'],
-    ['Lead quente respondeu', 'Notificar gestor da associacao', 'Ativa'],
-    ['Pediu pausa', 'Suspender sequencia por 30 dias', 'Rascunho']
-  ];
-  const whatsappSchedules = [
-    ['Boas-vindas', 'Hoje 19:00', 'Quentes com WhatsApp'],
-    ['Reativacao', 'Amanha 09:30', '5+ anos sem contato'],
-    ['Convite de visita', 'Sexta 18:00', 'Estudos ativos'],
-    ['Aniversario', 'Diario 08:00', 'Leads do dia']
-  ];
+  const whatsappTemplates = [];
+  const whatsappRules = [];
+  const whatsappSchedules = [];
   const whatsappAlerts = [
-    ['Lead quente respondeu', `${formatNumber(Math.max(1, Math.round(data.hot * 0.04)))} respostas para triagem`, 'Alta'],
-    ['Distrito acumulado', `${topDistrict?.name || 'Distrito'} precisa distribuicao`, 'Media'],
-    ['Estudo sem contato', `${formatNumber(Math.max(1, Math.round(data.studies * 0.12)))} estudos parados`, 'Alta']
+    ['Leads quentes com WhatsApp', `${formatNumber(hotWithWhatsapp)} contatos reais na base`, 'Alta'],
+    ['Estudos ativos', `${formatNumber(data.studies)} leads com estudo em andamento`, 'Media'],
+    ['Sem contato há 5+ anos', `${formatNumber(leadsWithoutFiveYears)} contatos com WhatsApp`, 'Alta']
   ];
-  const whatsappTimeline = [
-    ['Enviada', 'Boas-vindas personalizada', 'Hoje 09:10'],
-    ['Recebida', 'Lead respondeu pedindo continuidade', 'Hoje 09:24'],
-    ['Sistema', 'Movido para triagem de visita', 'Hoje 09:25'],
-    ['Agendada', 'Convite de visita programado', 'Hoje 19:00']
-  ];
+  const whatsappTimeline = [];
   const whatsappSendHistory = [
-    ['Boas-vindas', '1.280', '18%', 'Entregue'],
-    ['Convite de visita', '312', '31%', 'Respondido'],
-    ['Reativacao', '486', '9%', 'Monitorar']
+    ...(lastSend ? [['Disparo individual', '1', '-', 'Aceito']] : []),
+    ...(lastBatch ? [['Lote manual', formatNumber(lastBatch.sent || 0), '-', `${formatNumber(lastBatch.failed || 0)} falhas`]] : [])
   ];
 
   useEffect(() => {
@@ -1766,7 +1755,7 @@ function AdminGeneralView({
               <button
                 className={primaryButtonClass}
                 onClick={() => toast.success('Operação WhatsApp revisada', {
-                  description: 'Inbox, funil, templates, regras e alertas estão prontos para análise.'
+                  description: 'A aba agora mostra apenas dados reais carregados ou envios feitos na sessão.'
                 })}
                 type="button"
               >
@@ -1776,10 +1765,10 @@ function AdminGeneralView({
             </div>
             <div className="mt-6 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
               {[
-                ['Conversas abertas', whatsappInbox.length, 'fila de entrada'],
-                ['Templates', whatsappTemplates.length, 'modelos prontos'],
-                ['Regras ativas', whatsappRules.filter((rule) => rule[2] === 'Ativa').length, 'automação'],
-                ['Alertas', whatsappAlerts.length, 'atenção hoje']
+                ['Registros reais', whatsappInbox.length, 'leads com histórico'],
+                ['Templates', whatsappTemplates.length, 'cadastrados'],
+                ['Regras ativas', whatsappRules.filter((rule) => rule[2] === 'Ativa').length, 'cadastradas'],
+                ['Prioridades', whatsappAlerts.length, 'calculadas da base']
               ].map(([label, value, detail]) => (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_16px_42px_rgba(15,23,42,0.08)]" key={label}>
                   <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</span>
@@ -1794,16 +1783,16 @@ function AdminGeneralView({
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <span className={labelClass}>Caixa de entrada</span>
-                <h2 className="mt-1 text-2xl font-black text-slate-50">Respostas para atender</h2>
+                <h2 className="mt-1 text-2xl font-black text-slate-50">Registros importados</h2>
               </div>
               <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Ao vivo</span>
             </div>
             <div className="grid gap-3">
-              {whatsappInbox.map((lead) => (
+              {whatsappInbox.length ? whatsappInbox.map((lead) => (
                 <button
                   className="interactive-card grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
                   key={`inbox-${lead.id}`}
-                  onClick={() => toast.info(lead.n, { description: `${lead.status} · responsavel: ${lead.owner}` })}
+                  onClick={() => toast.info(lead.n, { description: lead.status })}
                   type="button"
                 >
                   <span className="min-w-0">
@@ -1815,13 +1804,17 @@ function AdminGeneralView({
                     <span className="mt-1 block text-xs font-bold text-slate-500">{lead.when}</span>
                   </span>
                 </button>
-              ))}
+              )) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+                  Nenhum lead com descrição, estudo ativo ou data de último contato apareceu nos filtros atuais.
+                </div>
+              )}
             </div>
           </article>
 
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Funil WhatsApp</span>
-            <h2 className="mt-1 text-2xl font-black text-slate-50">Etapas por lead</h2>
+            <span className={labelClass}>Indicadores WhatsApp</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Dados reais da base</h2>
             <div className="mt-5 grid gap-3">
               {whatsappFunnel.map((stage) => (
                 <div className={`rounded-2xl border border-white/30 bg-gradient-to-br ${stage.tone} p-4 text-white shadow-[0_16px_42px_rgba(15,23,42,0.14)]`} key={stage.label}>
@@ -1839,7 +1832,7 @@ function AdminGeneralView({
             <span className={labelClass}>Linha do tempo</span>
             <h2 className="mt-1 text-2xl font-black text-slate-50">Conversa do lead</h2>
             <div className="mt-5 grid gap-3">
-              {whatsappTimeline.map(([type, detail, when], index) => (
+              {whatsappTimeline.length ? whatsappTimeline.map(([type, detail, when], index) => (
                 <div className="grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={`${type}-${when}`}>
                   <span className={`mt-1 h-3 w-3 rounded-full ${index === 1 ? 'bg-emerald-600' : index === 3 ? 'bg-blue-600' : 'bg-slate-700'}`} />
                   <span>
@@ -1850,7 +1843,11 @@ function AdminGeneralView({
                     <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-700">{detail}</span>
                   </span>
                 </div>
-              ))}
+              )) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+                  Nenhuma conversa real do WhatsApp foi sincronizada para montar linha do tempo.
+                </div>
+              )}
             </div>
           </article>
 
@@ -1867,7 +1864,7 @@ function AdminGeneralView({
                   </tr>
                 </thead>
                 <tbody>
-                  {whatsappSendHistory.map(([name, sent, response, status]) => (
+                  {whatsappSendHistory.length ? whatsappSendHistory.map(([name, sent, response, status]) => (
                     <tr className="border-t border-slate-200" key={name}>
                       <td className="px-4 py-3 font-black text-slate-950">{name}</td>
                       <td className="px-4 py-3 font-bold text-slate-700">{sent}</td>
@@ -1876,7 +1873,11 @@ function AdminGeneralView({
                         <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide text-white ${status === 'Respondido' ? 'bg-emerald-600' : status === 'Monitorar' ? 'bg-orange-600' : 'bg-blue-600'}`}>{status}</span>
                       </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr className="border-t border-slate-200">
+                      <td className="px-4 py-5 text-sm font-semibold text-slate-700" colSpan={4}>Nenhum envio real registrado nesta sessão.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1891,7 +1892,7 @@ function AdminGeneralView({
               <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-800">{'{{nome}} · {{distrito}} · {{material}}'}</span>
             </div>
             <div className="grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-md:grid-cols-1">
-              {whatsappTemplates.map((template) => (
+              {whatsappTemplates.length ? whatsappTemplates.map((template) => (
                 <button
                   className="interactive-card rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
                   key={template.name}
@@ -1905,7 +1906,11 @@ function AdminGeneralView({
                   <strong className="mt-2 block text-lg font-black text-slate-950">{template.name}</strong>
                   <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-600">{template.body}</p>
                 </button>
-              ))}
+              )) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)] max-xl:col-span-2 max-md:col-span-1 xl:col-span-4">
+                  Nenhum template cadastrado no sistema ainda. Quando houver cadastro real, ele aparecerá aqui.
+                </div>
+              )}
             </div>
           </article>
 
@@ -1913,7 +1918,7 @@ function AdminGeneralView({
             <span className={labelClass}>Agendamentos</span>
             <h2 className="mt-1 text-2xl font-black text-slate-50">Mensagens programadas</h2>
             <div className="mt-5 grid gap-3">
-              {whatsappSchedules.map(([name, when, audience]) => (
+              {whatsappSchedules.length ? whatsappSchedules.map(([name, when, audience]) => (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={`${name}-${when}`}>
                   <div className="flex items-center justify-between gap-3">
                     <strong className="text-slate-950">{name}</strong>
@@ -1921,7 +1926,11 @@ function AdminGeneralView({
                   </div>
                   <span className="mt-2 block text-sm font-semibold text-slate-600">{audience}</span>
                 </div>
-              ))}
+              )) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+                  Nenhum agendamento real cadastrado.
+                </div>
+              )}
             </div>
           </article>
 
@@ -1929,7 +1938,7 @@ function AdminGeneralView({
             <span className={labelClass}>Regras automáticas</span>
             <h2 className="mt-1 text-2xl font-black text-slate-50">Resposta vira ação</h2>
             <div className="mt-5 grid gap-3">
-              {whatsappRules.map(([trigger, action, status]) => (
+              {whatsappRules.length ? whatsappRules.map(([trigger, action, status]) => (
                 <button
                   className="interactive-card rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-emerald-300"
                   key={trigger}
@@ -1942,7 +1951,11 @@ function AdminGeneralView({
                   </div>
                   <span className="mt-2 block text-sm font-semibold text-slate-600">{action}</span>
                 </button>
-              ))}
+              )) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+                  Nenhuma regra automática cadastrada no sistema.
+                </div>
+              )}
             </div>
           </article>
 
@@ -1964,12 +1977,12 @@ function AdminGeneralView({
 
           <article className={`${panelClass} p-6`}>
             <span className={labelClass}>Relatórios e atribuição</span>
-            <h2 className="mt-1 text-2xl font-black text-slate-50">Performance por campanha</h2>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Indicadores reais disponíveis</h2>
             <div className="mt-5 grid gap-3">
               {[
-                ['Taxa de resposta', '24%', 'Boas-vindas e convite'],
-                ['Tempo médio', '2h 18m', 'ate primeira resposta'],
-                ['Visitas geradas', formatNumber(Math.max(1, Math.round(data.studies * 0.18))), 'encaminhadas para voluntarios']
+                ['WhatsApp válidos', formatNumber(data.phone), 'telefones válidos na base'],
+                ['Contato até 90 dias', formatNumber(leadsWithRecentContact), 'último contato registrado'],
+                ['Estudos ativos', formatNumber(data.studies), 'material em andamento']
               ].map(([label, value, detail]) => (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={label}>
                   <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</span>
@@ -1979,12 +1992,12 @@ function AdminGeneralView({
               ))}
             </div>
             <button
-              className={`${ghostButtonClass} mt-4 w-full`}
-              onClick={() => toast.success('Atribuição preparada', { description: 'Leads respondidos podem ser distribuídos para coordenadores e voluntários.' })}
+              className={`${ghostButtonClass} mt-4 w-full opacity-70`}
+              onClick={() => toast.info('Atribuição indisponível', { description: 'Ainda não há cadastro real de atribuições WhatsApp para voluntários.' })}
               type="button"
             >
               <UsersRound size={17} />
-              Distribuir para voluntários
+              Atribuição aguardando cadastro real
             </button>
           </article>
 
