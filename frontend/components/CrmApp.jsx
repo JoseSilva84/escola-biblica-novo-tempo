@@ -556,6 +556,196 @@ function MetricCard({ icon: Icon, label, value, detail, tone = 'silver' }) {
   );
 }
 
+function whatsappHistoryForLead(lead) {
+  const history = [];
+  if (lead.desc && lead.desc !== 'N/I') {
+    history.push({
+      title: 'Conversa registrada',
+      detail: lead.desc,
+      tone: 'bg-emerald-500/10 border-emerald-400/20 text-emerald-100'
+    });
+  }
+  if (lead.c !== null && lead.c !== undefined) {
+    history.push({
+      title: 'Ultimo contato',
+      detail: `Contato registrado ha ${formatNumber(lead.c)} dias.`,
+      tone: 'bg-blue-500/10 border-blue-400/20 text-blue-100'
+    });
+  }
+  if (lead.e) {
+    history.push({
+      title: 'Estudo em andamento',
+      detail: 'O material aparece como em andamento e deve continuar no acompanhamento.',
+      tone: 'bg-violet-500/10 border-violet-400/20 text-violet-100'
+    });
+  }
+  if (!history.length) {
+    history.push({
+      title: 'Sem conversa importada',
+      detail: 'Este lead ainda nao possui texto de conversa do WhatsApp nos dados carregados.',
+      tone: 'bg-slate-500/10 border-slate-400/20 text-slate-200'
+    });
+  }
+  return history;
+}
+
+function LeadDetailModal({ lead, onClose }) {
+  if (!lead) return null;
+
+  const fields = [
+    ['Nome', lead.n],
+    ['WhatsApp', lead.tel || 'Nao informado'],
+    ['E-mail', lead.em || 'Nao informado'],
+    ['Distrito', lead.d],
+    ['Endereco', lead.end],
+    ['Idade', lead.a || 'Nao informada'],
+    ['Genero', lead.g === 'M' ? 'Masculino' : lead.g === 'F' ? 'Feminino' : 'Nao informado'],
+    ['Religiao', lead.r],
+    ['VIP', lead.v ? 'Sim' : 'Nao'],
+    ['Estudo ativo', lead.e ? 'Sim' : 'Nao'],
+    ['Material principal', lead.tm],
+    ['Materiais recebidos', formatNumber(lead.m)],
+    ['Prioridade ML', crmPriorityLabels[lead.p] || lead.p],
+    ['Score operacional', lead.s],
+    ['Similaridade VIP', `${Math.round((lead.sim || 0) * 100)}%`],
+    ['Faixa', lead.faixa || 'Nao informada']
+  ];
+
+  return createPortal(
+    <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/72 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <div className={`${panelClass} max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-slate-950`}>
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-6">
+          <div>
+            <span className={labelClass}>Detalhes do lead</span>
+            <h2 className="mt-2 text-2xl font-black text-slate-50">{lead.n}</h2>
+            <p className="mt-1 text-sm text-slate-400">{lead.d} · {crmPriorityLabels[lead.p] || lead.p} · score {lead.s}</p>
+          </div>
+          <button className={ghostButtonClass} onClick={onClose} type="button">Fechar</button>
+        </div>
+        <div className="grid max-h-[72vh] gap-5 overflow-y-auto p-6 lg:grid-cols-[1fr_0.9fr]">
+          <section className="grid gap-3">
+            <span className={labelClass}>Todos os dados</span>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {fields.map(([label, value]) => (
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.035] p-3" key={label}>
+                  <span className="block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
+                  <strong className="mt-1 block break-words text-sm text-slate-100">{String(value ?? 'Nao informado')}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="grid content-start gap-3">
+            <span className={labelClass}>WhatsApp e acompanhamento</span>
+            {whatsappHistoryForLead(lead).map((item) => (
+              <article className={`rounded-2xl border p-4 ${item.tone}`} key={item.title}>
+                <strong className="block text-sm">{item.title}</strong>
+                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-200">{item.detail}</p>
+              </article>
+            ))}
+            <div className="rounded-2xl border border-white/[0.07] bg-slate-900/60 p-4">
+              <span className={labelClass}>Resumo operacional</span>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                {lead.t ? 'Contato apto para WhatsApp.' : 'Contato sem WhatsApp valido.'} {lead.v ? 'Marcado como VIP. ' : ''}{lead.e ? 'Possui estudo ativo para acompanhamento.' : 'Sem estudo ativo registrado.'}
+              </p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function AssociationLeadExplorer({ association, records }) {
+  const [district, setDistrict] = useState('all');
+  const [search, setSearch] = useState('');
+  const [selectedLead, setSelectedLead] = useState(null);
+  const availableRecords = association?.id === 'paulistana' ? records : [];
+  const districts = useMemo(
+    () => Array.from(new Set(availableRecords.map((row) => row.d))).sort((a, b) => a.localeCompare(b)),
+    [availableRecords]
+  );
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return availableRecords
+      .filter((row) => {
+        if (district !== 'all' && row.d !== district) return false;
+        if (term) {
+          const haystack = `${row.n || ''} ${row.tel || ''} ${row.em || ''} ${row.d || ''}`.toLowerCase();
+          if (!haystack.includes(term)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => (b.s || 0) - (a.s || 0));
+  }, [availableRecords, district, search]);
+  const visible = filtered.slice(0, 120);
+  const phoneCount = filtered.filter((row) => row.t).length;
+
+  return (
+    <section className={`${panelClass} p-6`}>
+      <div className="mb-5 flex items-start justify-between gap-4 max-lg:flex-col">
+        <div>
+          <span className={labelClass}>Leads da associacao selecionada</span>
+          <h2 className="mt-1 text-xl font-black text-slate-50">Buscar leads por distrito</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
+            Clique em qualquer lead para abrir todos os dados cadastrados e o historico de WhatsApp importado.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-right max-sm:w-full max-sm:text-left">
+          <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] px-4 py-3">
+            <span className={labelClass}>Encontrados</span>
+            <strong className="block text-xl text-slate-50">{formatNumber(filtered.length)}</strong>
+          </div>
+          <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] px-4 py-3">
+            <span className={labelClass}>WhatsApp</span>
+            <strong className="block text-xl text-slate-50">{formatNumber(phoneCount)}</strong>
+          </div>
+        </div>
+      </div>
+      <div className="mb-5 grid gap-3 lg:grid-cols-[260px_1fr]">
+        <label className="grid gap-2 text-sm font-bold text-slate-300">
+          Distrito
+          <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setDistrict(event.target.value)} value={district}>
+            <option value="all">Todos os distritos</option>
+            {districts.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-2 text-sm font-bold text-slate-300">
+          Buscar lead
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+            <input className="h-11 w-full rounded-xl border border-white/[0.08] bg-slate-950/70 pl-10 pr-3 text-sm font-bold text-slate-100 outline-none placeholder:text-slate-600" onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone, e-mail ou distrito" value={search} />
+          </div>
+        </label>
+      </div>
+      {availableRecords.length ? (
+        <div className="grid max-h-[34rem] gap-2 overflow-y-auto pr-1">
+          {visible.map((lead) => (
+            <button className="interactive-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/42 p-4 text-left transition hover:border-blue-400/35 hover:bg-blue-500/[0.08]" key={lead.id} onClick={() => setSelectedLead(lead)} type="button">
+              <span className="min-w-0">
+                <strong className="block truncate text-base text-slate-50">{lead.n}</strong>
+                <span className="mt-1 block truncate text-sm text-slate-400">{lead.d} · {lead.tel || 'sem telefone'} · {lead.em || 'sem e-mail'}</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-200">{crmPriorityLabels[lead.p] || lead.p}</span>
+                <ChevronRight className="text-slate-400" size={18} />
+              </span>
+            </button>
+          ))}
+          {filtered.length > visible.length ? (
+            <p className="pt-2 text-center text-sm font-semibold text-slate-500">Exibindo {formatNumber(visible.length)} de {formatNumber(filtered.length)} leads. Use a busca ou escolha um distrito para refinar.</p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm text-slate-400">
+          Os leads completos ainda estao carregados apenas para a Associacao Paulistana.
+        </div>
+      )}
+      <LeadDetailModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
+    </section>
+  );
+}
+
 function AddAssociationForm({ onAdd }) {
   const [open, setOpen] = useState(false);
 
@@ -764,7 +954,7 @@ function AdminDashboard({ associations, data, isAssociationsView = false, onOpen
   );
 }
 
-function AssociationDashboard({ association, data, onOpenDetails }) {
+function AssociationDashboard({ association, data, records = [], onOpenDetails }) {
   const automations = [
     { name: 'Boas-vindas', status: 'Ativa', sent: 1280, response: '18%', color: 'border-emerald-500/20 bg-emerald-500/[0.04]' },
     { name: 'Devocional 21 dias', status: 'Rascunho', sent: 0, response: '-', color: 'border-slate-500/20 bg-slate-500/[0.04]' },
@@ -913,6 +1103,8 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
           ))}
         </div>
       </section>
+
+      <AssociationLeadExplorer association={association} records={records} />
     </div>
   );
 }
@@ -2090,7 +2282,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
       />
     );
   } else if (view === 'association') {
-    content = <AssociationDashboard association={selectedAssociation} data={data} onOpenDetails={() => openDetailsView(setView)} />;
+    content = <AssociationDashboard association={selectedAssociation} data={data} records={records} onOpenDetails={() => openDetailsView(setView)} />;
   } else if (view === 'automations') {
     content = <AdminGeneralView {...adminGeneralProps} initialSection="distribution" />;
   } else if (view === 'settings') {
