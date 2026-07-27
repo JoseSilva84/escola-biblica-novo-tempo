@@ -1274,7 +1274,7 @@ function AdminGeneralView({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <span className={labelClass}>WhatsApp Zpro</span>
-                <h2 className="mt-2 text-2xl font-extrabold text-slate-50">Disparo de teste</h2>
+                <h2 className="mt-2 text-2xl font-extrabold text-slate-50">Disparo Individual</h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-500">
                   Envie uma mensagem real pelo canal Baileys configurado antes de ativar filas maiores.
                 </p>
@@ -1292,7 +1292,7 @@ function AdminGeneralView({
             </div>
             <form className="grid gap-3" onSubmit={submitWhatsAppTest}>
               <label className="grid gap-2 text-sm font-medium text-slate-300">
-                Telefone do teste
+                WhatsApp
                 <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="phone" placeholder="Ex.: 5511999999999" />
               </label>
               <label className="grid gap-2 text-sm font-medium text-slate-300">
