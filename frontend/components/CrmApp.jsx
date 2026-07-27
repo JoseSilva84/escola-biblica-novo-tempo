@@ -477,6 +477,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
     ['users', 'Acessos', UsersRound],
     ['campaigns', 'Campanhas', Radio],
     ['automations', 'WhatsApp', MessageCircle],
+    ['ai-agent', 'IA', WandSparkles],
     ['reports', 'Relatórios', PieChart]
   ];
   items.push(['settings', 'Configurações', Settings]);
@@ -2335,6 +2336,266 @@ function AdminGeneralView({
   );
 }
 
+function AIAgentView({ associations = [], campaigns = [], data, records = [] }) {
+  const [tab, setTab] = useState('overview');
+  const [mode, setMode] = useState('assistido');
+  const [active, setActive] = useState(false);
+  const hotWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
+  const studyWhatsapp = records.filter((lead) => lead.t && lead.e).length;
+  const vipWhatsapp = records.filter((lead) => lead.t && lead.v).length;
+  const reviewQueue = records
+    .filter((lead) => lead.t && (lead.p === 'Hot' || lead.e || lead.v))
+    .sort((a, b) => (b.s || 0) - (a.s || 0))
+    .slice(0, 6);
+  const knowledgeItems = [
+    ['Campanha ativa', campaigns.find((campaign) => campaign.status === 'Ativa')?.name || 'Escola Biblica Novo Tempo'],
+    ['Associacao padrao', associations[0]?.name || 'Associacao Paulistana'],
+    ['Leads com WhatsApp', formatNumber(data.phone)],
+    ['Estudos ativos', formatNumber(data.studies)]
+  ];
+  const tabs = [
+    ['overview', 'Visao geral'],
+    ['agent', 'Agente'],
+    ['campaigns', 'Campanhas'],
+    ['knowledge', 'Base'],
+    ['flows', 'Fluxos'],
+    ['review', 'Revisao'],
+    ['safety', 'Seguranca'],
+    ['metrics', 'Metricas']
+  ];
+  const guardrails = [
+    'Nao prometer visita sem confirmacao humana.',
+    'Encaminhar temas sensiveis para humano.',
+    'Respeitar pedido de parar contato.',
+    'Responder apenas dentro das campanhas liberadas.',
+    'Registrar toda sugestao, resposta e decisao no historico.'
+  ];
+  const flowSteps = [
+    ['Entrada', 'Lead responde no WhatsApp ou entra em campanha autorizada.'],
+    ['Triagem', 'IA identifica interesse, duvida, pedido de visita ou opt-out.'],
+    ['Resposta assistida', 'IA prepara resposta para aprovacao humana.'],
+    ['Encaminhamento', 'Quando necessario, envia para gestor, coordenador ou voluntario.']
+  ];
+
+  return (
+    <div className="grid gap-6">
+      <section className={`${panelClass} overflow-hidden p-6`}>
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <span className={labelClass}>IA de atendimento</span>
+            <h1 className="silver-title mt-2 text-5xl font-black leading-tight tracking-normal max-md:text-4xl">Agente IA</h1>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
+              Configure a IA que futuramente fara triagem, sugestao de respostas e acompanhamento das campanhas no WhatsApp, sempre preservando revisao humana e auditoria.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className={active ? ghostButtonClass : primaryButtonClass}
+              onClick={() => {
+                setActive((value) => !value);
+                toast.message(active ? 'IA pausada' : 'IA ativada em modo assistido');
+              }}
+              type="button"
+            >
+              <WandSparkles size={18} />
+              {active ? 'Pausar IA' : 'Ativar IA'}
+            </button>
+            <select className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-950 shadow-[0_10px_28px_rgba(15,23,42,0.07)] outline-none" onChange={(event) => setMode(event.target.value)} value={mode}>
+              <option value="assistido">Modo assistido</option>
+              <option value="rascunho">Somente rascunho</option>
+              <option value="automatico">Automatico com limites</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-5 gap-4 max-xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
+        <MetricCard detail={active ? 'modo ativo' : 'modo pausado'} icon={WandSparkles} label="Status IA" tone={active ? 'green' : 'violet'} value={active ? 'Ativa' : 'Pausada'} />
+        <MetricCard detail="leads prioritarios" icon={Sparkles} label="Quentes WhatsApp" tone="orange" value={formatNumber(hotWhatsapp)} />
+        <MetricCard detail="para acompanhar" icon={ClipboardList} label="Estudos ativos" tone="green" value={formatNumber(studyWhatsapp)} />
+        <MetricCard detail="relacionamento" icon={Crown} label="VIPs WhatsApp" tone="violet" value={formatNumber(vipWhatsapp)} />
+        <MetricCard detail="primeira etapa segura" icon={ShieldCheck} label="Modo" value={mode === 'assistido' ? 'Assistido' : mode === 'rascunho' ? 'Rascunho' : 'Auto'} />
+      </section>
+
+      <section className={`${panelClass} p-3`}>
+        <div className="flex flex-wrap gap-2">
+          {tabs.map(([id, label]) => (
+            <button
+              className={`inline-flex h-10 items-center rounded-xl px-3 text-sm font-black transition ${tab === id ? 'bg-blue-600 text-white shadow-[0_14px_34px_rgba(37,99,235,0.28)]' : 'bg-white/70 text-slate-700 hover:bg-white'}`}
+              key={id}
+              onClick={() => setTab(id)}
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {tab === 'overview' ? (
+        <section className="grid grid-cols-[1fr_0.85fr] gap-4 max-xl:grid-cols-1">
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Painel executivo</span>
+            <h2 className="mt-2 text-2xl font-black text-slate-50">Como a IA entra na operacao</h2>
+            <div className="mt-5 grid gap-3">
+              {[
+                ['Triagem de respostas', 'Classifica interesse, duvida, visita, estudo ativo e pedido de pausa.'],
+                ['Sugestao de mensagem', 'Prepara resposta para aprovacao humana antes do envio.'],
+                ['Encaminhamento humano', 'Leads sensiveis ou promissores vao para gestor, coordenador ou voluntario.'],
+                ['Auditoria completa', 'Toda resposta sugerida, aprovada ou enviada fica registrada.']
+              ].map(([title, detail]) => (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={title}>
+                  <strong className="text-slate-950">{title}</strong>
+                  <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-600">{detail}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Checklist de implantacao</span>
+            <div className="mt-5 grid gap-3">
+              {['Definir instrucao do agente', 'Selecionar campanhas permitidas', 'Cadastrar base de conhecimento', 'Ativar modo assistido', 'Revisar respostas antes do automatico'].map((item, index) => (
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-slate-950 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={item}>
+                  <span className={`grid h-8 w-8 place-items-center rounded-xl text-sm font-black text-white ${index < 2 ? 'bg-emerald-600' : 'bg-slate-700'}`}>{index + 1}</span>
+                  <strong className="text-sm">{item}</strong>
+                </div>
+              ))}
+            </div>
+          </article>
+        </section>
+      ) : null}
+
+      {tab === 'agent' ? (
+        <section className="grid grid-cols-[1fr_0.9fr] gap-4 max-xl:grid-cols-1">
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Configuracao do agente</span>
+            <div className="mt-5 grid gap-4">
+              <label className="grid gap-2 text-sm font-bold text-slate-300">Nome da IA<input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" defaultValue="Assistente Novo Tempo" /></label>
+              <label className="grid gap-2 text-sm font-bold text-slate-300">Tom de voz<select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" defaultValue="acolhedor"><option value="acolhedor">Acolhedor e breve</option><option value="formal">Formal</option><option value="jovem">Jovem e simples</option><option value="pastoral">Pastoral cuidadoso</option></select></label>
+              <label className="grid gap-2 text-sm font-bold text-slate-300">Instrucao principal<textarea className="min-h-36 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 py-3 text-slate-100 outline-none" defaultValue="Voce e uma assistente da Escola Biblica Novo Tempo. Seja acolhedora, objetiva e respeitosa. Ajude a confirmar interesse, tirar duvidas simples e encaminhar casos sensiveis para um humano." /></label>
+              <button className={primaryButtonClass} onClick={() => toast.success('Configuracao da IA preparada')} type="button"><CheckCircle2 size={18} />Salvar configuracao</button>
+            </div>
+          </article>
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Limites do agente</span>
+            <div className="mt-5 grid gap-3">
+              {guardrails.map((item) => (
+                <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-800 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={item}>
+                  <input className="mt-1 h-4 w-4 accent-blue-600" defaultChecked type="checkbox" />
+                  {item}
+                </label>
+              ))}
+            </div>
+          </article>
+        </section>
+      ) : null}
+
+      {tab === 'campaigns' ? (
+        <section className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
+          {campaigns.map((campaign) => (
+            <article className={`${panelClass} p-5`} key={campaign.id}>
+              <div className="flex items-start justify-between gap-4">
+                <span className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/[0.06] text-slate-100"><Radio size={20} /></span>
+                <label className="inline-flex items-center gap-2 text-sm font-black text-slate-300"><input className="h-4 w-4 accent-blue-600" defaultChecked={campaign.status === 'Ativa'} type="checkbox" /> IA</label>
+              </div>
+              <h2 className="mt-5 text-xl font-black text-slate-50">{campaign.name}</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-500">{campaign.association}</p>
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700">Objetivo sugerido: confirmar interesse e encaminhar para estudo ou visita.</div>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {tab === 'knowledge' ? (
+        <section className="grid grid-cols-[0.9fr_1.1fr] gap-4 max-xl:grid-cols-1">
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Base operacional</span>
+            <div className="mt-5 grid gap-3">
+              {knowledgeItems.map(([label, value]) => (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={label}>
+                  <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</span>
+                  <strong className="mt-1 block text-slate-950">{value}</strong>
+                </div>
+              ))}
+            </div>
+          </article>
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Conteudo aprovado</span>
+            <textarea className="mt-5 min-h-64 w-full rounded-2xl border border-white/[0.08] bg-slate-950/70 px-4 py-4 text-sm leading-relaxed text-slate-100 outline-none" defaultValue="Perguntas frequentes, links oficiais, materiais disponiveis, horarios de atendimento, orientacoes pastorais e mensagens aprovadas devem ser cadastrados aqui antes do modo automatico." />
+          </article>
+        </section>
+      ) : null}
+
+      {tab === 'flows' ? (
+        <section className={`${panelClass} p-6`}>
+          <span className={labelClass}>Fluxo de atendimento</span>
+          <div className="mt-5 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-md:grid-cols-1">
+            {flowSteps.map(([title, detail], index) => (
+              <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={title}>
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-sm font-black text-white">{index + 1}</span>
+                <strong className="mt-4 block text-lg text-slate-950">{title}</strong>
+                <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-600">{detail}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 'review' ? (
+        <section className={`${panelClass} p-6`}>
+          <span className={labelClass}>Revisao assistida</span>
+          <h2 className="mt-1 text-2xl font-black text-slate-50">Leads para a IA sugerir resposta</h2>
+          <div className="mt-5 grid gap-3">
+            {reviewQueue.map((lead) => (
+              <div className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)] max-md:grid-cols-1" key={lead.id}>
+                <div>
+                  <strong className="text-slate-950">{lead.n}</strong>
+                  <span className="mt-1 block text-sm font-semibold text-slate-600">{lead.d} · {lead.tel || 'sem telefone'} · score {lead.s}</span>
+                </div>
+                <button className={ghostButtonClass} onClick={() => toast.info('Sugestao preparada', { description: `IA prepararia uma resposta assistida para ${lead.n}.` })} type="button">Gerar sugestao</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 'safety' ? (
+        <section className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
+          {[
+            ['Bloqueios sensiveis', 'luto, saude, abuso, crise emocional, reclamacao grave, pedido pastoral profundo'],
+            ['Opt-out', 'parar, remover, nao quero, cancelar, sair'],
+            ['Limites', 'maximo de mensagens por lead, horario permitido e pausa manual imediata'],
+            ['Auditoria', 'salvar prompt, resposta sugerida, resposta enviada, custo e aprovador']
+          ].map(([title, detail]) => (
+            <article className={`${panelClass} p-6`} key={title}>
+              <span className={labelClass}>Seguranca</span>
+              <h2 className="mt-2 text-xl font-black text-slate-50">{title}</h2>
+              <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-500">{detail}</p>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {tab === 'metrics' ? (
+        <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-md:grid-cols-1">
+          {[
+            ['Elegiveis para IA', hotWhatsapp + studyWhatsapp + vipWhatsapp, 'quentes, estudos e VIPs'],
+            ['Modo atual', mode === 'assistido' ? 'Assistido' : mode === 'rascunho' ? 'Rascunho' : 'Auto', 'politica de resposta'],
+            ['Campanhas ativas', campaigns.filter((campaign) => campaign.status === 'Ativa').length, 'podem receber IA'],
+            ['Custo estimado', 'R$ 0,00', 'sem uso de IA ainda']
+          ].map(([label, value, detail]) => (
+            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={label}>
+              <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</span>
+              <strong className="mt-2 block text-3xl font-black text-slate-950">{typeof value === 'number' ? formatNumber(value) : value}</strong>
+              <span className="mt-1 block text-sm font-semibold text-slate-600">{detail}</span>
+            </article>
+          ))}
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 function SettingsView({ theme, onToggleTheme }) {
   const settings = [
     {
@@ -2779,6 +3040,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
     content = <AssociationDashboard association={selectedAssociation} data={data} records={records} onOpenDetails={() => openDetailsView(setView)} />;
   } else if (view === 'automations') {
     content = <AdminGeneralView {...adminGeneralProps} initialSection="distribution" />;
+  } else if (view === 'ai-agent') {
+    content = <AIAgentView associations={associations} campaigns={adminCampaigns} data={data} records={records} />;
   } else if (view === 'settings') {
     content = <SettingsView onToggleTheme={() => setTheme((current) => current === 'light' ? 'dark' : 'light')} theme={theme} />;
   } else {
