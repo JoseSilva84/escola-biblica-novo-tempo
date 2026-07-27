@@ -52,6 +52,12 @@ const primaryButtonClass = 'primary-button-glow group relative inline-flex h-11 
 const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-semibold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
 const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slate-950/60 shadow-[0_28px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.035] backdrop-blur-2xl';
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+const crmPriorityLabels = {
+  Hot: 'Quente',
+  Warm: 'Potencial',
+  Cool: 'Morno',
+  Cold: 'Frio'
+};
 
 function apiFetch(path, options = {}) {
   const token = typeof window !== 'undefined' ? window.localStorage.getItem('sevenflow_token') : '';
@@ -104,6 +110,10 @@ function formatNumber(value) {
 
 function pct(part, total) {
   return total > 0 ? Math.round((part / total) * 100) : 0;
+}
+
+function phoneDigits(value) {
+  return String(value || '').replace(/\D/g, '');
 }
 
 function buildAssociationData(records) {
@@ -910,6 +920,7 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
 function AdminGeneralView({
   associations,
   data,
+  records = [],
   users,
   campaigns,
   auditEvents,
@@ -925,6 +936,14 @@ function AdminGeneralView({
   const [sendError, setSendError] = useState(null);
   const [batchLoading, setBatchLoading] = useState(false);
   const [lastBatch, setLastBatch] = useState(null);
+  const [leadFilters, setLeadFilters] = useState({
+    association: 'paulistana',
+    distrito: 'all',
+    prioridade: 'Hot',
+    search: ''
+  });
+  const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
+  const [batchPhonesText, setBatchPhonesText] = useState('');
 
   useEffect(() => {
     setSection(initialSection);
@@ -970,6 +989,93 @@ function AdminGeneralView({
     ['Com WhatsApp validado', data.phone, 'Automação', 'from-blue-600 to-cyan-500']
   ];
   const auditColors = ['from-emerald-600 to-teal-500', 'from-blue-600 to-cyan-500', 'from-violet-600 to-fuchsia-500', 'from-amber-500 to-orange-500'];
+  const districts = useMemo(
+    () => Array.from(new Set(records.map((row) => row.d))).sort((a, b) => a.localeCompare(b)),
+    [records]
+  );
+  const filteredWhatsappLeads = useMemo(() => {
+    const search = leadFilters.search.trim().toLowerCase();
+    return records
+      .filter((row) => {
+        if (!row.t || !phoneDigits(row.tel)) return false;
+        if (leadFilters.distrito !== 'all' && row.d !== leadFilters.distrito) return false;
+        if (leadFilters.prioridade !== 'all' && row.p !== leadFilters.prioridade) return false;
+        if (search) {
+          const haystack = `${row.n || ''} ${row.tel || ''} ${row.d || ''}`.toLowerCase();
+          if (!haystack.includes(search)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => (b.s || 0) - (a.s || 0));
+  }, [records, leadFilters]);
+  const visibleWhatsappLeads = useMemo(() => filteredWhatsappLeads.slice(0, 300), [filteredWhatsappLeads]);
+  const selectedWhatsappLeads = useMemo(
+    () => filteredWhatsappLeads.filter((row) => selectedLeadIds.has(row.id)),
+    [filteredWhatsappLeads, selectedLeadIds]
+  );
+  const batchLimit = Math.min(Math.max(Number(leadBatch) || 1, 1), 50);
+
+  useEffect(() => {
+    if (!selectedLeadIds.size) return;
+    setBatchPhonesText(selectedWhatsappLeads.slice(0, batchLimit).map((row) => phoneDigits(row.tel)).join('\n'));
+  }, [selectedLeadIds, selectedWhatsappLeads, batchLimit]);
+
+  function setLeadFilter(key, value) {
+    setLeadFilters((current) => ({ ...current, [key]: value }));
+  }
+
+  function syncBatchPhones(leads) {
+    setBatchPhonesText(leads.slice(0, batchLimit).map((row) => phoneDigits(row.tel)).join('\n'));
+  }
+
+  function selectLead(row) {
+    setSelectedLeadIds((current) => {
+      const next = new Set(current);
+      if (next.has(row.id)) {
+        next.delete(row.id);
+      } else {
+        next.add(row.id);
+      }
+      return next;
+    });
+  }
+
+  function selectFilteredBatch() {
+    const nextLeads = filteredWhatsappLeads.slice(0, batchLimit);
+    setSelectedLeadIds(new Set(nextLeads.map((row) => row.id)));
+    syncBatchPhones(nextLeads);
+    toast.success('Leads selecionados', {
+      description: `${formatNumber(nextLeads.length)} contatos foram colocados no lote.`
+    });
+  }
+
+  function clearLeadSelection() {
+    setSelectedLeadIds(new Set());
+    setBatchPhonesText('');
+  }
+
+  function exportSelectedLeads() {
+    const rowsToExport = selectedWhatsappLeads.length ? selectedWhatsappLeads : filteredWhatsappLeads;
+    const header = ['Nome', 'WhatsApp', 'Distrito', 'Prioridade ML', 'Score'];
+    const rows = rowsToExport.map((row) => [
+      row.n,
+      phoneDigits(row.tel),
+      row.d,
+      crmPriorityLabels[row.p] || row.p,
+      row.s
+    ]);
+    const csv = [header, ...rows].map((row) => row.map((cell) => {
+      const text = String(cell ?? '');
+      return /[",\n\r;]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+    }).join(';')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = selectedWhatsappLeads.length ? 'leads-selecionados-whatsapp.csv' : 'leads-filtrados-whatsapp.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   function submitUser(event) {
     event.preventDefault();
@@ -1047,22 +1153,27 @@ function AdminGeneralView({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const message = String(form.get('batchMessage') || '').trim();
-    const typedPhones = String(form.get('batchPhones') || '')
+    const typedPhones = batchPhonesText
       .split(/[\n,;]+/)
       .map((value) => value.trim())
       .filter(Boolean);
-    const limit = Math.min(Math.max(Number(leadBatch) || 1, 1), 50);
-    const recipients = typedPhones
-      .slice(0, limit)
-      .map((phone, index) => ({
-        id: `manual-${index + 1}`,
-        leadId: `manual-${index + 1}`,
-        phone
-      }));
+    const selectedByPhone = new Map(selectedWhatsappLeads.map((row) => [phoneDigits(row.tel), row]));
+    const recipients = typedPhones.slice(0, batchLimit).map((phone, index) => {
+      const normalized = phoneDigits(phone);
+      const lead = selectedByPhone.get(normalized);
+      return {
+        id: lead?.id || `manual-${index + 1}`,
+        leadId: lead?.id || `manual-${index + 1}`,
+        name: lead?.n || null,
+        district: lead?.d || null,
+        priority: lead?.p || null,
+        phone: normalized || phone
+      };
+    });
 
     if (!recipients.length) {
       toast.error('Informe os numeros', {
-        description: 'Cole ao menos um WhatsApp no campo de numeros do lote.'
+        description: 'Selecione leads ou cole ao menos um WhatsApp no campo de numeros do lote.'
       });
       return;
     }
@@ -1348,11 +1459,11 @@ function AdminGeneralView({
             <span className={labelClass}>Envio em lote WhatsApp</span>
             <label className="grid gap-2 text-sm font-medium text-slate-300">
               Quantidade de WhatsApps
-              <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" max={50} min="1" onChange={(event) => setLeadBatch(Math.min(Number(event.target.value || 1), 50))} type="number" value={leadBatch} />
+              <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" max={50} min="1" onChange={(event) => setLeadBatch(Math.min(Math.max(Number(event.target.value || 1), 1), 50))} type="number" value={leadBatch} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-slate-300">
               Numeros do lote
-              <textarea className="min-h-28 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 py-3 text-slate-100 outline-none" name="batchPhones" placeholder={`Um numero por linha. Ex.:\n75992456130\n5511999999999`} />
+              <textarea className="min-h-28 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 py-3 text-slate-100 outline-none" name="batchPhones" onChange={(event) => setBatchPhonesText(event.target.value)} placeholder={`Um numero por linha. Ex.:\n75992456130\n5511999999999`} value={batchPhonesText} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-slate-300">
               Mensagem do lote
@@ -1368,6 +1479,104 @@ function AdminGeneralView({
               </div>
             ) : null}
           </form>
+          <article className={`${panelClass} p-6 max-xl:col-span-1 xl:col-span-2`}>
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <span className={labelClass}>Leads para WhatsApp</span>
+                <h2 className="mt-2 text-2xl font-extrabold text-slate-50">Selecionar contatos por distrito e ML</h2>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                  Filtre os leads da Associacao Paulistana, escolha quentes ou potenciais, marque contatos e envie os WhatsApps para o lote.
+                </p>
+              </div>
+              <div className="grid min-w-[12rem] gap-1 rounded-2xl border border-white/[0.07] bg-slate-950/55 px-4 py-3 text-right">
+                <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Selecionados</span>
+                <strong className="text-2xl font-black text-slate-50">{formatNumber(selectedWhatsappLeads.length)}</strong>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[1.1fr_1.1fr_1fr_1.4fr_auto] gap-3 max-xl:grid-cols-2 max-md:grid-cols-1">
+              <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                Associacao
+                <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setLeadFilter('association', event.target.value)} value={leadFilters.association}>
+                  <option value="paulistana">Associacao Paulistana</option>
+                  {associations.filter((association) => association.id !== 'paulistana').map((association) => (
+                    <option disabled key={association.id} value={association.id}>{association.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                Distrito
+                <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setLeadFilter('distrito', event.target.value)} value={leadFilters.distrito}>
+                  <option value="all">Todos os distritos</option>
+                  {districts.map((district) => <option key={district} value={district}>{district}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                Prioridade ML
+                <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setLeadFilter('prioridade', event.target.value)} value={leadFilters.prioridade}>
+                  <option value="Hot">Quentes</option>
+                  <option value="Warm">Potenciais</option>
+                  <option value="all">Todas</option>
+                </select>
+              </label>
+              <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                Buscar
+                <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none placeholder:text-slate-600" onChange={(event) => setLeadFilter('search', event.target.value)} placeholder="Nome, distrito ou WhatsApp" value={leadFilters.search} />
+              </label>
+              <div className="grid content-end">
+                <button className={primaryButtonClass} onClick={selectFilteredBatch} type="button">
+                  <CheckCircle2 size={18} />
+                  Selecionar lote
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-slate-500">
+                {formatNumber(filteredWhatsappLeads.length)} leads encontrados com WhatsApp. Exibindo {formatNumber(visibleWhatsappLeads.length)}.
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <button className={ghostButtonClass} onClick={clearLeadSelection} type="button">Limpar selecao</button>
+                <button className={ghostButtonClass} onClick={exportSelectedLeads} type="button">Exportar contatos</button>
+              </div>
+            </div>
+
+            <div className="mt-5 max-h-[32rem] overflow-auto rounded-2xl border border-white/[0.07]">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-slate-950/85 text-left">
+                    {['Enviar', 'Nome', 'WhatsApp', 'Distrito', 'Prioridade ML', 'Score'].map((head) => (
+                      <th className="sticky top-0 z-[1] whitespace-nowrap border-b border-white/[0.07] bg-slate-950/95 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500" key={head}>{head}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleWhatsappLeads.map((lead) => {
+                    const checked = selectedLeadIds.has(lead.id);
+                    return (
+                      <tr className={`transition ${checked ? 'bg-blue-500/10' : 'hover:bg-white/[0.035]'}`} key={lead.id}>
+                        <td className="border-b border-white/[0.04] px-4 py-3">
+                          <input aria-label={`Selecionar ${lead.n}`} checked={checked} className="h-4 w-4 accent-blue-600" onChange={() => selectLead(lead)} type="checkbox" />
+                        </td>
+                        <td className="min-w-[14rem] border-b border-white/[0.04] px-4 py-3">
+                          <strong className="block text-slate-50">{lead.n}</strong>
+                          <span className="text-xs font-semibold text-slate-500">ID {lead.id}</span>
+                        </td>
+                        <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black tabular-nums text-emerald-400">{phoneDigits(lead.tel)}</td>
+                        <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-bold text-slate-300">{lead.d}</td>
+                        <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
+                          <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${lead.p === 'Hot' ? 'bg-orange-500 text-white' : lead.p === 'Warm' ? 'bg-amber-500 text-white' : 'bg-slate-600 text-white'}`}>
+                            {crmPriorityLabels[lead.p] || lead.p}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black tabular-nums text-slate-100">{lead.s}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </article>
           <article className={`${panelClass} p-6 max-xl:col-span-1 xl:col-span-2`}>
             <span className={labelClass}>Filas sugeridas</span>
             <div className="mt-5 grid gap-3">
@@ -1857,6 +2066,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
     data,
     onAddCampaign: addAdminCampaign,
     onAddUser: addAdminUser,
+    records,
     users: adminUsers
   };
 
