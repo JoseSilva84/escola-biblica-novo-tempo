@@ -492,8 +492,8 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
   return (
     <>
       {/* --- Desktop Sidebar --- */}
-      <aside className={`sidebar-shell sticky top-4 z-40 hidden h-[calc(100vh-2rem)] shrink-0 flex-col rounded-[1.75rem] border p-4 text-slate-100 backdrop-blur-2xl transition-all duration-300 lg:flex ${compact ? 'w-24' : 'w-72'}`}>
-        <div className={`mb-8 flex items-center gap-3 ${compact ? 'justify-center' : ''}`}>
+      <aside className={`sidebar-shell sticky top-4 z-40 hidden h-[calc(100vh-2rem)] min-h-0 shrink-0 flex-col rounded-[1.75rem] border p-4 text-slate-100 backdrop-blur-2xl transition-all duration-300 lg:flex ${compact ? 'w-24' : 'w-72'}`}>
+        <div className={`mb-5 flex shrink-0 items-center gap-3 ${compact ? 'justify-center' : ''}`}>
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl overflow-hidden shadow-[0_16px_36px_rgba(226,232,240,0.12)]">
             <img src="/novo-tempo.jpg" alt="Logo Novo Tempo" className="h-full w-full object-cover mix-blend-multiply dark:mix-blend-normal" />
           </div>
@@ -504,7 +504,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
         </div>
 
         <button
-          className="sidebar-toggle mb-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl border text-sm font-black transition duration-300 hover:-translate-y-0.5"
+          className="sidebar-toggle mb-4 inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl border text-sm font-black transition duration-300 hover:-translate-y-0.5"
           onClick={onToggleCompact}
           type="button"
         >
@@ -512,10 +512,10 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
           <span className={compact ? 'hidden' : 'inline'}>Recolher menu</span>
         </button>
 
-        <nav className="grid gap-2">
+        <nav className="sidebar-nav-scroll grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
           {items.map(([id, label, Icon]) => (
             <button
-              className={`sidebar-nav-item group flex h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition-all duration-300 ${compact ? 'justify-center hover:-translate-y-1' : 'hover:translate-x-1.5'} ${current === id ? 'nav-active' : 'nav-idle'}`}
+              className={`sidebar-nav-item group flex h-11 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition-all duration-300 ${compact ? 'justify-center hover:-translate-y-1' : 'hover:translate-x-1.5'} ${current === id ? 'nav-active' : 'nav-idle'}`}
               key={id}
               onClick={() => onNavigate(id)}
               type="button"
@@ -527,8 +527,8 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
           ))}
         </nav>
 
-        <div className="mt-auto grid gap-3">
-          <button className={`${ghostButtonClass} group transition-all duration-300 ${compact ? 'px-0 hover:-translate-y-1' : 'hover:translate-x-1.5'}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
+        <div className="mt-3 grid shrink-0 gap-3 border-t border-slate-900/10 pt-3">
+          <button className={`${ghostButtonClass} group h-10 transition-all duration-300 ${compact ? 'px-0 hover:-translate-y-1' : 'hover:translate-x-1.5'}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
             <LogOut className="transition duration-300 group-hover:scale-110" size={18} />
             <span className={compact ? 'hidden' : 'inline'}>Sair</span>
           </button>
