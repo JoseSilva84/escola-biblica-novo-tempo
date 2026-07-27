@@ -504,7 +504,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
         </div>
 
         <button
-          className="sidebar-toggle mb-4 inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl border text-sm font-black transition duration-300 hover:-translate-y-0.5"
+          className="sidebar-toggle mb-4 inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl border text-sm font-black transition duration-300"
           onClick={onToggleCompact}
           type="button"
         >
@@ -515,21 +515,21 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
         <nav className="sidebar-nav-scroll grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
           {items.map(([id, label, Icon]) => (
             <button
-              className={`sidebar-nav-item group flex h-11 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition-all duration-300 ${compact ? 'justify-center hover:-translate-y-1' : 'hover:translate-x-1.5'} ${current === id ? 'nav-active' : 'nav-idle'}`}
+              className={`sidebar-nav-item group flex h-11 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition-colors duration-200 ${compact ? 'justify-center' : ''} ${current === id ? 'nav-active' : 'nav-idle'}`}
               key={id}
               onClick={() => onNavigate(id)}
               type="button"
               title={compact ? label : undefined}
             >
-              <Icon className="transition group-hover:scale-110" size={19} />
+              <Icon size={19} />
               <span className={compact ? 'hidden' : 'inline'}>{label}</span>
             </button>
           ))}
         </nav>
 
         <div className="mt-3 grid shrink-0 gap-3 border-t border-slate-900/10 pt-3">
-          <button className={`${ghostButtonClass} group h-10 transition-all duration-300 ${compact ? 'px-0 hover:-translate-y-1' : 'hover:translate-x-1.5'}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
-            <LogOut className="transition duration-300 group-hover:scale-110" size={18} />
+          <button className={`${ghostButtonClass} group h-10 transition-colors duration-200 ${compact ? 'px-0' : ''}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
+            <LogOut size={18} />
             <span className={compact ? 'hidden' : 'inline'}>Sair</span>
           </button>
         </div>
