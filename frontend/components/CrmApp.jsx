@@ -1488,9 +1488,9 @@ function AdminGeneralView({
                   Filtre os leads da Associacao Paulistana, escolha quentes ou potenciais, marque contatos e envie os WhatsApps para o lote.
                 </p>
               </div>
-              <div className="grid min-w-[12rem] gap-1 rounded-2xl border border-white/[0.07] bg-slate-950/55 px-4 py-3 text-right">
-                <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Selecionados</span>
-                <strong className="text-2xl font-black text-slate-50">{formatNumber(selectedWhatsappLeads.length)}</strong>
+              <div className="grid min-w-[12rem] gap-1 rounded-2xl border border-blue-300/40 bg-gradient-to-br from-blue-600 to-slate-950 px-4 py-3 text-right shadow-[0_18px_42px_rgba(37,99,235,0.22)]">
+                <span className="text-xs font-bold uppercase tracking-[0.14em] text-white/75">Selecionados</span>
+                <strong className="text-2xl font-black text-white">{formatNumber(selectedWhatsappLeads.length)}</strong>
               </div>
             </div>
 
@@ -1546,7 +1546,7 @@ function AdminGeneralView({
                 <thead>
                   <tr className="bg-slate-950/85 text-left">
                     {['Enviar', 'Nome', 'WhatsApp', 'Distrito', 'Prioridade ML', 'Score'].map((head) => (
-                      <th className="sticky top-0 z-[1] whitespace-nowrap border-b border-white/[0.07] bg-slate-950/95 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500" key={head}>{head}</th>
+                      <th className="sticky top-0 z-[1] whitespace-nowrap border-b border-white/[0.12] bg-slate-950/95 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white/80" key={head}>{head}</th>
                     ))}
                   </tr>
                 </thead>
