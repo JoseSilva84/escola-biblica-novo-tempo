@@ -28,6 +28,7 @@ import {
   LayoutDashboard,
   Lock,
   LogOut,
+  Menu,
   MessageCircle,
   Moon,
   PanelLeftClose,
@@ -42,7 +43,8 @@ import {
   Sparkles,
   Sun,
   UsersRound,
-  WandSparkles
+  WandSparkles,
+  X
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import DashboardClient from './DashboardClient';
@@ -466,6 +468,8 @@ function LoginScreen({ onLogin }) {
 }
 
 function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
   const items = [
     ['admin', 'Dashboard', LayoutDashboard],
     ['general-admin', 'Admin geral', ShieldCheck],
@@ -477,49 +481,141 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
   ];
   items.push(['settings', 'Configurações', Settings]);
 
+  const mobileBottomItems = items.slice(0, 2); // Dashboard and Admin geral or whatever first two. Let's make it Dashboard and Associations for better UX, but we can just use slice. Wait, "Dashboard" and "Associações" are most used? Let's just pick the first two.
+  // We can manually pick for bottom nav:
+  const bottomNavItems = [
+    ['admin', 'Dashboard', LayoutDashboard],
+    ['associations', 'Associações', Building2]
+  ];
+
   return (
-    <aside className={`sidebar-shell sticky top-4 z-40 flex h-[calc(100vh-2rem)] shrink-0 flex-col rounded-[1.75rem] border p-4 text-slate-100 backdrop-blur-2xl transition-all duration-300 max-lg:relative max-lg:top-0 max-lg:h-auto max-lg:w-full ${compact ? 'w-24' : 'w-72'}`}>
-      <div className={`mb-8 flex items-center gap-3 ${compact ? 'justify-center' : ''}`}>
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl overflow-hidden shadow-[0_16px_36px_rgba(226,232,240,0.12)]">
-          <img src="/novo-tempo.jpg" alt="Logo Novo Tempo" className="h-full w-full object-cover mix-blend-multiply dark:mix-blend-normal" />
+    <>
+      {/* --- Desktop Sidebar --- */}
+      <aside className={`sidebar-shell sticky top-4 z-40 hidden h-[calc(100vh-2rem)] shrink-0 flex-col rounded-[1.75rem] border p-4 text-slate-100 backdrop-blur-2xl transition-all duration-300 lg:flex ${compact ? 'w-24' : 'w-72'}`}>
+        <div className={`mb-8 flex items-center gap-3 ${compact ? 'justify-center' : ''}`}>
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl overflow-hidden shadow-[0_16px_36px_rgba(226,232,240,0.12)]">
+            <img src="/novo-tempo.jpg" alt="Logo Novo Tempo" className="h-full w-full object-cover mix-blend-multiply dark:mix-blend-normal" />
+          </div>
+          <div className={compact ? 'hidden' : 'block'}>
+            <strong className="silver-title block text-xl font-black">Leads NT</strong>
+            <span className="text-xs font-bold text-slate-500">Admin central</span>
+          </div>
         </div>
-        <div className={compact ? 'hidden' : 'block'}>
-          <strong className="silver-title block text-xl font-black">Leads NT</strong>
-          <span className="text-xs font-bold text-slate-500">Admin central</span>
+
+        <button
+          className="sidebar-toggle mb-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl border text-sm font-black transition duration-300 hover:-translate-y-0.5"
+          onClick={onToggleCompact}
+          type="button"
+        >
+          {compact ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          <span className={compact ? 'hidden' : 'inline'}>Recolher menu</span>
+        </button>
+
+        <nav className="grid gap-2">
+          {items.map(([id, label, Icon]) => (
+            <button
+              className={`sidebar-nav-item group flex h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition-all duration-300 ${compact ? 'justify-center hover:-translate-y-1' : 'hover:translate-x-1.5'} ${current === id ? 'nav-active' : 'nav-idle'}`}
+              key={id}
+              onClick={() => onNavigate(id)}
+              type="button"
+              title={compact ? label : undefined}
+            >
+              <Icon className="transition group-hover:scale-110" size={19} />
+              <span className={compact ? 'hidden' : 'inline'}>{label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="mt-auto grid gap-3">
+          <button className={`${ghostButtonClass} group transition-all duration-300 ${compact ? 'px-0 hover:-translate-y-1' : 'hover:translate-x-1.5'}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
+            <LogOut className="transition duration-300 group-hover:scale-110" size={18} />
+            <span className={compact ? 'hidden' : 'inline'}>Sair</span>
+          </button>
         </div>
-      </div>
+      </aside>
 
-      <button
-        className="sidebar-toggle mb-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl border text-sm font-black transition duration-300 hover:-translate-y-0.5 max-lg:hidden"
-        onClick={onToggleCompact}
-        type="button"
-      >
-        {compact ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-        <span className={compact ? 'hidden' : 'inline'}>Recolher menu</span>
-      </button>
-
-      <nav className="grid gap-2">
-        {items.map(([id, label, Icon]) => (
+      {/* --- Mobile Bottom Navigation --- */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 flex h-20 items-center justify-around border-t border-white/[0.07] bg-slate-950/80 pb-2 pt-2 backdrop-blur-2xl lg:hidden">
+        {bottomNavItems.map(([id, label, Icon]) => (
           <button
-            className={`sidebar-nav-item group flex h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition-all duration-300 ${compact ? 'justify-center hover:-translate-y-1' : 'hover:translate-x-1.5'} ${current === id ? 'nav-active' : 'nav-idle'}`}
             key={id}
+            className={`flex flex-col items-center justify-center gap-1 rounded-xl px-4 py-2 transition-all ${current === id ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
             onClick={() => onNavigate(id)}
             type="button"
-            title={compact ? label : undefined}
           >
-            <Icon className="transition group-hover:scale-110" size={19} />
-            <span className={compact ? 'hidden' : 'inline'}>{label}</span>
+            <Icon size={20} className={current === id ? 'scale-110' : ''} />
+            <span className="text-[10px] font-bold">{label}</span>
           </button>
         ))}
+        
+        <button
+          className={`flex flex-col items-center justify-center gap-1 rounded-xl px-4 py-2 transition-all ${mobileMenuOpen ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
+          onClick={() => setMobileMenuOpen(true)}
+          type="button"
+        >
+          <Menu size={20} className={mobileMenuOpen ? 'scale-110' : ''} />
+          <span className="text-[10px] font-bold">Mais</span>
+        </button>
       </nav>
 
-      <div className="mt-auto grid gap-3">
-        <button className={`${ghostButtonClass} group transition-all duration-300 ${compact ? 'px-0 hover:-translate-y-1' : 'hover:translate-x-1.5'}`} onClick={onLogout} type="button" title={compact ? 'Sair' : undefined}>
-          <LogOut className="transition duration-300 group-hover:scale-110" size={18} />
-          <span className={compact ? 'hidden' : 'inline'}>Sair</span>
-        </button>
-      </div>
-    </aside>
+      {/* --- Mobile Sidebar Drawer --- */}
+      {/* Overlay */}
+      <div 
+        className={`fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${mobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setMobileMenuOpen(false)}
+      />
+      
+      {/* Drawer */}
+      <aside className={`fixed inset-y-0 right-0 z-50 flex w-72 flex-col border-l border-white/[0.07] bg-slate-900 p-4 shadow-2xl transition-transform duration-300 lg:hidden ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl overflow-hidden shadow-[0_16px_36px_rgba(226,232,240,0.12)]">
+              <img src="/novo-tempo.jpg" alt="Logo Novo Tempo" className="h-full w-full object-cover mix-blend-multiply dark:mix-blend-normal" />
+            </div>
+            <div>
+              <strong className="silver-title block text-lg font-black">Leads NT</strong>
+            </div>
+          </div>
+          <button 
+            onClick={() => setMobileMenuOpen(false)}
+            className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <nav className="grid gap-2 overflow-y-auto pb-4">
+          {items.map(([id, label, Icon]) => (
+            <button
+              className={`sidebar-nav-item group flex h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-black transition-all duration-300 ${current === id ? 'nav-active' : 'nav-idle'}`}
+              key={id}
+              onClick={() => {
+                onNavigate(id);
+                setMobileMenuOpen(false);
+              }}
+              type="button"
+            >
+              <Icon size={19} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="mt-auto grid gap-3 pt-4 border-t border-white/5">
+          <button 
+            className={`${ghostButtonClass} group transition-all duration-300`} 
+            onClick={() => {
+              onLogout();
+              setMobileMenuOpen(false);
+            }} 
+            type="button"
+          >
+            <LogOut size={18} />
+            <span>Sair</span>
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
 
@@ -2090,7 +2186,7 @@ function AppShell({ children, current, onNavigate, onLogout, theme, onToggleThem
             </div>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1500px] px-8 py-6 max-md:px-4">
+        <main className="mx-auto w-full max-w-[1500px] px-8 pb-6 pt-6 max-lg:pb-28 max-md:px-4">
           {children}
         </main>
       </div>
@@ -2114,7 +2210,7 @@ function DetailsShell({ payload, onBack, onLogout, onNavigate, user }) {
           onToggleCompact={() => setSidebarCompact((value) => !value)}
           user={user}
         />
-        <div className="min-w-0 flex-1 overflow-hidden rounded-[1.75rem] max-lg:rounded-none">
+        <div className="min-w-0 flex-1 overflow-hidden rounded-[1.75rem] max-lg:rounded-none max-lg:pb-24">
           <DashboardClient onBack={onBack} payload={payload} />
         </div>
       </div>
