@@ -589,6 +589,16 @@ function whatsappHistoryForLead(lead) {
   return history;
 }
 
+function priorityBadgeClasses(priority) {
+  const tones = {
+    Hot: 'bg-orange-600 text-white border-orange-700 shadow-[0_10px_24px_rgba(234,88,12,0.25)]',
+    Warm: 'bg-blue-600 text-white border-blue-700 shadow-[0_10px_24px_rgba(37,99,235,0.22)]',
+    Cool: 'bg-slate-700 text-white border-slate-800 shadow-[0_10px_24px_rgba(51,65,85,0.18)]',
+    Cold: 'bg-zinc-800 text-white border-zinc-900 shadow-[0_10px_24px_rgba(24,24,27,0.18)]'
+  };
+  return tones[priority] || tones.Cool;
+}
+
 function LeadDetailModal({ lead, onClose }) {
   if (!lead) return null;
 
@@ -612,39 +622,45 @@ function LeadDetailModal({ lead, onClose }) {
   ];
 
   return createPortal(
-    <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/72 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className={`${panelClass} max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-slate-950`}>
-        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-6">
+    <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
+      <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-white/12 bg-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.56)]">
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_52%,#0f172a_100%)] p-6 text-white">
           <div>
-            <span className={labelClass}>Detalhes do lead</span>
-            <h2 className="mt-2 text-2xl font-black text-slate-50">{lead.n}</h2>
-            <p className="mt-1 text-sm text-slate-400">{lead.d} · {crmPriorityLabels[lead.p] || lead.p} · score {lead.s}</p>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">Detalhes do lead</span>
+            <h2 className="mt-2 break-words text-3xl font-black tracking-normal text-white max-md:text-2xl">{lead.n}</h2>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide ${priorityBadgeClasses(lead.p)}`}>{crmPriorityLabels[lead.p] || lead.p}</span>
+              <span className="rounded-full border border-white/20 bg-white/12 px-3 py-1 text-xs font-bold text-white">{lead.d}</span>
+              <span className="rounded-full border border-white/20 bg-white/12 px-3 py-1 text-xs font-bold text-white">Score {lead.s}</span>
+              {lead.v ? <span className="rounded-full border border-fuchsia-200/40 bg-fuchsia-500 px-3 py-1 text-xs font-black text-white">VIP</span> : null}
+              {lead.e ? <span className="rounded-full border border-emerald-200/40 bg-emerald-600 px-3 py-1 text-xs font-black text-white">Estudo ativo</span> : null}
+            </div>
           </div>
-          <button className={ghostButtonClass} onClick={onClose} type="button">Fechar</button>
+          <button className="inline-flex h-11 items-center justify-center rounded-xl border border-white/20 bg-white px-4 text-sm font-black text-slate-950 shadow-[0_14px_35px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:bg-blue-50" onClick={onClose} type="button">Fechar</button>
         </div>
-        <div className="grid max-h-[72vh] gap-5 overflow-y-auto p-6 lg:grid-cols-[1fr_0.9fr]">
+        <div className="grid max-h-[72vh] gap-5 overflow-y-auto bg-slate-100 p-6 lg:grid-cols-[1fr_0.9fr]">
           <section className="grid gap-3">
-            <span className={labelClass}>Todos os dados</span>
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Todos os dados</span>
             <div className="grid gap-2 sm:grid-cols-2">
               {fields.map(([label, value]) => (
-                <div className="rounded-xl border border-white/[0.07] bg-white/[0.035] p-3" key={label}>
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.05)]" key={label}>
                   <span className="block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
-                  <strong className="mt-1 block break-words text-sm text-slate-100">{String(value ?? 'Nao informado')}</strong>
+                  <strong className="mt-1 block break-words text-sm leading-relaxed text-slate-950">{String(value ?? 'Nao informado')}</strong>
                 </div>
               ))}
             </div>
           </section>
           <section className="grid content-start gap-3">
-            <span className={labelClass}>WhatsApp e acompanhamento</span>
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">WhatsApp e acompanhamento</span>
             {whatsappHistoryForLead(lead).map((item) => (
-              <article className={`rounded-2xl border p-4 ${item.tone}`} key={item.title}>
-                <strong className="block text-sm">{item.title}</strong>
-                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-200">{item.detail}</p>
+              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.05)]" key={item.title}>
+                <strong className="block text-sm text-slate-950">{item.title}</strong>
+                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-700">{item.detail}</p>
               </article>
             ))}
-            <div className="rounded-2xl border border-white/[0.07] bg-slate-900/60 p-4">
-              <span className={labelClass}>Resumo operacional</span>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-[0_10px_28px_rgba(37,99,235,0.08)]">
+              <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-800">Resumo operacional</span>
+              <p className="mt-2 text-sm leading-relaxed text-slate-800">
                 {lead.t ? 'Contato apto para WhatsApp.' : 'Contato sem WhatsApp valido.'} {lead.v ? 'Marcado como VIP. ' : ''}{lead.e ? 'Possui estudo ativo para acompanhamento.' : 'Sem estudo ativo registrado.'}
               </p>
             </div>
@@ -685,50 +701,52 @@ function AssociationLeadExplorer({ association, records }) {
     <section className={`${panelClass} p-6`}>
       <div className="mb-5 flex items-start justify-between gap-4 max-lg:flex-col">
         <div>
-          <span className={labelClass}>Leads da associacao selecionada</span>
-          <h2 className="mt-1 text-xl font-black text-slate-50">Buscar leads por distrito</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Leads da associacao selecionada</span>
+          <h2 className="mt-1 text-2xl font-black tracking-normal text-slate-950">Buscar leads por distrito</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
             Clique em qualquer lead para abrir todos os dados cadastrados e o historico de WhatsApp importado.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 text-right max-sm:w-full max-sm:text-left">
-          <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] px-4 py-3">
-            <span className={labelClass}>Encontrados</span>
-            <strong className="block text-xl text-slate-50">{formatNumber(filtered.length)}</strong>
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-[0_12px_30px_rgba(37,99,235,0.08)]">
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-800">Encontrados</span>
+            <strong className="block text-xl text-slate-950">{formatNumber(filtered.length)}</strong>
           </div>
-          <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] px-4 py-3">
-            <span className={labelClass}>WhatsApp</span>
-            <strong className="block text-xl text-slate-50">{formatNumber(phoneCount)}</strong>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 shadow-[0_12px_30px_rgba(16,185,129,0.08)]">
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-800">WhatsApp</span>
+            <strong className="block text-xl text-slate-950">{formatNumber(phoneCount)}</strong>
           </div>
         </div>
       </div>
       <div className="mb-5 grid gap-3 lg:grid-cols-[260px_1fr]">
-        <label className="grid gap-2 text-sm font-bold text-slate-300">
+        <label className="grid gap-2 text-sm font-bold text-slate-800">
           Distrito
-          <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setDistrict(event.target.value)} value={district}>
+          <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 shadow-[0_10px_28px_rgba(15,23,42,0.06)] outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setDistrict(event.target.value)} value={district}>
             <option value="all">Todos os distritos</option>
             {districts.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </label>
-        <label className="grid gap-2 text-sm font-bold text-slate-300">
+        <label className="grid gap-2 text-sm font-bold text-slate-800">
           Buscar lead
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-            <input className="h-11 w-full rounded-xl border border-white/[0.08] bg-slate-950/70 pl-10 pr-3 text-sm font-bold text-slate-100 outline-none placeholder:text-slate-600" onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone, e-mail ou distrito" value={search} />
+            <input className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-bold text-slate-950 shadow-[0_10px_28px_rgba(15,23,42,0.06)] outline-none transition placeholder:text-slate-500 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone, e-mail ou distrito" value={search} />
           </div>
         </label>
       </div>
       {availableRecords.length ? (
         <div className="grid max-h-[34rem] gap-2 overflow-y-auto pr-1">
           {visible.map((lead) => (
-            <button className="interactive-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/42 p-4 text-left transition hover:border-blue-400/35 hover:bg-blue-500/[0.08]" key={lead.id} onClick={() => setSelectedLead(lead)} type="button">
+            <button className="interactive-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_35px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_18px_44px_rgba(37,99,235,0.12)] max-sm:grid-cols-1" key={lead.id} onClick={() => setSelectedLead(lead)} type="button">
               <span className="min-w-0">
-                <strong className="block truncate text-base text-slate-50">{lead.n}</strong>
-                <span className="mt-1 block truncate text-sm text-slate-400">{lead.d} · {lead.tel || 'sem telefone'} · {lead.em || 'sem e-mail'}</span>
+                <strong className="block truncate text-base font-black text-slate-950">{lead.n}</strong>
+                <span className="mt-1 block truncate text-sm font-medium text-slate-600">{lead.d} · {lead.tel || 'sem telefone'} · {lead.em || 'sem e-mail'}</span>
               </span>
-              <span className="flex items-center gap-2">
-                <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-200">{crmPriorityLabels[lead.p] || lead.p}</span>
-                <ChevronRight className="text-slate-400" size={18} />
+              <span className="flex items-center justify-end gap-3 max-sm:justify-between">
+                <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide ${priorityBadgeClasses(lead.p)}`}>{crmPriorityLabels[lead.p] || lead.p}</span>
+                <span className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700">
+                  <ChevronRight size={18} />
+                </span>
               </span>
             </button>
           ))}
