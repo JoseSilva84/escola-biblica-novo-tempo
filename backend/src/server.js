@@ -55,6 +55,140 @@ function readZproMessage(payload = {}) {
   };
 }
 
+function externalLeadId(value) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+async function findLeadReference({ leadId, phone }) {
+  const numericLeadId = externalLeadId(leadId);
+  if (numericLeadId) {
+    const lead = await prisma.lead.findFirst({
+      where: { externalId: numericLeadId },
+      select: { id: true, externalId: true, name: true, phone: true, district: { select: { name: true } } }
+    });
+    if (lead) return lead;
+  }
+
+  const textLeadId = String(leadId || '').trim();
+  if (textLeadId && !numericLeadId && !textLeadId.startsWith('manual-')) {
+    const lead = await prisma.lead.findUnique({
+      where: { id: textLeadId },
+      select: { id: true, externalId: true, name: true, phone: true, district: { select: { name: true } } }
+    }).catch(() => null);
+    if (lead) return lead;
+  }
+
+  const normalizedPhone = normalizePhone(phone);
+  if (normalizedPhone) {
+    const lead = await prisma.lead.findFirst({
+      where: {
+        OR: [
+          { phone: normalizedPhone },
+          { phone: { contains: normalizedPhone.slice(-10) } },
+          { phone: { contains: normalizedPhone.slice(-11) } }
+        ]
+      },
+      select: { id: true, externalId: true, name: true, phone: true, district: { select: { name: true } } }
+    });
+    if (lead) return lead;
+  }
+
+  return null;
+}
+
+function providerMessageId(data) {
+  return data?.id
+    || data?.messageId
+    || data?.key?.id
+    || data?.data?.id
+    || data?.data?.messageId
+    || null;
+}
+
+async function recordWhatsAppMessage({
+  phone,
+  body,
+  direction,
+  senderType,
+  senderName = null,
+  leadId = null,
+  leadName = null,
+  district = null,
+  provider = 'zpro-baileys',
+  providerStatus = null,
+  providerResponse = null,
+  providerMessageId: messageId = null,
+  occurredAt = new Date(),
+  metadata = {}
+}) {
+  const normalizedPhone = normalizePhone(phone) || String(phone || '').replace(/\D/g, '');
+  const cleanBody = String(body || '').trim();
+  if (!normalizedPhone || !cleanBody) return null;
+
+  const lead = await findLeadReference({ leadId, phone: normalizedPhone });
+  const numericLeadId = externalLeadId(leadId) || lead?.externalId || null;
+  const dbLeadId = lead?.id || null;
+  const nextLeadName = lead?.name || leadName || null;
+  const nextDistrict = lead?.district?.name || district || null;
+
+  const conversation = await prisma.whatsAppConversation.upsert({
+    where: { phone: normalizedPhone },
+    create: {
+      phone: normalizedPhone,
+      leadId: dbLeadId,
+      externalLeadId: numericLeadId,
+      leadName: nextLeadName,
+      district: nextDistrict
+    },
+    update: {
+      ...(dbLeadId ? { leadId: dbLeadId } : {}),
+      ...(numericLeadId ? { externalLeadId: numericLeadId } : {}),
+      ...(nextLeadName ? { leadName: nextLeadName } : {}),
+      ...(nextDistrict ? { district: nextDistrict } : {})
+    }
+  });
+
+  const message = await prisma.whatsAppMessage.create({
+    data: {
+      conversationId: conversation.id,
+      leadId: dbLeadId,
+      externalLeadId: numericLeadId,
+      direction,
+      senderType,
+      senderName,
+      body: cleanBody,
+      provider,
+      providerMessageId: messageId,
+      providerStatus,
+      metadata: {
+        ...metadata,
+        providerResponse: providerResponse || null
+      },
+      sentAt: direction === 'OUTBOUND' ? occurredAt : null,
+      receivedAt: direction === 'INBOUND' ? occurredAt : null
+    }
+  });
+
+  if (dbLeadId && direction === 'INBOUND') {
+    await prisma.leadInteraction.create({
+      data: {
+        leadId: dbLeadId,
+        channel: 'WHATSAPP',
+        summary: cleanBody,
+        metadata: {
+          conversationId: conversation.id,
+          messageId: message.id,
+          provider,
+          providerMessageId: messageId
+        }
+      }
+    }).catch(() => null);
+  }
+
+  return { conversation, message };
+}
+
 function normalizePhone(value) {
   const digits = String(value || '').replace(/\D/g, '');
   if (digits.length < 10 || digits.length > 13) return '';
@@ -328,18 +462,61 @@ app.get('/api/whatsapp/provider', requireAuth, (_request, response) => {
   });
 });
 
+app.get('/api/whatsapp/conversations', requireAuth, async (request, response) => {
+  const phone = normalizePhone(request.query?.phone);
+  const numericLeadId = externalLeadId(request.query?.leadId);
+  const limit = Math.min(Math.max(Number(request.query?.limit) || 50, 1), 200);
+
+  const where = {};
+  if (phone) where.phone = phone;
+  if (numericLeadId) where.externalLeadId = numericLeadId;
+
+  const conversations = await prisma.whatsAppConversation.findMany({
+    where,
+    orderBy: { updatedAt: 'desc' },
+    take: limit,
+    include: {
+      messages: {
+        orderBy: { createdAt: 'asc' },
+        take: 200
+      }
+    }
+  });
+
+  response.json({ conversations });
+});
+
 app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
   try {
+    const sentAt = new Date();
     const result = await sendZproTextMessage({
       phone: request.body?.phone,
       message: request.body?.message,
       leadId: request.body?.leadId,
       templateId: request.body?.templateId
     });
+    const saved = await recordWhatsAppMessage({
+      phone: result.phone,
+      body: request.body?.message,
+      direction: 'OUTBOUND',
+      senderType: request.body?.senderType || 'USER',
+      senderName: request.user?.email || request.user?.sub || 'Sistema',
+      leadId: request.body?.leadId,
+      leadName: request.body?.name || null,
+      district: request.body?.district || null,
+      provider: result.provider,
+      providerStatus: 'SENT',
+      providerResponse: result.providerResponse,
+      providerMessageId: providerMessageId(result.providerResponse),
+      occurredAt: sentAt,
+      metadata: { templateId: request.body?.templateId || null, attempts: result.attempts || [] }
+    });
     response.json({
       ...result,
+      conversationId: saved?.conversation?.id || null,
+      messageId: saved?.message?.id || null,
       sentBy: request.user?.email || request.user?.sub || null,
-      sentAt: new Date().toISOString()
+      sentAt: sentAt.toISOString()
     });
   } catch (error) {
     console.error('[zpro:send:error]', error.message, error.providerResponse || '');
@@ -370,7 +547,28 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         leadId: recipient.leadId || recipient.id || null,
         templateId: request.body?.templateId || null
       });
-      results.push({ ok: true, phone: result.phone, leadId: recipient.leadId || recipient.id || null });
+      const saved = await recordWhatsAppMessage({
+        phone: result.phone,
+        body: message,
+        direction: 'OUTBOUND',
+        senderType: request.body?.senderType || 'USER',
+        senderName: request.user?.email || request.user?.sub || 'Sistema',
+        leadId: recipient.leadId || recipient.id || null,
+        leadName: recipient.name || null,
+        district: recipient.district || null,
+        provider: result.provider,
+        providerStatus: 'SENT',
+        providerResponse: result.providerResponse,
+        providerMessageId: providerMessageId(result.providerResponse),
+        metadata: { templateId: request.body?.templateId || null, batch: true, attempts: result.attempts || [] }
+      });
+      results.push({
+        ok: true,
+        phone: result.phone,
+        leadId: recipient.leadId || recipient.id || null,
+        conversationId: saved?.conversation?.id || null,
+        messageId: saved?.message?.id || null
+      });
     } catch (error) {
       results.push({
         ok: false,
@@ -413,7 +611,30 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     hasText: Boolean(event.text)
   }));
 
-  response.json({ ok: true, received: true });
+  const saved = await recordWhatsAppMessage({
+    phone: event.phone,
+    body: event.text,
+    direction: event.fromMe ? 'OUTBOUND' : 'INBOUND',
+    senderType: event.fromMe ? 'SYSTEM' : 'LEAD',
+    senderName: event.fromMe ? 'WhatsApp' : event.name,
+    provider: 'zpro-baileys',
+    providerStatus: event.event,
+    providerMessageId: event.messageId,
+    occurredAt: new Date(),
+    metadata: {
+      channelId: event.channelId,
+      event: event.event,
+      raw: request.body
+    }
+  });
+
+  response.json({
+    ok: true,
+    received: true,
+    saved: Boolean(saved),
+    conversationId: saved?.conversation?.id || null,
+    messageId: saved?.message?.id || null
+  });
 });
 
 app.listen(port, '0.0.0.0', () => {

@@ -35,6 +35,19 @@ enum InteractionChannel {
   SISTEMA
 }
 
+enum WhatsAppDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsAppSenderType {
+  LEAD
+  USER
+  AI
+  AUTOMATION
+  SYSTEM
+}
+
 model User {
   id             String      @id @default(cuid())
   name           String
@@ -116,6 +129,8 @@ model Lead {
   campaigns      CampaignLead[]
   interactions   LeadInteraction[]
   whatsAppSends   WhatsAppSend[]
+  whatsAppConversations WhatsAppConversation[]
+  whatsAppMessages      WhatsAppMessage[]
   visits         Visit[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
@@ -190,6 +205,48 @@ model LeadInteraction {
   metadata  Json?
   lead      Lead               @relation(fields: [leadId], references: [id])
   createdAt DateTime           @default(now())
+}
+
+model WhatsAppConversation {
+  id             String            @id @default(cuid())
+  phone          String            @unique
+  leadId         String?
+  externalLeadId Int?
+  leadName       String?
+  district       String?
+  status         String            @default("ABERTA")
+  lead           Lead?             @relation(fields: [leadId], references: [id])
+  messages       WhatsAppMessage[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([leadId])
+  @@index([externalLeadId])
+}
+
+model WhatsAppMessage {
+  id                String              @id @default(cuid())
+  conversationId    String
+  leadId            String?
+  externalLeadId    Int?
+  direction         WhatsAppDirection
+  senderType        WhatsAppSenderType
+  senderName        String?
+  body              String
+  provider          String?
+  providerMessageId String?
+  providerStatus    String?
+  metadata          Json?
+  sentAt            DateTime?
+  receivedAt        DateTime?
+  conversation      WhatsAppConversation @relation(fields: [conversationId], references: [id])
+  lead              Lead?                @relation(fields: [leadId], references: [id])
+  createdAt         DateTime             @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([leadId])
+  @@index([externalLeadId])
+  @@index([providerMessageId])
 }
 
 model Visit {

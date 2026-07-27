@@ -1242,6 +1242,7 @@ function AdminGeneralView({
   const [sendError, setSendError] = useState(null);
   const [batchLoading, setBatchLoading] = useState(false);
   const [lastBatch, setLastBatch] = useState(null);
+  const [whatsappConversations, setWhatsappConversations] = useState([]);
   const [leadFilters, setLeadFilters] = useState({
     association: 'paulistana',
     distrito: 'all',
@@ -1265,6 +1266,14 @@ function AdminGeneralView({
       })
       .catch(() => {
         if (active) setProvider({ configured: false, provider: 'zpro-baileys' });
+      });
+    apiFetch('/api/whatsapp/conversations?limit=50')
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => {
+        if (active && payload?.conversations) setWhatsappConversations(payload.conversations);
+      })
+      .catch(() => {
+        if (active) setWhatsappConversations([]);
       });
     return () => { active = false; };
   }, [section]);
@@ -1320,8 +1329,31 @@ function AdminGeneralView({
     [filteredWhatsappLeads, selectedLeadIds]
   );
   const batchLimit = Math.min(Math.max(Number(leadBatch) || 1, 1), 50);
+  const savedWhatsappMessages = useMemo(
+    () => whatsappConversations.flatMap((conversation) => (conversation.messages || []).map((message) => ({ ...message, conversation }))),
+    [whatsappConversations]
+  );
   const whatsappInbox = useMemo(
-    () => filteredWhatsappLeads
+    () => whatsappConversations.length
+      ? whatsappConversations.slice(0, 6).map((conversation) => {
+        const messages = conversation.messages || [];
+        const lastMessage = messages[messages.length - 1];
+        const linkedLead = records.find((lead) => {
+          if (conversation.externalLeadId && lead.id === conversation.externalLeadId) return true;
+          return phoneDigits(lead.tel).endsWith(String(conversation.phone || '').slice(-10));
+        });
+        return {
+          id: conversation.externalLeadId || conversation.id,
+          n: conversation.leadName || conversation.phone,
+          d: conversation.district || 'Distrito não vinculado',
+          p: linkedLead?.p || null,
+          status: lastMessage
+            ? `${lastMessage.direction === 'INBOUND' ? 'Recebida' : 'Enviada'}: ${lastMessage.body}`
+            : 'Conversa salva sem mensagens',
+          when: lastMessage?.createdAt ? new Date(lastMessage.createdAt).toLocaleString('pt-BR') : 'Sem data'
+        };
+      })
+      : filteredWhatsappLeads
       .filter((lead) => (lead.desc && lead.desc !== 'N/I') || lead.e || lead.c !== null)
       .slice(0, 6)
       .map((lead) => ({
@@ -1333,7 +1365,7 @@ function AdminGeneralView({
             : `Último contato há ${formatNumber(lead.c)} dias`,
         when: lead.c === null ? 'Sem data' : `${formatNumber(lead.c)} dias`
       })),
-    [filteredWhatsappLeads]
+    [filteredWhatsappLeads, whatsappConversations, records]
   );
   const leadsWithImportedDescription = records.filter((lead) => lead.t && lead.desc && lead.desc !== 'N/I').length;
   const leadsWithRecentContact = records.filter((lead) => lead.t && lead.c !== null && lead.c <= 90).length;
@@ -1372,16 +1404,30 @@ function AdminGeneralView({
     ['Estudos ativos', `${formatNumber(data.studies)} leads com estudo em andamento`, 'Media'],
     ['Sem contato há 5+ anos', `${formatNumber(leadsWithoutFiveYears)} contatos com WhatsApp`, 'Alta']
   ];
+  const timelineConversation = whatsappConversations[0] || null;
   const timelineLead = whatsappInbox[0] || filteredWhatsappLeads[0] || null;
-  const whatsappTimeline = timelineLead ? [
+  const whatsappTimeline = timelineConversation?.messages?.length
+    ? timelineConversation.messages.map((message) => [
+      message.direction === 'INBOUND' ? 'Recebida' : 'Enviada',
+      message.body,
+      message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : 'Sem data'
+    ])
+    : timelineLead ? [
     ['Lead real', timelineLead.n, timelineLead.d],
     ...(timelineLead.desc && timelineLead.desc !== 'N/I' ? [['Descrição importada', timelineLead.desc, 'Cadastro']] : []),
     ...(timelineLead.e ? [['Estudo ativo', 'Material em andamento na base', 'Cadastro']] : []),
     ...(timelineLead.c !== null ? [['Último contato', `Registrado há ${formatNumber(timelineLead.c)} dias`, 'Base']] : [])
   ] : [];
   const whatsappSendHistory = [
-    ...(lastSend ? [['Disparo individual', '1', '-', 'Aceito']] : []),
-    ...(lastBatch ? [['Lote manual', formatNumber(lastBatch.sent || 0), '-', `${formatNumber(lastBatch.failed || 0)} falhas`]] : [])
+    ...Object.entries(savedWhatsappMessages.reduce((acc, message) => {
+      const key = message.senderType === 'AI' ? 'IA' : message.senderType === 'AUTOMATION' ? 'Automação' : message.direction === 'INBOUND' ? 'Recebidas' : 'Enviadas';
+      acc[key] = acc[key] || { sent: 0, received: 0 };
+      if (message.direction === 'OUTBOUND') acc[key].sent += 1;
+      if (message.direction === 'INBOUND') acc[key].received += 1;
+      return acc;
+    }, {})).map(([name, values]) => [name, formatNumber(values.sent), formatNumber(values.received), 'Salvo']),
+    ...(!savedWhatsappMessages.length && lastSend ? [['Disparo individual', '1', '-', 'Aceito']] : []),
+    ...(!savedWhatsappMessages.length && lastBatch ? [['Lote manual', formatNumber(lastBatch.sent || 0), '-', `${formatNumber(lastBatch.failed || 0)} falhas`]] : [])
   ];
 
   useEffect(() => {
@@ -1446,6 +1492,17 @@ function AdminGeneralView({
     URL.revokeObjectURL(url);
   }
 
+  async function refreshWhatsappConversations() {
+    try {
+      const response = await apiFetch('/api/whatsapp/conversations?limit=50');
+      if (!response.ok) return;
+      const payload = await response.json();
+      setWhatsappConversations(payload.conversations || []);
+    } catch {
+      setWhatsappConversations([]);
+    }
+  }
+
   function submitUser(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1506,6 +1563,7 @@ function AdminGeneralView({
         throw new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
       }
       setLastSend(payload);
+      await refreshWhatsappConversations();
       toast.success('Mensagem enviada', {
         description: `Disparo feito para ${payload.phone} via ${payload.transport || 'Z-PRO'}.`
       });
@@ -1560,6 +1618,7 @@ function AdminGeneralView({
         throw new Error(payload.message || 'Nao foi possivel enviar o lote.');
       }
       setLastBatch(payload);
+      await refreshWhatsappConversations();
       toast.success('Lote enviado', {
         description: `${payload.sent || 0} mensagens aceitas pelo provedor.`
       });
@@ -1825,7 +1884,7 @@ function AdminGeneralView({
                     <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{lead.d} · {lead.status}</span>
                   </span>
                   <span className="text-right">
-                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${priorityBadgeClasses(lead.p)}`}>{crmPriorityLabels[lead.p] || lead.p}</span>
+                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${priorityBadgeClasses(lead.p)}`}>{lead.p ? (crmPriorityLabels[lead.p] || lead.p) : 'Salva'}</span>
                     <span className="mt-1 block text-xs font-bold text-slate-500">{lead.when}</span>
                   </span>
                 </button>
