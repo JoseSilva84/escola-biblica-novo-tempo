@@ -603,7 +603,7 @@ function AddAssociationForm({ onAdd }) {
   );
 }
 
-function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociation }) {
+function AdminDashboard({ associations, data, isAssociationsView = false, onOpenAssociations, onOpenAssociation, onAddAssociation }) {
   const totals = associations.reduce((acc, association) => ({
     leads: acc.leads + association.leads,
     campaigns: acc.campaigns + association.campaigns,
@@ -630,10 +630,28 @@ function AdminDashboard({ associations, data, onOpenAssociation, onAddAssociatio
               Gerencie territórios, campanhas e performance dos leads em um painel central com navegação limpa e efeitos sutis de interação.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <button className={primaryButtonClass} onClick={() => onOpenAssociation('paulistana')} type="button">
-                Abrir Associação Paulistana
-                <ArrowRight size={18} />
-              </button>
+              {isAssociationsView ? (
+                <label className="relative inline-flex min-w-72 items-center">
+                  <select
+                    className={`${primaryButtonClass} w-full appearance-none pr-11`}
+                    defaultValue=""
+                    onChange={(event) => {
+                      if (event.target.value) onOpenAssociation(event.target.value);
+                    }}
+                  >
+                    <option value="">Selecionar associação</option>
+                    {associations.map((association) => (
+                      <option key={association.id} value={association.id}>{association.name}</option>
+                    ))}
+                  </select>
+                  <ChevronRight className="pointer-events-none absolute right-4 text-white" size={18} />
+                </label>
+              ) : (
+                <button className={primaryButtonClass} onClick={onOpenAssociations} type="button">
+                  Associações
+                  <ArrowRight size={18} />
+                </button>
+              )}
               <button
                 className={ghostButtonClass}
                 onClick={() => toast.info('Fila de automações', {
@@ -1848,7 +1866,9 @@ export default function CrmApp({ payload: initialPayload = null }) {
       <AdminDashboard
         associations={associations}
         data={data}
+        isAssociationsView={view === 'associations'}
         onAddAssociation={(association) => setAssociations((current) => [association, ...current])}
+        onOpenAssociations={() => setView('associations')}
         onOpenAssociation={openAssociation}
       />
     );
