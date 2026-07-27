@@ -892,7 +892,6 @@ function AssociationDashboard({ association, data, onOpenDetails }) {
 function AdminGeneralView({
   associations,
   data,
-  records = [],
   users,
   campaigns,
   auditEvents,
@@ -902,7 +901,6 @@ function AdminGeneralView({
 }) {
   const [section, setSection] = useState(initialSection);
   const [leadBatch, setLeadBatch] = useState(20);
-  const [targetUser, setTargetUser] = useState(users[3]?.name || users[0]?.name || 'Equipe');
   const [provider, setProvider] = useState(null);
   const [sendLoading, setSendLoading] = useState(false);
   const [lastSend, setLastSend] = useState(null);
@@ -1031,20 +1029,22 @@ function AdminGeneralView({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const message = String(form.get('batchMessage') || '').trim();
+    const typedPhones = String(form.get('batchPhones') || '')
+      .split(/[\n,;]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
     const limit = Math.min(Math.max(Number(leadBatch) || 1, 1), 50);
-    const recipients = records
-      .filter((record) => record.t && record.p === 'Hot')
+    const recipients = typedPhones
       .slice(0, limit)
-      .map((record) => ({
-        id: record.id,
-        leadId: record.id,
-        phone: record.tel,
-        name: record.n
+      .map((phone, index) => ({
+        id: `manual-${index + 1}`,
+        leadId: `manual-${index + 1}`,
+        phone
       }));
 
     if (!recipients.length) {
-      toast.error('Nenhum contato disponivel', {
-        description: 'Nao encontrei leads quentes com WhatsApp para este lote.'
+      toast.error('Informe os numeros', {
+        description: 'Cole ao menos um WhatsApp no campo de numeros do lote.'
       });
       return;
     }
@@ -1327,16 +1327,14 @@ function AdminGeneralView({
           </article>
 
           <form className={`${panelClass} grid content-start gap-5 p-6`} onSubmit={submitWhatsAppBatch}>
-            <span className={labelClass}>Distribuição de trabalho</span>
+            <span className={labelClass}>Envio em lote WhatsApp</span>
             <label className="grid gap-2 text-sm font-medium text-slate-300">
               Quantidade de WhatsApps
               <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" max={50} min="1" onChange={(event) => setLeadBatch(Math.min(Number(event.target.value || 1), 50))} type="number" value={leadBatch} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-slate-300">
-              Responsável
-              <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" onChange={(event) => setTargetUser(event.target.value)} value={targetUser}>
-                {users.map((item) => <option key={item.id}>{item.name}</option>)}
-              </select>
+              Numeros do lote
+              <textarea className="min-h-28 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 py-3 text-slate-100 outline-none" name="batchPhones" placeholder={`Um numero por linha. Ex.:\n75992456130\n5511999999999`} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-slate-300">
               Mensagem do lote
@@ -1841,7 +1839,6 @@ export default function CrmApp({ payload: initialPayload = null }) {
     data,
     onAddCampaign: addAdminCampaign,
     onAddUser: addAdminUser,
-    records,
     users: adminUsers
   };
 
@@ -1885,4 +1882,3 @@ export default function CrmApp({ payload: initialPayload = null }) {
     </AppShell>
   );
 }
-
