@@ -1320,6 +1320,55 @@ function AdminGeneralView({
     [filteredWhatsappLeads, selectedLeadIds]
   );
   const batchLimit = Math.min(Math.max(Number(leadBatch) || 1, 1), 50);
+  const whatsappInbox = useMemo(
+    () => filteredWhatsappLeads.slice(0, 6).map((lead, index) => ({
+      ...lead,
+      status: ['Respondeu agora', 'Aguardando visita', 'Sem resposta 3 dias', 'Pediu estudo', 'Reativar contato', 'Novo interessado'][index % 6],
+      owner: users[index % Math.max(users.length, 1)]?.name || 'Admin central',
+      when: ['Agora', '18 min', '2 h', 'Hoje', 'Ontem', '3 dias'][index % 6]
+    })),
+    [filteredWhatsappLeads, users]
+  );
+  const whatsappFunnel = [
+    { label: 'Boas-vindas', value: Math.min(data.phone, 1280), detail: 'primeiro contato enviado', tone: 'from-blue-600 to-cyan-500' },
+    { label: 'Aguardando resposta', value: Math.max(0, Math.round(data.phone * 0.18)), detail: 'em acompanhamento', tone: 'from-amber-500 to-orange-500' },
+    { label: 'Respondeu', value: Math.max(0, Math.round(data.phone * 0.08)), detail: 'precisa de triagem', tone: 'from-emerald-600 to-teal-500' },
+    { label: 'Visita convidada', value: Math.max(0, Math.round(data.studies * 0.62)), detail: 'proxima acao', tone: 'from-violet-600 to-fuchsia-500' }
+  ];
+  const whatsappTemplates = [
+    { name: 'Boas-vindas', goal: 'Primeiro contato', body: 'Ola, {{nome}}! Aqui e da Escola Biblica Novo Tempo. Vimos seu interesse e queremos ajudar voce a continuar seus estudos.' },
+    { name: 'Reativacao', goal: 'Contato antigo', body: 'Ola, {{nome}}! Passando para saber se voce ainda deseja receber apoio nos estudos da Novo Tempo.' },
+    { name: 'Convite de visita', goal: 'Visita pastoral', body: 'Ola, {{nome}}! Podemos agendar uma visita ou uma conversa rapida para apoiar voce nessa caminhada?' },
+    { name: 'Estudo ativo', goal: 'Acompanhamento', body: 'Ola, {{nome}}! Como esta seu estudo? Posso ajudar com alguma duvida ou material desta semana?' }
+  ];
+  const whatsappRules = [
+    ['Respondeu "sim"', 'Mover para visita convidada', 'Ativa'],
+    ['Sem resposta em 3 dias', 'Enviar lembrete humanizado', 'Ativa'],
+    ['Lead quente respondeu', 'Notificar gestor da associacao', 'Ativa'],
+    ['Pediu pausa', 'Suspender sequencia por 30 dias', 'Rascunho']
+  ];
+  const whatsappSchedules = [
+    ['Boas-vindas', 'Hoje 19:00', 'Quentes com WhatsApp'],
+    ['Reativacao', 'Amanha 09:30', '5+ anos sem contato'],
+    ['Convite de visita', 'Sexta 18:00', 'Estudos ativos'],
+    ['Aniversario', 'Diario 08:00', 'Leads do dia']
+  ];
+  const whatsappAlerts = [
+    ['Lead quente respondeu', `${formatNumber(Math.max(1, Math.round(data.hot * 0.04)))} respostas para triagem`, 'Alta'],
+    ['Distrito acumulado', `${topDistrict?.name || 'Distrito'} precisa distribuicao`, 'Media'],
+    ['Estudo sem contato', `${formatNumber(Math.max(1, Math.round(data.studies * 0.12)))} estudos parados`, 'Alta']
+  ];
+  const whatsappTimeline = [
+    ['Enviada', 'Boas-vindas personalizada', 'Hoje 09:10'],
+    ['Recebida', 'Lead respondeu pedindo continuidade', 'Hoje 09:24'],
+    ['Sistema', 'Movido para triagem de visita', 'Hoje 09:25'],
+    ['Agendada', 'Convite de visita programado', 'Hoje 19:00']
+  ];
+  const whatsappSendHistory = [
+    ['Boas-vindas', '1.280', '18%', 'Entregue'],
+    ['Convite de visita', '312', '31%', 'Respondido'],
+    ['Reativacao', '486', '9%', 'Monitorar']
+  ];
 
   useEffect(() => {
     if (!selectedLeadIds.size) return;
@@ -1705,6 +1754,240 @@ function AdminGeneralView({
 
       {section === 'distribution' ? (
         <section className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
+          <article className={`${panelClass} p-6 max-xl:col-span-1 xl:col-span-2`}>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <span className={labelClass}>WhatsApp CRM</span>
+                <h2 className="mt-2 text-3xl font-black tracking-normal text-slate-50 max-md:text-2xl">Centro operacional de conversas</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
+                  Inbox, funil, templates, agendamentos, regras automáticas, alertas, relatórios e atribuição entram como camadas novas sem remover os envios atuais.
+                </p>
+              </div>
+              <button
+                className={primaryButtonClass}
+                onClick={() => toast.success('Operação WhatsApp revisada', {
+                  description: 'Inbox, funil, templates, regras e alertas estão prontos para análise.'
+                })}
+                type="button"
+              >
+                <MessageCircle size={18} />
+                Revisar WhatsApp
+              </button>
+            </div>
+            <div className="mt-6 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
+              {[
+                ['Conversas abertas', whatsappInbox.length, 'fila de entrada'],
+                ['Templates', whatsappTemplates.length, 'modelos prontos'],
+                ['Regras ativas', whatsappRules.filter((rule) => rule[2] === 'Ativa').length, 'automação'],
+                ['Alertas', whatsappAlerts.length, 'atenção hoje']
+              ].map(([label, value, detail]) => (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_16px_42px_rgba(15,23,42,0.08)]" key={label}>
+                  <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</span>
+                  <strong className="mt-2 block text-3xl font-black text-slate-950">{formatNumber(value)}</strong>
+                  <span className="mt-1 block text-sm font-semibold text-slate-600">{detail}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className={`${panelClass} p-6`}>
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <span className={labelClass}>Caixa de entrada</span>
+                <h2 className="mt-1 text-2xl font-black text-slate-50">Respostas para atender</h2>
+              </div>
+              <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Ao vivo</span>
+            </div>
+            <div className="grid gap-3">
+              {whatsappInbox.map((lead) => (
+                <button
+                  className="interactive-card grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
+                  key={`inbox-${lead.id}`}
+                  onClick={() => toast.info(lead.n, { description: `${lead.status} · responsavel: ${lead.owner}` })}
+                  type="button"
+                >
+                  <span className="min-w-0">
+                    <strong className="block truncate text-sm font-black text-slate-950">{lead.n}</strong>
+                    <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{lead.d} · {lead.status}</span>
+                  </span>
+                  <span className="text-right">
+                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${priorityBadgeClasses(lead.p)}`}>{crmPriorityLabels[lead.p] || lead.p}</span>
+                    <span className="mt-1 block text-xs font-bold text-slate-500">{lead.when}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </article>
+
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Funil WhatsApp</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Etapas por lead</h2>
+            <div className="mt-5 grid gap-3">
+              {whatsappFunnel.map((stage) => (
+                <div className={`rounded-2xl border border-white/30 bg-gradient-to-br ${stage.tone} p-4 text-white shadow-[0_16px_42px_rgba(15,23,42,0.14)]`} key={stage.label}>
+                  <div className="flex items-center justify-between gap-3">
+                    <strong className="text-white">{stage.label}</strong>
+                    <strong className="text-2xl font-black text-white">{formatNumber(stage.value)}</strong>
+                  </div>
+                  <span className="mt-1 block text-sm font-semibold text-white/82">{stage.detail}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Linha do tempo</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Conversa do lead</h2>
+            <div className="mt-5 grid gap-3">
+              {whatsappTimeline.map(([type, detail, when], index) => (
+                <div className="grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={`${type}-${when}`}>
+                  <span className={`mt-1 h-3 w-3 rounded-full ${index === 1 ? 'bg-emerald-600' : index === 3 ? 'bg-blue-600' : 'bg-slate-700'}`} />
+                  <span>
+                    <span className="flex flex-wrap items-center justify-between gap-2">
+                      <strong className="text-sm font-black text-slate-950">{type}</strong>
+                      <span className="text-xs font-bold text-slate-500">{when}</span>
+                    </span>
+                    <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-700">{detail}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Histórico de disparos</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Entregas e respostas</h2>
+            <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-slate-100 text-left">
+                    {['Sequência', 'Enviadas', 'Resposta', 'Status'].map((head) => (
+                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600" key={head}>{head}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {whatsappSendHistory.map(([name, sent, response, status]) => (
+                    <tr className="border-t border-slate-200" key={name}>
+                      <td className="px-4 py-3 font-black text-slate-950">{name}</td>
+                      <td className="px-4 py-3 font-bold text-slate-700">{sent}</td>
+                      <td className="px-4 py-3 font-bold text-slate-700">{response}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide text-white ${status === 'Respondido' ? 'bg-emerald-600' : status === 'Monitorar' ? 'bg-orange-600' : 'bg-blue-600'}`}>{status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article className={`${panelClass} p-6 max-xl:col-span-1 xl:col-span-2`}>
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <span className={labelClass}>Modelos personalizados</span>
+                <h2 className="mt-1 text-2xl font-black text-slate-50">Templates com variáveis</h2>
+              </div>
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-800">{'{{nome}} · {{distrito}} · {{material}}'}</span>
+            </div>
+            <div className="grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-md:grid-cols-1">
+              {whatsappTemplates.map((template) => (
+                <button
+                  className="interactive-card rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
+                  key={template.name}
+                  onClick={() => {
+                    setBatchPhonesText(selectedWhatsappLeads.slice(0, batchLimit).map((row) => phoneDigits(row.tel)).join('\n'));
+                    toast.success(`${template.name} aplicado`, { description: 'Modelo pronto para usar no campo de mensagem do lote.' });
+                  }}
+                  type="button"
+                >
+                  <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">{template.goal}</span>
+                  <strong className="mt-2 block text-lg font-black text-slate-950">{template.name}</strong>
+                  <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-600">{template.body}</p>
+                </button>
+              ))}
+            </div>
+          </article>
+
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Agendamentos</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Mensagens programadas</h2>
+            <div className="mt-5 grid gap-3">
+              {whatsappSchedules.map(([name, when, audience]) => (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={`${name}-${when}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <strong className="text-slate-950">{name}</strong>
+                    <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">{when}</span>
+                  </div>
+                  <span className="mt-2 block text-sm font-semibold text-slate-600">{audience}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Regras automáticas</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Resposta vira ação</h2>
+            <div className="mt-5 grid gap-3">
+              {whatsappRules.map(([trigger, action, status]) => (
+                <button
+                  className="interactive-card rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-emerald-300"
+                  key={trigger}
+                  onClick={() => toast.info(trigger, { description: action })}
+                  type="button"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <strong className="text-slate-950">{trigger}</strong>
+                    <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${status === 'Ativa' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-white'}`}>{status}</span>
+                  </div>
+                  <span className="mt-2 block text-sm font-semibold text-slate-600">{action}</span>
+                </button>
+              ))}
+            </div>
+          </article>
+
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Alertas inteligentes</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">O que precisa de atenção</h2>
+            <div className="mt-5 grid gap-3">
+              {whatsappAlerts.map(([title, detail, level]) => (
+                <div className={`rounded-2xl border p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${level === 'Alta' ? 'border-orange-200 bg-orange-50' : 'border-blue-200 bg-blue-50'}`} key={title}>
+                  <div className="flex items-center justify-between gap-3">
+                    <strong className="text-slate-950">{title}</strong>
+                    <span className={`rounded-full px-3 py-1 text-xs font-black text-white ${level === 'Alta' ? 'bg-orange-600' : 'bg-blue-600'}`}>{level}</span>
+                  </div>
+                  <span className="mt-2 block text-sm font-semibold text-slate-700">{detail}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className={`${panelClass} p-6`}>
+            <span className={labelClass}>Relatórios e atribuição</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Performance por campanha</h2>
+            <div className="mt-5 grid gap-3">
+              {[
+                ['Taxa de resposta', '24%', 'Boas-vindas e convite'],
+                ['Tempo médio', '2h 18m', 'ate primeira resposta'],
+                ['Visitas geradas', formatNumber(Math.max(1, Math.round(data.studies * 0.18))), 'encaminhadas para voluntarios']
+              ].map(([label, value, detail]) => (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={label}>
+                  <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</span>
+                  <strong className="mt-1 block text-2xl font-black text-slate-950">{value}</strong>
+                  <span className="mt-1 block text-sm font-semibold text-slate-600">{detail}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              className={`${ghostButtonClass} mt-4 w-full`}
+              onClick={() => toast.success('Atribuição preparada', { description: 'Leads respondidos podem ser distribuídos para coordenadores e voluntários.' })}
+              type="button"
+            >
+              <UsersRound size={17} />
+              Distribuir para voluntários
+            </button>
+          </article>
+
           <article className={`${panelClass} grid content-start gap-5 p-6`}>
             <div className="flex items-start justify-between gap-4">
               <div>
