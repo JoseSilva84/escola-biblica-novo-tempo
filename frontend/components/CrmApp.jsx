@@ -1337,23 +1337,48 @@ function AdminGeneralView({
   );
   const leadsWithImportedDescription = records.filter((lead) => lead.t && lead.desc && lead.desc !== 'N/I').length;
   const leadsWithRecentContact = records.filter((lead) => lead.t && lead.c !== null && lead.c <= 90).length;
+  const leadsContactUntilOneYear = records.filter((lead) => lead.t && lead.c !== null && lead.c > 90 && lead.c <= 365).length;
+  const leadsContactOneToFiveYears = records.filter((lead) => lead.t && lead.c !== null && lead.c > 365 && lead.c <= 1825).length;
   const leadsWithoutFiveYears = records.filter((lead) => lead.t && lead.c !== null && lead.c > 1825).length;
   const hotWithWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
+  const vipWithWhatsapp = records.filter((lead) => lead.t && lead.v).length;
+  const studiesWithWhatsapp = records.filter((lead) => lead.t && lead.e).length;
   const whatsappFunnel = [
     { label: 'Com WhatsApp', value: data.phone, detail: 'telefone válido na base', tone: 'from-blue-600 to-cyan-500' },
     { label: 'Descrição importada', value: leadsWithImportedDescription, detail: 'campo de observação preenchido', tone: 'from-slate-700 to-slate-900' },
     { label: 'Contato até 90 dias', value: leadsWithRecentContact, detail: 'último contato registrado', tone: 'from-emerald-600 to-teal-500' },
     { label: 'Estudo ativo', value: data.studies, detail: 'material em andamento', tone: 'from-violet-600 to-fuchsia-500' }
   ];
-  const whatsappTemplates = [];
-  const whatsappRules = [];
-  const whatsappSchedules = [];
+  const whatsappTemplates = [
+    { name: 'Quentes com WhatsApp', goal: 'Prioridade alta', count: hotWithWhatsapp, filter: { prioridade: 'Hot' } },
+    { name: 'VIPs com WhatsApp', goal: 'Relacionamento', count: vipWithWhatsapp, filter: { prioridade: 'all' } },
+    { name: 'Estudos ativos', goal: 'Acompanhamento', count: studiesWithWhatsapp, filter: { prioridade: 'all' } },
+    { name: 'Sem contato 5+ anos', goal: 'Recuperacao', count: leadsWithoutFiveYears, filter: { prioridade: 'all' } }
+  ];
+  const whatsappRules = [
+    ['Priorizar quentes com WhatsApp', `${formatNumber(hotWithWhatsapp)} leads`, 'Base real'],
+    ['Acompanhar estudos ativos', `${formatNumber(studiesWithWhatsapp)} leads`, 'Base real'],
+    ['Recuperar sem contato 5+ anos', `${formatNumber(leadsWithoutFiveYears)} leads`, 'Base real'],
+    ['Relacionar VIPs com WhatsApp', `${formatNumber(vipWithWhatsapp)} leads`, 'Base real']
+  ];
+  const whatsappSchedules = [
+    ['Contato até 90 dias', leadsWithRecentContact, 'último contato registrado'],
+    ['91 dias a 1 ano', leadsContactUntilOneYear, 'contatos em aquecimento'],
+    ['1 a 5 anos', leadsContactOneToFiveYears, 'recuperação moderada'],
+    ['5+ anos', leadsWithoutFiveYears, 'recuperação antiga']
+  ];
   const whatsappAlerts = [
     ['Leads quentes com WhatsApp', `${formatNumber(hotWithWhatsapp)} contatos reais na base`, 'Alta'],
     ['Estudos ativos', `${formatNumber(data.studies)} leads com estudo em andamento`, 'Media'],
     ['Sem contato há 5+ anos', `${formatNumber(leadsWithoutFiveYears)} contatos com WhatsApp`, 'Alta']
   ];
-  const whatsappTimeline = [];
+  const timelineLead = whatsappInbox[0] || filteredWhatsappLeads[0] || null;
+  const whatsappTimeline = timelineLead ? [
+    ['Lead real', timelineLead.n, timelineLead.d],
+    ...(timelineLead.desc && timelineLead.desc !== 'N/I' ? [['Descrição importada', timelineLead.desc, 'Cadastro']] : []),
+    ...(timelineLead.e ? [['Estudo ativo', 'Material em andamento na base', 'Cadastro']] : []),
+    ...(timelineLead.c !== null ? [['Último contato', `Registrado há ${formatNumber(timelineLead.c)} dias`, 'Base']] : [])
+  ] : [];
   const whatsappSendHistory = [
     ...(lastSend ? [['Disparo individual', '1', '-', 'Aceito']] : []),
     ...(lastBatch ? [['Lote manual', formatNumber(lastBatch.sent || 0), '-', `${formatNumber(lastBatch.failed || 0)} falhas`]] : [])
@@ -1749,7 +1774,7 @@ function AdminGeneralView({
                 <span className={labelClass}>WhatsApp CRM</span>
                 <h2 className="mt-2 text-3xl font-black tracking-normal text-slate-50 max-md:text-2xl">Centro operacional de conversas</h2>
                 <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
-                  Inbox, funil, templates, agendamentos, regras automáticas, alertas, relatórios e atribuição entram como camadas novas sem remover os envios atuais.
+                  Registros importados, indicadores, segmentos, recência, critérios, alertas e relatórios calculados com a base real, sem remover os envios atuais.
                 </p>
               </div>
               <button
@@ -1766,8 +1791,8 @@ function AdminGeneralView({
             <div className="mt-6 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
               {[
                 ['Registros reais', whatsappInbox.length, 'leads com histórico'],
-                ['Templates', whatsappTemplates.length, 'cadastrados'],
-                ['Regras ativas', whatsappRules.filter((rule) => rule[2] === 'Ativa').length, 'cadastradas'],
+                ['Segmentos', whatsappTemplates.length, 'calculados da base'],
+                ['Critérios', whatsappRules.length, 'calculados da base'],
                 ['Prioridades', whatsappAlerts.length, 'calculadas da base']
               ].map(([label, value, detail]) => (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_16px_42px_rgba(15,23,42,0.08)]" key={label}>
@@ -1886,10 +1911,10 @@ function AdminGeneralView({
           <article className={`${panelClass} p-6 max-xl:col-span-1 xl:col-span-2`}>
             <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
               <div>
-                <span className={labelClass}>Modelos personalizados</span>
-                <h2 className="mt-1 text-2xl font-black text-slate-50">Templates com variáveis</h2>
+                <span className={labelClass}>Segmentos reais</span>
+                <h2 className="mt-1 text-2xl font-black text-slate-50">Grupos para ação WhatsApp</h2>
               </div>
-              <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-800">{'{{nome}} · {{distrito}} · {{material}}'}</span>
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-800">Base real de leads</span>
             </div>
             <div className="grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-md:grid-cols-1">
               {whatsappTemplates.length ? whatsappTemplates.map((template) => (
@@ -1897,46 +1922,46 @@ function AdminGeneralView({
                   className="interactive-card rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
                   key={template.name}
                   onClick={() => {
-                    setBatchPhonesText(selectedWhatsappLeads.slice(0, batchLimit).map((row) => phoneDigits(row.tel)).join('\n'));
-                    toast.success(`${template.name} aplicado`, { description: 'Modelo pronto para usar no campo de mensagem do lote.' });
+                    setLeadFilters((current) => ({ ...current, ...template.filter }));
+                    toast.success(`${template.name} selecionado`, { description: `${formatNumber(template.count)} leads nesse segmento real.` });
                   }}
                   type="button"
                 >
                   <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">{template.goal}</span>
                   <strong className="mt-2 block text-lg font-black text-slate-950">{template.name}</strong>
-                  <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-600">{template.body}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{formatNumber(template.count)} leads encontrados na base atual.</p>
                 </button>
               )) : (
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)] max-xl:col-span-2 max-md:col-span-1 xl:col-span-4">
-                  Nenhum template cadastrado no sistema ainda. Quando houver cadastro real, ele aparecerá aqui.
+                  Nenhum segmento real encontrado com os filtros atuais.
                 </div>
               )}
             </div>
           </article>
 
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Agendamentos</span>
-            <h2 className="mt-1 text-2xl font-black text-slate-50">Mensagens programadas</h2>
+            <span className={labelClass}>Recência real</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Último contato</h2>
             <div className="mt-5 grid gap-3">
               {whatsappSchedules.length ? whatsappSchedules.map(([name, when, audience]) => (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={`${name}-${when}`}>
                   <div className="flex items-center justify-between gap-3">
                     <strong className="text-slate-950">{name}</strong>
-                    <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">{when}</span>
+                    <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">{formatNumber(when)}</span>
                   </div>
                   <span className="mt-2 block text-sm font-semibold text-slate-600">{audience}</span>
                 </div>
               )) : (
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
-                  Nenhum agendamento real cadastrado.
+                  Nenhuma data de último contato encontrada na base.
                 </div>
               )}
             </div>
           </article>
 
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Regras automáticas</span>
-            <h2 className="mt-1 text-2xl font-black text-slate-50">Resposta vira ação</h2>
+            <span className={labelClass}>Critérios reais</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Priorização da base</h2>
             <div className="mt-5 grid gap-3">
               {whatsappRules.length ? whatsappRules.map(([trigger, action, status]) => (
                 <button
@@ -1953,7 +1978,7 @@ function AdminGeneralView({
                 </button>
               )) : (
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
-                  Nenhuma regra automática cadastrada no sistema.
+                  Nenhum critério real encontrado na base.
                 </div>
               )}
             </div>
