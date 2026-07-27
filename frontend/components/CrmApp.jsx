@@ -1566,7 +1566,7 @@ function AppShell({ children, current, onNavigate, onLogout, theme, onToggleThem
           <div className="flex items-center justify-between gap-4">
             <div>
               <span className={labelClass}>Leads NT</span>
-              <h2 className="text-xl font-black text-slate-50">Administração central</h2>
+              <h2 className="text-xl font-black text-slate-50">Administração Geral</h2>
             </div>
             <div className="flex items-center gap-3">
               <button
