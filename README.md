@@ -1,4 +1,4 @@
-# Leads NT - CRM de Interessados
+# Amigos NT - CRM de Interessados
 
 Sistema em desenvolvimento para organizar interessados da Novo Tempo, acompanhar campanhas por associacao/distrito e apoiar a priorizacao de contatos com dados operacionais e ranking de machine learning.
 
@@ -116,7 +116,7 @@ Para desenvolvimento local, o endpoint fica:
 http://localhost:4000/api/webhooks/zpro/whatsapp?token=SUA_CHAVE_ZPRO_WEBHOOK_SECRET
 ```
 
-O campo do Zpro recebe eventos de entrada, como mensagens recebidas e status do canal. Para envio automatico de mensagens, o Leads NT devera chamar a API do Zpro usando as credenciais do provedor e registrar os disparos na tabela `WhatsAppSend`.
+O campo do Zpro recebe eventos de entrada, como mensagens recebidas e status do canal. Para envio automatico de mensagens, o Amigos NT devera chamar a API do Zpro usando as credenciais do provedor e registrar os disparos na tabela `WhatsAppSend`.
 
 ### Envio de mensagens pelo Zpro
 
@@ -139,7 +139,7 @@ Se a sua instalacao do Zpro usar outro caminho de envio, altere apenas `ZPRO_SEN
 ZPRO_SEND_TEXT_PATH="/v2/api/external/{apiId}"
 ```
 
-Rotas internas do Leads NT para disparo:
+Rotas internas do Amigos NT para disparo:
 
 - `GET /api/whatsapp/provider`
 - `POST /api/whatsapp/send`

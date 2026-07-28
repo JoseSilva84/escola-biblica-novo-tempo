@@ -365,7 +365,7 @@ function LoginScreen({ onLogin }) {
     try {
       await onLogin(loginPayload.user || loginPayload);
       setLoading(false);
-      toast.success('Bem-vindo ao Leads NT', {
+      toast.success('Bem-vindo ao Amigos NT', {
         description: 'Dashboard admin carregado com sucesso.'
       });
     } catch {
@@ -404,7 +404,7 @@ function LoginScreen({ onLogin }) {
           <div>
 
             <h1 className="silver-title max-w-2xl text-6xl font-black leading-tight tracking-normal max-md:text-4xl text-center">
-              Leads NT
+              Amigos NT
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-400 text-center">
               Administre Campanhas, Automações e Leads da Novo Tempo.
@@ -431,7 +431,7 @@ function LoginScreen({ onLogin }) {
         <form className={`${panelClass} grid content-center gap-5 p-8 max-sm:p-5`} onSubmit={submitLogin}>
           <div className="flex flex-col items-center justify-center">
             <img src="/logo.png" alt="Novo Tempo" className="animate-logo-float mb-4 h-28 object-contain drop-shadow-md" />
-            <h2 className="mt-2 text-2xl font-black text-slate-50 text-center">Acesso aos Leads NT</h2>
+            <h2 className="mt-2 text-2xl font-black text-slate-50 text-center">Acesso aos Amigos NT</h2>
           </div>
           <label className="grid gap-2 text-sm font-bold text-slate-300 text-center">
             Email
@@ -498,7 +498,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
             <img src="/novo-tempo.jpg" alt="Logo Novo Tempo" className="h-full w-full object-cover mix-blend-multiply dark:mix-blend-normal" />
           </div>
           <div className={compact ? 'hidden' : 'block'}>
-            <strong className="silver-title block text-xl font-black">Leads NT</strong>
+            <strong className="silver-title block text-xl font-black">Amigos NT</strong>
             <span className="text-xs font-bold text-slate-500">Admin central</span>
           </div>
         </div>
@@ -574,7 +574,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
               <img src="/novo-tempo.jpg" alt="Logo Novo Tempo" className="h-full w-full object-cover mix-blend-multiply dark:mix-blend-normal" />
             </div>
             <div>
-              <strong className="silver-title block text-lg font-black">Leads NT</strong>
+              <strong className="silver-title block text-lg font-black">Amigos NT</strong>
             </div>
           </div>
           <button 
@@ -2600,7 +2600,7 @@ function SettingsView({ theme, onToggleTheme }) {
   const settings = [
     {
       title: 'Perfil do sistema',
-      description: 'Nome Leads NT, identidade visual, domínio e dados institucionais.',
+      description: 'Nome Amigos NT, identidade visual, domínio e dados institucionais.',
       status: 'Configurado',
       icon: Crown
     },
@@ -2644,7 +2644,7 @@ function SettingsView({ theme, onToggleTheme }) {
             <span className={labelClass}>Administração</span>
             <h1 className="silver-title mt-2 text-5xl font-black leading-tight tracking-normal max-md:text-4xl">Configurações</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
-              Centralize os ajustes críticos do Leads NT em um painel organizado, com foco em segurança, operação e consistência visual.
+              Centralize os ajustes críticos do Amigos NT em um painel organizado, com foco em segurança, operação e consistência visual.
             </p>
           </div>
           <button
@@ -2739,7 +2739,7 @@ function AppShell({ children, current, onNavigate, onLogout, theme, onToggleThem
         <header className="sticky top-0 z-30 border-b border-white/[0.07] bg-slate-950/60 px-8 py-4 backdrop-blur-2xl max-md:px-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <span className={labelClass}>Leads NT</span>
+              <span className={labelClass}>Amigos NT</span>
               <h2 className="text-xl font-black text-slate-50">Administração Geral</h2>
             </div>
             <div className="flex items-center gap-3">

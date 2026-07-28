@@ -638,5 +638,5 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
 });
 
 app.listen(port, '0.0.0.0', () => {
-  console.log(`Leads NT backend running on port ${port}`);
+  console.log(`Amigos NT backend running on port ${port}`);
 });
