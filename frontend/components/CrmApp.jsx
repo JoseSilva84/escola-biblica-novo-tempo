@@ -2875,7 +2875,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const initialAssociations = initialPayload ? buildInitialAssociations(initialPayload.records) : [];
   const [user, setUser] = useState(null);
   const [view, setView] = useState('login');
-  const [authReady, setAuthReady] = useState(false);
+  const [authReady, setAuthReady] = useState(true);
+  const [restoringSession, setRestoringSession] = useState(false);
   const [theme, setTheme] = useState('light');
   const [selectedAssociationId, setSelectedAssociationId] = useState('paulistana');
   const [payload, setPayload] = useState(initialPayload);
@@ -2895,6 +2896,17 @@ export default function CrmApp({ payload: initialPayload = null }) {
     let active = true;
 
     async function restoreSession() {
+      const storedToken = window.localStorage.getItem('sevenflow_token');
+      if (!storedToken) {
+        setAuthReady(true);
+        setRestoringSession(false);
+        setView('login');
+        return;
+      }
+
+      setAuthReady(false);
+      setRestoringSession(true);
+
       try {
         const response = await apiFetch('/api/auth/me');
         if (!response.ok) {
@@ -2918,7 +2930,10 @@ export default function CrmApp({ payload: initialPayload = null }) {
         window.localStorage.removeItem('sevenflow_token');
         if (active) setView('login');
       } finally {
-        if (active) setAuthReady(true);
+        if (active) {
+          setAuthReady(true);
+          setRestoringSession(false);
+        }
       }
     }
 
@@ -2951,7 +2966,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
     setView('association');
   }
 
-  if (!authReady) {
+  if (!authReady && restoringSession) {
     return (
       <div className="silver-stage min-h-screen">
         <AppToaster theme={theme} />
