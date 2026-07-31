@@ -2383,29 +2383,53 @@ function ConversationsView({ records = [] }) {
   const lastSeenMessageIdRef = useRef(null);
 
   async function loadConversations(phone = '', options = {}) {
-    const { silent = false, notify = false } = options;
+    const { silent = false, notify = false, selectSearched = false } = options;
     if (!silent) setLoading(true);
     try {
       const query = phoneDigits(phone);
-      const params = new URLSearchParams({
-        limit: '100',
+      const recentParams = new URLSearchParams({
+        limit: '10',
         _: String(Date.now())
       });
-      if (query) params.set('phone', query);
-      const response = await apiFetch(`/api/whatsapp/conversations?${params.toString()}`, {
+      const searchedParams = new URLSearchParams({
+        limit: '1',
+        _: String(Date.now())
+      });
+      if (query) searchedParams.set('phone', query);
+
+      const requestOptions = {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
+      };
+      const [recentResponse, searchedResponse] = await Promise.all([
+        apiFetch(`/api/whatsapp/conversations?${recentParams.toString()}`, requestOptions),
+        query ? apiFetch(`/api/whatsapp/conversations?${searchedParams.toString()}`, requestOptions) : Promise.resolve(null)
+      ]);
+      const recentPayload = recentResponse.ok ? await recentResponse.json() : { conversations: [] };
+      const searchedPayload = searchedResponse?.ok ? await searchedResponse.json() : { conversations: [] };
+      const byId = new Map();
+      [...(searchedPayload.conversations || []), ...(recentPayload.conversations || [])].forEach((conversation) => {
+        byId.set(conversation.id, conversation);
       });
-      const payload = response.ok ? await response.json() : { conversations: [] };
-      const nextConversations = payload.conversations || [];
-      const nextSelected = nextConversations.find((conversation) => conversation.id === selectedId) || nextConversations[0] || null;
+      const nextConversations = Array.from(byId.values()).slice(0, query ? 11 : 10);
+      const searchedConversation = query
+        ? nextConversations.find((conversation) => phoneDigits(conversation.phone).endsWith(query.slice(-10)))
+        : null;
+      const nextSelected = (
+        (selectSearched && searchedConversation)
+        || nextConversations.find((conversation) => conversation.id === selectedId)
+        || nextConversations[0]
+        || null
+      );
       const nextMessages = nextSelected?.messages || [];
       const nextLastMessage = nextMessages[nextMessages.length - 1] || null;
       const previousLastMessageId = lastSeenMessageIdRef.current;
 
       setConversations(nextConversations);
       setSelectedId((current) => (
-        nextConversations.some((conversation) => conversation.id === current)
+        selectSearched && searchedConversation
+          ? searchedConversation.id
+          : nextConversations.some((conversation) => conversation.id === current)
           ? current
           : nextConversations[0]?.id || null
       ));
@@ -2476,9 +2500,7 @@ function ConversationsView({ records = [] }) {
 
   async function submitSearch(event) {
     event.preventDefault();
-    await loadConversations(phoneSearch);
-    if (!phoneDigits(phoneSearch)) return;
-    setSelectedId(null);
+    await loadConversations(phoneSearch, { selectSearched: true });
   }
 
   async function submitMessage(event) {
@@ -2506,7 +2528,7 @@ function ConversationsView({ records = [] }) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
       setMessageText('');
-      await loadConversations(phone);
+      await loadConversations(phone, { selectSearched: true });
       setSelectedId(payload.conversationId || selectedId);
       toast.success('Mensagem salva na conversa', {
         description: `Historico atualizado para ${payload.phone || phone}.`
