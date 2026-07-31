@@ -477,6 +477,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
     ['users', 'Acessos', UsersRound],
     ['campaigns', 'Campanhas', Radio],
     ['automations', 'WhatsApp', MessageCircle],
+    ['conversations', 'Conversas', MessageCircle],
     ['ai-agent', 'IA', WandSparkles],
     ['reports', 'Relatórios', PieChart]
   ];
@@ -1244,6 +1245,7 @@ function AdminGeneralView({
   const [batchLoading, setBatchLoading] = useState(false);
   const [lastBatch, setLastBatch] = useState(null);
   const [whatsappConversations, setWhatsappConversations] = useState([]);
+  const [selectedInboxId, setSelectedInboxId] = useState(null);
   const [leadFilters, setLeadFilters] = useState({
     association: 'paulistana',
     distrito: 'all',
@@ -1345,6 +1347,8 @@ function AdminGeneralView({
         });
         return {
           id: conversation.externalLeadId || conversation.id,
+          conversation,
+          messages,
           n: conversation.leadName || conversation.phone,
           d: conversation.district || 'Distrito não vinculado',
           p: linkedLead?.p || null,
@@ -1359,6 +1363,7 @@ function AdminGeneralView({
       .slice(0, 6)
       .map((lead) => ({
         ...lead,
+        sourceLead: lead,
         status: lead.desc && lead.desc !== 'N/I'
           ? 'Descrição importada'
           : lead.e
@@ -1368,6 +1373,16 @@ function AdminGeneralView({
       })),
     [filteredWhatsappLeads, whatsappConversations, records]
   );
+  const selectedInboxItem = useMemo(
+    () => whatsappInbox.find((item) => String(item.id) === String(selectedInboxId)) || whatsappInbox[0] || null,
+    [selectedInboxId, whatsappInbox]
+  );
+  const selectedQuestion = selectedInboxItem?.messages?.find((message) => message.direction === 'INBOUND')
+    || selectedInboxItem?.messages?.[0]
+    || null;
+  const selectedAnswer = selectedQuestion
+    ? selectedInboxItem?.messages?.find((message) => message.direction === 'OUTBOUND' && new Date(message.createdAt || 0) >= new Date(selectedQuestion.createdAt || 0))
+    : selectedInboxItem?.messages?.find((message) => message.direction === 'OUTBOUND') || null;
   const leadsWithImportedDescription = records.filter((lead) => lead.t && lead.desc && lead.desc !== 'N/I').length;
   const leadsWithRecentContact = records.filter((lead) => lead.t && lead.c !== null && lead.c <= 90).length;
   const leadsContactUntilOneYear = records.filter((lead) => lead.t && lead.c !== null && lead.c > 90 && lead.c <= 365).length;
@@ -1875,9 +1890,9 @@ function AdminGeneralView({
             <div className="grid gap-3">
               {whatsappInbox.length ? whatsappInbox.map((lead) => (
                 <button
-                  className="interactive-card grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
+                  className={`interactive-card grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300 ${String(selectedInboxItem?.id) === String(lead.id) ? 'border-blue-400 ring-4 ring-blue-500/10' : 'border-slate-200'}`}
                   key={`inbox-${lead.id}`}
-                  onClick={() => toast.info(lead.n, { description: lead.status })}
+                  onClick={() => setSelectedInboxId(lead.id)}
                   type="button"
                 >
                   <span className="min-w-0">
@@ -1895,6 +1910,26 @@ function AdminGeneralView({
                 </div>
               )}
             </div>
+            {selectedInboxItem ? (
+              <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-[0_12px_34px_rgba(37,99,235,0.08)]">
+                <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-800">Pergunta e resposta</span>
+                <strong className="mt-1 block text-sm font-black text-slate-950">{selectedInboxItem.n}</strong>
+                <div className="mt-3 grid gap-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Pergunta</span>
+                    <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">
+                      {selectedQuestion?.body || selectedInboxItem.desc || selectedInboxItem.status}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-200 bg-white p-4">
+                    <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Resposta ligada</span>
+                    <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">
+                      {selectedAnswer?.body || 'Ainda nao ha resposta salva para esta pergunta. Ao responder pela tela Conversas, ela ficara gravada no historico deste numero.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </article>
 
           <article className={`${panelClass} p-6`}>
@@ -2332,6 +2367,260 @@ function AdminGeneralView({
           </article>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+function ConversationsView({ records = [] }) {
+  const [conversations, setConversations] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [phoneSearch, setPhoneSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [messageText, setMessageText] = useState('Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?');
+
+  async function loadConversations(phone = '') {
+    setLoading(true);
+    try {
+      const query = phoneDigits(phone);
+      const response = await apiFetch(`/api/whatsapp/conversations?limit=100${query ? `&phone=${query}` : ''}`);
+      const payload = response.ok ? await response.json() : { conversations: [] };
+      setConversations(payload.conversations || []);
+      setSelectedId((current) => current || payload.conversations?.[0]?.id || null);
+    } catch {
+      setConversations([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  const leadOptions = useMemo(
+    () => records
+      .filter((lead) => lead.t && phoneDigits(lead.tel))
+      .sort((a, b) => (b.s || 0) - (a.s || 0))
+      .slice(0, 80),
+    [records]
+  );
+  const selectedConversation = conversations.find((conversation) => conversation.id === selectedId) || conversations[0] || null;
+  const activePhone = phoneDigits(phoneSearch) || selectedConversation?.phone || '';
+  const messages = selectedConversation?.messages || [];
+  const lastMessage = messages[messages.length - 1];
+  const activeLead = records.find((lead) => phoneDigits(lead.tel).endsWith(String(activePhone).slice(-10)));
+  const quickActions = [
+    ['Resumo', 'Gerar resumo da conversa para o coordenador.'],
+    ['Visita', 'Marcar como candidato para visita ou estudo presencial.'],
+    ['IA', 'Preparar sugestao de resposta antes do envio.'],
+    ['Pausa', 'Registrar pedido para nao receber novas mensagens.']
+  ];
+
+  async function submitSearch(event) {
+    event.preventDefault();
+    await loadConversations(phoneSearch);
+    if (!phoneDigits(phoneSearch)) return;
+    setSelectedId(null);
+  }
+
+  async function submitMessage(event) {
+    event.preventDefault();
+    const phone = activePhone;
+    const message = messageText.trim();
+    if (!phone || !message) {
+      toast.error('Informe telefone e mensagem');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const response = await apiFetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone,
+          message,
+          leadId: activeLead?.id || selectedConversation?.externalLeadId || null,
+          name: activeLead?.n || selectedConversation?.leadName || null,
+          district: activeLead?.d || selectedConversation?.district || null
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
+      setMessageText('');
+      await loadConversations(phone);
+      setSelectedId(payload.conversationId || selectedId);
+      toast.success('Mensagem salva na conversa', {
+        description: `Historico atualizado para ${payload.phone || phone}.`
+      });
+    } catch (error) {
+      toast.error('Falha ao enviar', { description: error.message });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-6">
+      <section className={`${panelClass} overflow-hidden p-6`}>
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <span className={labelClass}>WhatsApp</span>
+            <h1 className="silver-title mt-2 text-5xl font-extrabold leading-tight tracking-normal max-md:text-4xl">Conversas</h1>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
+              Atendimento por numero com historico salvo no banco, leitura das respostas e ferramentas de acompanhamento para transformar mensagem em cuidado real.
+            </p>
+          </div>
+          <form className="flex min-w-[20rem] gap-2 max-sm:min-w-0 max-sm:w-full" onSubmit={submitSearch}>
+            <input
+              className="h-11 min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none placeholder:text-slate-600"
+              onChange={(event) => setPhoneSearch(event.target.value)}
+              placeholder="Buscar ou digitar numero"
+              value={phoneSearch}
+            />
+            <button className={primaryButtonClass} type="submit">
+              <Search size={18} />
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-[22rem_1fr_18rem] gap-4 max-2xl:grid-cols-[20rem_1fr] max-lg:grid-cols-1">
+        <aside className={`${panelClass} min-h-[42rem] overflow-hidden p-4`}>
+          <div className="flex items-center justify-between gap-3">
+            <span className={labelClass}>Numeros</span>
+            <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations()} type="button">Atualizar</button>
+          </div>
+          <div className="mt-4 grid max-h-[36rem] gap-2 overflow-auto pr-1">
+            {loading ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-700">Carregando conversas...</div>
+            ) : conversations.length ? conversations.map((conversation) => {
+              const conversationMessages = conversation.messages || [];
+              const currentLast = conversationMessages[conversationMessages.length - 1];
+              return (
+                <button
+                  className={`interactive-card rounded-2xl border bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'border-blue-400 ring-4 ring-blue-500/10' : 'border-slate-200'}`}
+                  key={conversation.id}
+                  onClick={() => {
+                    setSelectedId(conversation.id);
+                    setPhoneSearch(conversation.phone);
+                  }}
+                  type="button"
+                >
+                  <strong className="block truncate text-sm font-black text-slate-950">{conversation.leadName || conversation.phone}</strong>
+                  <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{conversation.phone} · {conversation.district || 'Distrito nao vinculado'}</span>
+                  <span className="mt-2 block truncate text-xs font-bold text-slate-500">{currentLast?.body || 'Sem mensagens registradas'}</span>
+                </button>
+              );
+            }) : (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700">
+                Nenhuma conversa salva para esse filtro. Digite um numero e envie a primeira mensagem.
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <article className={`${panelClass} flex min-h-[42rem] flex-col overflow-hidden`}>
+          <div className="border-b border-white/[0.07] p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <span className={labelClass}>Atendimento</span>
+                <h2 className="mt-1 text-2xl font-black text-slate-50">{activeLead?.n || selectedConversation?.leadName || activePhone || 'Novo numero'}</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">{activePhone || 'Digite um numero para iniciar'}{activeLead?.d ? ` · ${activeLead.d}` : ''}</p>
+              </div>
+              <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
+                {lastMessage?.direction === 'INBOUND' ? 'Responder' : 'Em acompanhamento'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto bg-slate-950/20 p-5">
+            <div className="grid gap-3">
+              {messages.length ? messages.map((message) => {
+                const outgoing = message.direction === 'OUTBOUND';
+                return (
+                  <div className={`flex ${outgoing ? 'justify-end' : 'justify-start'}`} key={message.id}>
+                    <div className={`max-w-[78%] rounded-2xl border px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${outgoing ? 'border-blue-300 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-800'}`}>
+                      <span className={`block text-[11px] font-black uppercase tracking-[0.14em] ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
+                        {outgoing ? 'Resposta enviada' : 'Pergunta recebida'}
+                      </span>
+                      <p className="mt-1 text-sm font-semibold leading-relaxed">{message.body}</p>
+                      <span className={`mt-2 block text-right text-[11px] font-bold ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
+                        {message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : 'Sem data'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="grid min-h-[20rem] place-items-center rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-700">
+                  A conversa deste numero ainda nao tem mensagens salvas.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <form className="grid gap-3 border-t border-white/[0.07] p-5" onSubmit={submitMessage}>
+            <textarea
+              className="min-h-28 rounded-2xl border border-white/[0.08] bg-slate-950/70 px-4 py-3 text-sm font-semibold leading-relaxed text-slate-100 outline-none placeholder:text-slate-600"
+              onChange={(event) => setMessageText(event.target.value)}
+              placeholder="Digite sua resposta"
+              value={messageText}
+            />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-slate-500">Ao enviar, a mensagem fica ligada ao numero no banco de dados.</span>
+              <button className={primaryButtonClass} disabled={sending || !activePhone} type="submit">
+                <Send size={18} />
+                {sending ? 'Enviando...' : 'Enviar resposta'}
+              </button>
+            </div>
+          </form>
+        </article>
+
+        <aside className={`${panelClass} grid content-start gap-4 p-5 max-2xl:col-span-2 max-lg:col-span-1`}>
+          <div>
+            <span className={labelClass}>Ferramentas</span>
+            <h2 className="mt-1 text-xl font-black text-slate-50">Proximas acoes</h2>
+          </div>
+          {quickActions.map(([title, detail]) => (
+            <button
+              className="interactive-card rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
+              key={title}
+              onClick={() => toast.info(title, { description: detail })}
+              type="button"
+            >
+              <strong className="block text-sm font-black text-slate-950">{title}</strong>
+              <span className="mt-1 block text-xs font-semibold leading-relaxed text-slate-600">{detail}</span>
+            </button>
+          ))}
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Poderiamos implementar mais</span>
+            <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">
+              etiquetas por assunto, status de atendimento, responsavel, resposta sugerida por IA, resumo automatico, opt-out e tarefas de visita ligadas a conversa.
+            </p>
+          </div>
+        </aside>
+      </section>
+
+      <section className={`${panelClass} p-6`}>
+        <span className={labelClass}>Base de contatos</span>
+        <div className="mt-4 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-md:grid-cols-1">
+          {leadOptions.slice(0, 8).map((lead) => (
+            <button
+              className="interactive-card rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
+              key={lead.id}
+              onClick={() => {
+                setPhoneSearch(phoneDigits(lead.tel));
+                loadConversations(lead.tel);
+              }}
+              type="button"
+            >
+              <strong className="block truncate text-sm font-black text-slate-950">{lead.n}</strong>
+              <span className="mt-1 block text-xs font-semibold text-slate-600">{phoneDigits(lead.tel)} · {lead.d}</span>
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
@@ -3055,6 +3344,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
     content = <AssociationDashboard association={selectedAssociation} data={data} records={records} onOpenDetails={() => openDetailsView(setView)} />;
   } else if (view === 'automations') {
     content = <AdminGeneralView {...adminGeneralProps} initialSection="distribution" />;
+  } else if (view === 'conversations') {
+    content = <ConversationsView records={records} />;
   } else if (view === 'ai-agent') {
     content = <AIAgentView associations={associations} campaigns={adminCampaigns} data={data} records={records} />;
   } else if (view === 'settings') {
