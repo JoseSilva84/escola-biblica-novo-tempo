@@ -15,7 +15,6 @@ import {
 } from 'recharts';
 import {
   ArrowRight,
-  AlertCircle,
   BadgePlus,
   Bell,
   Building2,
@@ -24,7 +23,6 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
-  Clock,
   Crown,
   Eye,
   EyeOff,
@@ -143,19 +141,13 @@ function ContactAvatar({ name, phone, size = 'md' }) {
 
 function deliveryState(message = {}) {
   const raw = `${message.providerStatus || ''} ${message.metadata?.status || ''} ${message.metadata?.ack || ''}`.toLowerCase();
-  if (raw.includes('read') || raw.includes('played') || raw.includes('ack:3') || raw === '3') {
+  if (raw.includes('read') || raw.includes('played') || raw.includes('ack:3') || raw.includes('ack 3') || raw.trim() === '3') {
     return { label: 'Lida', Icon: CheckCheck, className: 'text-sky-200' };
   }
-  if (raw.includes('delivered') || raw.includes('delivery') || raw.includes('ack:2') || raw === '2') {
+  if (raw.includes('delivered') || raw.includes('delivery') || raw.includes('ack:2') || raw.includes('ack 2') || raw.trim() === '2') {
     return { label: 'Entregue', Icon: CheckCheck, className: 'text-blue-100' };
   }
-  if (raw.includes('fail') || raw.includes('error') || raw.includes('undelivered') || raw.includes('rejected')) {
-    return { label: 'Nao entregue', Icon: AlertCircle, className: 'text-red-200' };
-  }
-  if (message.sentAt || raw.includes('sent') || raw.includes('server') || raw.includes('ack:1') || raw === '1') {
-    return { label: 'Enviada', Icon: Check, className: 'text-blue-100' };
-  }
-  return { label: 'Pendente', Icon: Clock, className: 'text-blue-100/80' };
+  return { label: 'Enviada, aguardando entrega', Icon: Check, className: 'text-blue-100' };
 }
 
 function DeliveryReceipt({ message }) {
