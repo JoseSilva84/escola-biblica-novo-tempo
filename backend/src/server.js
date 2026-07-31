@@ -32,26 +32,108 @@ function webhookAllowed(request) {
   return Boolean(secret && received === secret);
 }
 
+function parseMaybeJson(value) {
+  if (typeof value !== 'string') return value;
+  const text = value.trim();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { body: text, rawText: text };
+  }
+}
+
+function coerceWebhookPayload(body = {}) {
+  const parsed = parseMaybeJson(body);
+  if (!parsed || typeof parsed !== 'object') return {};
+
+  if (typeof parsed.payload === 'string') return parseMaybeJson(parsed.payload);
+  if (typeof parsed.data === 'string') {
+    return {
+      ...parsed,
+      data: parseMaybeJson(parsed.data)
+    };
+  }
+  if (typeof parsed.message === 'string' && parsed.message.trim().startsWith('{')) {
+    return {
+      ...parsed,
+      message: parseMaybeJson(parsed.message)
+    };
+  }
+
+  return parsed;
+}
+
+function firstValue(...values) {
+  return values.find((value) => value !== undefined && value !== null && String(value).trim() !== '');
+}
+
+function readMessageText(data = {}) {
+  const message = data.message || data.messages?.[0]?.message || {};
+  return firstValue(
+    data.text,
+    data.body,
+    data.content,
+    data.messageText,
+    data.message?.text,
+    data.message?.body,
+    message.conversation,
+    message.extendedTextMessage?.text,
+    message.imageMessage?.caption,
+    message.videoMessage?.caption,
+    data.messages?.[0]?.body,
+    data.messages?.[0]?.text,
+    data.rawText
+  ) || '';
+}
+
 function readZproMessage(payload = {}) {
-  const data = payload.data || payload.message || payload;
-  const contact = data.contact || data.sender || data.from || {};
-  const rawPhone = data.remoteJid || data.from || data.phone || contact.phone || contact.number || '';
+  const data = payload.data || payload.ticket || payload.message || payload.messages?.[0] || payload;
+  const key = data.key || data.message?.key || payload.key || {};
+  const contact = data.contact || data.sender || data.from || data.ticket?.contact || payload.contact || {};
+  const rawPhone = firstValue(
+    data.remoteJid,
+    data.remoteJID,
+    data.chatId,
+    data.jid,
+    data.from,
+    data.phone,
+    data.number,
+    key.remoteJid,
+    key.participant,
+    contact.phone,
+    contact.number,
+    contact.remoteJid,
+    payload.phone,
+    payload.number
+  ) || '';
   const phone = String(rawPhone).replace(/@s\.whatsapp\.net$/i, '').replace(/\D/g, '');
-  const text = data.text
-    || data.body
-    || data.message?.conversation
-    || data.message?.extendedTextMessage?.text
-    || data.messages?.[0]?.message?.conversation
-    || '';
+  const text = readMessageText(data);
+  const fromMe = Boolean(data.fromMe || key.fromMe || data.message?.key?.fromMe);
 
   return {
     event: payload.event || payload.type || payload.action || 'zpro.webhook',
-    channelId: payload.channelId || payload.sessionId || data.channelId || data.sessionId || null,
-    messageId: data.id || data.messageId || data.key?.id || null,
-    fromMe: Boolean(data.fromMe || data.key?.fromMe),
+    channelId: payload.channelId || payload.sessionId || data.channelId || data.sessionId || data.whatsappId || null,
+    messageId: data.id || data.messageId || key.id || data.message?.key?.id || null,
+    fromMe,
     phone,
-    name: contact.name || contact.pushName || data.pushName || null,
+    name: contact.name || contact.pushName || data.pushName || data.senderName || null,
     text: String(text || '').trim()
+  };
+}
+
+function webhookDiagnostics(request, payload, event) {
+  const data = payload?.data || payload?.ticket || payload?.message || payload?.messages?.[0] || payload || {};
+  return {
+    contentType: request.headers['content-type'] || null,
+    bodyType: typeof request.body,
+    topKeys: Object.keys(payload || {}).slice(0, 12),
+    dataKeys: data && typeof data === 'object' ? Object.keys(data).slice(0, 16) : [],
+    event: event.event,
+    channelId: event.channelId,
+    phone: event.phone,
+    fromMe: event.fromMe,
+    hasText: Boolean(event.text)
   };
 }
 
@@ -410,7 +492,9 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '2mb', type: ['application/json', 'application/*+json'] }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.text({ limit: '2mb', type: ['text/*', 'application/xml'] }));
 app.use(cookieParser());
 
 app.get('/api/health', async (_request, response) => {
@@ -607,14 +691,9 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     return;
   }
 
-  const event = readZproMessage(request.body);
-  console.log('[zpro:webhook]', JSON.stringify({
-    event: event.event,
-    channelId: event.channelId,
-    phone: event.phone,
-    fromMe: event.fromMe,
-    hasText: Boolean(event.text)
-  }));
+  const payload = coerceWebhookPayload(request.body);
+  const event = readZproMessage(payload);
+  console.log('[zpro:webhook]', JSON.stringify(webhookDiagnostics(request, payload, event)));
 
   const saved = await recordWhatsAppMessage({
     phone: event.phone,
@@ -629,7 +708,7 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     metadata: {
       channelId: event.channelId,
       event: event.event,
-      raw: request.body
+      raw: payload
     }
   });
 
