@@ -2600,7 +2600,7 @@ function ConversationsView({ records = [] }) {
                   <div className={`flex ${outgoing ? 'justify-end' : 'justify-start'}`} key={message.id}>
                     <div className={`max-w-[78%] rounded-2xl border px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${outgoing ? 'border-blue-300 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-800'}`}>
                       <span className={`block text-[11px] font-black uppercase tracking-[0.14em] ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
-                        {outgoing ? 'Resposta enviada' : 'Pergunta recebida'}
+                        {outgoing ? 'Mensagem enviada' : 'Pergunta recebida'}
                       </span>
                       <p className="mt-1 text-sm font-semibold leading-relaxed">{message.body}</p>
                       <span className={`mt-2 block text-right text-[11px] font-bold ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
