@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Area,
@@ -2378,19 +2378,46 @@ function ConversationsView({ records = [] }) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [messageText, setMessageText] = useState('Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?');
+  const chatEndRef = useRef(null);
+  const lastSeenMessageIdRef = useRef(null);
 
-  async function loadConversations(phone = '') {
-    setLoading(true);
+  async function loadConversations(phone = '', options = {}) {
+    const { silent = false, notify = false } = options;
+    if (!silent) setLoading(true);
     try {
       const query = phoneDigits(phone);
       const response = await apiFetch(`/api/whatsapp/conversations?limit=100${query ? `&phone=${query}` : ''}`);
       const payload = response.ok ? await response.json() : { conversations: [] };
-      setConversations(payload.conversations || []);
-      setSelectedId((current) => current || payload.conversations?.[0]?.id || null);
+      const nextConversations = payload.conversations || [];
+      const nextSelected = nextConversations.find((conversation) => conversation.id === selectedId) || nextConversations[0] || null;
+      const nextMessages = nextSelected?.messages || [];
+      const nextLastMessage = nextMessages[nextMessages.length - 1] || null;
+      const previousLastMessageId = lastSeenMessageIdRef.current;
+
+      setConversations(nextConversations);
+      setSelectedId((current) => (
+        nextConversations.some((conversation) => conversation.id === current)
+          ? current
+          : nextConversations[0]?.id || null
+      ));
+      if (nextLastMessage?.id) {
+        lastSeenMessageIdRef.current = nextLastMessage.id;
+      }
+      if (
+        notify
+        && previousLastMessageId
+        && nextLastMessage?.id
+        && nextLastMessage.id !== previousLastMessageId
+        && nextLastMessage.direction === 'INBOUND'
+      ) {
+        toast.success('Nova resposta recebida', {
+          description: nextLastMessage.body
+        });
+      }
     } catch {
       setConversations([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -2416,6 +2443,23 @@ function ConversationsView({ records = [] }) {
     ['IA', 'Preparar sugestao de resposta antes do envio.'],
     ['Pausa', 'Registrar pedido para nao receber novas mensagens.']
   ];
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages.length, selectedConversation?.id]);
+
+  useEffect(() => {
+    if (lastMessage?.id) {
+      lastSeenMessageIdRef.current = lastMessage.id;
+    }
+  }, [selectedConversation?.id]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      loadConversations(activePhone || phoneSearch, { silent: true, notify: true });
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [activePhone, phoneSearch, selectedId]);
 
   async function submitSearch(event) {
     event.preventDefault();
@@ -2557,6 +2601,7 @@ function ConversationsView({ records = [] }) {
                   A conversa deste numero ainda nao tem mensagens salvas.
                 </div>
               )}
+              <span ref={chatEndRef} />
             </div>
           </div>
 

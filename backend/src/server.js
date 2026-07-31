@@ -170,6 +170,11 @@ async function recordWhatsAppMessage({
     }
   });
 
+  await prisma.whatsAppConversation.update({
+    where: { id: conversation.id },
+    data: { updatedAt: occurredAt }
+  }).catch(() => null);
+
   if (dbLeadId && direction === 'INBOUND') {
     await prisma.leadInteraction.create({
       data: {
