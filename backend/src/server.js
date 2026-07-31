@@ -99,6 +99,17 @@ function readZproMessage(payload = {}) {
   const key = data.key || data.message?.key || payload.key || {};
   const contact = data.contact || data.sender || data.from || ticket.contact || data.ticket?.contact || payload.contact || {};
   const rawPhone = firstValue(
+    ticket.contact?.phone,
+    ticket.contact?.number,
+    ticket.contact?.remoteJid,
+    ticket.remoteJid,
+    ticket.whatsapp,
+    ticket.phone,
+    contact.phone,
+    contact.number,
+    contact.remoteJid,
+    payload.phone,
+    payload.number,
     data.remoteJid,
     data.remoteJID,
     data.chatId,
@@ -107,18 +118,7 @@ function readZproMessage(payload = {}) {
     data.phone,
     data.number,
     key.remoteJid,
-    key.participant,
-    ticket.remoteJid,
-    ticket.contact?.remoteJid,
-    ticket.contact?.phone,
-    ticket.contact?.number,
-    ticket.whatsapp,
-    ticket.phone,
-    contact.phone,
-    contact.number,
-    contact.remoteJid,
-    payload.phone,
-    payload.number
+    key.participant
   ) || '';
   const phone = String(rawPhone).replace(/@s\.whatsapp\.net$/i, '').replace(/\D/g, '');
   const text = firstValue(
