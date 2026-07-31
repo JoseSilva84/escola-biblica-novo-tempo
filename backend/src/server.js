@@ -573,6 +573,10 @@ app.get('/api/whatsapp/provider', requireAuth, (_request, response) => {
 });
 
 app.get('/api/whatsapp/conversations', requireAuth, async (request, response) => {
+  response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.set('Pragma', 'no-cache');
+  response.set('Expires', '0');
+
   const phone = normalizePhone(request.query?.phone);
   const numericLeadId = externalLeadId(request.query?.leadId);
   const limit = Math.min(Math.max(Number(request.query?.limit) || 50, 1), 200);

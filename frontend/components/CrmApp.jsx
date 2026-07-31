@@ -2379,6 +2379,7 @@ function ConversationsView({ records = [] }) {
   const [sending, setSending] = useState(false);
   const [messageText, setMessageText] = useState('Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?');
   const chatEndRef = useRef(null);
+  const activePhoneRef = useRef('');
   const lastSeenMessageIdRef = useRef(null);
 
   async function loadConversations(phone = '', options = {}) {
@@ -2386,7 +2387,15 @@ function ConversationsView({ records = [] }) {
     if (!silent) setLoading(true);
     try {
       const query = phoneDigits(phone);
-      const response = await apiFetch(`/api/whatsapp/conversations?limit=100${query ? `&phone=${query}` : ''}`);
+      const params = new URLSearchParams({
+        limit: '100',
+        _: String(Date.now())
+      });
+      if (query) params.set('phone', query);
+      const response = await apiFetch(`/api/whatsapp/conversations?${params.toString()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
       const payload = response.ok ? await response.json() : { conversations: [] };
       const nextConversations = payload.conversations || [];
       const nextSelected = nextConversations.find((conversation) => conversation.id === selectedId) || nextConversations[0] || null;
@@ -2415,7 +2424,7 @@ function ConversationsView({ records = [] }) {
         });
       }
     } catch {
-      setConversations([]);
+      if (!silent) setConversations([]);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -2449,6 +2458,10 @@ function ConversationsView({ records = [] }) {
   }, [messages.length, selectedConversation?.id]);
 
   useEffect(() => {
+    activePhoneRef.current = activePhone;
+  }, [activePhone]);
+
+  useEffect(() => {
     if (lastMessage?.id) {
       lastSeenMessageIdRef.current = lastMessage.id;
     }
@@ -2456,10 +2469,10 @@ function ConversationsView({ records = [] }) {
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      loadConversations(activePhone || phoneSearch, { silent: true, notify: true });
+      loadConversations(activePhoneRef.current || phoneSearch, { silent: true, notify: true });
     }, 1000);
     return () => window.clearInterval(interval);
-  }, [activePhone, phoneSearch, selectedId]);
+  }, [phoneSearch, selectedId]);
 
   async function submitSearch(event) {
     event.preventDefault();
