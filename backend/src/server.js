@@ -73,8 +73,14 @@ function readMessageText(data = {}) {
   return firstValue(
     data.text,
     data.body,
+    data.msg,
     data.content,
     data.messageText,
+    data.lastMessage,
+    data.lastMessageAt?.body,
+    data.lastMessageReceived,
+    data.lastMessageReceived?.body,
+    data.lastMessageReceived?.text,
     data.message?.text,
     data.message?.body,
     message.conversation,
@@ -88,9 +94,10 @@ function readMessageText(data = {}) {
 }
 
 function readZproMessage(payload = {}) {
-  const data = payload.data || payload.ticket || payload.message || payload.messages?.[0] || payload;
+  const data = payload.data || payload.msg || payload.message || payload.messages?.[0] || payload.ticket || payload;
+  const ticket = payload.ticket || data.ticket || {};
   const key = data.key || data.message?.key || payload.key || {};
-  const contact = data.contact || data.sender || data.from || data.ticket?.contact || payload.contact || {};
+  const contact = data.contact || data.sender || data.from || ticket.contact || data.ticket?.contact || payload.contact || {};
   const rawPhone = firstValue(
     data.remoteJid,
     data.remoteJID,
@@ -101,6 +108,12 @@ function readZproMessage(payload = {}) {
     data.number,
     key.remoteJid,
     key.participant,
+    ticket.remoteJid,
+    ticket.contact?.remoteJid,
+    ticket.contact?.phone,
+    ticket.contact?.number,
+    ticket.whatsapp,
+    ticket.phone,
     contact.phone,
     contact.number,
     contact.remoteJid,
@@ -108,12 +121,18 @@ function readZproMessage(payload = {}) {
     payload.number
   ) || '';
   const phone = String(rawPhone).replace(/@s\.whatsapp\.net$/i, '').replace(/\D/g, '');
-  const text = readMessageText(data);
-  const fromMe = Boolean(data.fromMe || key.fromMe || data.message?.key?.fromMe);
+  const text = firstValue(
+    readMessageText(data),
+    readMessageText(payload.msg),
+    readMessageText(ticket),
+    payload.text,
+    payload.body
+  );
+  const fromMe = Boolean(data.fromMe || key.fromMe || data.message?.key?.fromMe || payload.fromMe);
 
   return {
     event: payload.event || payload.type || payload.action || 'zpro.webhook',
-    channelId: payload.channelId || payload.sessionId || data.channelId || data.sessionId || data.whatsappId || null,
+    channelId: payload.channelId || payload.sessionId || data.channelId || data.sessionId || data.whatsappId || ticket.channelId || ticket.whatsappId || null,
     messageId: data.id || data.messageId || key.id || data.message?.key?.id || null,
     fromMe,
     phone,
@@ -123,12 +142,14 @@ function readZproMessage(payload = {}) {
 }
 
 function webhookDiagnostics(request, payload, event) {
-  const data = payload?.data || payload?.ticket || payload?.message || payload?.messages?.[0] || payload || {};
+  const data = payload?.data || payload?.msg || payload?.message || payload?.messages?.[0] || payload?.ticket || payload || {};
   return {
     contentType: request.headers['content-type'] || null,
     bodyType: typeof request.body,
     topKeys: Object.keys(payload || {}).slice(0, 12),
     dataKeys: data && typeof data === 'object' ? Object.keys(data).slice(0, 16) : [],
+    msgKeys: payload?.msg && typeof payload.msg === 'object' ? Object.keys(payload.msg).slice(0, 16) : [],
+    ticketKeys: payload?.ticket && typeof payload.ticket === 'object' ? Object.keys(payload.ticket).slice(0, 16) : [],
     event: event.event,
     channelId: event.channelId,
     phone: event.phone,
