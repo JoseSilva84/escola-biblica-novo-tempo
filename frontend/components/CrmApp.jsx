@@ -15,12 +15,16 @@ import {
 } from 'recharts';
 import {
   ArrowRight,
+  AlertCircle,
   BadgePlus,
   Bell,
   Building2,
+  Check,
+  CheckCheck,
   CheckCircle2,
   ChevronRight,
   ClipboardList,
+  Clock,
   Crown,
   Eye,
   EyeOff,
@@ -133,6 +137,34 @@ function ContactAvatar({ name, phone, size = 'md' }) {
   return (
     <span className={`${sizeClass} grid shrink-0 place-items-center rounded-2xl border border-white/70 bg-[linear-gradient(135deg,#e0f2fe_0%,#2563eb_48%,#0f172a_100%)] font-black text-white shadow-[0_14px_34px_rgba(37,99,235,0.20)] ring-1 ring-blue-200/70`}>
       {contactInitials(name, phone)}
+    </span>
+  );
+}
+
+function deliveryState(message = {}) {
+  const raw = `${message.providerStatus || ''} ${message.metadata?.status || ''} ${message.metadata?.ack || ''}`.toLowerCase();
+  if (raw.includes('read') || raw.includes('played') || raw.includes('ack:3') || raw === '3') {
+    return { label: 'Lida', Icon: CheckCheck, className: 'text-sky-200' };
+  }
+  if (raw.includes('delivered') || raw.includes('delivery') || raw.includes('ack:2') || raw === '2') {
+    return { label: 'Entregue', Icon: CheckCheck, className: 'text-blue-100' };
+  }
+  if (raw.includes('fail') || raw.includes('error') || raw.includes('undelivered') || raw.includes('rejected')) {
+    return { label: 'Nao entregue', Icon: AlertCircle, className: 'text-red-200' };
+  }
+  if (message.sentAt || raw.includes('sent') || raw.includes('server') || raw.includes('ack:1') || raw === '1') {
+    return { label: 'Enviada', Icon: Check, className: 'text-blue-100' };
+  }
+  return { label: 'Pendente', Icon: Clock, className: 'text-blue-100/80' };
+}
+
+function DeliveryReceipt({ message }) {
+  const state = deliveryState(message);
+  const Icon = state.Icon;
+  return (
+    <span className={`inline-flex items-center gap-1 ${state.className}`} title={state.label}>
+      <Icon size={15} strokeWidth={2.8} />
+      <span className="sr-only">{state.label}</span>
     </span>
   );
 }
@@ -2650,8 +2682,9 @@ function ConversationsView({ records = [] }) {
                         {outgoing ? 'Mensagem enviada' : 'Pergunta recebida'}
                       </span>
                       <p className="mt-1 text-sm font-semibold leading-relaxed">{message.body}</p>
-                      <span className={`mt-2 block text-right text-[11px] font-bold ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
-                        {message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : 'Sem data'}
+                      <span className={`mt-2 flex items-center justify-end gap-1.5 text-[11px] font-bold ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
+                        <span>{message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : 'Sem data'}</span>
+                        {outgoing ? <DeliveryReceipt message={message} /> : null}
                       </span>
                     </div>
                   </div>

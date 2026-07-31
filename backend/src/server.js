@@ -93,6 +93,25 @@ function readMessageText(data = {}) {
   ) || '';
 }
 
+function readMessageStatus(payload = {}, data = {}, ticket = {}, key = {}) {
+  return firstValue(
+    payload.status,
+    payload.ack,
+    payload.messageStatus,
+    payload.deliveryStatus,
+    data.status,
+    data.ack,
+    data.messageStatus,
+    data.deliveryStatus,
+    data.receiptStatus,
+    data.update?.status,
+    data.update?.ack,
+    ticket.lastMessageStatus,
+    ticket.status,
+    key.status
+  ) || null;
+}
+
 function readZproMessage(payload = {}) {
   const data = payload.data || payload.msg || payload.message || payload.messages?.[0] || payload.ticket || payload;
   const ticket = payload.ticket || data.ticket || {};
@@ -129,6 +148,7 @@ function readZproMessage(payload = {}) {
     payload.body
   );
   const fromMe = Boolean(data.fromMe || key.fromMe || data.message?.key?.fromMe || payload.fromMe);
+  const status = readMessageStatus(payload, data, ticket, key);
 
   return {
     event: payload.event || payload.type || payload.action || 'zpro.webhook',
@@ -137,6 +157,7 @@ function readZproMessage(payload = {}) {
     fromMe,
     phone,
     name: contact.name || contact.pushName || data.pushName || data.senderName || null,
+    status: status ? String(status) : null,
     text: String(text || '').trim()
   };
 }
@@ -154,6 +175,7 @@ function webhookDiagnostics(request, payload, event) {
     channelId: event.channelId,
     phone: event.phone,
     fromMe: event.fromMe,
+    status: event.status,
     hasText: Boolean(event.text)
   };
 }
@@ -720,6 +742,60 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
   const event = readZproMessage(payload);
   console.log('[zpro:webhook]', JSON.stringify(webhookDiagnostics(request, payload, event)));
 
+  if (!event.text && event.status) {
+    let updated = { count: 0 };
+    if (event.messageId) {
+      updated = await prisma.whatsAppMessage.updateMany({
+        where: { providerMessageId: event.messageId },
+        data: {
+          providerStatus: event.status,
+          metadata: {
+            status: event.status,
+            channelId: event.channelId,
+            event: event.event,
+            raw: payload
+          }
+        }
+      });
+    }
+    if (!updated.count && event.phone) {
+      const conversation = await prisma.whatsAppConversation.findUnique({
+        where: { phone: normalizePhone(event.phone) || event.phone },
+        select: {
+          messages: {
+            where: { direction: 'OUTBOUND' },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { id: true }
+          }
+        }
+      }).catch(() => null);
+      const latestMessageId = conversation?.messages?.[0]?.id;
+      if (latestMessageId) {
+        await prisma.whatsAppMessage.update({
+          where: { id: latestMessageId },
+          data: {
+            providerStatus: event.status,
+            metadata: {
+              status: event.status,
+              channelId: event.channelId,
+              event: event.event,
+              raw: payload
+            }
+          }
+        });
+        updated = { count: 1 };
+      }
+    }
+    response.json({
+      ok: true,
+      received: true,
+      statusUpdated: updated.count,
+      providerMessageId: event.messageId
+    });
+    return;
+  }
+
   const saved = await recordWhatsAppMessage({
     phone: event.phone,
     body: event.text,
@@ -727,7 +803,7 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     senderType: event.fromMe ? 'SYSTEM' : 'LEAD',
     senderName: event.fromMe ? 'WhatsApp' : event.name,
     provider: 'zpro-baileys',
-    providerStatus: event.event,
+    providerStatus: event.status || event.event,
     providerMessageId: event.messageId,
     occurredAt: new Date(),
     metadata: {
