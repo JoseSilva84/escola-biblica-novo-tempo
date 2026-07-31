@@ -139,19 +139,22 @@ function ContactAvatar({ name, phone, size = 'md' }) {
   );
 }
 
-function deliveryState(message = {}) {
+function deliveryState(message = {}, deliveredByReply = false) {
+  if (deliveredByReply) {
+    return { label: 'Entregue', Icon: CheckCheck, className: 'text-blue-100' };
+  }
   const raw = `${message.providerStatus || ''} ${message.metadata?.status || ''} ${message.metadata?.ack || ''}`.toLowerCase();
   if (raw.includes('read') || raw.includes('played') || raw.includes('ack:3') || raw.includes('ack 3') || raw.trim() === '3') {
     return { label: 'Lida', Icon: CheckCheck, className: 'text-sky-200' };
   }
-  if (raw.includes('delivered') || raw.includes('delivery') || raw.includes('ack:2') || raw.includes('ack 2') || raw.trim() === '2') {
+  if (raw.includes('delivered') || raw.includes('delivery') || raw.includes('delivered_by_reply') || raw.includes('ack:2') || raw.includes('ack 2') || raw.trim() === '2' || message.metadata?.deliveredByReply) {
     return { label: 'Entregue', Icon: CheckCheck, className: 'text-blue-100' };
   }
   return { label: 'Enviada, aguardando entrega', Icon: Check, className: 'text-blue-100' };
 }
 
-function DeliveryReceipt({ message }) {
-  const state = deliveryState(message);
+function DeliveryReceipt({ message, deliveredByReply = false }) {
+  const state = deliveryState(message, deliveredByReply);
   const Icon = state.Icon;
   return (
     <span className={`inline-flex items-center gap-1 ${state.className}`} title={state.label}>
@@ -2667,6 +2670,10 @@ function ConversationsView({ records = [] }) {
             <div className="grid gap-3">
               {messages.length ? messages.map((message) => {
                 const outgoing = message.direction === 'OUTBOUND';
+                const deliveredByReply = outgoing && messages.some((nextMessage) => (
+                  nextMessage.direction === 'INBOUND'
+                  && new Date(nextMessage.createdAt || 0) > new Date(message.createdAt || 0)
+                ));
                 return (
                   <div className={`flex ${outgoing ? 'justify-end' : 'justify-start'}`} key={message.id}>
                     <div className={`max-w-[78%] rounded-2xl border px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${outgoing ? 'border-blue-300 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-800'}`}>
@@ -2676,7 +2683,7 @@ function ConversationsView({ records = [] }) {
                       <p className="mt-1 text-sm font-semibold leading-relaxed">{message.body}</p>
                       <span className={`mt-2 flex items-center justify-end gap-1.5 text-[11px] font-bold ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
                         <span>{message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : 'Sem data'}</span>
-                        {outgoing ? <DeliveryReceipt message={message} /> : null}
+                        {outgoing ? <DeliveryReceipt deliveredByReply={deliveredByReply} message={message} /> : null}
                       </span>
                     </div>
                   </div>

@@ -316,6 +316,32 @@ async function recordWhatsAppMessage({
     }).catch(() => null);
   }
 
+  if (direction === 'INBOUND') {
+    const previousOutbound = await prisma.whatsAppMessage.findFirst({
+      where: {
+        conversationId: conversation.id,
+        direction: 'OUTBOUND',
+        createdAt: { lt: message.createdAt }
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true }
+    }).catch(() => null);
+
+    if (previousOutbound?.id) {
+      await prisma.whatsAppMessage.update({
+        where: { id: previousOutbound.id },
+        data: {
+          providerStatus: 'DELIVERED_BY_REPLY',
+          metadata: {
+            deliveredByReply: true,
+            deliveredByReplyMessageId: message.id,
+            deliveredByReplyAt: message.createdAt
+          }
+        }
+      }).catch(() => null);
+    }
+  }
+
   return { conversation, message };
 }
 
