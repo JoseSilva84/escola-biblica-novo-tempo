@@ -118,6 +118,25 @@ function phoneDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+function contactInitials(name, phone) {
+  const cleanName = String(name || '').trim();
+  if (cleanName && !/^\d+$/.test(cleanName)) {
+    const parts = cleanName.split(/\s+/).filter(Boolean);
+    return `${parts[0]?.[0] || ''}${parts[1]?.[0] || ''}`.toUpperCase() || 'NT';
+  }
+  const digits = phoneDigits(phone);
+  return digits ? digits.slice(-2) : 'NT';
+}
+
+function ContactAvatar({ name, phone, size = 'md' }) {
+  const sizeClass = size === 'lg' ? 'h-16 w-16 text-lg' : 'h-12 w-12 text-sm';
+  return (
+    <span className={`${sizeClass} grid shrink-0 place-items-center rounded-2xl border border-white/70 bg-[linear-gradient(135deg,#e0f2fe_0%,#2563eb_48%,#0f172a_100%)] font-black text-white shadow-[0_14px_34px_rgba(37,99,235,0.20)] ring-1 ring-blue-200/70`}>
+      {contactInitials(name, phone)}
+    </span>
+  );
+}
+
 function buildAssociationData(records) {
   const total = records.length;
   const phone = records.filter((row) => row.t).length;
@@ -2579,7 +2598,7 @@ function ConversationsView({ records = [] }) {
               const currentLast = conversationMessages[conversationMessages.length - 1];
               return (
                 <button
-                  className={`interactive-card rounded-2xl border bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'border-blue-400 ring-4 ring-blue-500/10' : 'border-slate-200'}`}
+                  className={`interactive-card flex items-center gap-3 rounded-2xl border bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'border-blue-400 ring-4 ring-blue-500/10' : 'border-slate-200'}`}
                   key={conversation.id}
                   onClick={() => {
                     setSelectedId(conversation.id);
@@ -2587,9 +2606,12 @@ function ConversationsView({ records = [] }) {
                   }}
                   type="button"
                 >
+                  <ContactAvatar name={conversation.leadName} phone={conversation.phone} />
+                  <span className="min-w-0">
                   <strong className="block truncate text-sm font-black text-slate-950">{conversation.leadName || conversation.phone}</strong>
                   <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{conversation.phone} · {conversation.district || 'Distrito nao vinculado'}</span>
                   <span className="mt-2 block truncate text-xs font-bold text-slate-500">{currentLast?.body || 'Sem mensagens registradas'}</span>
+                  </span>
                 </button>
               );
             }) : (
@@ -2603,10 +2625,13 @@ function ConversationsView({ records = [] }) {
         <article className={`${panelClass} flex min-h-[42rem] flex-col overflow-hidden`}>
           <div className="border-b border-white/[0.07] p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <span className={labelClass}>Atendimento</span>
+              <div className="flex min-w-0 items-center gap-4">
+                <ContactAvatar name={activeLead?.n || selectedConversation?.leadName} phone={activePhone} size="lg" />
+                <span className="min-w-0">
+                  <span className={labelClass}>Atendimento</span>
                 <h2 className="mt-1 text-2xl font-black text-slate-50">{activeLead?.n || selectedConversation?.leadName || activePhone || 'Novo numero'}</h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">{activePhone || 'Digite um numero para iniciar'}{activeLead?.d ? ` · ${activeLead.d}` : ''}</p>
+                </span>
               </div>
               <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
                 {lastMessage?.direction === 'INBOUND' ? 'Responder' : 'Em acompanhamento'}
