@@ -2556,20 +2556,19 @@ function ConversationsView({ records = [] }) {
       const searchedConversation = query
         ? nextConversations.find((conversation) => phoneDigits(conversation.phone).endsWith(query.slice(-10)))
         : null;
-      const nextSelected = (
-        (selectSearched && searchedConversation)
-        || nextConversations.find((conversation) => conversation.id === selectedId)
-        || nextConversations[0]
-        || null
-      );
+      const nextSelected = selectSearched
+        ? searchedConversation
+        : nextConversations.find((conversation) => conversation.id === selectedId)
+          || nextConversations[0]
+          || null;
       const nextMessages = nextSelected?.messages || [];
       const nextLastMessage = nextMessages[nextMessages.length - 1] || null;
       const previousLastMessageId = lastSeenMessageIdRef.current;
 
       setConversations(nextConversations);
       setSelectedId((current) => (
-        selectSearched && searchedConversation
-          ? searchedConversation.id
+        selectSearched
+          ? searchedConversation?.id || null
           : nextConversations.some((conversation) => conversation.id === current)
           ? current
           : nextConversations[0]?.id || null
@@ -2606,8 +2605,13 @@ function ConversationsView({ records = [] }) {
       .slice(0, 80),
     [records]
   );
-  const selectedConversation = conversations.find((conversation) => conversation.id === selectedId) || conversations[0] || null;
-  const activePhone = phoneDigits(phoneSearch) || selectedConversation?.phone || '';
+  const searchedPhone = phoneDigits(phoneSearch);
+  const selectedById = conversations.find((conversation) => conversation.id === selectedId) || null;
+  const searchedConversation = searchedPhone
+    ? conversations.find((conversation) => phoneDigits(conversation.phone).endsWith(searchedPhone.slice(-10)))
+    : null;
+  const selectedConversation = searchedPhone ? searchedConversation : selectedById || conversations[0] || null;
+  const activePhone = searchedPhone || selectedConversation?.phone || '';
   const messages = selectedConversation?.messages || [];
   const lastMessage = messages[messages.length - 1];
   const activeLead = records.find((lead) => phoneDigits(lead.tel).endsWith(String(activePhone).slice(-10)));
