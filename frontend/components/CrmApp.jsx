@@ -2707,12 +2707,12 @@ function ConversationsView({ records = [] }) {
       </section>
 
       <section className="grid grid-cols-[22rem_1fr_18rem] gap-4 max-2xl:grid-cols-[20rem_1fr] max-lg:grid-cols-1">
-        <aside className={`${panelClass} min-h-[42rem] overflow-hidden p-4`}>
+        <aside className={`${panelClass} flex min-h-[42rem] flex-col overflow-hidden p-4`}>
           <div className="flex items-center justify-between gap-3">
             <span className={labelClass}>Numeros</span>
             <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations()} type="button">Atualizar</button>
           </div>
-          <div className="mt-4 grid max-h-[36rem] gap-2 overflow-auto pr-1">
+          <div className="mt-4 grid min-h-0 flex-1 content-start gap-2 overflow-auto pr-1">
             {loading ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-700">Carregando conversas...</div>
             ) : conversations.length ? conversations.map((conversation) => {
