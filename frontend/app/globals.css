@@ -237,7 +237,7 @@
   }
 
   .interactive-card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-5px) scale(1.025);
     border-color: rgba(71, 85, 105, 0.28);
     background-color: rgba(255, 255, 255, 0.72);
     box-shadow: 0 24px 80px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.38);
@@ -588,9 +588,17 @@
   }
 
   .app-light .interactive-card:hover {
-    transform: translateY(-4px) scale(1.01);
+    transform: translateY(-6px) scale(1.03);
     background-color: rgba(255, 255, 255, 0.95) !important;
     box-shadow: 0 32px 90px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.8) !important;
+  }
+
+  .premium-panel :is(article, button, div).rounded-2xl[class*="border"] {
+    transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1), border-color 260ms, background-color 260ms, box-shadow 260ms, filter 260ms;
+  }
+
+  .premium-panel :is(article, button, div).rounded-2xl[class*="border"]:hover {
+    transform: translateY(-5px) scale(1.028);
   }
 
   /* Adding shimmer effect to main button in light mode */
@@ -687,7 +695,7 @@
   .details-light button.interactive-card:hover,
   .details-light article.interactive-card:hover,
   .details-light section.interactive-card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-5px) scale(1.025);
     border-color: rgba(37, 99, 235, 0.22) !important;
     background: linear-gradient(135deg, rgba(255,255,255,0.88), rgba(239,246,255,0.72)) !important;
     box-shadow: 0 28px 90px rgba(37,99,235,0.13), inset 0 1px 0 rgba(255,255,255,0.92) !important;

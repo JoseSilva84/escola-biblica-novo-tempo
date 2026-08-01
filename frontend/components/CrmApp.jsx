@@ -743,6 +743,79 @@ function priorityBadgeClasses(priority) {
   return tones[priority] || tones.Cool;
 }
 
+function inboxPhone(item) {
+  return item?.conversation?.phone || item?.tel || item?.sourceLead?.tel || item?.n || 'Numero nao informado';
+}
+
+function InboxConversationModal({ item, question, answer, onClose }) {
+  if (!item) return null;
+
+  const phone = inboxPhone(item);
+  const messages = item.messages?.length
+    ? item.messages
+    : [
+      {
+        id: `${item.id}-imported`,
+        direction: 'INBOUND',
+        body: item.desc || item.status || 'Conversa importada sem texto detalhado.',
+        createdAt: null
+      }
+    ];
+
+  return createPortal(
+    <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
+      <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-white/12 bg-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.56)]">
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_52%,#0f172a_100%)] p-6 text-white">
+          <div className="min-w-0">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">Conversa do lead</span>
+            <h2 className="mt-2 break-words text-3xl font-black tracking-normal text-white max-md:text-2xl">{item.n}</h2>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-white/20 bg-white/12 px-3 py-1 text-xs font-bold text-white">{phone}</span>
+              <span className="rounded-full border border-white/20 bg-white/12 px-3 py-1 text-xs font-bold text-white">{item.d}</span>
+              <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide ${priorityBadgeClasses(item.p)}`}>{item.p ? (crmPriorityLabels[item.p] || item.p) : 'Salva'}</span>
+            </div>
+          </div>
+          <button className="inline-flex h-11 items-center justify-center rounded-xl border border-white/20 bg-white px-4 text-sm font-black text-slate-950 shadow-[0_14px_35px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:bg-blue-50" onClick={onClose} type="button">
+            <X size={18} />
+            Fechar
+          </button>
+        </div>
+        <div className="grid max-h-[72vh] gap-5 overflow-y-auto bg-slate-100 p-6 lg:grid-cols-[1fr_0.78fr]">
+          <section className="grid content-start gap-3">
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Mensagens salvas</span>
+            {messages.map((message, index) => {
+              const outbound = message.direction === 'OUTBOUND';
+              return (
+                <article className={`rounded-2xl border p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${outbound ? 'border-blue-200 bg-blue-50' : 'border-emerald-200 bg-white'}`} key={message.id || `${message.direction}-${index}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <strong className="text-sm font-black text-slate-950">{outbound ? `Enviada para ${phone}` : `Recebida de ${phone}`}</strong>
+                    <span className="text-xs font-bold text-slate-500">{message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : item.when}</span>
+                  </div>
+                  <p className="mt-2 whitespace-pre-line text-sm font-semibold leading-relaxed text-slate-700">{message.body}</p>
+                </article>
+              );
+            })}
+          </section>
+          <section className="grid content-start gap-3">
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Pergunta e resposta</span>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Pergunta</span>
+              <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">{question?.body || item.desc || item.status}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Resposta ligada</span>
+              <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">
+                {answer?.body || 'Ainda nao ha resposta salva para esta pergunta. Ao responder pela tela Conversas, ela ficara gravada no historico deste numero.'}
+              </p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function LeadDetailModal({ lead, onClose }) {
   if (!lead) return null;
 
@@ -1292,6 +1365,7 @@ function AdminGeneralView({
   const [lastBatch, setLastBatch] = useState(null);
   const [whatsappConversations, setWhatsappConversations] = useState([]);
   const [selectedInboxId, setSelectedInboxId] = useState(null);
+  const [conversationModalOpen, setConversationModalOpen] = useState(false);
   const [leadFilters, setLeadFilters] = useState({
     association: 'paulistana',
     distrito: 'all',
@@ -1429,6 +1503,7 @@ function AdminGeneralView({
   const selectedAnswer = selectedQuestion
     ? selectedInboxItem?.messages?.find((message) => message.direction === 'OUTBOUND' && new Date(message.createdAt || 0) >= new Date(selectedQuestion.createdAt || 0))
     : selectedInboxItem?.messages?.find((message) => message.direction === 'OUTBOUND') || null;
+  const selectedInboxPhone = selectedInboxItem ? inboxPhone(selectedInboxItem) : null;
   const leadsWithImportedDescription = records.filter((lead) => lead.t && lead.desc && lead.desc !== 'N/I').length;
   const leadsWithRecentContact = records.filter((lead) => lead.t && lead.c !== null && lead.c <= 90).length;
   const leadsContactUntilOneYear = records.filter((lead) => lead.t && lead.c !== null && lead.c > 90 && lead.c <= 365).length;
@@ -1466,16 +1541,22 @@ function AdminGeneralView({
     ['Estudos ativos', `${formatNumber(data.studies)} leads com estudo em andamento`, 'Media'],
     ['Sem contato há 5+ anos', `${formatNumber(leadsWithoutFiveYears)} contatos com WhatsApp`, 'Alta']
   ];
-  const timelineConversation = whatsappConversations[0] || null;
-  const timelineLead = whatsappInbox[0] || filteredWhatsappLeads[0] || null;
-  const whatsappTimeline = timelineConversation?.messages?.length
-    ? timelineConversation.messages.map((message) => [
-      message.direction === 'INBOUND' ? 'Recebida' : 'Enviada',
+  const timelineConversation = selectedInboxItem?.conversation || whatsappConversations[0] || null;
+  const timelineLead = selectedInboxItem || filteredWhatsappLeads[0] || null;
+  const whatsappTimeline = selectedInboxItem?.messages?.length
+    ? selectedInboxItem.messages.map((message) => [
+      message.direction === 'INBOUND' ? `Recebida de ${selectedInboxPhone}` : `Enviada para ${selectedInboxPhone}`,
       message.body,
       message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : 'Sem data'
     ])
+    : timelineConversation?.messages?.length
+      ? timelineConversation.messages.map((message) => [
+        message.direction === 'INBOUND' ? `Recebida de ${selectedInboxPhone || timelineConversation.phone}` : `Enviada para ${selectedInboxPhone || timelineConversation.phone}`,
+        message.body,
+        message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : 'Sem data'
+      ])
     : timelineLead ? [
-    ['Lead real', timelineLead.n, timelineLead.d],
+    ['Lead real', timelineLead.n, selectedInboxPhone || timelineLead.d],
     ...(timelineLead.desc && timelineLead.desc !== 'N/I' ? [['Descrição importada', timelineLead.desc, 'Cadastro']] : []),
     ...(timelineLead.e ? [['Estudo ativo', 'Material em andamento na base', 'Cadastro']] : []),
     ...(timelineLead.c !== null ? [['Último contato', `Registrado há ${formatNumber(timelineLead.c)} dias`, 'Base']] : [])
@@ -1938,7 +2019,10 @@ function AdminGeneralView({
                 <button
                   className={`interactive-card grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300 ${String(selectedInboxItem?.id) === String(lead.id) ? 'border-blue-400 ring-4 ring-blue-500/10' : 'border-slate-200'}`}
                   key={`inbox-${lead.id}`}
-                  onClick={() => setSelectedInboxId(lead.id)}
+                  onClick={() => {
+                    setSelectedInboxId(lead.id);
+                    setConversationModalOpen(true);
+                  }}
                   type="button"
                 >
                   <span className="min-w-0">
@@ -1996,7 +2080,12 @@ function AdminGeneralView({
 
           <article className={`${panelClass} p-6`}>
             <span className={labelClass}>Linha do tempo</span>
-            <h2 className="mt-1 text-2xl font-black text-slate-50">Conversa do lead</h2>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-2xl font-black text-slate-50">Conversa do lead</h2>
+              {selectedInboxPhone ? (
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-800">{selectedInboxPhone}</span>
+              ) : null}
+            </div>
             <div className="mt-5 grid gap-3">
               {whatsappTimeline.length ? whatsappTimeline.map(([type, detail, when], index) => (
                 <div className="grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={`${type}-${when}`}>
@@ -2413,6 +2502,12 @@ function AdminGeneralView({
           </article>
         </section>
       ) : null}
+      <InboxConversationModal
+        answer={selectedAnswer}
+        item={conversationModalOpen ? selectedInboxItem : null}
+        onClose={() => setConversationModalOpen(false)}
+        question={selectedQuestion}
+      />
     </div>
   );
 }
