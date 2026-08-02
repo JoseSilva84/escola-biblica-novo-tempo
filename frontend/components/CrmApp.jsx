@@ -1550,8 +1550,12 @@ function LeadsView({ associations, data, records = [], onNavigate }) {
 
         <div className="mt-5 max-h-[34rem] overflow-auto rounded-2xl border border-white/[0.07]">
           <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-slate-950/85 text-left">
+            <thead
+              className="cursor-pointer"
+              onClick={() => setSelectedLead(selectedLeads[0] || visibleLeads[0] || null)}
+              title="Abrir detalhes do primeiro lead visivel ou selecionado"
+            >
+              <tr className="bg-slate-950/85 text-left transition hover:bg-slate-900">
                 {['Selecionar', 'Nome', 'WhatsApp', 'Distrito', 'Prioridade ML', 'Status', 'Score', 'Acoes'].map((head) => (
                   <th className="sticky top-0 z-[1] whitespace-nowrap border-b border-white/[0.12] bg-slate-950/95 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white/80" key={head}>{head}</th>
                 ))}
@@ -1561,9 +1565,9 @@ function LeadsView({ associations, data, records = [], onNavigate }) {
               {visibleLeads.map((lead) => {
                 const checked = selectedLeadIds.has(lead.id);
                 return (
-                  <tr className={`transition ${checked ? 'bg-blue-500/10' : 'hover:bg-white/[0.035]'}`} key={lead.id}>
+                  <tr className={`cursor-pointer transition ${checked ? 'bg-blue-500/10' : 'hover:bg-white/[0.035]'}`} key={lead.id} onClick={() => setSelectedLead(lead)} title={`Abrir detalhes de ${lead.n}`}>
                     <td className="border-b border-white/[0.04] px-4 py-3">
-                      <input aria-label={`Selecionar ${lead.n}`} checked={checked} className="h-4 w-4 accent-blue-600" onChange={() => toggleLead(lead)} type="checkbox" />
+                      <input aria-label={`Selecionar ${lead.n}`} checked={checked} className="h-4 w-4 accent-blue-600" onChange={() => toggleLead(lead)} onClick={(event) => event.stopPropagation()} type="checkbox" />
                     </td>
                     <td className="min-w-[15rem] border-b border-white/[0.04] px-4 py-3">
                       <button className="text-left" onClick={() => setSelectedLead(lead)} type="button">
@@ -1589,8 +1593,8 @@ function LeadsView({ associations, data, records = [], onNavigate }) {
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black tabular-nums text-slate-100">{lead.s}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
                       <div className="flex gap-2">
-                        <button className="inline-flex h-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/10 px-3 text-xs font-black text-slate-100 transition hover:bg-white/15" onClick={() => setSelectedLead(lead)} type="button">Abrir</button>
-                        <button className="inline-flex h-9 items-center justify-center rounded-xl bg-blue-600 px-3 text-xs font-black text-white transition hover:bg-blue-500" onClick={() => onNavigate('automations')} type="button">WhatsApp</button>
+                        <button className="inline-flex h-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/10 px-3 text-xs font-black text-slate-100 transition hover:bg-white/15" onClick={(event) => { event.stopPropagation(); setSelectedLead(lead); }} type="button">Abrir</button>
+                        <button className="inline-flex h-9 items-center justify-center rounded-xl bg-blue-600 px-3 text-xs font-black text-white transition hover:bg-blue-500" onClick={(event) => { event.stopPropagation(); onNavigate('automations'); }} type="button">WhatsApp</button>
                       </div>
                     </td>
                   </tr>
