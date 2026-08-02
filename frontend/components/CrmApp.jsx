@@ -1632,6 +1632,7 @@ function AdminGeneralView({
   const [whatsappConversations, setWhatsappConversations] = useState([]);
   const [selectedInboxId, setSelectedInboxId] = useState(null);
   const [conversationModalOpen, setConversationModalOpen] = useState(false);
+  const [selectedAdminLead, setSelectedAdminLead] = useState(null);
   const [leadFilters, setLeadFilters] = useState({
     association: 'paulistana',
     distrito: 'all',
@@ -2666,8 +2667,12 @@ function AdminGeneralView({
 
             <div className="mt-5 max-h-[32rem] overflow-auto rounded-2xl border border-white/[0.07]">
               <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="bg-slate-950/85 text-left">
+                <thead
+                  className="cursor-pointer"
+                  onClick={() => setSelectedAdminLead(selectedWhatsappLeads[0] || visibleWhatsappLeads[0] || null)}
+                  title="Abrir detalhes do primeiro lead visivel ou selecionado"
+                >
+                  <tr className="bg-slate-950/85 text-left transition hover:bg-slate-900">
                     {['Enviar', 'Nome', 'WhatsApp', 'Distrito', 'Prioridade ML', 'Score'].map((head) => (
                       <th className="sticky top-0 z-[1] whitespace-nowrap border-b border-white/[0.12] bg-slate-950/95 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white/80" key={head}>{head}</th>
                     ))}
@@ -2677,9 +2682,9 @@ function AdminGeneralView({
                   {visibleWhatsappLeads.map((lead) => {
                     const checked = selectedLeadIds.has(lead.id);
                     return (
-                      <tr className={`transition ${checked ? 'bg-blue-500/10' : 'hover:bg-white/[0.035]'}`} key={lead.id}>
+                      <tr className={`cursor-pointer transition ${checked ? 'bg-blue-500/10' : 'hover:bg-white/[0.035]'}`} key={lead.id} onClick={() => setSelectedAdminLead(lead)} title={`Abrir detalhes de ${lead.n}`}>
                         <td className="border-b border-white/[0.04] px-4 py-3">
-                          <input aria-label={`Selecionar ${lead.n}`} checked={checked} className="h-4 w-4 accent-blue-600" onChange={() => selectLead(lead)} type="checkbox" />
+                          <input aria-label={`Selecionar ${lead.n}`} checked={checked} className="h-4 w-4 accent-blue-600" onChange={() => selectLead(lead)} onClick={(event) => event.stopPropagation()} type="checkbox" />
                         </td>
                         <td className="min-w-[14rem] border-b border-white/[0.04] px-4 py-3">
                           <strong className="block text-slate-50">{lead.n}</strong>
@@ -2700,6 +2705,7 @@ function AdminGeneralView({
               </table>
             </div>
           </article>
+          <LeadDetailModal lead={selectedAdminLead} onClose={() => setSelectedAdminLead(null)} />
           <article className={`${panelClass} p-6 max-xl:col-span-1 xl:col-span-2`}>
             <span className={labelClass}>Filas sugeridas</span>
             <div className="mt-5 grid gap-3">
@@ -3131,6 +3137,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
   const [tab, setTab] = useState('overview');
   const [mode, setMode] = useState('assistido');
   const [active, setActive] = useState(false);
+  const [selectedReviewLead, setSelectedReviewLead] = useState(null);
   const hotWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
   const studyWhatsapp = records.filter((lead) => lead.t && lead.e).length;
   const vipWhatsapp = records.filter((lead) => lead.t && lead.v).length;
@@ -3334,19 +3341,27 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
 
       {tab === 'review' ? (
         <section className={`${panelClass} p-6`}>
-          <span className={labelClass}>Revisao assistida</span>
-          <h2 className="mt-1 text-2xl font-black text-slate-50">Leads para a IA sugerir resposta</h2>
+          <button
+            className="block w-full rounded-2xl bg-slate-950/85 p-4 text-left transition hover:bg-slate-900"
+            onClick={() => setSelectedReviewLead(reviewQueue[0] || null)}
+            title="Abrir detalhes do primeiro lead da fila"
+            type="button"
+          >
+            <span className={labelClass}>Revisao assistida</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Leads para a IA sugerir resposta</h2>
+          </button>
           <div className="mt-5 grid gap-3">
             {reviewQueue.map((lead) => (
-              <div className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)] max-md:grid-cols-1" key={lead.id}>
+              <div className="grid cursor-pointer grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300 max-md:grid-cols-1" key={lead.id} onClick={() => setSelectedReviewLead(lead)} title={`Abrir detalhes de ${lead.n}`}>
                 <div>
                   <strong className="text-slate-950">{lead.n}</strong>
                   <span className="mt-1 block text-sm font-semibold text-slate-600">{lead.d} · {lead.tel || 'sem telefone'} · score {lead.s}</span>
                 </div>
-                <button className={ghostButtonClass} onClick={() => toast.info('Sugestao preparada', { description: `IA prepararia uma resposta assistida para ${lead.n}.` })} type="button">Gerar sugestao</button>
+                <button className={ghostButtonClass} onClick={(event) => { event.stopPropagation(); toast.info('Sugestao preparada', { description: `IA prepararia uma resposta assistida para ${lead.n}.` }); }} type="button">Gerar sugestao</button>
               </div>
             ))}
           </div>
+          <LeadDetailModal lead={selectedReviewLead} onClose={() => setSelectedReviewLead(null)} />
         </section>
       ) : null}
 
