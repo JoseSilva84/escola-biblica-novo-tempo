@@ -518,7 +518,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
   
   const items = [
     ['admin', 'Dashboard', LayoutDashboard],
-    ['general-admin', 'Admin geral', ShieldCheck],
+    ['leads', 'Leads', ClipboardList],
     ['associations', 'Associações', Building2],
     ['users', 'Acessos', UsersRound],
     ['campaigns', 'Campanhas', Radio],
@@ -529,11 +529,9 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
   ];
   items.push(['settings', 'Configurações', Settings]);
 
-  const mobileBottomItems = items.slice(0, 2); // Dashboard and Admin geral or whatever first two. Let's make it Dashboard and Associations for better UX, but we can just use slice. Wait, "Dashboard" and "Associações" are most used? Let's just pick the first two.
-  // We can manually pick for bottom nav:
   const bottomNavItems = [
     ['admin', 'Dashboard', LayoutDashboard],
-    ['associations', 'Associações', Building2]
+    ['leads', 'Leads', ClipboardList]
   ];
 
   return (
@@ -1041,7 +1039,7 @@ function AddAssociationForm({ onAdd }) {
   );
 }
 
-function AdminDashboard({ associations, data, isAssociationsView = false, onOpenAssociations, onOpenAssociation, onAddAssociation }) {
+function AdminDashboard({ associations, data, isAssociationsView = false, onOpenAdminGeneral, onOpenAssociations, onOpenAssociation, onOpenLeads, onAddAssociation }) {
   const totals = associations.reduce((acc, association) => ({
     leads: acc.leads + association.leads,
     campaigns: acc.campaigns + association.campaigns,
@@ -1068,6 +1066,10 @@ function AdminDashboard({ associations, data, isAssociationsView = false, onOpen
               Gerencie territórios, campanhas e performance dos leads em um painel central com navegação limpa e efeitos sutis de interação.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
+              <button className={primaryButtonClass} onClick={onOpenLeads} type="button">
+                <ClipboardList size={18} />
+                Leads
+              </button>
               {isAssociationsView ? (
                 <label className="relative inline-flex min-w-72 items-center">
                   <select
@@ -1099,6 +1101,10 @@ function AdminDashboard({ associations, data, isAssociationsView = false, onOpen
               >
                 <WandSparkles size={18} />
                 Revisar automações
+              </button>
+              <button className={ghostButtonClass} onClick={onOpenAdminGeneral} type="button">
+                <ShieldCheck size={18} />
+                Gestao geral
               </button>
             </div>
           </div>
@@ -1343,6 +1349,259 @@ function AssociationDashboard({ association, data, records = [], onOpenDetails }
       </section>
 
       <AssociationLeadExplorer association={association} records={records} />
+    </div>
+  );
+}
+
+function LeadsView({ associations, data, records = [], onNavigate }) {
+  const [filters, setFilters] = useState({
+    association: 'paulistana',
+    distrito: 'all',
+    prioridade: 'all',
+    status: 'all',
+    search: ''
+  });
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
+
+  const districts = useMemo(
+    () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [records]
+  );
+
+  const filteredLeads = useMemo(() => {
+    const term = filters.search.trim().toLowerCase();
+    return records
+      .filter((lead) => {
+        if (filters.association !== 'paulistana') return false;
+        if (filters.distrito !== 'all' && lead.d !== filters.distrito) return false;
+        if (filters.prioridade !== 'all' && lead.p !== filters.prioridade) return false;
+        if (filters.status === 'whatsapp' && !lead.t) return false;
+        if (filters.status === 'study' && !lead.e) return false;
+        if (filters.status === 'vip' && !lead.v) return false;
+        if (filters.status === 'no-recent-contact' && (lead.c === null || lead.c <= 365)) return false;
+        if (term) {
+          const haystack = `${lead.n || ''} ${lead.tel || ''} ${lead.em || ''} ${lead.d || ''} ${lead.id || ''}`.toLowerCase();
+          if (!haystack.includes(term)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => (b.s || 0) - (a.s || 0));
+  }, [filters, records]);
+
+  const visibleLeads = filteredLeads.slice(0, 300);
+  const selectedLeads = filteredLeads.filter((lead) => selectedLeadIds.has(lead.id));
+  const hotWithWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
+  const staleLeads = records.filter((lead) => lead.t && lead.c !== null && lead.c > 365).length;
+
+  function setFilter(key, value) {
+    setFilters((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleLead(lead) {
+    setSelectedLeadIds((current) => {
+      const next = new Set(current);
+      if (next.has(lead.id)) {
+        next.delete(lead.id);
+      } else {
+        next.add(lead.id);
+      }
+      return next;
+    });
+  }
+
+  function selectVisibleLeads() {
+    const next = new Set(visibleLeads.filter((lead) => lead.t).map((lead) => lead.id));
+    setSelectedLeadIds(next);
+    toast.success('Leads selecionados', {
+      description: `${formatNumber(next.size)} contatos com WhatsApp ficaram marcados.`
+    });
+  }
+
+  function clearSelection() {
+    setSelectedLeadIds(new Set());
+  }
+
+  function exportLeads() {
+    const rowsToExport = selectedLeads.length ? selectedLeads : filteredLeads;
+    const header = ['Nome', 'WhatsApp', 'Email', 'Distrito', 'Prioridade ML', 'Score', 'VIP', 'Estudo ativo'];
+    const rows = rowsToExport.map((lead) => [
+      lead.n,
+      phoneDigits(lead.tel),
+      lead.em || '',
+      lead.d,
+      crmPriorityLabels[lead.p] || lead.p,
+      lead.s,
+      lead.v ? 'Sim' : 'Nao',
+      lead.e ? 'Sim' : 'Nao'
+    ]);
+    const csv = [header, ...rows].map((row) => row.map((cell) => {
+      const text = String(cell ?? '');
+      return /[",\n\r;]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+    }).join(';')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = selectedLeads.length ? 'leads-selecionados.csv' : 'leads-filtrados.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="grid gap-6">
+      <section className={`${panelClass} overflow-hidden p-6`}>
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <span className={labelClass}>CRM de leads</span>
+            <h1 className="silver-title mt-2 text-5xl font-extrabold leading-tight tracking-normal max-md:text-4xl">Leads</h1>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
+              Consulte a base, priorize contatos, abra detalhes e encaminhe grupos para WhatsApp ou Conversas sem perder os fluxos ja existentes.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className={primaryButtonClass} onClick={() => onNavigate('automations')} type="button">
+              <Send size={18} />
+              Enviar WhatsApp
+            </button>
+            <button className={ghostButtonClass} onClick={() => onNavigate('conversations')} type="button">
+              <MessageCircle size={18} />
+              Conversas
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
+        <MetricCard detail="base carregada" icon={ClipboardList} label="Total de leads" value={formatNumber(data.total)} />
+        <MetricCard detail="aptos para contato" icon={MessageCircle} label="Com WhatsApp" tone="green" value={formatNumber(data.phone)} />
+        <MetricCard detail="prioridade alta com telefone" icon={Sparkles} label="Quentes WhatsApp" tone="orange" value={formatNumber(hotWithWhatsapp)} />
+        <MetricCard detail="contato acima de 1 ano" icon={Bell} label="Reativar" tone="violet" value={formatNumber(staleLeads)} />
+      </section>
+
+      <section className={`${panelClass} p-6`}>
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span className={labelClass}>Base operacional</span>
+            <h2 className="mt-1 text-2xl font-black text-slate-50">Lista de leads</h2>
+          </div>
+          <div className="grid min-w-[11rem] gap-1 rounded-2xl border border-blue-300/40 bg-gradient-to-br from-blue-600 to-slate-950 px-4 py-3 text-right shadow-[0_18px_42px_rgba(37,99,235,0.22)]">
+            <span className="text-xs font-bold uppercase tracking-[0.14em] text-white/75">Selecionados</span>
+            <strong className="text-2xl font-black text-white">{formatNumber(selectedLeads.length)}</strong>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1.4fr] gap-3 max-xl:grid-cols-2 max-md:grid-cols-1">
+          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+            Associacao
+            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter('association', event.target.value)} value={filters.association}>
+              <option value="paulistana">Associacao Paulistana</option>
+              {associations.filter((association) => association.id !== 'paulistana').map((association) => (
+                <option disabled key={association.id} value={association.id}>{association.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+            Distrito
+            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter('distrito', event.target.value)} value={filters.distrito}>
+              <option value="all">Todos os distritos</option>
+              {districts.map((district) => <option key={district} value={district}>{district}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+            Prioridade ML
+            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter('prioridade', event.target.value)} value={filters.prioridade}>
+              <option value="all">Todas</option>
+              <option value="Hot">Quentes</option>
+              <option value="Warm">Potenciais</option>
+              <option value="Cool">Mornos</option>
+              <option value="Cold">Frios</option>
+            </select>
+          </label>
+          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+            Segmento
+            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter('status', event.target.value)} value={filters.status}>
+              <option value="all">Todos</option>
+              <option value="whatsapp">Com WhatsApp</option>
+              <option value="study">Estudo ativo</option>
+              <option value="vip">VIP</option>
+              <option value="no-recent-contact">Sem contato recente</option>
+            </select>
+          </label>
+          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+            Buscar
+            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none placeholder:text-slate-600" onChange={(event) => setFilter('search', event.target.value)} placeholder="Nome, email, distrito ou WhatsApp" value={filters.search} />
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-slate-500">
+            {formatNumber(filteredLeads.length)} leads encontrados. Exibindo {formatNumber(visibleLeads.length)}.
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <button className={ghostButtonClass} onClick={selectVisibleLeads} type="button">
+              <CheckCircle2 size={18} />
+              Selecionar visiveis
+            </button>
+            <button className={ghostButtonClass} onClick={clearSelection} type="button">Limpar selecao</button>
+            <button className={ghostButtonClass} onClick={exportLeads} type="button">Exportar leads</button>
+          </div>
+        </div>
+
+        <div className="mt-5 max-h-[34rem] overflow-auto rounded-2xl border border-white/[0.07]">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-slate-950/85 text-left">
+                {['Selecionar', 'Nome', 'WhatsApp', 'Distrito', 'Prioridade ML', 'Status', 'Score', 'Acoes'].map((head) => (
+                  <th className="sticky top-0 z-[1] whitespace-nowrap border-b border-white/[0.12] bg-slate-950/95 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white/80" key={head}>{head}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleLeads.map((lead) => {
+                const checked = selectedLeadIds.has(lead.id);
+                return (
+                  <tr className={`transition ${checked ? 'bg-blue-500/10' : 'hover:bg-white/[0.035]'}`} key={lead.id}>
+                    <td className="border-b border-white/[0.04] px-4 py-3">
+                      <input aria-label={`Selecionar ${lead.n}`} checked={checked} className="h-4 w-4 accent-blue-600" onChange={() => toggleLead(lead)} type="checkbox" />
+                    </td>
+                    <td className="min-w-[15rem] border-b border-white/[0.04] px-4 py-3">
+                      <button className="text-left" onClick={() => setSelectedLead(lead)} type="button">
+                        <strong className="block text-slate-50">{lead.n}</strong>
+                        <span className="text-xs font-semibold text-slate-500">ID {lead.id} · {lead.em || 'sem email'}</span>
+                      </button>
+                    </td>
+                    <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black tabular-nums text-emerald-400">{phoneDigits(lead.tel) || 'sem telefone'}</td>
+                    <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-bold text-slate-300">{lead.d}</td>
+                    <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
+                      <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${lead.p === 'Hot' ? 'bg-orange-500 text-white' : lead.p === 'Warm' ? 'bg-amber-500 text-white' : 'bg-slate-600 text-white'}`}>
+                        {crmPriorityLabels[lead.p] || lead.p}
+                      </span>
+                    </td>
+                    <td className="min-w-[12rem] border-b border-white/[0.04] px-4 py-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        {lead.t ? <span className="rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-black uppercase text-white">WhatsApp</span> : null}
+                        {lead.v ? <span className="rounded-full bg-fuchsia-500 px-2 py-1 text-[10px] font-black uppercase text-white">VIP</span> : null}
+                        {lead.e ? <span className="rounded-full bg-blue-600 px-2 py-1 text-[10px] font-black uppercase text-white">Estudo</span> : null}
+                        {!lead.t && !lead.v && !lead.e ? <span className="text-xs font-semibold text-slate-500">Sem marcador</span> : null}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black tabular-nums text-slate-100">{lead.s}</td>
+                    <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
+                      <div className="flex gap-2">
+                        <button className="inline-flex h-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/10 px-3 text-xs font-black text-slate-100 transition hover:bg-white/15" onClick={() => setSelectedLead(lead)} type="button">Abrir</button>
+                        <button className="inline-flex h-9 items-center justify-center rounded-xl bg-blue-600 px-3 text-xs font-black text-white transition hover:bg-blue-500" onClick={() => onNavigate('automations')} type="button">WhatsApp</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <LeadDetailModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
     </div>
   );
 }
@@ -3568,10 +3827,14 @@ export default function CrmApp({ payload: initialPayload = null }) {
         data={data}
         isAssociationsView={view === 'associations'}
         onAddAssociation={(association) => setAssociations((current) => [association, ...current])}
+        onOpenAdminGeneral={() => setView('general-admin')}
         onOpenAssociations={() => setView('associations')}
         onOpenAssociation={openAssociation}
+        onOpenLeads={() => setView('leads')}
       />
     );
+  } else if (view === 'leads') {
+    content = <LeadsView associations={associations} data={data} onNavigate={setView} records={records} />;
   } else if (['general-admin', 'users', 'campaigns'].includes(view)) {
     content = (
       <AdminGeneralView
