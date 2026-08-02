@@ -102,6 +102,14 @@ function mainMaterialType(value) {
   return 'N/I';
 }
 
+function mainMaterialName(value) {
+  const text = normalize(value, '');
+  const firstMaterial = text.split(/\s*\*-\*\s*/).find(Boolean) || '';
+  const withoutDate = firstMaterial.split('|')[0]?.trim() || '';
+  const name = withoutDate.replace(/\s+-\s+(?:on-line|online|impresso|pdf|digital).*$/i, '').trim();
+  return name || 'N/I';
+}
+
 function compactAddress(row) {
   const cidade = normalize(row.Cidade, '');
   const bairro = normalize(row.Bairro, '');
@@ -162,8 +170,10 @@ function transformRecord(row, ml) {
     m: materialCount(row.Material),
     c: daysSince(row['Data do Último Contato']),
     a: Number.parseInt(normalize(row.Idade, ''), 10) || null,
+    birthDate: normalize(row['Data de aniversário'], 'N/I'),
     g: genderCode(row.Sexo),
     tm: mainMaterialType(row.Material),
+    materialName: mainMaterialName(row.Material),
     tel: normalize(row.Telefone, ''),
     em: email === 'N/I' ? '' : email,
     end: compactAddress(row),
