@@ -40,6 +40,19 @@ def composite_key(row, headers):
     return "|".join(normalized) if normalized else None
 
 
+def normalize_text_key(value):
+    text = str(value or "").strip().casefold()
+    return " ".join(text.split()) or None
+
+
+def duplicate_items(counter: Counter, limit=20):
+    return [
+        {"valor": value, "quantidade": quantity}
+        for value, quantity in counter.most_common()
+        if value and quantity > 1
+    ][:limit]
+
+
 def copy_row_style(sheet, source_row, target_row, columns):
     for column in range(1, columns + 1):
         source = sheet.cell(row=source_row, column=column)
@@ -77,6 +90,9 @@ def consolidar_planilhas(base_path: Path = DEFAULT_BASE, source_paths: list[Path
     seen_new_ids = set()
     seen_new_composites = set()
     sources = []
+    upload_ids = Counter()
+    upload_emails = Counter()
+    upload_names = Counter()
 
     for source_path in source_paths:
         source_workbook = load_workbook(source_path, read_only=True, data_only=False)
@@ -98,6 +114,15 @@ def consolidar_planilhas(base_path: Path = DEFAULT_BASE, source_paths: list[Path
             stats["lidos"] += 1
             row_id = normalize_id(row[source_id_col])
             fallback = composite_key(row, source_headers)
+            values = {header: row[index] if index < len(row) else None for index, header in enumerate(source_headers)}
+            email_key = normalize_text_key(values.get("Email"))
+            name_key = normalize_text_key(f"{values.get('Aluno') or ''} {values.get('Sobrenome') or ''}")
+            if row_id:
+                upload_ids[row_id] += 1
+            if email_key:
+                upload_emails[email_key] += 1
+            if name_key:
+                upload_names[name_key] += 1
             already_exists = (row_id and row_id in existing_ids) or (
                 not row_id and fallback in existing_composites
             )
@@ -150,6 +175,11 @@ def consolidar_planilhas(base_path: Path = DEFAULT_BASE, source_paths: list[Path
             {"distrito": district, "quantidade": quantity}
             for district, quantity in sorted(new_districts.items(), key=lambda item: (-item[1], item[0]))
         ],
+        "alertas_duplicidade": {
+            "ids_repetidos_upload": duplicate_items(upload_ids),
+            "emails_repetidos_upload": duplicate_items(upload_emails),
+            "nomes_repetidos_upload": duplicate_items(upload_names),
+        },
         "arquivos": sources,
     }
 

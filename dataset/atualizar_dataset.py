@@ -13,6 +13,27 @@ from gerar_alunos_json import DEFAULT_EXCEL, gerar_alunos_json
 from treinar_vip_ml import DEFAULT_DATASET_DIR, DEFAULT_REFERENCE_DATE, treinar_vip_ml
 
 UPDATE_STATUS_FILE = "ultima_atualizacao_dataset.json"
+UPDATE_HISTORY_FILE = "historico_atualizacoes_dataset.json"
+
+
+def append_history(output_dir: Path, status: dict, limit: int = 50) -> list[dict]:
+    history_path = output_dir / UPDATE_HISTORY_FILE
+    try:
+        history = json.loads(history_path.read_text(encoding="utf-8"))
+        if not isinstance(history, list):
+            history = []
+    except FileNotFoundError:
+        history = []
+    except json.JSONDecodeError:
+        history = []
+
+    history.insert(0, status)
+    history = history[:limit]
+    history_path.write_text(
+        json.dumps(history, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return history
 
 
 def main() -> None:
@@ -45,6 +66,7 @@ def main() -> None:
             json.dumps(status, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
+        resultado["historico"] = append_history(args.saida, status)
 
     print(json.dumps(resultado, ensure_ascii=False, indent=2))
 

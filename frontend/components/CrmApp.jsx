@@ -1328,9 +1328,14 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
 
 function LastDatasetUpdateCard({ update }) {
   const consolidation = update?.consolidacao;
-  if (!consolidation || !consolidation.alunos_novos) return null;
-
-  const districts = consolidation.distritos_novos || [];
+  const hasUpdate = Boolean(consolidation);
+  const districts = consolidation?.distritos_novos || [];
+  const duplicateAlerts = consolidation?.alertas_duplicidade || {};
+  const duplicateCount = [
+    duplicateAlerts.ids_repetidos_upload,
+    duplicateAlerts.emails_repetidos_upload,
+    duplicateAlerts.nomes_repetidos_upload
+  ].reduce((total, items) => total + (items?.length || 0), 0);
   const date = update.atualizado_em
     ? new Intl.DateTimeFormat('pt-BR', {
       dateStyle: 'short',
@@ -1345,17 +1350,29 @@ function LastDatasetUpdateCard({ update }) {
         <div>
           <span className={labelClass}>Ultima entrada na base</span>
           <h2 className="mt-2 text-3xl font-black text-slate-50">
-            {formatNumber(consolidation.alunos_novos)} novos alunos
+            {hasUpdate ? `${formatNumber(consolidation.alunos_novos)} novos alunos` : 'Nenhum upload registrado'}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-400">
-            Entraram no sistema em {date}. A base foi de {formatNumber(consolidation.linhas_antes)} para {formatNumber(consolidation.linhas_depois)} registros.
+            {hasUpdate
+              ? `Processado em ${date}. A base foi de ${formatNumber(consolidation.linhas_antes)} para ${formatNumber(consolidation.linhas_depois)} registros.`
+              : 'Quando um Excel for enviado pelo painel, este card mostrara o resumo da entrada mais recente.'}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {(consolidation.arquivos || []).map((file) => (
+            {(consolidation?.arquivos || []).map((file) => (
               <span className="rounded-full border border-emerald-300/30 bg-emerald-500/[0.08] px-3 py-1 text-xs font-bold text-emerald-300" key={file.arquivo}>
                 {file.arquivo}: {formatNumber(file.novos)} novos
               </span>
             ))}
+            {hasUpdate && consolidation.alunos_novos === 0 ? (
+              <span className="rounded-full border border-amber-300/30 bg-amber-500/[0.08] px-3 py-1 text-xs font-bold text-amber-300">
+                Nenhum novo lead neste upload
+              </span>
+            ) : null}
+            {duplicateCount ? (
+              <span className="rounded-full border border-red-300/30 bg-red-500/[0.08] px-3 py-1 text-xs font-bold text-red-300">
+                {formatNumber(duplicateCount)} alerta(s) de duplicidade
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="grid gap-2">
@@ -1366,18 +1383,105 @@ function LastDatasetUpdateCard({ update }) {
             </span>
           </div>
           <div className="grid max-h-72 gap-2 overflow-auto pr-1">
-            {districts.slice(0, 12).map((item) => (
+            {districts.length ? districts.slice(0, 12).map((item) => (
               <div className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-white/[0.07] bg-slate-950/42 px-4 py-3" key={item.distrito}>
                 <span className="min-w-0 truncate text-sm font-bold text-slate-100">{item.distrito}</span>
                 <strong className="rounded-full bg-white/90 px-3 py-1 text-sm font-black tabular-nums text-slate-950">
                   {formatNumber(item.quantidade)}
                 </strong>
               </div>
-            ))}
+            )) : (
+              <div className="rounded-xl border border-white/[0.07] bg-slate-950/42 px-4 py-3 text-sm font-semibold text-slate-400">
+                Nenhum distrito novo registrado nesta atualizacao.
+              </div>
+            )}
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function DatasetHistoryModal({ history = [], onClose }) {
+  return (
+    <div className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/70 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <div className="max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/[0.10] bg-slate-950 text-slate-100 shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-6">
+          <div>
+            <span className={labelClass}>Historico do dataset</span>
+            <h2 className="mt-1 text-2xl font-black">Excels processados</h2>
+          </div>
+          <button className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] bg-white/10 text-white" onClick={onClose} type="button" aria-label="Fechar historico">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="max-h-[70vh] overflow-auto p-6">
+          {history.length ? (
+            <div className="grid gap-4">
+              {history.map((entry, index) => {
+                const consolidation = entry.consolidacao || {};
+                const alerts = consolidation.alertas_duplicidade || {};
+                const alertCount = (alerts.ids_repetidos_upload?.length || 0)
+                  + (alerts.emails_repetidos_upload?.length || 0)
+                  + (alerts.nomes_repetidos_upload?.length || 0);
+                const date = entry.atualizado_em
+                  ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Fortaleza' }).format(new Date(entry.atualizado_em))
+                  : 'sem data';
+                return (
+                  <article className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5" key={`${entry.atualizado_em}-${index}`}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <strong className="text-xl font-black">{formatNumber(consolidation.alunos_novos || 0)} novos leads</strong>
+                        <p className="mt-1 text-sm text-slate-400">
+                          {date} · base {formatNumber(consolidation.linhas_antes || 0)} → {formatNumber(consolidation.linhas_depois || 0)}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${consolidation.alunos_novos ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+                        {consolidation.alunos_novos ? 'Com novos leads' : 'Sem novos leads'}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                      <div>
+                        <span className={labelClass}>Arquivos</span>
+                        <div className="mt-2 grid gap-2">
+                          {(consolidation.arquivos || []).map((file) => (
+                            <div className="rounded-xl bg-slate-900/70 px-3 py-2 text-sm" key={file.arquivo}>
+                              <strong>{file.arquivo}</strong>
+                              <span className="block text-xs text-slate-400">
+                                {formatNumber(file.lidos)} lidos · {formatNumber(file.novos)} novos · {formatNumber(file.ja_existiam)} ja existiam · {formatNumber(file.duplicados_upload)} duplicados no upload
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <span className={labelClass}>Distritos e alertas</span>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {(consolidation.distritos_novos || []).slice(0, 10).map((item) => (
+                            <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-bold text-blue-200" key={item.distrito}>
+                              {item.distrito}: {formatNumber(item.quantidade)}
+                            </span>
+                          ))}
+                          {alertCount ? (
+                            <span className="rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold text-red-200">
+                              {formatNumber(alertCount)} alerta(s) de ID/email/nome repetido
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-8 text-center text-slate-400">
+              Nenhum upload de Excel registrado ainda.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1538,7 +1642,7 @@ function AssociationDashboard({ association, data, records = [], onDatasetUpdate
   );
 }
 
-function LeadsView({ associations, data, lastDatasetUpdate, records = [], onNavigate }) {
+function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetUpdate, records = [], onNavigate }) {
   const [filters, setFilters] = useState({
     association: 'paulistana',
     distrito: 'all',
@@ -1548,6 +1652,7 @@ function LeadsView({ associations, data, lastDatasetUpdate, records = [], onNavi
   });
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const districts = useMemo(
     () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -1665,6 +1770,13 @@ function LeadsView({ associations, data, lastDatasetUpdate, records = [], onNavi
       </section>
 
       <LastDatasetUpdateCard update={lastDatasetUpdate} />
+
+      <div className="flex justify-end">
+        <button className={ghostButtonClass} onClick={() => setHistoryOpen(true)} type="button">
+          <ClipboardList size={18} />
+          Historico dos Excels
+        </button>
+      </div>
 
       <section className={`${panelClass} p-6`}>
         <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
@@ -1793,6 +1905,7 @@ function LeadsView({ associations, data, lastDatasetUpdate, records = [], onNavi
       </section>
 
       <LeadDetailModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
+      {historyOpen ? <DatasetHistoryModal history={datasetUpdateHistory} onClose={() => setHistoryOpen(false)} /> : null}
     </div>
   );
 }
@@ -4041,7 +4154,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
       />
     );
   } else if (view === 'leads') {
-    content = <LeadsView associations={associations} data={data} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={setView} records={records} />;
+    content = <LeadsView associations={associations} data={data} datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={setView} records={records} />;
   } else if (['general-admin', 'users', 'campaigns'].includes(view)) {
     content = (
       <AdminGeneralView

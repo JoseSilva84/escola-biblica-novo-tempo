@@ -11,6 +11,7 @@ const DATASET_DIR = resolveConfiguredPath(process.env.DATASET_DIR)
 const ML_RANKING_FILE = 'ranking_nao_vip_ml_pandas.csv';
 const ALUNOS_FILE = 'alunos.json';
 const UPDATE_STATUS_FILE = 'ultima_atualizacao_dataset.json';
+const UPDATE_HISTORY_FILE = 'historico_atualizacoes_dataset.json';
 
 function resolveConfiguredPath(value) {
   if (!value) return null;
@@ -88,6 +89,21 @@ function readLastDatasetUpdate() {
     };
   } catch {
     return null;
+  }
+}
+
+function readDatasetUpdateHistory() {
+  const historyPath = firstExistingPath([
+    resolveConfiguredPath(process.env.DATASET_UPDATE_HISTORY_PATH),
+    path.join(DATASET_DIR, UPDATE_HISTORY_FILE)
+  ]);
+  if (!historyPath) return [];
+
+  try {
+    const history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+    return Array.isArray(history) ? history.slice(0, 50) : [];
+  } catch {
+    return [];
   }
 }
 
@@ -211,6 +227,7 @@ export function getDashboardData() {
   const alunos = JSON.parse(fs.readFileSync(alunosPath, 'utf8'));
   const ranking = readMlRanking();
   const lastDatasetUpdate = readLastDatasetUpdate();
+  const datasetUpdateHistory = readDatasetUpdateHistory();
   const records = alunos.map((row) => transformRecord(row, ranking.byId));
 
   return {
@@ -221,6 +238,7 @@ export function getDashboardData() {
       mlSource: ranking.source,
       mlRecords: ranking.byId.size,
       lastDatasetUpdate,
+      datasetUpdateHistory,
       referenceDate: '2026-06-08',
       model: 'ranking_nao_vip_ml_pandas.csv + regra operacional do notebook analise_vip_ml.ipynb'
     }
