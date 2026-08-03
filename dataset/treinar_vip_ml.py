@@ -206,6 +206,8 @@ def treinar_vip_ml(
         "registros": int(len(base)),
         "vips": int(base["vip_alvo"].sum()),
         "taxa_vip": float(base["vip_alvo"].mean()),
+        "ranking_nao_vip": int(len(ranking)),
+        "ranking_alphaville": int(len(ranking_alphaville)),
         "roc_auc_teste": float(roc_auc_score(y_teste, prob_teste)),
         "average_precision_teste": float(average_precision_score(y_teste, prob_teste)),
         "random_state": RANDOM_STATE,
@@ -215,11 +217,7 @@ def treinar_vip_ml(
         json.dumps(metricas, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
-    return {
-        **metricas,
-        "ranking_nao_vip": int(len(ranking)),
-        "ranking_alphaville": int(len(ranking_alphaville)),
-    }
+    return metricas
 
 
 def main() -> None:

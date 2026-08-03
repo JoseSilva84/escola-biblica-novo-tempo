@@ -2,6 +2,8 @@
   "registros": 46800,
   "vips": 4014,
   "taxa_vip": 0.08576923076923076,
+  "ranking_nao_vip": 42786,
+  "ranking_alphaville": 138,
   "roc_auc_teste": 0.946934126160939,
   "average_precision_teste": 0.7210805975717457,
   "random_state": 42,

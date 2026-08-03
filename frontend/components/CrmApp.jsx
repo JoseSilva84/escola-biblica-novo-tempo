@@ -138,6 +138,21 @@ function formatDatasetDate(value) {
   }).format(date);
 }
 
+function hasNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function formatMlDelta(summary, key, fallbackValue) {
+  const delta = summary?.[key] || {};
+  const before = delta.antes;
+  const after = delta.depois;
+  const diff = delta.diferenca;
+  if (hasNumber(before) || hasNumber(after) || hasNumber(diff)) {
+    return `${hasNumber(before) ? formatNumber(before) : 'sem base anterior'} para ${hasNumber(after) ? formatNumber(after) : 'sem dado'} (${hasNumber(diff) ? formatNumber(diff) : 'sem diferenca'})`;
+  }
+  return hasNumber(fallbackValue) ? `total ${formatNumber(fallbackValue)}` : 'sem dado salvo';
+}
+
 function pct(part, total) {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
@@ -1529,7 +1544,8 @@ function DatasetHistoryView({ history = [], onBack }) {
             const newLeads = consolidation.alunos_novos_detalhes || [];
             const mlStatus = entry.ml_status || {};
             const mlSummary = mlStatus.resumo || {};
-            const mlDate = formatDatasetDate(mlStatus.atualizado_em_brasil || mlStatus.atualizado_em);
+            const mlDate = formatDatasetDate(mlStatus.atualizado_em_brasil || mlStatus.atualizado_em || entry.atualizado_em);
+            const mlMetrics = entry.ml || {};
             return (
               <article className="history-dark-surface rounded-2xl border border-white/[0.10] bg-slate-950 p-6 shadow-[0_24px_70px_rgba(2,6,23,0.32)]" key={entry.id || `${entry.atualizado_em}-${index}`}>
                 <div className="mb-5 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
@@ -1543,7 +1559,7 @@ function DatasetHistoryView({ history = [], onBack }) {
                   </div>
                   <div className="rounded-2xl bg-orange-600 p-4">
                     <span className="text-[10px] font-black uppercase tracking-wide text-white/75">ML registros</span>
-                    <strong className="mt-2 block text-3xl font-black text-white">{formatNumber(mlSummary.registros?.depois || entry.ml?.registros || 0)}</strong>
+                    <strong className="mt-2 block text-3xl font-black text-white">{formatNumber(mlSummary.registros?.depois ?? mlMetrics.registros ?? 0)}</strong>
                   </div>
                   <div className="rounded-2xl bg-slate-800 p-4">
                     <span className="text-[10px] font-black uppercase tracking-wide text-white/75">ML atualizado</span>
@@ -1601,9 +1617,9 @@ function DatasetHistoryView({ history = [], onBack }) {
                       <span className="text-[11px] font-black uppercase tracking-[0.16em] !text-slate-300">Machine Learning atualizado</span>
                       <div className="mt-3 grid gap-2 text-xs font-semibold !text-slate-300">
                         <span>Horario Brasil: {mlDate}</span>
-                        <span>Registros: {formatNumber(mlSummary.registros?.antes || 0)} para {formatNumber(mlSummary.registros?.depois || 0)} ({formatNumber(mlSummary.registros?.diferenca || 0)})</span>
-                        <span>VIPs historicos: {formatNumber(mlSummary.vips?.antes || 0)} para {formatNumber(mlSummary.vips?.depois || 0)} ({formatNumber(mlSummary.vips?.diferenca || 0)})</span>
-                        <span>Ranking nao VIP: {formatNumber(mlSummary.ranking_nao_vip?.antes || 0)} para {formatNumber(mlSummary.ranking_nao_vip?.depois || 0)} ({formatNumber(mlSummary.ranking_nao_vip?.diferenca || 0)})</span>
+                        <span>Registros: {formatMlDelta(mlSummary, 'registros', mlMetrics.registros)}</span>
+                        <span>VIPs historicos: {formatMlDelta(mlSummary, 'vips', mlMetrics.vips)}</span>
+                        <span>Ranking nao VIP: {formatMlDelta(mlSummary, 'ranking_nao_vip', mlMetrics.ranking_nao_vip)}</span>
                         <span>Arquivos: {(mlStatus.arquivos_atualizados || []).join(', ') || 'metricas e rankings atualizados'}</span>
                       </div>
                     </div>
