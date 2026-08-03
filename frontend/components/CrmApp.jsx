@@ -24,8 +24,10 @@ import {
   ChevronRight,
   ClipboardList,
   Crown,
+  Database,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   Gauge,
   LayoutDashboard,
   Lock,
@@ -44,6 +46,7 @@ import {
   ShieldCheck,
   Sparkles,
   Sun,
+  UploadCloud,
   UsersRound,
   WandSparkles,
   X
@@ -1201,7 +1204,120 @@ function AdminDashboard({ associations, data, isAssociationsView = false, onOpen
   );
 }
 
-function AssociationDashboard({ association, data, records = [], onOpenDetails }) {
+function DatasetUploadPanel({ association, onUpdated, user }) {
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [lastResult, setLastResult] = useState(null);
+  const canUpdate = user?.role === 'ADMIN_GERAL';
+
+  async function submitUpload(event) {
+    event.preventDefault();
+    if (!canUpdate || uploading || !files.length) return;
+
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    setUploading(true);
+    setLastResult(null);
+
+    try {
+      const response = await apiFetch('/api/dataset/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result?.message || 'Nao foi possivel atualizar a base.');
+      }
+      setLastResult(result);
+      setFiles([]);
+      event.currentTarget.reset();
+      await onUpdated?.();
+      const novos = result?.result?.consolidacao?.alunos_novos ?? 0;
+      toast.success('Base atualizada', {
+        description: `${formatNumber(novos)} aluno(s) novo(s) inseridos e ML recalculado.`
+      });
+    } catch (error) {
+      toast.error('Atualizacao falhou', {
+        description: error.message || 'Confira os arquivos e tente novamente.'
+      });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const consolidation = lastResult?.result?.consolidacao;
+  const ml = lastResult?.result?.ml;
+
+  return (
+    <section className={`${panelClass} p-6`}>
+      <div className="mb-5 flex items-start justify-between gap-4 max-lg:flex-col">
+        <div>
+          <span className={labelClass}>Base de dados</span>
+          <h2 className="mt-1 text-xl font-black text-slate-50">Atualizar interessados de {association.name}</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
+            Envie um ou mais Excels. O sistema compara com a base atual, adiciona apenas alunos novos e recalcula a priorizacao ML.
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-2 rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
+          <Database size={14} />
+          Admin
+        </span>
+      </div>
+
+      <form className="grid gap-4" onSubmit={submitUpload}>
+        <label className={`interactive-card flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center transition ${canUpdate ? 'border-blue-400/35 bg-blue-500/[0.05] hover:border-blue-300/70' : 'border-slate-400/20 bg-slate-500/[0.04] opacity-70'}`}>
+          <UploadCloud className="text-blue-400" size={28} />
+          <span className="text-sm font-bold text-slate-100">
+            {files.length ? `${files.length} arquivo(s) selecionado(s)` : 'Selecionar arquivos Excel'}
+          </span>
+          <span className="text-xs text-slate-400">Aceita varios arquivos .xlsx da listagem completa</span>
+          <input
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            disabled={!canUpdate || uploading}
+            multiple
+            onChange={(event) => setFiles(Array.from(event.target.files || []))}
+            type="file"
+          />
+        </label>
+
+        {files.length > 0 && (
+          <div className="grid gap-2">
+            {files.map((file) => (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-slate-950/45 px-4 py-3" key={`${file.name}-${file.size}`}>
+                <span className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-200">
+                  <FileSpreadsheet className="shrink-0 text-emerald-400" size={17} />
+                  <span className="truncate">{file.name}</span>
+                </span>
+                <span className="text-xs font-bold text-slate-500">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button className={primaryButtonClass} disabled={!canUpdate || uploading || !files.length} type="submit">
+            <Database size={17} />
+            {uploading ? 'Atualizando...' : 'Atualizar base e recalcular ML'}
+          </button>
+          {!canUpdate && <span className="text-sm text-slate-400">Disponivel apenas para Admin Geral.</span>}
+          {uploading && <span className="text-sm font-semibold text-blue-300">Processando Excel, JSON e ranking ML...</span>}
+        </div>
+      </form>
+
+      {consolidation && (
+        <div className="mt-5 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+          <MetricCard detail="antes do upload" icon={UsersRound} label="Base anterior" value={formatNumber(consolidation.linhas_antes)} />
+          <MetricCard detail="inseridos agora" icon={BadgePlus} label="Novos alunos" tone="green" value={formatNumber(consolidation.alunos_novos)} />
+          <MetricCard detail="apos consolidar" icon={CheckCircle2} label="Base final" value={formatNumber(consolidation.linhas_depois)} />
+          <MetricCard detail={`${formatNumber(ml?.vips || 0)} VIPs historicos`} icon={Sparkles} label="ML registros" tone="orange" value={formatNumber(ml?.registros || 0)} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AssociationDashboard({ association, data, records = [], onDatasetUpdated, onOpenDetails, user }) {
   const automations = [
     { name: 'Boas-vindas', status: 'Ativa', sent: 1280, response: '18%', color: 'border-emerald-500/20 bg-emerald-500/[0.04]' },
     { name: 'Devocional 21 dias', status: 'Rascunho', sent: 0, response: '-', color: 'border-slate-500/20 bg-slate-500/[0.04]' },
@@ -1262,6 +1378,8 @@ function AssociationDashboard({ association, data, records = [], onOpenDetails }
         <MetricCard detail={`${pct(data.vip, data.total)}% da base`} icon={CheckCircle2} label="VIPs" tone="violet" value={formatNumber(data.vip)} />
         <MetricCard detail={`${pct(data.studies, data.total)}% em andamento`} icon={ClipboardList} label="Estudos ativos" value={formatNumber(data.studies)} />
       </section>
+
+      <DatasetUploadPanel association={association} onUpdated={onDatasetUpdated} user={user} />
 
       <section className="grid grid-cols-[1.15fr_0.85fr] gap-4 max-xl:grid-cols-1">
         <article className={`${panelClass} p-6`}>
@@ -3866,7 +3984,16 @@ export default function CrmApp({ payload: initialPayload = null }) {
       />
     );
   } else if (view === 'association') {
-    content = <AssociationDashboard association={selectedAssociation} data={data} records={records} onOpenDetails={() => openDetailsView(setView)} />;
+    content = (
+      <AssociationDashboard
+        association={selectedAssociation}
+        data={data}
+        onDatasetUpdated={loadDashboard}
+        onOpenDetails={() => openDetailsView(setView)}
+        records={records}
+        user={user}
+      />
+    );
   } else if (view === 'automations') {
     content = <AdminGeneralView {...adminGeneralProps} initialSection="distribution" />;
   } else if (view === 'conversations') {

@@ -213,6 +213,10 @@ Esse comando regenera `alunos.json`, recalcula o ranking VIP, salva o modelo `mo
 
 O Dockerfile aceita a variavel de build `AUTO_UPDATE_DATASET=true` para rodar essa rotina durante o build. Sem essa variavel, o deploy usa os arquivos derivados ja enviados no repositorio, que e o caminho mais leve e seguro para a VPS.
 
+Para usar a atualizacao pelo painel administrativo, habilite tambem `INSTALL_DATASET_TOOLS=true` no build da VPS. Isso instala Python e as dependencias necessarias para processar uploads de Excel sem recalcular a base durante o deploy.
+
+Com `INSTALL_DATASET_TOOLS=true`, o Admin Geral pode usar o botao "Atualizar base" na tela da associacao. O painel aceita varios arquivos `.xlsx`, consolida apenas alunos que ainda nao existem na planilha principal pelo `ID`, regenera `alunos.json` e recalcula o ranking VIP. Para manter os uploads e a planilha consolidada entre recriacoes do container, use armazenamento persistente em `/app/dataset` ou outro storage externo.
+
 ## Seguranca
 
 Arquivos de ambiente nao devem ser enviados para o GitHub:

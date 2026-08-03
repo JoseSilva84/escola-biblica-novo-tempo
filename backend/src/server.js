@@ -2,12 +2,28 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import fs from 'fs';
+import fsp from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { spawn } from 'child_process';
 import { createSessionToken, requireAuth, sessionCookieOptions, validateCredentials, verifySessionToken } from './auth.js';
 import { getDashboardData } from './data.js';
 import { prisma } from './prisma.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
+const DATASET_DIR = resolveDatasetDir();
+const MAX_DATASET_UPLOAD_BYTES = Number(process.env.DATASET_UPLOAD_LIMIT_BYTES || 150 * 1024 * 1024);
+
+function resolveDatasetDir() {
+  if (process.env.DATASET_DIR) return path.resolve(process.env.DATASET_DIR);
+  const candidates = [
+    path.resolve(process.cwd(), 'dataset'),
+    path.resolve(process.cwd(), '..', 'dataset')
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[0];
+}
 
 function normalizeOrigin(origin) {
   return String(origin || '').trim().replace(/\/+$/, '');
@@ -30,6 +46,112 @@ function webhookAllowed(request) {
     || ''
   ).trim();
   return Boolean(secret && received === secret);
+}
+
+function requireAdminGeral(request, response, next) {
+  if (request.user?.role !== 'ADMIN_GERAL') {
+    response.status(403).json({ message: 'Apenas Admin Geral pode atualizar a base de dados.' });
+    return;
+  }
+  next();
+}
+
+function splitBuffer(buffer, separator) {
+  const parts = [];
+  let start = 0;
+  let index = buffer.indexOf(separator, start);
+  while (index !== -1) {
+    parts.push(buffer.subarray(start, index));
+    start = index + separator.length;
+    index = buffer.indexOf(separator, start);
+  }
+  parts.push(buffer.subarray(start));
+  return parts;
+}
+
+function parseMultipartFiles(request) {
+  const contentType = String(request.headers['content-type'] || '');
+  const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType)?.[1]
+    || /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType)?.[2];
+  if (!boundary) {
+    const error = new Error('Upload multipart sem boundary.');
+    error.status = 400;
+    throw error;
+  }
+
+  const boundaryBuffer = Buffer.from(`--${boundary}`);
+  const files = [];
+  for (const rawPart of splitBuffer(request.body, boundaryBuffer)) {
+    let part = rawPart;
+    if (part.length === 0 || part.equals(Buffer.from('--\r\n')) || part.equals(Buffer.from('--'))) continue;
+    if (part.subarray(0, 2).toString() === '\r\n') part = part.subarray(2);
+    if (part.subarray(-2).toString() === '\r\n') part = part.subarray(0, -2);
+    if (part.subarray(-2).toString() === '--') part = part.subarray(0, -2);
+
+    const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
+    if (headerEnd === -1) continue;
+    const headerText = part.subarray(0, headerEnd).toString('latin1');
+    const body = part.subarray(headerEnd + 4);
+    const disposition = headerText.split(/\r\n/).find((line) => /^content-disposition:/i.test(line)) || '';
+    const filename = /filename="([^"]*)"/i.exec(disposition)?.[1];
+    const fieldName = /name="([^"]*)"/i.exec(disposition)?.[1] || '';
+    if (!filename || !body.length) continue;
+    if (fieldName !== 'files' && fieldName !== 'excel') continue;
+    if (!/\.xlsx$/i.test(filename)) {
+      const error = new Error(`Arquivo recusado: ${filename}. Envie apenas .xlsx.`);
+      error.status = 400;
+      throw error;
+    }
+    files.push({
+      filename: path.basename(filename).replace(/[^\w .()\-À-ÿ]/g, '_'),
+      buffer: body
+    });
+  }
+  return files;
+}
+
+function datasetPythonBin() {
+  const configured = String(process.env.DATASET_PYTHON_BIN || '').trim();
+  if (configured) return configured;
+  if (fs.existsSync('/opt/dataset-venv/bin/python')) return '/opt/dataset-venv/bin/python';
+  return process.platform === 'win32' ? 'python' : 'python3';
+}
+
+function runDatasetUpdate(uploadPaths) {
+  const python = datasetPythonBin();
+  const script = path.join(DATASET_DIR, 'atualizar_dataset.py');
+  const base = path.join(DATASET_DIR, 'ListagemCompleta (1).xlsx');
+  const args = [script, '--arquivo', base, '--saida', DATASET_DIR, '--novos-arquivos', ...uploadPaths];
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(python, args, {
+      cwd: DATASET_DIR,
+      env: { ...process.env, PYTHONUTF8: '1' },
+      windowsHide: true
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+    child.on('error', (error) => {
+      error.status = 503;
+      error.message = `Python do dataset indisponivel: ${error.message}`;
+      reject(error);
+    });
+    child.on('close', (code) => {
+      if (code !== 0) {
+        const error = new Error(stderr || stdout || `Atualizacao do dataset falhou com codigo ${code}.`);
+        error.status = 500;
+        reject(error);
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch {
+        resolve({ raw: stdout.trim() });
+      }
+    });
+  });
 }
 
 function parseMaybeJson(value) {
@@ -561,10 +683,53 @@ app.use(cors({
   },
   credentials: true
 }));
+app.use(cookieParser());
+
+app.post(
+  '/api/dataset/upload',
+  express.raw({ type: 'multipart/form-data', limit: MAX_DATASET_UPLOAD_BYTES }),
+  requireAuth,
+  requireAdminGeral,
+  async (request, response) => {
+    let tempDir = null;
+    try {
+      const files = parseMultipartFiles(request);
+      if (!files.length) {
+        response.status(400).json({ message: 'Envie pelo menos um arquivo .xlsx.' });
+        return;
+      }
+
+      tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'dataset-upload-'));
+      const uploadPaths = [];
+      for (const [index, file] of files.entries()) {
+        const filename = `${String(index + 1).padStart(2, '0')}-${file.filename}`;
+        const uploadPath = path.join(tempDir, filename);
+        await fsp.writeFile(uploadPath, file.buffer);
+        uploadPaths.push(uploadPath);
+      }
+
+      const result = await runDatasetUpdate(uploadPaths);
+      response.json({
+        ok: true,
+        uploadedFiles: files.map((file) => file.filename),
+        result
+      });
+    } catch (error) {
+      response.status(error.status || 500).json({
+        ok: false,
+        message: error.message || 'Nao foi possivel atualizar a base de dados.'
+      });
+    } finally {
+      if (tempDir) {
+        await fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+      }
+    }
+  }
+);
+
 app.use(express.json({ limit: '2mb', type: ['application/json', 'application/*+json'] }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(express.text({ limit: '2mb', type: ['text/*', 'application/xml'] }));
-app.use(cookieParser());
 
 app.get('/api/health', async (_request, response) => {
   try {

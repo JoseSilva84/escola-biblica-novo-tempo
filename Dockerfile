@@ -3,8 +3,9 @@ FROM node:22-bookworm-slim
 WORKDIR /app
 
 ARG AUTO_UPDATE_DATASET=false
+ARG INSTALL_DATASET_TOOLS=false
 
-RUN if [ "$AUTO_UPDATE_DATASET" = "true" ]; then \
+RUN if [ "$AUTO_UPDATE_DATASET" = "true" ] || [ "$INSTALL_DATASET_TOOLS" = "true" ]; then \
     apt-get update \
     && apt-get install -y --no-install-recommends python3 python3-venv \
     && rm -rf /var/lib/apt/lists/*; \
@@ -23,7 +24,7 @@ RUN npm ci
 
 WORKDIR /app
 
-RUN if [ "$AUTO_UPDATE_DATASET" = "true" ]; then \
+RUN if [ "$AUTO_UPDATE_DATASET" = "true" ] || [ "$INSTALL_DATASET_TOOLS" = "true" ]; then \
     python3 -m venv /opt/dataset-venv \
     && /opt/dataset-venv/bin/pip install --no-cache-dir -r /app/dataset/requirements-dataset.txt; \
   else \
