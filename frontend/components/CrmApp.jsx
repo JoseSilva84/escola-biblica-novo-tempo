@@ -4123,6 +4123,16 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {canGoBack ? (
+                <button
+                  aria-label="Voltar"
+                  className="interactive-card grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-900/10 bg-white/70 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
+                  onClick={onBack}
+                  type="button"
+                >
+                  <ArrowRight className="rotate-180" size={17} />
+                </button>
+              ) : null}
               <button
                 className="interactive-card inline-flex h-10 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/70 px-3 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
                 onClick={() => {
@@ -4136,16 +4146,6 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
                 {isLight ? <Moon size={17} /> : <Sun size={17} />}
                 {isLight ? 'Dark' : 'Light'}
               </button>
-              {canGoBack ? (
-                <button
-                  aria-label="Voltar"
-                  className="interactive-card grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-900/10 bg-white/70 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
-                  onClick={onBack}
-                  type="button"
-                >
-                  <ArrowRight className="rotate-180" size={17} />
-                </button>
-              ) : null}
               <button
                 className="interactive-card relative grid h-10 w-10 place-items-center rounded-xl border border-slate-900/10 bg-white/70 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
                 onClick={() => toast('3 notificações operacionais', {
