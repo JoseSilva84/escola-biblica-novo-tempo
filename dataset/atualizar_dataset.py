@@ -7,6 +7,7 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from consolidar_planilhas import consolidar_planilhas
 from gerar_alunos_json import DEFAULT_EXCEL, gerar_alunos_json
@@ -14,6 +15,53 @@ from treinar_vip_ml import DEFAULT_DATASET_DIR, DEFAULT_REFERENCE_DATE, treinar_
 
 UPDATE_STATUS_FILE = "ultima_atualizacao_dataset.json"
 UPDATE_HISTORY_FILE = "historico_atualizacoes_dataset.json"
+ML_METRICS_FILE = "metricas_vip_sklearn.json"
+
+
+def read_json(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def metric_delta(after: dict, before: dict, key: str) -> dict:
+    after_value = after.get(key)
+    before_value = before.get(key)
+    if isinstance(after_value, (int, float)) and isinstance(before_value, (int, float)):
+        delta = after_value - before_value
+    else:
+        delta = None
+    return {
+        "antes": before_value,
+        "depois": after_value,
+        "diferenca": delta,
+    }
+
+
+def build_ml_status(metricas: dict, metricas_anteriores: dict) -> dict:
+    now_utc = datetime.now(timezone.utc)
+    now_brazil = now_utc.astimezone(ZoneInfo("America/Fortaleza"))
+    return {
+        "atualizado_em": now_utc.isoformat(),
+        "atualizado_em_brasil": now_brazil.isoformat(),
+        "timezone": "America/Fortaleza",
+        "resumo": {
+            "registros": metric_delta(metricas, metricas_anteriores, "registros"),
+            "vips": metric_delta(metricas, metricas_anteriores, "vips"),
+            "ranking_nao_vip": metric_delta(metricas, metricas_anteriores, "ranking_nao_vip"),
+            "ranking_alphaville": metric_delta(metricas, metricas_anteriores, "ranking_alphaville"),
+            "roc_auc_teste": metric_delta(metricas, metricas_anteriores, "roc_auc_teste"),
+            "average_precision_teste": metric_delta(metricas, metricas_anteriores, "average_precision_teste"),
+        },
+        "arquivos_atualizados": [
+            "modelo_vip_sklearn.joblib",
+            "metricas_vip_sklearn.json",
+            "ranking_nao_vip_ml_pandas.csv",
+            "ranking_Alphaville_ml_pandas.csv",
+        ],
+    }
 
 
 def append_history(output_dir: Path, status: dict, limit: int = 50) -> list[dict]:
@@ -50,9 +98,11 @@ def main() -> None:
     if args.novos_arquivos:
         consolidacao = consolidar_planilhas(args.arquivo, args.novos_arquivos)
 
+    metricas_anteriores = read_json(args.saida / ML_METRICS_FILE)
     alunos = gerar_alunos_json(args.arquivo, args.saida / "alunos.json")
     metricas = treinar_vip_ml(args.arquivo, args.saida, args.data_referencia)
-    resultado = {"consolidacao": consolidacao, "alunos_json": alunos, "ml": metricas}
+    ml_status = build_ml_status(metricas, metricas_anteriores)
+    resultado = {"consolidacao": consolidacao, "alunos_json": alunos, "ml": metricas, "ml_status": ml_status}
 
     if consolidacao:
         status = {
@@ -61,6 +111,7 @@ def main() -> None:
             "alunos_json": alunos,
             "consolidacao": consolidacao,
             "ml": metricas,
+            "ml_status": ml_status,
         }
         (args.saida / UPDATE_STATUS_FILE).write_text(
             json.dumps(status, ensure_ascii=False, indent=2) + "\n",

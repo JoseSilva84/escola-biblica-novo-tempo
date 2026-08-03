@@ -170,7 +170,8 @@ function normalizeDatasetHistoryEntry(entry) {
     },
     uploadedFiles: entry.uploadedFiles || [],
     consolidacao: summary,
-    ml: entry.ml || null
+    ml: entry.ml?.metricas || entry.ml || null,
+    ml_status: entry.ml?.status || entry.mlStatus || entry.ml_status || null
   };
 }
 
@@ -220,7 +221,10 @@ async function saveDatasetUploadHistory({ result, files, user }) {
   if (!prisma.datasetUploadHistory) return null;
   await ensureDatasetHistoryTable();
   const consolidation = result?.consolidacao || {};
-  const ml = result?.ml || null;
+  const ml = {
+    metricas: result?.ml || null,
+    status: result?.ml_status || null
+  };
   return prisma.datasetUploadHistory.create({
     data: {
       status: 'COMPLETED',
@@ -273,7 +277,10 @@ async function importDatasetHistoryFromFiles(entries = []) {
         rowsBefore: Number(consolidation.linhas_antes || 0),
         rowsAfter: Number(consolidation.linhas_depois || 0),
         districts: consolidation.distritos_novos || [],
-        ml: entry?.ml || null,
+        ml: {
+          metricas: entry?.ml || null,
+          status: entry?.ml_status || null
+        },
         createdAt
       }
     });
@@ -908,6 +915,9 @@ app.get('/api/auth/me', (request, response) => {
 });
 
 app.get('/api/dashboard', requireAuth, async (_request, response) => {
+  response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.set('Pragma', 'no-cache');
+  response.set('Expires', '0');
   const payload = getDashboardData();
   try {
     const dbHistory = await readDatasetHistoryFromDb(50);
@@ -928,6 +938,9 @@ app.get('/api/dashboard', requireAuth, async (_request, response) => {
 });
 
 app.get('/api/dataset/history', requireAuth, requireAdminGeral, async (_request, response) => {
+  response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.set('Pragma', 'no-cache');
+  response.set('Expires', '0');
   try {
     const history = await readDatasetHistoryFromDb(100);
     response.json({ history });

@@ -53,6 +53,25 @@ def duplicate_items(counter: Counter, limit=20):
     ][:limit]
 
 
+def row_detail(output_row, headers, source_name):
+    values = {header: output_row[index] if index < len(output_row) else None for index, header in enumerate(headers)}
+    nome = " ".join(
+        str(values.get(header) or "").strip()
+        for header in ("Aluno", "Sobrenome")
+        if str(values.get(header) or "").strip()
+    )
+    return {
+        "id": normalize_id(values.get("ID")),
+        "nome": nome or "Nome nao informado",
+        "email": str(values.get("Email") or "").strip(),
+        "telefone": str(values.get("Telefone") or "").strip(),
+        "distrito": str(values.get("Distrito") or "Nao informado").strip() or "Nao informado",
+        "cidade": str(values.get("Cidade") or "").strip(),
+        "bairro": str(values.get("Bairro") or "").strip(),
+        "arquivo": source_name,
+    }
+
+
 def copy_row_style(sheet, source_row, target_row, columns):
     for column in range(1, columns + 1):
         source = sheet.cell(row=source_row, column=column)
@@ -93,6 +112,7 @@ def consolidar_planilhas(base_path: Path = DEFAULT_BASE, source_paths: list[Path
     upload_ids = Counter()
     upload_emails = Counter()
     upload_names = Counter()
+    new_lead_details = []
 
     for source_path in source_paths:
         source_workbook = load_workbook(source_path, read_only=True, data_only=False)
@@ -142,6 +162,7 @@ def consolidar_planilhas(base_path: Path = DEFAULT_BASE, source_paths: list[Path
                 for header in base_headers
             ]
             rows_to_append.append(output_row)
+            new_lead_details.append(row_detail(output_row, base_headers, source_path.name))
             district = output_row[base_headers.index("Distrito")] if "Distrito" in base_headers else ""
             new_districts[str(district or "Nao informado").strip() or "Nao informado"] += 1
             if row_id:
@@ -175,6 +196,7 @@ def consolidar_planilhas(base_path: Path = DEFAULT_BASE, source_paths: list[Path
             {"distrito": district, "quantidade": quantity}
             for district, quantity in sorted(new_districts.items(), key=lambda item: (-item[1], item[0]))
         ],
+        "alunos_novos_detalhes": new_lead_details,
         "alertas_duplicidade": {
             "ids_repetidos_upload": duplicate_items(upload_ids),
             "emails_repetidos_upload": duplicate_items(upload_emails),

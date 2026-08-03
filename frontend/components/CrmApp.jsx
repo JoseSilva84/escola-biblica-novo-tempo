@@ -69,6 +69,7 @@ const crmPriorityLabels = {
 function apiFetch(path, options = {}) {
   const token = typeof window !== 'undefined' ? window.localStorage.getItem('sevenflow_token') : '';
   return fetch(`${API_BASE}${path}`, {
+    cache: 'no-store',
     ...options,
     credentials: 'include',
     headers: {
@@ -1454,6 +1455,7 @@ function LastDatasetUpdateCard({ update }) {
 function DatasetHistoryView({ history = [], onBack }) {
   const [dbHistory, setDbHistory] = useState(Array.isArray(history) ? history : []);
   const [loading, setLoading] = useState(false);
+  const [openDistricts, setOpenDistricts] = useState(() => new Set());
   const safeHistory = dbHistory.length ? dbHistory : (Array.isArray(history) ? history : []);
 
   useEffect(() => {
@@ -1479,6 +1481,18 @@ function DatasetHistoryView({ history = [], onBack }) {
     loadHistory();
     return () => { active = false; };
   }, []);
+
+  function toggleDistrict(key) {
+    setOpenDistricts((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="grid gap-6">
@@ -1511,8 +1525,31 @@ function DatasetHistoryView({ history = [], onBack }) {
               + (alerts.nomes_repetidos_upload?.length || 0);
             const date = formatDatasetDate(entry.atualizado_em);
             const files = consolidation.arquivos || entry.uploadedFiles || [];
+            const newLeads = consolidation.alunos_novos_detalhes || [];
+            const mlStatus = entry.ml_status || {};
+            const mlSummary = mlStatus.resumo || {};
+            const mlDate = formatDatasetDate(mlStatus.atualizado_em_brasil || mlStatus.atualizado_em);
             return (
               <article className="rounded-2xl border border-white/[0.10] bg-slate-950 p-6 shadow-[0_24px_70px_rgba(2,6,23,0.32)]" key={entry.id || `${entry.atualizado_em}-${index}`}>
+                <div className="mb-5 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
+                  <div className="rounded-2xl bg-blue-600 p-4">
+                    <span className="text-[10px] font-black uppercase tracking-wide text-white/75">Novos leads</span>
+                    <strong className="mt-2 block text-3xl font-black text-white">{formatNumber(consolidation.alunos_novos || 0)}</strong>
+                  </div>
+                  <div className="rounded-2xl bg-emerald-600 p-4">
+                    <span className="text-[10px] font-black uppercase tracking-wide text-white/75">Distritos</span>
+                    <strong className="mt-2 block text-3xl font-black text-white">{formatNumber((consolidation.distritos_novos || []).length)}</strong>
+                  </div>
+                  <div className="rounded-2xl bg-orange-600 p-4">
+                    <span className="text-[10px] font-black uppercase tracking-wide text-white/75">ML registros</span>
+                    <strong className="mt-2 block text-3xl font-black text-white">{formatNumber(mlSummary.registros?.depois || entry.ml?.registros || 0)}</strong>
+                  </div>
+                  <div className="rounded-2xl bg-slate-800 p-4">
+                    <span className="text-[10px] font-black uppercase tracking-wide text-white/75">ML atualizado</span>
+                    <strong className="mt-2 block text-sm font-black text-white">{mlDate}</strong>
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <span className="text-[11px] font-black uppercase tracking-[0.16em] !text-slate-300">{date}</span>
@@ -1558,17 +1595,49 @@ function DatasetHistoryView({ history = [], onBack }) {
                         <p className="text-sm font-semibold !text-slate-300">Nenhum arquivo listado neste registro.</p>
                       )}
                     </div>
+
+                    <div className="mt-4 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
+                      <span className="text-[11px] font-black uppercase tracking-[0.16em] !text-slate-300">Machine Learning atualizado</span>
+                      <div className="mt-3 grid gap-2 text-xs font-semibold !text-slate-300">
+                        <span>Horario Brasil: {mlDate}</span>
+                        <span>Registros: {formatNumber(mlSummary.registros?.antes || 0)} para {formatNumber(mlSummary.registros?.depois || 0)} ({formatNumber(mlSummary.registros?.diferenca || 0)})</span>
+                        <span>VIPs historicos: {formatNumber(mlSummary.vips?.antes || 0)} para {formatNumber(mlSummary.vips?.depois || 0)} ({formatNumber(mlSummary.vips?.diferenca || 0)})</span>
+                        <span>Ranking nao VIP: {formatNumber(mlSummary.ranking_nao_vip?.antes || 0)} para {formatNumber(mlSummary.ranking_nao_vip?.depois || 0)} ({formatNumber(mlSummary.ranking_nao_vip?.diferenca || 0)})</span>
+                        <span>Arquivos: {(mlStatus.arquivos_atualizados || []).join(', ') || 'metricas e rankings atualizados'}</span>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid gap-4">
                     <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
                       <span className="text-[11px] font-black uppercase tracking-[0.16em] !text-slate-300">Distritos dos novos leads</span>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {(consolidation.distritos_novos || []).length ? consolidation.distritos_novos.slice(0, 14).map((item) => (
-                          <span className="rounded-full bg-blue-500/20 px-3 py-1 text-xs font-bold !text-blue-100" key={item.distrito}>
-                            {item.distrito}: {formatNumber(item.quantidade)}
-                          </span>
-                        )) : (
+                      <div className="mt-3 grid gap-2">
+                        {(consolidation.distritos_novos || []).length ? consolidation.distritos_novos.slice(0, 14).map((item) => {
+                          const districtKey = `${entry.id || index}-${item.distrito}`;
+                          const districtOpen = openDistricts.has(districtKey);
+                          const districtLeads = newLeads.filter((lead) => lead.distrito === item.distrito);
+                          return (
+                            <div className="rounded-xl bg-white/[0.06] p-2" key={item.distrito}>
+                              <button className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1 text-left transition hover:bg-white/[0.08]" onClick={() => toggleDistrict(districtKey)} type="button">
+                                <span className="text-xs font-black !text-blue-100">{item.distrito}: {formatNumber(item.quantidade)}</span>
+                                <ChevronRight className={`text-blue-100 transition ${districtOpen ? 'rotate-90' : ''}`} size={16} />
+                              </button>
+                              {districtOpen ? (
+                                <div className="mt-2 grid gap-2">
+                                  {districtLeads.length ? districtLeads.map((lead) => (
+                                    <div className="rounded-lg bg-slate-950/70 px-3 py-2" key={`${lead.id}-${lead.email}-${lead.nome}`}>
+                                      <strong className="block text-sm !text-white">{lead.nome}</strong>
+                                      <span className="block text-xs font-semibold !text-slate-300">ID {lead.id || 'sem ID'} | {lead.telefone || 'sem telefone'} | {lead.email || 'sem email'}</span>
+                                      <span className="block text-xs font-semibold !text-slate-400">{lead.cidade || 'cidade nao informada'} | {lead.bairro || 'bairro nao informado'} | {lead.arquivo}</span>
+                                    </div>
+                                  )) : (
+                                    <span className="block px-2 pb-2 text-xs font-semibold !text-slate-300">Este upload antigo nao tem a lista nominal salva.</span>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        }) : (
                           <span className="text-sm font-semibold !text-slate-300">Nenhum distrito novo registrado neste upload.</span>
                         )}
                       </div>
@@ -4250,7 +4319,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   }, []);
 
   async function loadDashboard() {
-    const response = await apiFetch('/api/dashboard');
+    const response = await apiFetch(`/api/dashboard?refresh=${Date.now()}`);
     if (!response.ok) {
       throw new Error('Nao foi possivel carregar os dados do backend.');
     }
