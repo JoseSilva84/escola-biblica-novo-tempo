@@ -209,7 +209,9 @@ Para atualizar os arquivos derivados depois de trocar a planilha `ListagemComple
 python dataset/atualizar_dataset.py
 ```
 
-Esse comando regenera `alunos.json`, recalcula o ranking VIP, salva o modelo `modelo_vip_sklearn.joblib` e atualiza `metricas_vip_sklearn.json`. No Dockerfile de producao, essa rotina roda durante o build; portanto, um redeploy com a planilha nova ja reconstroi os dados usados pelo backend.
+Esse comando regenera `alunos.json`, recalcula o ranking VIP, salva o modelo `modelo_vip_sklearn.joblib` e atualiza `metricas_vip_sklearn.json`.
+
+O Dockerfile aceita a variavel de build `AUTO_UPDATE_DATASET=true` para rodar essa rotina durante o build. Sem essa variavel, o deploy usa os arquivos derivados ja enviados no repositorio, que e o caminho mais leve e seguro para a VPS.
 
 ## Seguranca
 
