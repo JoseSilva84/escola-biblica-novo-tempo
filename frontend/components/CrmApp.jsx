@@ -250,7 +250,7 @@ function buildAdminUsers(associations) {
   return [
     {
       id: 'user-admin-central',
-      name: 'Admin central',
+      name: 'Admin geral',
       email: 'admin@leadsnt.com.br',
       role: 'ADMIN_GERAL',
       scope: 'Todas as associacoes',
@@ -306,7 +306,7 @@ function buildAdminCampaigns(associations) {
       name: 'Reencontro Novo Tempo',
       association: associations[1]?.name || 'Associacao Paulista Sul',
       status: 'Planejada',
-      owner: 'Admin central',
+      owner: 'Admin geral',
       goal: 900
     }
   ];
@@ -544,7 +544,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
           </div>
           <div className={compact ? 'hidden' : 'block'}>
             <strong className="silver-title block text-xl font-black">Amigos NT</strong>
-            <span className="text-xs font-bold text-slate-500">Admin central</span>
+            <span className="text-xs font-bold text-slate-500">Admin Geral</span>
           </div>
         </div>
 
@@ -1943,7 +1943,7 @@ function AdminGeneralView({
       name,
       association: String(form.get('association') || associations[0]?.name || 'Todas as associacoes'),
       status: String(form.get('status') || 'Planejada'),
-      owner: String(form.get('owner') || 'Admin central'),
+      owner: String(form.get('owner') || 'Admin geral'),
       goal: Number(form.get('goal') || 0)
     });
     event.currentTarget.reset();
@@ -3690,7 +3690,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const [adminUsers, setAdminUsers] = useState(() => buildAdminUsers(initialAssociations));
   const [adminCampaigns, setAdminCampaigns] = useState(() => buildAdminCampaigns(initialAssociations));
   const [auditEvents, setAuditEvents] = useState([
-    { id: 'audit-login', action: 'Login administrativo', user: 'Admin central', detail: 'Sessão aberta com perfil ADMIN_GERAL', when: 'Agora' },
+    { id: 'audit-login', action: 'Login administrativo', user: 'Admin geral', detail: 'Sessão aberta com perfil ADMIN_GERAL', when: 'Agora' },
     { id: 'audit-export', action: 'Exportação controlada', user: 'Gestão Paulistana', detail: 'Relatório de distritos filtrados disponível', when: 'Hoje' },
     { id: 'audit-ml', action: 'Ranking ML carregado', user: 'Sistema', detail: 'Prioridade operacional aplicada ao dashboard', when: 'Hoje' }
   ]);
@@ -3816,14 +3816,14 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const addAdminCampaign = (campaign) => {
     setAdminCampaigns((current) => [campaign, ...current]);
     setAuditEvents((current) => [
-      { id: `audit-${Date.now()}`, action: 'Campanha criada', user: user?.name || 'Admin central', detail: campaign.name, when: 'Agora' },
+      { id: `audit-${Date.now()}`, action: 'Campanha criada', user: user?.name || 'Admin geral', detail: campaign.name, when: 'Agora' },
       ...current
     ]);
   };
   const addAdminUser = (nextUser) => {
     setAdminUsers((current) => [nextUser, ...current]);
     setAuditEvents((current) => [
-      { id: `audit-${Date.now()}`, action: 'Acesso criado', user: user?.name || 'Admin central', detail: `${nextUser.name} · ${nextUser.role.replaceAll('_', ' ')}`, when: 'Agora' },
+      { id: `audit-${Date.now()}`, action: 'Acesso criado', user: user?.name || 'Admin geral', detail: `${nextUser.name} · ${nextUser.role.replaceAll('_', ' ')}`, when: 'Agora' },
       ...current
     ]);
   };
