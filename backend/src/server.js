@@ -154,6 +154,96 @@ function runDatasetUpdate(uploadPaths) {
   });
 }
 
+function normalizeDatasetHistoryEntry(entry) {
+  if (!entry) return null;
+  const summary = entry.summary || {};
+  return {
+    id: entry.id || null,
+    atualizado_em: entry.createdAt instanceof Date ? entry.createdAt.toISOString() : entry.createdAt,
+    status: entry.status || 'COMPLETED',
+    associationId: entry.associationId || null,
+    associationName: entry.associationName || null,
+    uploadedBy: {
+      id: entry.uploadedById || null,
+      name: entry.uploadedByName || null,
+      email: entry.uploadedByEmail || null
+    },
+    uploadedFiles: entry.uploadedFiles || [],
+    consolidacao: summary,
+    ml: entry.ml || null
+  };
+}
+
+let datasetHistoryTableReady = null;
+
+function ensureDatasetHistoryTable() {
+  if (datasetHistoryTableReady) return datasetHistoryTableReady;
+  datasetHistoryTableReady = (async () => {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "DatasetUploadHistory" (
+        "id" TEXT NOT NULL,
+        "status" TEXT NOT NULL DEFAULT 'COMPLETED',
+        "associationId" TEXT,
+        "associationName" TEXT,
+        "uploadedById" TEXT,
+        "uploadedByName" TEXT,
+        "uploadedByEmail" TEXT,
+        "uploadedFiles" JSONB NOT NULL,
+        "summary" JSONB NOT NULL,
+        "alerts" JSONB,
+        "newLeads" INTEGER NOT NULL DEFAULT 0,
+        "rowsBefore" INTEGER NOT NULL DEFAULT 0,
+        "rowsAfter" INTEGER NOT NULL DEFAULT 0,
+        "districts" JSONB,
+        "ml" JSONB,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "DatasetUploadHistory_pkey" PRIMARY KEY ("id")
+      )
+    `);
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "DatasetUploadHistory_createdAt_idx" ON "DatasetUploadHistory"("createdAt")');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "DatasetUploadHistory_associationId_idx" ON "DatasetUploadHistory"("associationId")');
+  })();
+  return datasetHistoryTableReady;
+}
+
+async function readDatasetHistoryFromDb(limit = 50) {
+  if (!prisma.datasetUploadHistory) return [];
+  await ensureDatasetHistoryTable();
+  const rows = await prisma.datasetUploadHistory.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit
+  });
+  return rows.map(normalizeDatasetHistoryEntry).filter(Boolean);
+}
+
+async function saveDatasetUploadHistory({ result, files, user }) {
+  if (!prisma.datasetUploadHistory) return null;
+  await ensureDatasetHistoryTable();
+  const consolidation = result?.consolidacao || {};
+  const ml = result?.ml || null;
+  return prisma.datasetUploadHistory.create({
+    data: {
+      status: 'COMPLETED',
+      associationId: 'paulistana',
+      associationName: 'Associacao Paulistana',
+      uploadedById: user?.sub || null,
+      uploadedByName: user?.name || null,
+      uploadedByEmail: user?.email || null,
+      uploadedFiles: files.map((file) => ({
+        name: file.filename,
+        size: file.buffer.length
+      })),
+      summary: consolidation,
+      alerts: consolidation.alertas_duplicidade || {},
+      newLeads: Number(consolidation.alunos_novos || 0),
+      rowsBefore: Number(consolidation.linhas_antes || 0),
+      rowsAfter: Number(consolidation.linhas_depois || 0),
+      districts: consolidation.distritos_novos || [],
+      ml
+    }
+  });
+}
+
 function parseMaybeJson(value) {
   if (typeof value !== 'string') return value;
   const text = value.trim();
@@ -709,10 +799,21 @@ app.post(
       }
 
       const result = await runDatasetUpdate(uploadPaths);
+      let savedHistory = null;
+      let historyWarning = null;
+      try {
+        savedHistory = await saveDatasetUploadHistory({ result, files, user: request.user });
+      } catch (historyError) {
+        historyWarning = historyError.message || 'Historico nao foi salvo no banco.';
+        console.error('[dataset:history:error]', historyWarning);
+      }
       response.json({
         ok: true,
         uploadedFiles: files.map((file) => file.filename),
-        result
+        result,
+        historySaved: Boolean(savedHistory),
+        history: normalizeDatasetHistoryEntry(savedHistory),
+        historyWarning
       });
     } catch (error) {
       response.status(error.status || 500).json({
@@ -768,8 +869,30 @@ app.get('/api/auth/me', (request, response) => {
   response.json({ user });
 });
 
-app.get('/api/dashboard', requireAuth, (_request, response) => {
-  response.json(getDashboardData());
+app.get('/api/dashboard', requireAuth, async (_request, response) => {
+  const payload = getDashboardData();
+  try {
+    const dbHistory = await readDatasetHistoryFromDb(50);
+    if (dbHistory.length) {
+      payload.meta.datasetUpdateHistory = dbHistory;
+      payload.meta.lastDatasetUpdate = dbHistory[0];
+    }
+  } catch (error) {
+    console.error('[dashboard:dataset-history:error]', error.message);
+  }
+  response.json(payload);
+});
+
+app.get('/api/dataset/history', requireAuth, requireAdminGeral, async (_request, response) => {
+  try {
+    const history = await readDatasetHistoryFromDb(100);
+    response.json({ history });
+  } catch (error) {
+    response.status(500).json({
+      history: [],
+      message: error.message || 'Nao foi possivel carregar o historico do dataset.'
+    });
+  }
 });
 
 app.get('/api/whatsapp/provider', requireAuth, (_request, response) => {

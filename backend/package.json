@@ -7,6 +7,7 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "prisma:generate": "prisma generate",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:push": "prisma db push",
     "seed:admin": "node src/scripts/seedAdmin.js",
     "setup:db": "prisma generate && prisma db push && node src/scripts/seedAdmin.js",

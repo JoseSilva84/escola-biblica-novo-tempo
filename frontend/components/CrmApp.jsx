@@ -1218,6 +1218,8 @@ function AdminDashboard({ associations, data, isAssociationsView = false, onOpen
 function DatasetUploadPanel({ association, onUpdated, user }) {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState('');
   const [lastResult, setLastResult] = useState(null);
   const canUpdate = user?.role === 'ADMIN_GERAL';
 
@@ -1225,34 +1227,65 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
     event.preventDefault();
     if (!canUpdate || uploading || !files.length) return;
 
+    const form = event.currentTarget;
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
     setUploading(true);
+    setProgress(8);
+    setProgressLabel('Enviando arquivos para o backend...');
     setLastResult(null);
 
+    let result = null;
     try {
+      setProgress(22);
       const response = await apiFetch('/api/dataset/upload', {
         method: 'POST',
         body: formData
       });
-      const result = await response.json().catch(() => ({}));
+      setProgress(68);
+      setProgressLabel('Consolidando Excel, JSON e ranking ML...');
+      result = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(result?.message || 'Nao foi possivel atualizar a base.');
       }
+      setProgress(82);
+      setProgressLabel('Atualizacao concluida. Recarregando painel...');
       setLastResult(result);
       setFiles([]);
-      event.currentTarget.reset();
-      await onUpdated?.();
+      form.reset();
       const novos = result?.result?.consolidacao?.alunos_novos ?? 0;
       toast.success('Base atualizada', {
         description: `${formatNumber(novos)} aluno(s) novo(s) inseridos e ML recalculado.`
       });
+      if (result?.historyWarning) {
+        toast.warning('Historico pendente', {
+          description: 'A base foi atualizada, mas o historico no banco precisa ser verificado.'
+        });
+      }
     } catch (error) {
+      setProgress(0);
+      setProgressLabel('');
       toast.error('Atualizacao falhou', {
         description: error.message || 'Confira os arquivos e tente novamente.'
       });
-    } finally {
       setUploading(false);
+      return;
+    }
+
+    try {
+      await onUpdated?.();
+      setProgress(100);
+      setProgressLabel('Painel atualizado.');
+    } catch {
+      toast.warning('Base atualizada', {
+        description: 'Os arquivos foram processados. Recarregue a pagina se os numeros nao mudarem de imediato.'
+      });
+    } finally {
+      window.setTimeout(() => {
+        setUploading(false);
+        setProgress(0);
+        setProgressLabel('');
+      }, 500);
     }
   }
 
@@ -1276,12 +1309,12 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
       </div>
 
       <form className="grid gap-4" onSubmit={submitUpload}>
-        <label className={`interactive-card flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center transition ${canUpdate ? 'border-blue-400/35 bg-blue-500/[0.05] hover:border-blue-300/70' : 'border-slate-400/20 bg-slate-500/[0.04] opacity-70'}`}>
+        <label className={`interactive-card flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center transition ${canUpdate ? 'border-blue-400/35 bg-blue-100/70 hover:border-blue-400' : 'border-slate-400/20 bg-slate-500/[0.04] opacity-70'}`}>
           <UploadCloud className="text-blue-400" size={28} />
-          <span className="text-sm font-bold text-slate-100">
+          <span className="text-sm font-bold !text-slate-950">
             {files.length ? `${files.length} arquivo(s) selecionado(s)` : 'Selecionar arquivos Excel'}
           </span>
-          <span className="text-xs text-slate-400">Aceita varios arquivos .xlsx da listagem completa</span>
+          <span className="text-xs font-semibold !text-slate-700">Aceita varios arquivos .xlsx da listagem completa</span>
           <input
             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
@@ -1295,12 +1328,12 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
         {files.length > 0 && (
           <div className="grid gap-2">
             {files.map((file) => (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-slate-950/45 px-4 py-3" key={`${file.name}-${file.size}`}>
-                <span className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-200">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/75 px-4 py-3" key={`${file.name}-${file.size}`}>
+                <span className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold !text-slate-950">
                   <FileSpreadsheet className="shrink-0 text-emerald-400" size={17} />
                   <span className="truncate">{file.name}</span>
                 </span>
-                <span className="text-xs font-bold text-slate-500">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
+                <span className="text-xs font-bold !text-slate-700">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
               </div>
             ))}
           </div>
@@ -1312,8 +1345,19 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
             {uploading ? 'Atualizando...' : 'Atualizar base e recalcular ML'}
           </button>
           {!canUpdate && <span className="text-sm text-slate-400">Disponivel apenas para Admin Geral.</span>}
-          {uploading && <span className="text-sm font-semibold text-blue-300">Processando Excel, JSON e ranking ML...</span>}
+          {uploading && <span className="text-sm font-semibold !text-slate-900">{progressLabel || 'Processando Excel, JSON e ranking ML...'}</span>}
         </div>
+        {uploading && (
+          <div className="grid gap-2 rounded-2xl border border-blue-200 bg-blue-50/80 p-3">
+            <div className="h-3 overflow-hidden rounded-full bg-white shadow-inner">
+              <div className="h-full rounded-full bg-gradient-to-r from-blue-700 via-emerald-500 to-blue-500 transition-all duration-500" style={{ width: `${Math.max(8, Math.min(progress, 100))}%` }} />
+            </div>
+            <div className="flex items-center justify-between text-xs font-black uppercase tracking-wide !text-slate-800">
+              <span>Progresso</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+          </div>
+        )}
       </form>
 
       {consolidation && (
@@ -1404,6 +1448,161 @@ function LastDatasetUpdateCard({ update }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function DatasetHistoryView({ history = [], onBack }) {
+  const [dbHistory, setDbHistory] = useState(Array.isArray(history) ? history : []);
+  const [loading, setLoading] = useState(false);
+  const safeHistory = dbHistory.length ? dbHistory : (Array.isArray(history) ? history : []);
+
+  useEffect(() => {
+    let active = true;
+    async function loadHistory() {
+      setLoading(true);
+      try {
+        const response = await apiFetch('/api/dataset/history');
+        const payload = await response.json().catch(() => ({}));
+        if (active && response.ok && Array.isArray(payload.history)) {
+          setDbHistory(payload.history);
+        }
+      } catch {
+        if (active) {
+          toast.warning('Historico indisponivel', {
+            description: 'Nao foi possivel consultar o historico no banco agora.'
+          });
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadHistory();
+    return () => { active = false; };
+  }, []);
+
+  return (
+    <div className="grid gap-6">
+      <section className={`${panelClass} overflow-hidden p-6`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <span className={labelClass}>Historico do dataset</span>
+            <h1 className="silver-title mt-2 text-4xl font-extrabold leading-tight tracking-normal max-md:text-3xl">Excels processados</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
+              Cada atualizacao manual fica registrada aqui com arquivos enviados, novos leads, duplicidades e resumo por distrito.
+            </p>
+          </div>
+          <button className={ghostButtonClass} onClick={onBack} type="button">
+            <ArrowRight className="rotate-180" size={18} />
+            Voltar para Leads
+          </button>
+        </div>
+      </section>
+
+      <section className="grid gap-4">
+        {loading ? (
+          <div className={`${panelClass} p-6 text-sm font-semibold text-slate-400`}>Carregando historico salvo no banco...</div>
+        ) : null}
+        {safeHistory.length ? (
+          safeHistory.map((entry, index) => {
+            const consolidation = entry.consolidacao || {};
+            const alerts = consolidation.alertas_duplicidade || {};
+            const alertCount = (alerts.ids_repetidos_upload?.length || 0)
+              + (alerts.emails_repetidos_upload?.length || 0)
+              + (alerts.nomes_repetidos_upload?.length || 0);
+            const date = formatDatasetDate(entry.atualizado_em);
+            const files = consolidation.arquivos || entry.uploadedFiles || [];
+            return (
+              <article className="rounded-2xl border border-white/[0.10] bg-slate-950 p-6 shadow-[0_24px_70px_rgba(2,6,23,0.32)]" key={entry.id || `${entry.atualizado_em}-${index}`}>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <span className="text-[11px] font-black uppercase tracking-[0.16em] !text-slate-300">{date}</span>
+                    <h2 className="mt-2 text-2xl font-black !text-white">
+                      {formatNumber(consolidation.alunos_novos || 0)} novos leads
+                    </h2>
+                    <p className="mt-2 text-sm font-semibold !text-slate-300">
+                      Base {formatNumber(consolidation.linhas_antes || 0)} para {formatNumber(consolidation.linhas_depois || 0)} registros.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${consolidation.alunos_novos ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+                      {consolidation.alunos_novos ? 'Com novos leads' : 'Sem novos leads'}
+                    </span>
+                    {alertCount ? (
+                      <span className="rounded-full bg-red-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
+                        {formatNumber(alertCount)} alerta(s)
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-slate-700 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
+                        Sem duplicidade relevante
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
+                    <span className="text-[11px] font-black uppercase tracking-[0.16em] !text-slate-300">Arquivos enviados</span>
+                    <div className="mt-3 grid gap-2">
+                      {files.length ? files.map((file, fileIndex) => (
+                        <div className="rounded-xl bg-white/[0.06] px-3 py-2" key={file.arquivo || file.name || fileIndex}>
+                          <strong className="block text-sm !text-white">{file.arquivo || file.name}</strong>
+                          {'lidos' in file ? (
+                            <span className="text-xs font-semibold !text-slate-300">
+                              {formatNumber(file.lidos)} lidos | {formatNumber(file.novos)} novos | {formatNumber(file.ja_existiam)} ja existiam | {formatNumber(file.duplicados_upload)} duplicados no upload
+                            </span>
+                          ) : (
+                            <span className="text-xs font-semibold !text-slate-300">{file.size ? `${(Number(file.size) / 1024 / 1024).toFixed(1)} MB` : 'Arquivo registrado'}</span>
+                          )}
+                        </div>
+                      )) : (
+                        <p className="text-sm font-semibold !text-slate-300">Nenhum arquivo listado neste registro.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4">
+                    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
+                      <span className="text-[11px] font-black uppercase tracking-[0.16em] !text-slate-300">Distritos dos novos leads</span>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {(consolidation.distritos_novos || []).length ? consolidation.distritos_novos.slice(0, 14).map((item) => (
+                          <span className="rounded-full bg-blue-500/20 px-3 py-1 text-xs font-bold !text-blue-100" key={item.distrito}>
+                            {item.distrito}: {formatNumber(item.quantidade)}
+                          </span>
+                        )) : (
+                          <span className="text-sm font-semibold !text-slate-300">Nenhum distrito novo registrado neste upload.</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
+                      <span className="text-[11px] font-black uppercase tracking-[0.16em] !text-slate-300">Duplicidades detectadas</span>
+                      <div className="mt-3 grid gap-2">
+                        {[
+                          ['IDs repetidos', alerts.ids_repetidos_upload],
+                          ['Emails repetidos', alerts.emails_repetidos_upload],
+                          ['Nomes repetidos', alerts.nomes_repetidos_upload]
+                        ].map(([label, items]) => (
+                          <div className="rounded-xl bg-white/[0.06] px-3 py-2" key={label}>
+                            <strong className="block text-xs uppercase tracking-wide !text-white">{label}</strong>
+                            <span className="text-xs font-semibold !text-slate-300">
+                              {items?.length ? items.slice(0, 4).map((item) => `${item.valor} (${item.quantidade})`).join(', ') : 'Nenhum alerta'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <div className="rounded-2xl border border-white/[0.10] bg-slate-950 p-8 text-center text-sm font-semibold !text-white">
+            Nenhum upload de Excel registrado ainda.
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -1657,7 +1856,6 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
   });
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   const districts = useMemo(
     () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -1777,7 +1975,7 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
       <LastDatasetUpdateCard update={lastDatasetUpdate} />
 
       <div className="flex justify-end">
-        <button className={ghostButtonClass} onClick={() => setHistoryOpen(true)} type="button">
+        <button className={ghostButtonClass} onClick={() => onNavigate('dataset-history')} type="button">
           <ClipboardList size={18} />
           Historico dos Excels
         </button>
@@ -1910,7 +2108,6 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
       </section>
 
       <LeadDetailModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
-      {historyOpen ? <DatasetHistoryModal history={datasetUpdateHistory} onClose={() => setHistoryOpen(false)} /> : null}
     </div>
   );
 }
@@ -4160,6 +4357,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
     );
   } else if (view === 'leads') {
     content = <LeadsView associations={associations} data={data} datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={setView} records={records} />;
+  } else if (view === 'dataset-history') {
+    content = <DatasetHistoryView history={payload?.meta?.datasetUpdateHistory || []} onBack={() => setView('leads')} />;
   } else if (['general-admin', 'users', 'campaigns'].includes(view)) {
     content = (
       <AdminGeneralView

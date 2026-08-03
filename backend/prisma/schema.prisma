@@ -249,6 +249,28 @@ model WhatsAppMessage {
   @@index([providerMessageId])
 }
 
+model DatasetUploadHistory {
+  id              String   @id @default(cuid())
+  status          String   @default("COMPLETED")
+  associationId   String?
+  associationName String?
+  uploadedById    String?
+  uploadedByName  String?
+  uploadedByEmail String?
+  uploadedFiles   Json
+  summary         Json
+  alerts          Json?
+  newLeads        Int      @default(0)
+  rowsBefore      Int      @default(0)
+  rowsAfter       Int      @default(0)
+  districts       Json?
+  ml              Json?
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([associationId])
+}
+
 model Visit {
   id          String   @id @default(cuid())
   leadId      String
