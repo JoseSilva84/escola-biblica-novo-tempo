@@ -61,14 +61,14 @@ const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slat
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 const adminNavItems = [
   ['admin', 'Dashboard', LayoutDashboard],
-  ['associations', 'AssociaÃ§Ãµes', Building2],
+  ['associations', 'Associa\u00e7\u00f5es', Building2],
   ['leads', 'Leads', ClipboardList],
   ['campaigns', 'Campanhas', Radio],
   ['automations', 'WhatsApp', MessageCircle],
   ['conversations', 'Conversas', MessageCircle],
   ['ai-agent', 'IA', WandSparkles],
-  ['reports', 'RelatÃ³rios', PieChart],
-  ['settings', 'ConfiguraÃ§Ãµes', Settings]
+  ['reports', 'Relat\u00f3rios', PieChart],
+  ['settings', 'Configura\u00e7\u00f5es', Settings]
 ];
 const crmPriorityLabels = {
   Hot: 'Quente',
@@ -542,17 +542,7 @@ function LoginScreen({ onLogin }) {
 function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  const items = [
-    ['admin', 'Dashboard', LayoutDashboard],
-    ['associations', 'Associações', Building2],
-    ['leads', 'Leads', ClipboardList],
-    ['campaigns', 'Campanhas', Radio],
-    ['automations', 'WhatsApp', MessageCircle],
-    ['conversations', 'Conversas', MessageCircle],
-    ['ai-agent', 'IA', WandSparkles],
-    ['reports', 'Relatórios', PieChart]
-  ];
-  items.push(['settings', 'Configurações', Settings]);
+  const items = adminNavItems;
 
   const bottomNavItems = [
     ['admin', 'Dashboard', LayoutDashboard],
@@ -4127,16 +4117,6 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
         <header className="sticky top-4 z-50 shrink-0 rounded-t-[1.75rem] border-b border-white/[0.07] bg-slate-950/60 px-8 py-4 backdrop-blur-2xl max-lg:top-0 max-lg:rounded-none max-md:px-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
-              {canGoBack ? (
-                <button
-                  className="interactive-card inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/70 px-3 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
-                  onClick={onBack}
-                  type="button"
-                >
-                  <ArrowRight className="rotate-180" size={17} />
-                  Voltar
-                </button>
-              ) : null}
               <div>
               <span className={labelClass}>Amigos NT</span>
               <h2 className="text-xl font-black text-slate-50">Administração Geral</h2>
@@ -4144,7 +4124,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
             </div>
             <div className="flex items-center gap-3">
               <button
-                className="hidden"
+                className="interactive-card inline-flex h-10 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/70 px-3 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
                 onClick={() => {
                   onToggleTheme();
                   toast.message(isLight ? 'Modo dark ativado' : 'Modo light prateado ativado', {
@@ -4156,6 +4136,16 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
                 {isLight ? <Moon size={17} /> : <Sun size={17} />}
                 {isLight ? 'Dark' : 'Light'}
               </button>
+              {canGoBack ? (
+                <button
+                  aria-label="Voltar"
+                  className="interactive-card grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-900/10 bg-white/70 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
+                  onClick={onBack}
+                  type="button"
+                >
+                  <ArrowRight className="rotate-180" size={17} />
+                </button>
+              ) : null}
               <button
                 className="interactive-card relative grid h-10 w-10 place-items-center rounded-xl border border-slate-900/10 bg-white/70 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
                 onClick={() => toast('3 notificações operacionais', {
@@ -4198,45 +4188,6 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
                           {label}
                         </button>
                       ))}
-                      <button
-                        className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900"
-                        onClick={() => {
-                          onToggleTheme();
-                          toast.message(isLight ? 'Modo dark ativado' : 'Modo light prateado ativado', {
-                            description: isLight ? 'A opÃ§Ã£o escura fica disponÃ­vel como modo alternativo.' : 'O fundo prateado voltou a ser a experiÃªncia principal.'
-                          });
-                        }}
-                        type="button"
-                      >
-                        {isLight ? <Moon size={16} className="text-slate-400 transition-colors group-hover/item:text-indigo-500" /> : <Sun size={16} className="text-slate-400 transition-colors group-hover/item:text-amber-500" />}
-                        AparÃªncia
-                      </button>
-                    </div>
-                    <div className="hidden">
-                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
-                        <Crown size={16} className="text-slate-400 transition-colors group-hover/item:text-blue-500" />
-                        Perfil do sistema
-                      </button>
-                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
-                        <ShieldCheck size={16} className="text-slate-400 transition-colors group-hover/item:text-emerald-500" />
-                        Permissões e acessos
-                      </button>
-                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
-                        <MessageCircle size={16} className="text-slate-400 transition-colors group-hover/item:text-green-500" />
-                        Integração WhatsApp
-                      </button>
-                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
-                        <Gauge size={16} className="text-slate-400 transition-colors group-hover/item:text-violet-500" />
-                        Banco de dados
-                      </button>
-                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
-                        <Bell size={16} className="text-slate-400 transition-colors group-hover/item:text-amber-500" />
-                        Notificações
-                      </button>
-                      <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => { onNavigate('settings'); onToggleTheme(); }} type="button">
-                        <Sparkles size={16} className="text-slate-400 transition-colors group-hover/item:text-indigo-500" />
-                        Aparência
-                      </button>
                     </div>
                     <div className="my-1.5 h-px bg-slate-200/80" />
                     <button
