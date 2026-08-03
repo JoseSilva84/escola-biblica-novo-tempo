@@ -115,6 +115,17 @@ function formatNumber(value) {
   return Number(value || 0).toLocaleString('pt-BR');
 }
 
+function formatDatasetDate(value) {
+  if (!value) return 'sem data';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'sem data';
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Fortaleza'
+  }).format(date);
+}
+
 function pct(part, total) {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
@@ -1336,13 +1347,7 @@ function LastDatasetUpdateCard({ update }) {
     duplicateAlerts.emails_repetidos_upload,
     duplicateAlerts.nomes_repetidos_upload
   ].reduce((total, items) => total + (items?.length || 0), 0);
-  const date = update.atualizado_em
-    ? new Intl.DateTimeFormat('pt-BR', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-      timeZone: 'America/Fortaleza'
-    }).format(new Date(update.atualizado_em))
-    : 'agora';
+  const date = formatDatasetDate(update?.atualizado_em);
 
   return (
     <section className={`${panelClass} overflow-hidden p-6`}>
@@ -1403,6 +1408,8 @@ function LastDatasetUpdateCard({ update }) {
 }
 
 function DatasetHistoryModal({ history = [], onClose }) {
+  const safeHistory = Array.isArray(history) ? history : [];
+
   return (
     <div className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/70 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true">
       <div className="max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/[0.10] bg-slate-950 text-slate-100 shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
@@ -1416,17 +1423,15 @@ function DatasetHistoryModal({ history = [], onClose }) {
           </button>
         </div>
         <div className="max-h-[70vh] overflow-auto p-6">
-          {history.length ? (
+          {safeHistory.length ? (
             <div className="grid gap-4">
-              {history.map((entry, index) => {
+              {safeHistory.map((entry, index) => {
                 const consolidation = entry.consolidacao || {};
                 const alerts = consolidation.alertas_duplicidade || {};
                 const alertCount = (alerts.ids_repetidos_upload?.length || 0)
                   + (alerts.emails_repetidos_upload?.length || 0)
                   + (alerts.nomes_repetidos_upload?.length || 0);
-                const date = entry.atualizado_em
-                  ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Fortaleza' }).format(new Date(entry.atualizado_em))
-                  : 'sem data';
+                const date = formatDatasetDate(entry.atualizado_em);
                 return (
                   <article className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5" key={`${entry.atualizado_em}-${index}`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
