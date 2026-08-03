@@ -10,6 +10,7 @@ const DATASET_DIR = resolveConfiguredPath(process.env.DATASET_DIR)
   || path.resolve(process.cwd(), 'dataset');
 const ML_RANKING_FILE = 'ranking_nao_vip_ml_pandas.csv';
 const ALUNOS_FILE = 'alunos.json';
+const UPDATE_STATUS_FILE = 'ultima_atualizacao_dataset.json';
 
 function resolveConfiguredPath(value) {
   if (!value) return null;
@@ -70,6 +71,24 @@ function readMlRanking() {
   }
 
   return { byId, source: rankingPath };
+}
+
+function readLastDatasetUpdate() {
+  const updatePath = firstExistingPath([
+    resolveConfiguredPath(process.env.DATASET_UPDATE_STATUS_PATH),
+    path.join(DATASET_DIR, UPDATE_STATUS_FILE)
+  ]);
+  if (!updatePath) return null;
+
+  try {
+    const update = JSON.parse(fs.readFileSync(updatePath, 'utf8'));
+    return {
+      ...update,
+      updatePath
+    };
+  } catch {
+    return null;
+  }
 }
 
 function normalize(value, fallback = 'N/I') {
@@ -191,6 +210,7 @@ export function getDashboardData() {
   }
   const alunos = JSON.parse(fs.readFileSync(alunosPath, 'utf8'));
   const ranking = readMlRanking();
+  const lastDatasetUpdate = readLastDatasetUpdate();
   const records = alunos.map((row) => transformRecord(row, ranking.byId));
 
   return {
@@ -200,6 +220,7 @@ export function getDashboardData() {
       alunosPath,
       mlSource: ranking.source,
       mlRecords: ranking.byId.size,
+      lastDatasetUpdate,
       referenceDate: '2026-06-08',
       model: 'ranking_nao_vip_ml_pandas.csv + regra operacional do notebook analise_vip_ml.ipynb'
     }

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 from copy import copy
+from collections import Counter
 from pathlib import Path
 
 from openpyxl import load_workbook
@@ -72,6 +73,7 @@ def consolidar_planilhas(base_path: Path = DEFAULT_BASE, source_paths: list[Path
     original_rows = sheet.max_row - 1
     template_row = sheet.max_row
     rows_to_append = []
+    new_districts = Counter()
     seen_new_ids = set()
     seen_new_composites = set()
     sources = []
@@ -115,6 +117,8 @@ def consolidar_planilhas(base_path: Path = DEFAULT_BASE, source_paths: list[Path
                 for header in base_headers
             ]
             rows_to_append.append(output_row)
+            district = output_row[base_headers.index("Distrito")] if "Distrito" in base_headers else ""
+            new_districts[str(district or "Nao informado").strip() or "Nao informado"] += 1
             if row_id:
                 seen_new_ids.add(row_id)
                 existing_ids.add(row_id)
@@ -142,6 +146,10 @@ def consolidar_planilhas(base_path: Path = DEFAULT_BASE, source_paths: list[Path
         "linhas_antes": original_rows,
         "alunos_novos": len(rows_to_append),
         "linhas_depois": original_rows + len(rows_to_append),
+        "distritos_novos": [
+            {"distrito": district, "quantidade": quantity}
+            for district, quantity in sorted(new_districts.items(), key=lambda item: (-item[1], item[0]))
+        ],
         "arquivos": sources,
     }
 

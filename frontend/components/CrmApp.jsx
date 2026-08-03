@@ -1306,13 +1306,77 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
       </form>
 
       {consolidation && (
-        <div className="mt-5 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
-          <MetricCard detail="antes do upload" icon={UsersRound} label="Base anterior" value={formatNumber(consolidation.linhas_antes)} />
-          <MetricCard detail="inseridos agora" icon={BadgePlus} label="Novos alunos" tone="green" value={formatNumber(consolidation.alunos_novos)} />
-          <MetricCard detail="apos consolidar" icon={CheckCircle2} label="Base final" value={formatNumber(consolidation.linhas_depois)} />
-          <MetricCard detail={`${formatNumber(ml?.vips || 0)} VIPs historicos`} icon={Sparkles} label="ML registros" tone="orange" value={formatNumber(ml?.registros || 0)} />
-        </div>
+        <>
+          <div className="mt-5 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+            <MetricCard detail="antes do upload" icon={UsersRound} label="Base anterior" value={formatNumber(consolidation.linhas_antes)} />
+            <MetricCard detail="inseridos agora" icon={BadgePlus} label="Novos alunos" tone="green" value={formatNumber(consolidation.alunos_novos)} />
+            <MetricCard detail="apos consolidar" icon={CheckCircle2} label="Base final" value={formatNumber(consolidation.linhas_depois)} />
+            <MetricCard detail={`${formatNumber(ml?.vips || 0)} VIPs historicos`} icon={Sparkles} label="ML registros" tone="orange" value={formatNumber(ml?.registros || 0)} />
+          </div>
+          <div className="mt-5">
+            <LastDatasetUpdateCard update={{
+              atualizado_em: new Date().toISOString(),
+              consolidacao: consolidation,
+              ml
+            }} />
+          </div>
+        </>
       )}
+    </section>
+  );
+}
+
+function LastDatasetUpdateCard({ update }) {
+  const consolidation = update?.consolidacao;
+  if (!consolidation || !consolidation.alunos_novos) return null;
+
+  const districts = consolidation.distritos_novos || [];
+  const date = update.atualizado_em
+    ? new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+      timeZone: 'America/Fortaleza'
+    }).format(new Date(update.atualizado_em))
+    : 'agora';
+
+  return (
+    <section className={`${panelClass} overflow-hidden p-6`}>
+      <div className="grid grid-cols-[0.9fr_1.1fr] gap-6 max-xl:grid-cols-1">
+        <div>
+          <span className={labelClass}>Ultima entrada na base</span>
+          <h2 className="mt-2 text-3xl font-black text-slate-50">
+            {formatNumber(consolidation.alunos_novos)} novos alunos
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
+            Entraram no sistema em {date}. A base foi de {formatNumber(consolidation.linhas_antes)} para {formatNumber(consolidation.linhas_depois)} registros.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(consolidation.arquivos || []).map((file) => (
+              <span className="rounded-full border border-emerald-300/30 bg-emerald-500/[0.08] px-3 py-1 text-xs font-bold text-emerald-300" key={file.arquivo}>
+                {file.arquivo}: {formatNumber(file.novos)} novos
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className={labelClass}>Distritos dos novos alunos</span>
+            <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
+              {formatNumber(districts.length)} distritos
+            </span>
+          </div>
+          <div className="grid max-h-72 gap-2 overflow-auto pr-1">
+            {districts.slice(0, 12).map((item) => (
+              <div className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-white/[0.07] bg-slate-950/42 px-4 py-3" key={item.distrito}>
+                <span className="min-w-0 truncate text-sm font-bold text-slate-100">{item.distrito}</span>
+                <strong className="rounded-full bg-white/90 px-3 py-1 text-sm font-black tabular-nums text-slate-950">
+                  {formatNumber(item.quantidade)}
+                </strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
@@ -1474,7 +1538,7 @@ function AssociationDashboard({ association, data, records = [], onDatasetUpdate
   );
 }
 
-function LeadsView({ associations, data, records = [], onNavigate }) {
+function LeadsView({ associations, data, lastDatasetUpdate, records = [], onNavigate }) {
   const [filters, setFilters] = useState({
     association: 'paulistana',
     distrito: 'all',
@@ -1599,6 +1663,8 @@ function LeadsView({ associations, data, records = [], onNavigate }) {
         <MetricCard detail="prioridade alta com telefone" icon={Sparkles} label="Quentes WhatsApp" tone="orange" value={formatNumber(hotWithWhatsapp)} />
         <MetricCard detail="contato acima de 1 ano" icon={Bell} label="Reativar" tone="violet" value={formatNumber(staleLeads)} />
       </section>
+
+      <LastDatasetUpdateCard update={lastDatasetUpdate} />
 
       <section className={`${panelClass} p-6`}>
         <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
@@ -3975,7 +4041,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
       />
     );
   } else if (view === 'leads') {
-    content = <LeadsView associations={associations} data={data} onNavigate={setView} records={records} />;
+    content = <LeadsView associations={associations} data={data} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={setView} records={records} />;
   } else if (['general-admin', 'users', 'campaigns'].includes(view)) {
     content = (
       <AdminGeneralView
