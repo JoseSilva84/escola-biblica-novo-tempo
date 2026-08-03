@@ -518,9 +518,8 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
   
   const items = [
     ['admin', 'Dashboard', LayoutDashboard],
-    ['leads', 'Leads', ClipboardList],
     ['associations', 'Associações', Building2],
-    ['users', 'Acessos', UsersRound],
+    ['leads', 'Leads', ClipboardList],
     ['campaigns', 'Campanhas', Radio],
     ['automations', 'WhatsApp', MessageCircle],
     ['conversations', 'Conversas', MessageCircle],
@@ -1039,7 +1038,7 @@ function AddAssociationForm({ onAdd }) {
   );
 }
 
-function AdminDashboard({ associations, data, isAssociationsView = false, onOpenAdminGeneral, onOpenAssociations, onOpenAssociation, onOpenLeads, onAddAssociation }) {
+function AdminDashboard({ associations, data, isAssociationsView = false, onOpenAdminGeneral, onOpenAssociations, onOpenAssociation, onOpenLeads, onOpenUsers, onAddAssociation }) {
   const totals = associations.reduce((acc, association) => ({
     leads: acc.leads + association.leads,
     campaigns: acc.campaigns + association.campaigns,
@@ -1105,6 +1104,10 @@ function AdminDashboard({ associations, data, isAssociationsView = false, onOpen
               <button className={ghostButtonClass} onClick={onOpenAdminGeneral} type="button">
                 <ShieldCheck size={18} />
                 Gestao geral
+              </button>
+              <button className={ghostButtonClass} onClick={onOpenUsers} type="button">
+                <UsersRound size={18} />
+                Acessos
               </button>
             </div>
           </div>
@@ -3850,6 +3853,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
         onOpenAssociations={() => setView('associations')}
         onOpenAssociation={openAssociation}
         onOpenLeads={() => setView('leads')}
+        onOpenUsers={() => setView('users')}
       />
     );
   } else if (view === 'leads') {
