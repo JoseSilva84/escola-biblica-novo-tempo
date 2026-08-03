@@ -1,16 +1,14 @@
 {
-  "registros": 45964,
-  "vips": 4009,
-  "taxa_vip": 0.08722043338264729,
-  "roc_auc_teste": 0.9580975460288619,
-  "average_precision_teste": 0.7479886187764653,
+  "registros": 46800,
+  "vips": 4014,
+  "taxa_vip": 0.08576923076923076,
+  "roc_auc_teste": 0.946934126160939,
+  "average_precision_teste": 0.7210805975717457,
   "random_state": 42,
   "bibliotecas": [
     "pandas",
     "numpy",
     "scikit-learn",
-    "matplotlib",
-    "seaborn",
     "openpyxl",
     "joblib"
   ]
