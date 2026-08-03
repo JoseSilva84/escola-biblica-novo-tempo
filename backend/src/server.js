@@ -244,6 +244,44 @@ async function saveDatasetUploadHistory({ result, files, user }) {
   });
 }
 
+async function importDatasetHistoryFromFiles(entries = []) {
+  if (!prisma.datasetUploadHistory || !entries.length) return [];
+  await ensureDatasetHistoryTable();
+  const existing = await prisma.datasetUploadHistory.count();
+  if (existing > 0) return [];
+
+  for (const entry of entries.slice().reverse()) {
+    const consolidation = entry?.consolidacao || {};
+    const createdAt = Number.isNaN(Date.parse(entry?.atualizado_em || ''))
+      ? new Date()
+      : new Date(entry.atualizado_em);
+    await prisma.datasetUploadHistory.create({
+      data: {
+        status: entry?.status || 'IMPORTED',
+        associationId: entry?.associationId || 'paulistana',
+        associationName: entry?.associationName || 'Associacao Paulistana',
+        uploadedFiles: (consolidation.arquivos || []).map((file) => ({
+          name: file.arquivo,
+          read: file.lidos,
+          new: file.novos,
+          existing: file.ja_existiam,
+          duplicated: file.duplicados_upload
+        })),
+        summary: consolidation,
+        alerts: consolidation.alertas_duplicidade || {},
+        newLeads: Number(consolidation.alunos_novos || 0),
+        rowsBefore: Number(consolidation.linhas_antes || 0),
+        rowsAfter: Number(consolidation.linhas_depois || 0),
+        districts: consolidation.distritos_novos || [],
+        ml: entry?.ml || null,
+        createdAt
+      }
+    });
+  }
+
+  return readDatasetHistoryFromDb(50);
+}
+
 function parseMaybeJson(value) {
   if (typeof value !== 'string') return value;
   const text = value.trim();
@@ -876,6 +914,12 @@ app.get('/api/dashboard', requireAuth, async (_request, response) => {
     if (dbHistory.length) {
       payload.meta.datasetUpdateHistory = dbHistory;
       payload.meta.lastDatasetUpdate = dbHistory[0];
+    } else if (payload.meta.datasetUpdateHistory?.length) {
+      const importedHistory = await importDatasetHistoryFromFiles(payload.meta.datasetUpdateHistory);
+      if (importedHistory.length) {
+        payload.meta.datasetUpdateHistory = importedHistory;
+        payload.meta.lastDatasetUpdate = importedHistory[0];
+      }
     }
   } catch (error) {
     console.error('[dashboard:dataset-history:error]', error.message);
