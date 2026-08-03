@@ -203,6 +203,14 @@ A pasta `dataset/` concentra os dados e analises usadas pelo dashboard:
 
 O backend transforma esses dados em registros compactos para o dashboard e inclui metadados como total de registros, origem do ranking e data de referencia.
 
+Para atualizar os arquivos derivados depois de trocar a planilha `ListagemCompleta (1).xlsx`, rode:
+
+```bash
+python dataset/atualizar_dataset.py
+```
+
+Esse comando regenera `alunos.json`, recalcula o ranking VIP, salva o modelo `modelo_vip_sklearn.joblib` e atualiza `metricas_vip_sklearn.json`. No Dockerfile de producao, essa rotina roda durante o build; portanto, um redeploy com a planilha nova ja reconstroi os dados usados pelo backend.
+
 ## Seguranca
 
 Arquivos de ambiente nao devem ser enviados para o GitHub:
