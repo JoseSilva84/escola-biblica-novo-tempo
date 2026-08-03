@@ -3662,8 +3662,8 @@ function AppShell({ children, current, onNavigate, onLogout, theme, onToggleThem
       <AppToaster theme={theme} />
       <div className="flex min-h-screen gap-4 p-4 max-lg:flex-col max-lg:p-0">
       <Sidebar compact={sidebarCompact} current={current} onLogout={onLogout} onNavigate={onNavigate} onToggleCompact={() => setSidebarCompact((value) => !value)} user={user} />
-      <div className="flex min-h-[calc(100vh-2rem)] min-w-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] max-lg:min-h-screen max-lg:rounded-none">
-        <header className="sticky top-0 z-30 border-b border-white/[0.07] bg-slate-950/60 px-8 py-4 backdrop-blur-2xl max-md:px-4">
+      <div className="flex min-h-[calc(100vh-2rem)] min-w-0 flex-1 flex-col overflow-visible rounded-[1.75rem] max-lg:min-h-screen max-lg:rounded-none">
+        <header className="sticky top-4 z-50 shrink-0 rounded-t-[1.75rem] border-b border-white/[0.07] bg-slate-950/60 px-8 py-4 backdrop-blur-2xl max-lg:top-0 max-lg:rounded-none max-md:px-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <span className={labelClass}>Amigos NT</span>
