@@ -59,6 +59,17 @@ const primaryButtonClass = 'primary-button-glow group relative inline-flex h-11 
 const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-semibold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
 const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slate-950/60 shadow-[0_28px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.035] backdrop-blur-2xl';
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+const adminNavItems = [
+  ['admin', 'Dashboard', LayoutDashboard],
+  ['associations', 'AssociaÃ§Ãµes', Building2],
+  ['leads', 'Leads', ClipboardList],
+  ['campaigns', 'Campanhas', Radio],
+  ['automations', 'WhatsApp', MessageCircle],
+  ['conversations', 'Conversas', MessageCircle],
+  ['ai-agent', 'IA', WandSparkles],
+  ['reports', 'RelatÃ³rios', PieChart],
+  ['settings', 'ConfiguraÃ§Ãµes', Settings]
+];
 const crmPriorityLabels = {
   Hot: 'Quente',
   Warm: 'Potencial',
@@ -4133,7 +4144,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
             </div>
             <div className="flex items-center gap-3">
               <button
-                className="interactive-card inline-flex h-10 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/70 px-3 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
+                className="hidden"
                 onClick={() => {
                   onToggleTheme();
                   toast.message(isLight ? 'Modo dark ativado' : 'Modo light prateado ativado', {
@@ -4176,6 +4187,32 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Configurações</span>
                     </div>
                     <div className="flex flex-col gap-0.5">
+                      {adminNavItems.map(([id, label, Icon]) => (
+                        <button
+                          className={`group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold transition-all hover:bg-slate-100 hover:text-slate-900 ${current === id ? 'bg-blue-50 text-blue-700' : 'text-slate-600'}`}
+                          key={id}
+                          onClick={() => onNavigate(id)}
+                          type="button"
+                        >
+                          <Icon size={16} className={`transition-colors group-hover/item:text-blue-500 ${current === id ? 'text-blue-600' : 'text-slate-400'}`} />
+                          {label}
+                        </button>
+                      ))}
+                      <button
+                        className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900"
+                        onClick={() => {
+                          onToggleTheme();
+                          toast.message(isLight ? 'Modo dark ativado' : 'Modo light prateado ativado', {
+                            description: isLight ? 'A opÃ§Ã£o escura fica disponÃ­vel como modo alternativo.' : 'O fundo prateado voltou a ser a experiÃªncia principal.'
+                          });
+                        }}
+                        type="button"
+                      >
+                        {isLight ? <Moon size={16} className="text-slate-400 transition-colors group-hover/item:text-indigo-500" /> : <Sun size={16} className="text-slate-400 transition-colors group-hover/item:text-amber-500" />}
+                        AparÃªncia
+                      </button>
+                    </div>
+                    <div className="hidden">
                       <button className="group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900" onClick={() => onNavigate('settings')} type="button">
                         <Crown size={16} className="text-slate-400 transition-colors group-hover/item:text-blue-500" />
                         Perfil do sistema
