@@ -1512,7 +1512,7 @@ function DatasetHistoryView({ history = [], onBack }) {
         </div>
       </section>
 
-      <section className="grid gap-4">
+      <section className="history-dark-surface grid gap-4">
         {loading ? (
           <div className={`${panelClass} p-6 text-sm font-semibold text-slate-400`}>Carregando historico salvo no banco...</div>
         ) : null}
@@ -1530,7 +1530,7 @@ function DatasetHistoryView({ history = [], onBack }) {
             const mlSummary = mlStatus.resumo || {};
             const mlDate = formatDatasetDate(mlStatus.atualizado_em_brasil || mlStatus.atualizado_em);
             return (
-              <article className="rounded-2xl border border-white/[0.10] bg-slate-950 p-6 shadow-[0_24px_70px_rgba(2,6,23,0.32)]" key={entry.id || `${entry.atualizado_em}-${index}`}>
+              <article className="history-dark-surface rounded-2xl border border-white/[0.10] bg-slate-950 p-6 shadow-[0_24px_70px_rgba(2,6,23,0.32)]" key={entry.id || `${entry.atualizado_em}-${index}`}>
                 <div className="mb-5 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
                   <div className="rounded-2xl bg-blue-600 p-4">
                     <span className="text-[10px] font-black uppercase tracking-wide text-white/75">Novos leads</span>
@@ -4103,7 +4103,7 @@ function PlaceholderView({ title, subtitle, icon: Icon }) {
   );
 }
 
-function AppShell({ children, current, onNavigate, onLogout, theme, onToggleTheme, user }) {
+function AppShell({ children, current, onBack, canGoBack = false, onNavigate, onLogout, theme, onToggleTheme, user }) {
   const isLight = theme === 'light';
   const [sidebarCompact, setSidebarCompact] = useState(false);
 
@@ -4115,9 +4115,21 @@ function AppShell({ children, current, onNavigate, onLogout, theme, onToggleThem
       <div className="flex min-h-[calc(100vh-2rem)] min-w-0 flex-1 flex-col overflow-visible rounded-[1.75rem] max-lg:min-h-screen max-lg:rounded-none">
         <header className="sticky top-4 z-50 shrink-0 rounded-t-[1.75rem] border-b border-white/[0.07] bg-slate-950/60 px-8 py-4 backdrop-blur-2xl max-lg:top-0 max-lg:rounded-none max-md:px-4">
           <div className="flex items-center justify-between gap-4">
-            <div>
+            <div className="flex min-w-0 items-center gap-3">
+              {canGoBack ? (
+                <button
+                  className="interactive-card inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/70 px-3 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
+                  onClick={onBack}
+                  type="button"
+                >
+                  <ArrowRight className="rotate-180" size={17} />
+                  Voltar
+                </button>
+              ) : null}
+              <div>
               <span className={labelClass}>Amigos NT</span>
               <h2 className="text-xl font-black text-slate-50">Administração Geral</h2>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -4257,6 +4269,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const [theme, setTheme] = useState('light');
   const [selectedAssociationId, setSelectedAssociationId] = useState('paulistana');
   const [payload, setPayload] = useState(initialPayload);
+  const [viewHistory, setViewHistory] = useState([]);
   const [associations, setAssociations] = useState(() => initialAssociations);
   const [adminUsers, setAdminUsers] = useState(() => buildAdminUsers(initialAssociations));
   const [adminCampaigns, setAdminCampaigns] = useState(() => buildAdminCampaigns(initialAssociations));
@@ -4335,12 +4348,27 @@ export default function CrmApp({ payload: initialPayload = null }) {
     await apiFetch('/api/auth/logout', { method: 'POST' });
     window.localStorage.removeItem('sevenflow_token');
     setUser(null);
+    setViewHistory([]);
     setView('login');
+  }
+
+  function navigateView(nextView) {
+    if (nextView === view) return;
+    setViewHistory((history) => [...history, view].filter((item) => item !== 'login').slice(-20));
+    setView(nextView);
+  }
+
+  function goBack() {
+    setViewHistory((history) => {
+      const previous = history[history.length - 1] || 'admin';
+      setView(previous === 'login' ? 'admin' : previous);
+      return history.slice(0, -1);
+    });
   }
 
   function openAssociation(id) {
     setSelectedAssociationId(id);
-    setView('association');
+    navigateView('association');
   }
 
   if (!authReady && restoringSession) {
@@ -4375,9 +4403,9 @@ export default function CrmApp({ payload: initialPayload = null }) {
   if (view === 'details') {
     return (
       <DetailsShell
-        onBack={() => setView('association')}
+        onBack={goBack}
         onLogout={logout}
-        onNavigate={setView}
+        onNavigate={navigateView}
         payload={payload}
         user={user}
       />
@@ -4417,17 +4445,17 @@ export default function CrmApp({ payload: initialPayload = null }) {
         data={data}
         isAssociationsView={view === 'associations'}
         onAddAssociation={(association) => setAssociations((current) => [association, ...current])}
-        onOpenAdminGeneral={() => setView('general-admin')}
-        onOpenAssociations={() => setView('associations')}
+        onOpenAdminGeneral={() => navigateView('general-admin')}
+        onOpenAssociations={() => navigateView('associations')}
         onOpenAssociation={openAssociation}
-        onOpenLeads={() => setView('leads')}
-        onOpenUsers={() => setView('users')}
+        onOpenLeads={() => navigateView('leads')}
+        onOpenUsers={() => navigateView('users')}
       />
     );
   } else if (view === 'leads') {
-    content = <LeadsView associations={associations} data={data} datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={setView} records={records} />;
+    content = <LeadsView associations={associations} data={data} datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={navigateView} records={records} />;
   } else if (view === 'dataset-history') {
-    content = <DatasetHistoryView history={payload?.meta?.datasetUpdateHistory || []} onBack={() => setView('leads')} />;
+    content = <DatasetHistoryView history={payload?.meta?.datasetUpdateHistory || []} onBack={goBack} />;
   } else if (['general-admin', 'users', 'campaigns'].includes(view)) {
     content = (
       <AdminGeneralView
@@ -4441,7 +4469,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
         association={selectedAssociation}
         data={data}
         onDatasetUpdated={loadDashboard}
-        onOpenDetails={() => openDetailsView(setView)}
+        onOpenDetails={() => openDetailsView(navigateView)}
         records={records}
         user={user}
       />
@@ -4461,8 +4489,10 @@ export default function CrmApp({ payload: initialPayload = null }) {
   return (
     <AppShell
       current={view === 'association' ? 'associations' : view}
+      canGoBack={view !== 'admin'}
+      onBack={goBack}
       onLogout={logout}
-      onNavigate={setView}
+      onNavigate={navigateView}
       onToggleTheme={() => setTheme((current) => current === 'light' ? 'dark' : 'light')}
       theme={theme}
       user={user}

@@ -578,6 +578,21 @@
     -webkit-backdrop-filter: blur(12px) !important;
   }
 
+  .app-light .history-dark-surface,
+  .app-light .history-dark-surface * {
+    color: rgb(248 250 252) !important;
+  }
+
+  .app-light .history-dark-surface .history-muted,
+  .app-light .history-dark-surface .history-muted * {
+    color: rgb(226 232 240) !important;
+  }
+
+  .app-light .history-dark-surface .history-faint,
+  .app-light .history-dark-surface .history-faint * {
+    color: rgb(203 213 225) !important;
+  }
+
   /* Enhancing interactive cards in light mode */
   .app-light .interactive-card {
     transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 300ms, background-color 300ms;
