@@ -2570,7 +2570,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
               <span className={labelClass}>Base piloto Alphaville</span>
               <h2 className="mt-1 text-2xl font-black text-slate-50">Inteligência dos campos ainda não explorados</h2>
             </div>
-            <span className="rounded-full border border-white/15 bg-slate-950/72 px-4 py-2 text-xs font-black uppercase tracking-wide text-white shadow-[0_14px_32px_rgba(15,23,42,0.24)]">
+            <span className="rounded-full border border-white/[0.08] bg-slate-950/45 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-950">
               {formatNumber(analytics.pilot.total)} registros reais
             </span>
           </div>
