@@ -1874,13 +1874,23 @@ function AnalyticsRankingModal({ ranking, onClose }) {
         <div className="max-h-[calc(88vh-150px)] overflow-y-auto p-6">
           <div className="grid gap-3">
             {filteredRows.length ? visibleRows.map((row, index) => {
-              const title = row.title || row.n || 'Lead sem nome';
-              const subtitle = row.subtitle || (ranking.type === 'recentContacts' ? `${row.d || 'Distrito não informado'} · ${row.tel || 'sem telefone'}` : null);
-              const metric = row.metric || (ranking.type === 'recentContacts' ? `${formatNumber(row.c)} dias` : null);
-              const details = row.details || (ranking.type === 'recentContacts' ? [
-                row.birthDate && row.birthDate !== 'N/I' ? `Aniversário: ${row.birthDate}` : 'Aniversário não informado',
-                row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
-              ] : []);
+              const title = row.title || row.address || row.name || row.n || 'Lead sem nome';
+              const subtitle = row.subtitle
+                || (ranking.type === 'addresses' ? (row.names || []).join(', ') || 'Sem nomes vinculados' : null)
+                || (ranking.type === 'materials' ? `${formatNumber(row.leads || 0)} leads vinculados` : null)
+                || (ranking.type === 'birthdays' ? `${row.month || 'Mês'} · ${row.date}` : null)
+                || (ranking.type === 'recentContacts' ? `${row.d || 'Distrito não informado'} · ${row.tel || 'sem telefone'}` : null);
+              const metric = row.metric
+                || (ranking.type === 'addresses' ? `${formatNumber(row.leads || 0)} leads` : null)
+                || (ranking.type === 'materials' ? formatNumber(row.recebidos || 0) : null)
+                || (ranking.type === 'birthdays' ? row.date : null)
+                || (ranking.type === 'recentContacts' ? `${formatNumber(row.c)} dias` : null);
+              const details = row.details
+                || (ranking.type === 'materials' ? row.names : null)
+                || (ranking.type === 'recentContacts' ? [
+                  row.birthDate && row.birthDate !== 'N/I' ? `Aniversário: ${row.birthDate}` : 'Aniversário não informado',
+                  row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
+                ] : []);
               return (
                 <div className="grid grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.18)] max-md:grid-cols-1" key={`${ranking.title}-${title}-${index}`}>
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.18)]">
@@ -2078,35 +2088,25 @@ function LeadAnalyticsSection({ data, records = [] }) {
   const seeAllButtonClass = 'inline-flex h-10 items-center justify-center rounded-2xl bg-slate-950 px-4 text-xs font-black uppercase tracking-wide text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-500/15';
   const openRanking = (ranking) => setSelectedRanking(ranking);
   const openAddressRanking = () => openRanking({
+    type: 'addresses',
     kicker: 'Ranking de endereços',
     title: 'Todos os endereços repetidos',
     subtitle: 'Sequência completa dos endereços com mais de um lead vinculado.',
-    rows: analytics.addressRankingAll.map((row) => ({
-      title: row.address,
-      subtitle: row.names.join(', ') || 'Sem nomes vinculados',
-      metric: `${formatNumber(row.leads)} leads`
-    }))
+    rows: analytics.addressRankingAll
   });
   const openMaterialRanking = () => openRanking({
+    type: 'materials',
     kicker: 'Ranking de materiais',
     title: 'Todos os materiais recebidos',
     subtitle: 'Sequência completa dos materiais, ordenada pela quantidade recebida.',
-    rows: analytics.materialRankingAll.map((row) => ({
-      title: row.name,
-      subtitle: `${formatNumber(row.leads)} leads vinculados`,
-      metric: formatNumber(row.recebidos),
-      details: row.names
-    }))
+    rows: analytics.materialRankingAll
   });
   const openBirthdayRanking = () => openRanking({
+    type: 'birthdays',
     kicker: 'Aniversariantes',
     title: 'Todos os aniversariantes',
     subtitle: 'Sequência completa por mês, com nome e data completa de aniversário.',
-    rows: analytics.birthdaysByMonth.flatMap((month) => month.leads.map((lead) => ({
-      title: lead.name,
-      subtitle: `${month.month} · ${lead.date}`,
-      metric: lead.date
-    })))
+    rows: analytics.birthdaysByMonth.flatMap((month) => month.leads.map((lead) => ({ ...lead, month })))
   });
   const openRecentContactRanking = () => openRanking({
     type: 'recentContacts',
