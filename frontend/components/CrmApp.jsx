@@ -1776,7 +1776,7 @@ function DatasetHistoryModal({ history = [], onClose }) {
   );
 }
 
-function AssociationDashboard({ association, data, records = [], onDatasetUpdated, onOpenDetails, user }) {
+function AssociationDashboard({ association, data, records = [], onDatasetUpdated, onOpenDetails, onOpenHistory, user }) {
   const automations = [
     { name: 'Boas-vindas', status: 'Ativa', sent: 1280, response: '18%', color: 'border-emerald-500/20 bg-emerald-500/[0.04]' },
     { name: 'Devocional 21 dias', status: 'Rascunho', sent: 0, response: '-', color: 'border-slate-500/20 bg-slate-500/[0.04]' },
@@ -1807,6 +1807,10 @@ function AssociationDashboard({ association, data, records = [], onDatasetUpdate
               >
                 <Send size={18} />
                 Nova sequência WhatsApp
+              </button>
+              <button className={ghostButtonClass} onClick={onOpenHistory} type="button">
+                <ClipboardList size={18} />
+                Historico das atualizacoes
               </button>
             </div>
           </div>
@@ -4475,6 +4479,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
         data={data}
         onDatasetUpdated={loadDashboard}
         onOpenDetails={() => openDetailsView(navigateView)}
+        onOpenHistory={() => navigateView('dataset-history')}
         records={records}
         user={user}
       />
