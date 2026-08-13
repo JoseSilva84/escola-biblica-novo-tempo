@@ -1861,14 +1861,21 @@ function AnalyticsRankingModal({ ranking, onClose }) {
                 || (ranking.type === 'addresses' ? (row.names || []).join(', ') || 'Sem nomes vinculados' : null)
                 || (ranking.type === 'materials' ? `${formatNumber(row.leads || 0)} leads vinculados` : null)
                 || (ranking.type === 'birthdays' ? `${row.month || 'Mês'} · ${row.date}` : null)
+                || (ranking.type === 'leadList' ? `${row.d || 'Distrito não informado'} · ${row.tel || 'sem telefone'} · ${row.em || 'sem e-mail'}` : null)
                 || (ranking.type === 'recentContacts' ? `${row.d || 'Distrito não informado'} · ${row.tel || 'sem telefone'}` : null);
               const metric = row.metric
                 || (ranking.type === 'addresses' ? `${formatNumber(row.leads || 0)} leads` : null)
                 || (ranking.type === 'materials' ? formatNumber(row.recebidos || 0) : null)
                 || (ranking.type === 'birthdays' ? row.date : null)
+                || (ranking.type === 'leadList' ? (row.t ? 'WhatsApp' : 'Sem WhatsApp') : null)
                 || (ranking.type === 'recentContacts' ? `${formatNumber(row.c)} dias` : null);
               const details = row.details
                 || (ranking.type === 'materials' ? row.names : null)
+                || (ranking.type === 'leadList' ? [
+                  row.em ? `E-mail: ${row.em}` : 'E-mail não informado',
+                  row.tel ? `Telefone: ${row.tel}` : 'Telefone não informado',
+                  row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
+                ] : null)
                 || (ranking.type === 'recentContacts' ? [
                   row.birthDate && row.birthDate !== 'N/I' ? `Aniversário: ${row.birthDate}` : 'Aniversário não informado',
                   row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
@@ -1995,6 +2002,35 @@ function LeadAnalyticsSection({ data, records = [] }) {
         .filter(Boolean)
         .sort((a, b) => a.day - b.day || a.name.localeCompare(b.name))
     }));
+    const emailGroups = [
+      {
+        name: 'Com e-mail',
+        value: records.filter((lead) => Boolean(lead.em)).length,
+        rows: records.filter((lead) => Boolean(lead.em))
+      },
+      {
+        name: 'Sem e-mail',
+        value: records.filter((lead) => !lead.em).length,
+        rows: records.filter((lead) => !lead.em)
+      }
+    ];
+    const emailWhatsappGroups = [
+      {
+        name: 'E-mail e WhatsApp',
+        value: records.filter((lead) => Boolean(lead.em) && lead.t).length,
+        rows: records.filter((lead) => Boolean(lead.em) && lead.t)
+      },
+      {
+        name: 'Sem e-mail, com WhatsApp',
+        value: records.filter((lead) => !lead.em && lead.t).length,
+        rows: records.filter((lead) => !lead.em && lead.t)
+      },
+      {
+        name: 'Sem e-mail e sem WhatsApp',
+        value: records.filter((lead) => !lead.em && !lead.t).length,
+        rows: records.filter((lead) => !lead.em && !lead.t)
+      }
+    ];
 
     return {
       funnel: (data?.campaignTrend || []).map((item) => ({ ...item, taxa: pct(item.leads, total) })),
@@ -2002,6 +2038,8 @@ function LeadAnalyticsSection({ data, records = [] }) {
         { name: 'Com WhatsApp', value: data?.phone || 0 },
         { name: 'Sem WhatsApp', value: Math.max(total - (data?.phone || 0), 0) }
       ],
+      emailGroups,
+      emailWhatsappGroups,
       ageGroups: [
         { name: 'Até 17', value: ageBuckets.ate17 },
         { name: '18-24', value: ageBuckets.de18a24 },
@@ -2097,6 +2135,54 @@ function LeadAnalyticsSection({ data, records = [] }) {
     subtitle: 'Lista completa do contato mais recente para o mais distante. Use a pesquisa para limitar por dia, mês ou ano.',
     rows: analytics.recentContactsAll
   });
+  const openLeadGroup = (kicker, group) => openRanking({
+    type: 'leadList',
+    kicker,
+    title: group.name,
+    subtitle: `${formatNumber(group.value)} leads encontrados neste grupo.`,
+    rows: group.rows
+  });
+
+  function ContactSegmentCard({ kicker, title, groups, tone = 'blue' }) {
+    const total = groups.reduce((sum, group) => sum + group.value, 0);
+    const tones = {
+      blue: ['bg-blue-600', 'hover:border-blue-300/55'],
+      emerald: ['bg-emerald-600', 'hover:border-emerald-300/55'],
+      violet: ['bg-violet-600', 'hover:border-violet-300/55']
+    };
+    const [barTone, hoverTone] = tones[tone] || tones.blue;
+
+    return (
+      <article className={`${panelClass} p-5`}>
+        <span className={labelClass}>{kicker}</span>
+        <h3 className="mt-1 text-lg font-black text-slate-50">{title}</h3>
+        <div className="mt-5 grid gap-3">
+          {groups.map((group) => {
+            const percent = pct(group.value, total);
+            return (
+              <button
+                className={`group rounded-2xl border border-white/[0.08] bg-slate-950/42 p-4 text-left transition duration-300 hover:-translate-y-0.5 ${hoverTone} hover:shadow-[0_18px_42px_rgba(37,99,235,0.16)]`}
+                key={group.name}
+                onClick={() => openLeadGroup(kicker, group)}
+                type="button"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <strong className="block text-sm font-black text-slate-50">{group.name}</strong>
+                    <span className="mt-1 block text-xs font-semibold text-slate-500">{percent}% da base analisada</span>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-950 shadow-[0_12px_26px_rgba(255,255,255,0.16)]">{formatNumber(group.value)}</span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+                  <div className={`h-full rounded-full ${barTone} shadow-[0_0_24px_rgba(37,99,235,0.28)] transition-all duration-500`} style={{ width: `${Math.max(percent, group.value ? 3 : 0)}%` }} />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </article>
+    );
+  }
 
   return (
     <section className="grid gap-4">
@@ -2242,6 +2328,20 @@ function LeadAnalyticsSection({ data, records = [] }) {
             </ResponsiveContainer>
           </div>
         </article>
+
+        <ContactSegmentCard
+          groups={analytics.emailGroups}
+          kicker="E-mail"
+          title="Registrados e pendentes"
+          tone="blue"
+        />
+
+        <ContactSegmentCard
+          groups={analytics.emailWhatsappGroups}
+          kicker="Contato completo"
+          title="E-mail e WhatsApp"
+          tone="emerald"
+        />
 
         <article className={`${panelClass} p-5`}>
           <span className={labelClass}>Idade</span>
