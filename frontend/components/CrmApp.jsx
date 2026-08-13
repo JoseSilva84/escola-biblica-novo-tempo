@@ -252,105 +252,24 @@ function buildInitialAssociations(records) {
       name: 'Associação Paulistana',
       region: 'São Paulo Capital',
       status: 'Ativa',
-      campaigns: 4,
+      campaigns: 0,
       leads: data.total,
       hot: data.hot,
       studies: data.studies,
       districts: data.districts,
       conversion: data.conversion,
       featured: true
-    },
-    {
-      id: 'sul',
-      name: 'Associação Paulista Sul',
-      region: 'Grande São Paulo',
-      status: 'Planejada',
-      campaigns: 2,
-      leads: 12840,
-      hot: 932,
-      studies: 611,
-      districts: 31,
-      conversion: 5
-    },
-    {
-      id: 'leste',
-      name: 'Associação Paulista Leste',
-      region: 'Zona Leste e Alto Tietê',
-      status: 'Planejada',
-      campaigns: 1,
-      leads: 9630,
-      hot: 604,
-      studies: 428,
-      districts: 26,
-      conversion: 4
     }
+
   ];
 }
 
-function buildAdminUsers(associations) {
-  return [
-    {
-      id: 'user-admin-central',
-      name: 'Admin geral',
-      email: 'admin@leadsnt.com.br',
-      role: 'ADMIN_GERAL',
-      scope: 'Todas as associacoes',
-      status: 'Ativo'
-    },
-    {
-      id: 'user-paulistana',
-      name: 'Gestao Paulistana',
-      email: 'paulistana@leadsnt.com.br',
-      role: 'GESTOR_ASSOCIACAO',
-      scope: associations[0]?.name || 'Associacao Paulistana',
-      status: 'Ativo'
-    },
-    {
-      id: 'user-coord',
-      name: 'Coordenacao de campanha',
-      email: 'coordenacao@leadsnt.com.br',
-      role: 'COORDENADOR_CAMPANHA',
-      scope: 'Campanhas ativas',
-      status: 'Convite pendente'
-    },
-    {
-      id: 'user-volunteer',
-      name: 'Equipe de visitas',
-      email: 'visitas@leadsnt.com.br',
-      role: 'VOLUNTARIO',
-      scope: 'Leads atribuidos',
-      status: 'Ativo'
-    }
-  ];
+function buildAdminUsers() {
+  return [];
 }
 
-function buildAdminCampaigns(associations) {
-  return [
-    {
-      id: 'campaign-escola-biblica',
-      name: 'Escola Biblica Novo Tempo',
-      association: associations[0]?.name || 'Associacao Paulistana',
-      status: 'Ativa',
-      owner: 'Gestao Paulistana',
-      goal: 1800
-    },
-    {
-      id: 'campaign-familia',
-      name: 'Curso Familia',
-      association: associations[0]?.name || 'Associacao Paulistana',
-      status: 'Planejada',
-      owner: 'Coordenacao de campanha',
-      goal: 600
-    },
-    {
-      id: 'campaign-reencontro',
-      name: 'Reencontro Novo Tempo',
-      association: associations[1]?.name || 'Associacao Paulista Sul',
-      status: 'Planejada',
-      owner: 'Admin geral',
-      goal: 900
-    }
-  ];
+function buildAdminCampaigns() {
+  return [];
 }
 
 function BibleStudyAnimation() {
@@ -1777,11 +1696,7 @@ function DatasetHistoryModal({ history = [], onClose }) {
 }
 
 function AssociationDashboard({ association, data, records = [], onDatasetUpdated, onOpenDetails, onOpenHistory, user }) {
-  const automations = [
-    { name: 'Boas-vindas', status: 'Ativa', sent: 1280, response: '18%', color: 'border-emerald-500/20 bg-emerald-500/[0.04]' },
-    { name: 'Devocional 21 dias', status: 'Rascunho', sent: 0, response: '-', color: 'border-slate-500/20 bg-slate-500/[0.04]' },
-    { name: 'Convite de visita', status: 'Ativa', sent: 312, response: '31%', color: 'border-blue-500/20 bg-blue-500/[0.04]' }
-  ];
+  const automations = [];
 
   return (
     <div className="grid gap-6">
@@ -1853,26 +1768,10 @@ function AssociationDashboard({ association, data, records = [], onDatasetUpdate
             </div>
             <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">{association.name}</span>
           </div>
-          <div className="grid gap-3">
-            <button className="interactive-card group grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-blue-400/20 bg-blue-500/[0.08] p-5 text-left" onClick={onOpenDetails} type="button">
-              <span>
-                <span className={labelClass}>Campanha ativa</span>
-                <strong className="mt-2 block text-2xl font-black text-slate-50">Escola Bíblica Novo Tempo</strong>
-                <span className="mt-2 block text-sm leading-relaxed text-slate-400">Clique para abrir a tela Detalhes dos interessados com filtros, prioridades, distritos e exportação.</span>
-              </span>
-              <span className="grid h-12 w-12 place-items-center rounded-xl bg-blue-500 text-white transition group-hover:translate-x-1">
-                <ArrowRight size={22} />
-              </span>
-            </button>
-            {['Curso Família', 'Semana Especial', 'Reencontro Novo Tempo'].map((campaign) => (
-              <div className="interactive-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5" key={campaign}>
-                <div>
-                  <span className={labelClass}>Próxima campanha</span>
-                  <strong className="mt-2 block text-lg text-slate-200">{campaign}</strong>
-                </div>
-                <span className="rounded-full bg-slate-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">Planejada</span>
-              </div>
-            ))}
+          <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5">
+            <span className={labelClass}>Campanhas cadastradas</span>
+            <strong className="mt-2 block text-3xl font-black text-slate-50">0</strong>
+            <span className="mt-2 block text-sm leading-relaxed text-slate-400">Nenhuma campanha real cadastrada para esta associacao.</span>
           </div>
         </article>
 
@@ -1911,7 +1810,7 @@ function AssociationDashboard({ association, data, records = [], onDatasetUpdate
           </button>
         </div>
         <div className="grid grid-cols-3 gap-3 max-lg:grid-cols-1">
-          {automations.map((automation) => (
+          {automations.length ? automations.map((automation) => (
             <div className={`interactive-card rounded-2xl border ${automation.color} p-5`} key={automation.name}>
               <div className="mb-4 flex items-center justify-between gap-3">
                 <strong className="text-slate-100">{automation.name}</strong>
@@ -1928,7 +1827,11 @@ function AssociationDashboard({ association, data, records = [], onDatasetUpdate
                 </div>
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400 max-lg:col-span-1 lg:col-span-3">
+              Nenhuma automacao real cadastrada ainda.
+            </div>
+          )}
         </div>
       </section>
 
@@ -2663,7 +2566,7 @@ function AdminGeneralView({
         <MetricCard detail={`${activeCampaigns} em andamento`} icon={Radio} label="Campanhas" tone="green" value={formatNumber(campaigns.length)} />
         <MetricCard detail="com prioridade alta" icon={Sparkles} label="Leads quentes" tone="orange" value={formatNumber(data.hot)} />
         <MetricCard detail={`${associations.length} associações no painel`} icon={Building2} label="Territórios" value={formatNumber(data.districts)} />
-        <MetricCard detail={`${pendingUsers} convite pendente`} icon={ShieldCheck} label="Pendências" tone="violet" value={formatNumber(pendingUsers + 4)} />
+        <MetricCard detail={`${pendingUsers} convite pendente`} icon={ShieldCheck} label="Pendências" tone="violet" value={formatNumber(pendingUsers)} />
       </section>
 
       <section className={`${panelClass} p-3`}>
@@ -3739,7 +3642,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
     .sort((a, b) => (b.s || 0) - (a.s || 0))
     .slice(0, 6);
   const knowledgeItems = [
-    ['Campanha ativa', campaigns.find((campaign) => campaign.status === 'Ativa')?.name || 'Escola Biblica Novo Tempo'],
+    ['Campanha ativa', campaigns.find((campaign) => campaign.status === 'Ativa')?.name || 'Nenhuma campanha ativa'],
     ['Associacao padrao', associations[0]?.name || 'Associacao Paulistana'],
     ['Leads com WhatsApp', formatNumber(data.phone)],
     ['Estudos ativos', formatNumber(data.studies)]
@@ -4169,8 +4072,8 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
               </button>
               <button
                 className="interactive-card relative grid h-10 w-10 place-items-center rounded-xl border border-slate-900/10 bg-white/70 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
-                onClick={() => toast('3 notificações operacionais', {
-                  description: '12 leads sem resposta, 3 visitas pendentes e 1 automação pronta para revisão.',
+                onClick={() => toast('0 notificacoes operacionais', {
+                  description: '0 leads sem resposta, 0 visitas pendentes e 0 automacoes prontas para revisao.',
                   action: {
                     label: 'Ver',
                     onClick: () => setTimeout(() => toast.info('Central de notificações será aberta na próxima etapa.'), 0)
