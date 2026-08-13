@@ -1795,7 +1795,57 @@ function DatasetHistoryModal({ history = [], onClose }) {
   );
 }
 
+function AnalyticsRankingModal({ ranking, onClose }) {
+  if (!ranking) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
+      <div className="max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-blue-600/24 via-slate-900 to-emerald-500/16 p-6">
+          <div>
+            <span className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">{ranking.kicker}</span>
+            <h2 className="mt-2 text-2xl font-black text-white">{ranking.title}</h2>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-slate-300">{ranking.subtitle}</p>
+          </div>
+          <button className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/12 bg-white/8 text-white transition hover:bg-white/14" onClick={onClose} type="button">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="max-h-[calc(88vh-150px)] overflow-y-auto p-6">
+          <div className="grid gap-3">
+            {ranking.rows.length ? ranking.rows.map((row, index) => (
+              <div className="grid grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.18)] max-md:grid-cols-1" key={`${ranking.title}-${row.title}-${index}`}>
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.18)]">
+                  #{index + 1}
+                </span>
+                <div className="min-w-0">
+                  <strong className="block break-words text-base font-black text-white">{row.title}</strong>
+                  {row.subtitle ? <span className="mt-1 block break-words text-sm font-semibold text-slate-400">{row.subtitle}</span> : null}
+                  {row.details?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {row.details.map((detail) => (
+                        <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300" key={detail}>{detail}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                {row.metric ? <strong className="rounded-2xl bg-blue-600 px-4 py-2 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)]">{row.metric}</strong> : null}
+              </div>
+            )) : (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-6 text-center text-sm font-semibold text-slate-400">
+                Nenhum dado real encontrado para este ranking.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function LeadAnalyticsSection({ data, records = [] }) {
+  const [selectedRanking, setSelectedRanking] = useState(null);
   const analytics = useMemo(() => {
     const total = data?.total || records.length || 0;
     const priorityLabels = { Hot: 'Quentes', Warm: 'Potenciais', Cool: 'Frios' };
@@ -1848,9 +1898,10 @@ function LeadAnalyticsSection({ data, records = [] }) {
     }, {});
     const materialNameMap = records.reduce((map, lead) => {
       const name = lead.materialName && lead.materialName !== 'N/I' ? lead.materialName : 'Não informado';
-      const current = map.get(name) || { name, leads: 0, recebidos: 0 };
+      const current = map.get(name) || { name, leads: 0, recebidos: 0, names: [] };
       current.leads += 1;
       current.recebidos += Number(lead.m) || 0;
+      if (lead.n && current.names.length < 8) current.names.push(lead.n);
       map.set(name, current);
       return map;
     }, new Map());
@@ -1916,18 +1967,15 @@ function LeadAnalyticsSection({ data, records = [] }) {
         { name: 'Acima de 1 ano', value: recency.antigos },
         { name: 'Sem informação', value: recency.semInfo }
       ],
-      addressRanking: Array.from(addressMap.values())
+      addressRankingAll: Array.from(addressMap.values())
         .filter((item) => item.leads > 1)
-        .sort((a, b) => b.leads - a.leads || a.address.localeCompare(b.address))
-        .slice(0, 8),
-      materialRanking: Array.from(materialNameMap.values())
-        .sort((a, b) => b.recebidos - a.recebidos || b.leads - a.leads || a.name.localeCompare(b.name))
-        .slice(0, 8),
+        .sort((a, b) => b.leads - a.leads || a.address.localeCompare(b.address)),
+      materialRankingAll: Array.from(materialNameMap.values())
+        .sort((a, b) => b.recebidos - a.recebidos || b.leads - a.leads || a.name.localeCompare(b.name)),
       birthdaysByMonth,
-      recentContacts: records
+      recentContactsAll: records
         .filter((lead) => Number.isFinite(Number(lead.c)))
-        .sort((a, b) => Number(a.c) - Number(b.c))
-        .slice(0, 10),
+        .sort((a, b) => Number(a.c) - Number(b.c)),
       conversion: [
         { name: 'WhatsApp', value: pct(data?.phone || 0, total) },
         { name: 'Quentes', value: pct(data?.hot || 0, total) },
@@ -1944,6 +1992,12 @@ function LeadAnalyticsSection({ data, records = [] }) {
     color: '#e2e8f0'
   };
   const emptyData = !records.length && !(data?.total || 0);
+  const addressRanking = analytics.addressRankingAll.slice(0, 8);
+  const materialRanking = analytics.materialRankingAll.slice(0, 8);
+  const recentContacts = analytics.recentContactsAll.slice(0, 10);
+  const rankingButtonClass = 'group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-slate-950/72 via-slate-900/46 to-white/[0.035] p-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.16)] transition duration-300 hover:-translate-y-1 hover:border-blue-300/45 hover:shadow-[0_24px_60px_rgba(37,99,235,0.18)] focus:outline-none focus:ring-4 focus:ring-blue-500/18';
+  const rankingNumberClass = 'grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.24)] ring-1 ring-slate-900/5';
+  const openRanking = (ranking) => setSelectedRanking(ranking);
 
   return (
     <section className="grid gap-4">
@@ -2144,17 +2198,32 @@ function LeadAnalyticsSection({ data, records = [] }) {
           <span className={labelClass}>Ranking de endereços</span>
           <h3 className="mt-1 text-xl font-black text-slate-50">Leads com o mesmo endereço</h3>
           <div className="mt-5 grid gap-3">
-            {analytics.addressRanking.length ? analytics.addressRanking.map((item, index) => (
-              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-4" key={item.address}>
-                <div className="flex items-start justify-between gap-4">
+            {addressRanking.length ? addressRanking.map((item, index) => (
+              <button
+                className={rankingButtonClass}
+                key={item.address}
+                onClick={() => openRanking({
+                  kicker: 'Ranking de endereços',
+                  title: item.address,
+                  subtitle: `${formatNumber(item.leads)} leads encontrados com este mesmo endereço.`,
+                  rows: analytics.addressRankingAll.map((row) => ({
+                    title: row.address,
+                    subtitle: row.names.join(', ') || 'Sem nomes vinculados',
+                    metric: `${formatNumber(row.leads)} leads`
+                  }))
+                })}
+                type="button"
+              >
+                <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/70 to-transparent opacity-0 transition group-hover:opacity-100" />
+                <div className="grid grid-cols-[auto_1fr_auto] items-start gap-4">
+                  <span className={rankingNumberClass}>#{index + 1}</span>
                   <div className="min-w-0">
-                    <span className="text-xs font-black uppercase tracking-wide text-blue-200">#{index + 1}</span>
-                    <strong className="mt-1 block break-words text-sm font-black text-slate-50">{item.address}</strong>
-                    <span className="mt-1 block truncate text-xs font-semibold text-slate-500">{item.names.join(', ') || 'Sem nomes vinculados'}</span>
+                    <strong className="block break-words text-base font-black text-slate-50">{item.address}</strong>
+                    <span className="mt-1 block truncate text-xs font-semibold text-slate-400">{item.names.join(', ') || 'Sem nomes vinculados'}</span>
                   </div>
-                  <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">{formatNumber(item.leads)}</span>
+                  <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white shadow-[0_12px_28px_rgba(37,99,235,0.26)]">{formatNumber(item.leads)}</span>
                 </div>
-              </div>
+              </button>
             )) : (
               <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400">
                 Nenhum endereço repetido encontrado na base atual.
@@ -2167,15 +2236,33 @@ function LeadAnalyticsSection({ data, records = [] }) {
           <span className={labelClass}>Ranking de materiais</span>
           <h3 className="mt-1 text-xl font-black text-slate-50">Materiais recebidos</h3>
           <div className="mt-5 grid gap-3">
-            {analytics.materialRanking.length ? analytics.materialRanking.map((item, index) => (
-              <div className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/42 p-4" key={item.name}>
-                <div className="min-w-0">
-                  <span className="text-xs font-black uppercase tracking-wide text-amber-200">#{index + 1}</span>
-                  <strong className="mt-1 block truncate text-sm font-black text-slate-50">{item.name}</strong>
-                  <span className="mt-1 block text-xs font-semibold text-slate-500">{formatNumber(item.leads)} leads vinculados</span>
+            {materialRanking.length ? materialRanking.map((item, index) => (
+              <button
+                className={rankingButtonClass}
+                key={item.name}
+                onClick={() => openRanking({
+                  kicker: 'Ranking de materiais',
+                  title: item.name,
+                  subtitle: `${formatNumber(item.recebidos)} materiais recebidos em ${formatNumber(item.leads)} leads vinculados.`,
+                  rows: analytics.materialRankingAll.map((row) => ({
+                    title: row.name,
+                    subtitle: `${formatNumber(row.leads)} leads vinculados`,
+                    metric: formatNumber(row.recebidos),
+                    details: row.names
+                  }))
+                })}
+                type="button"
+              >
+                <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/75 to-transparent opacity-0 transition group-hover:opacity-100" />
+                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
+                  <span className={rankingNumberClass}>#{index + 1}</span>
+                  <div className="min-w-0">
+                    <strong className="block truncate text-base font-black text-slate-50">{item.name}</strong>
+                    <span className="mt-1 block text-xs font-semibold text-slate-400">{formatNumber(item.leads)} leads vinculados</span>
+                  </div>
+                  <strong className="text-2xl font-black text-white">{formatNumber(item.recebidos)}</strong>
                 </div>
-                <strong className="text-2xl font-black text-slate-50">{formatNumber(item.recebidos)}</strong>
-              </div>
+              </button>
             )) : (
               <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400">
                 Nenhum material recebido registrado na base atual.
@@ -2191,10 +2278,25 @@ function LeadAnalyticsSection({ data, records = [] }) {
           <h3 className="mt-1 text-xl font-black text-slate-50">Leads por mês do ano</h3>
           <div className="mt-5 grid grid-cols-3 gap-3 max-2xl:grid-cols-2 max-md:grid-cols-1">
             {analytics.birthdaysByMonth.map((month) => (
-              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-4" key={month.month}>
+              <button
+                className={rankingButtonClass}
+                key={month.month}
+                onClick={() => openRanking({
+                  kicker: 'Aniversariantes',
+                  title: month.month,
+                  subtitle: `${formatNumber(month.leads.length)} aniversariantes registrados em ${month.month}.`,
+                  rows: month.leads.map((lead) => ({
+                    title: lead.name,
+                    subtitle: lead.date,
+                    metric: `${String(lead.day).padStart(2, '0')}/${String(analytics.birthdaysByMonth.findIndex((item) => item.month === month.month) + 1).padStart(2, '0')}`
+                  }))
+                })}
+                type="button"
+              >
+                <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/75 to-transparent opacity-0 transition group-hover:opacity-100" />
                 <div className="flex items-center justify-between gap-3">
                   <strong className="text-sm font-black text-slate-50">{month.month}</strong>
-                  <span className="rounded-full bg-slate-700 px-2.5 py-1 text-[11px] font-black text-white">{formatNumber(month.leads.length)}</span>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-950 shadow-[0_10px_24px_rgba(255,255,255,0.18)]">{formatNumber(month.leads.length)}</span>
                 </div>
                 <div className="mt-3 grid gap-2">
                   {month.leads.slice(0, 5).map((lead) => (
@@ -2206,7 +2308,7 @@ function LeadAnalyticsSection({ data, records = [] }) {
                   {!month.leads.length ? <span className="text-xs font-semibold text-slate-500">Sem aniversariantes registrados.</span> : null}
                   {month.leads.length > 5 ? <span className="text-[11px] font-bold text-slate-500">+{formatNumber(month.leads.length - 5)} outros</span> : null}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </article>
@@ -2215,15 +2317,35 @@ function LeadAnalyticsSection({ data, records = [] }) {
           <span className={labelClass}>Ranking de contato</span>
           <h3 className="mt-1 text-xl font-black text-slate-50">Leads por contato recente</h3>
           <div className="mt-5 grid gap-3">
-            {analytics.recentContacts.length ? analytics.recentContacts.map((lead, index) => (
-              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-white/[0.07] bg-slate-950/42 p-4" key={`${lead.id}-${lead.c}`}>
-                <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-500/16 text-xs font-black text-emerald-200">#{index + 1}</span>
-                <div className="min-w-0">
-                  <strong className="block truncate text-sm font-black text-slate-50">{lead.n || 'Lead sem nome'}</strong>
-                  <span className="mt-1 block truncate text-xs font-semibold text-slate-500">{lead.d || 'Distrito não informado'} · {lead.tel || 'sem telefone'}</span>
+            {recentContacts.length ? recentContacts.map((lead, index) => (
+              <button
+                className={rankingButtonClass}
+                key={`${lead.id}-${lead.c}`}
+                onClick={() => openRanking({
+                  kicker: 'Ranking de contato',
+                  title: 'Leads por contato recente',
+                  subtitle: 'Lista completa ordenada pelo menor número de dias desde o último contato registrado.',
+                  rows: analytics.recentContactsAll.map((row) => ({
+                    title: row.n || 'Lead sem nome',
+                    subtitle: `${row.d || 'Distrito não informado'} · ${row.tel || 'sem telefone'}`,
+                    metric: `${formatNumber(row.c)} dias`,
+                    details: [
+                      row.birthDate && row.birthDate !== 'N/I' ? `Aniversário: ${row.birthDate}` : 'Aniversário não informado',
+                      row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
+                    ]
+                  }))
+                })}
+                type="button"
+              >
+                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+                  <span className={rankingNumberClass}>#{index + 1}</span>
+                  <div className="min-w-0">
+                    <strong className="block truncate text-sm font-black text-slate-50">{lead.n || 'Lead sem nome'}</strong>
+                    <span className="mt-1 block truncate text-xs font-semibold text-slate-400">{lead.d || 'Distrito não informado'} · {lead.tel || 'sem telefone'}</span>
+                  </div>
+                  <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white shadow-[0_12px_28px_rgba(16,185,129,0.24)]">{formatNumber(lead.c)} dias</span>
                 </div>
-                <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white">{formatNumber(lead.c)} dias</span>
-              </div>
+              </button>
             )) : (
               <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400">
                 Nenhum contato com data registrada na base atual.
@@ -2232,6 +2354,7 @@ function LeadAnalyticsSection({ data, records = [] }) {
           </div>
         </article>
       </div>
+      <AnalyticsRankingModal ranking={selectedRanking} onClose={() => setSelectedRanking(null)} />
     </section>
   );
 }
