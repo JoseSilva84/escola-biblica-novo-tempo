@@ -50,11 +50,56 @@ function webhookAllowed(request) {
 }
 
 function requireAdminGeral(request, response, next) {
-  if (request.user?.role !== 'ADMIN_GERAL') {
+  if (!isAdminGeralUser(request.user)) {
     response.status(403).json({ message: 'Apenas Admin Geral pode atualizar a base de dados.' });
     return;
   }
   next();
+}
+
+function isAdminGeralUser(user = {}) {
+  return user.role === 'ADMIN_GERAL'
+    && !user.associationId
+    && !user.associationName
+    && !/associa/i.test(String(user.name || ''));
+}
+
+function normalizeAssociationSlug(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/associacao/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || null;
+}
+
+function userAssociationSlug(user = {}) {
+  return normalizeAssociationSlug(user.associationSlug || user.associationName || user.name);
+}
+
+function scopedDashboardPayload(payload, user = {}) {
+  if (isAdminGeralUser(user)) return payload;
+
+  const slug = userAssociationSlug(user);
+  const canReadPaulistana = slug === 'paulistana';
+  const records = canReadPaulistana ? payload.records : [];
+  return {
+    ...payload,
+    records,
+    meta: {
+      ...payload.meta,
+      total: records.length,
+      lastDatasetUpdate: canReadPaulistana ? payload.meta?.lastDatasetUpdate || null : null,
+      datasetUpdateHistory: canReadPaulistana ? payload.meta?.datasetUpdateHistory || [] : [],
+      scopedAssociation: {
+        id: user.associationId || null,
+        slug,
+        name: user.associationName || user.name || null
+      }
+    }
+  };
 }
 
 function splitBuffer(buffer, separator) {
@@ -993,27 +1038,29 @@ app.get('/api/auth/me', (request, response) => {
   response.json({ user });
 });
 
-app.get('/api/dashboard', requireAuth, async (_request, response) => {
+app.get('/api/dashboard', requireAuth, async (request, response) => {
   response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   response.set('Pragma', 'no-cache');
   response.set('Expires', '0');
   const payload = getDashboardData();
   try {
-    const dbHistory = await readDatasetHistoryFromDb(50);
-    if (dbHistory.length) {
-      payload.meta.datasetUpdateHistory = dbHistory;
-      payload.meta.lastDatasetUpdate = dbHistory[0];
-    } else if (payload.meta.datasetUpdateHistory?.length) {
-      const importedHistory = await importDatasetHistoryFromFiles(payload.meta.datasetUpdateHistory);
-      if (importedHistory.length) {
-        payload.meta.datasetUpdateHistory = importedHistory;
-        payload.meta.lastDatasetUpdate = importedHistory[0];
+    if (isAdminGeralUser(request.user) || userAssociationSlug(request.user) === 'paulistana') {
+      const dbHistory = await readDatasetHistoryFromDb(50);
+      if (dbHistory.length) {
+        payload.meta.datasetUpdateHistory = dbHistory;
+        payload.meta.lastDatasetUpdate = dbHistory[0];
+      } else if (payload.meta.datasetUpdateHistory?.length) {
+        const importedHistory = await importDatasetHistoryFromFiles(payload.meta.datasetUpdateHistory);
+        if (importedHistory.length) {
+          payload.meta.datasetUpdateHistory = importedHistory;
+          payload.meta.lastDatasetUpdate = importedHistory[0];
+        }
       }
     }
   } catch (error) {
     console.error('[dashboard:dataset-history:error]', error.message);
   }
-  response.json(payload);
+  response.json(scopedDashboardPayload(payload, request.user));
 });
 
 app.get('/api/dataset/history', requireAuth, requireAdminGeral, async (_request, response) => {
@@ -1048,6 +1095,11 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
   response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   response.set('Pragma', 'no-cache');
   response.set('Expires', '0');
+
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.json({ conversations: [] });
+    return;
+  }
 
   const phone = normalizePhone(request.query?.phone);
   const numericLeadId = externalLeadId(request.query?.leadId);

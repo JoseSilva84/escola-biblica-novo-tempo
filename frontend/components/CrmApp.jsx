@@ -98,7 +98,10 @@ function apiFetch(path, options = {}) {
 }
 
 function isAdminUser(user) {
-  return user?.role === 'ADMIN_GERAL';
+  return user?.role === 'ADMIN_GERAL'
+    && !user?.associationId
+    && !user?.associationName
+    && !/associa/i.test(String(user?.name || ''));
 }
 
 function navigationItemsForUser(user) {
@@ -107,6 +110,34 @@ function navigationItemsForUser(user) {
 
 function defaultViewForUser(user) {
   return isAdminUser(user) ? 'admin' : 'associations';
+}
+
+function accessLabelForUser(user) {
+  if (isAdminUser(user)) return 'Admin Geral';
+  return user?.associationName || user?.name || 'Associacao';
+}
+
+function allowedViewsForUser(user) {
+  const menuViews = navigationItemsForUser(user).map(([id]) => id);
+  return new Set(isAdminUser(user)
+    ? [...menuViews, 'association', 'details', 'dataset-history', 'general-admin', 'users']
+    : [...menuViews, 'association', 'details']);
+}
+
+function canOpenView(user, view) {
+  return allowedViewsForUser(user).has(view);
+}
+
+function associationSlugForUser(user = {}) {
+  user = user || {};
+  return String(user.associationSlug || user.associationName || user.name || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/associacao/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'paulistana';
 }
 
 function AppToaster({ theme = 'light' }) {
@@ -289,6 +320,32 @@ function buildAdminUsers() {
 
 function buildAdminCampaigns() {
   return [];
+}
+
+function scopedAssociationsForUser(associations, user) {
+  if (isAdminUser(user)) return associations;
+  const slug = associationSlugForUser(user);
+  const association = associations.find((item) => item.id === slug)
+    || associations.find((item) => item.name === user?.associationName)
+    || {
+      id: slug,
+      name: user?.associationName || user?.name || 'Associacao',
+      region: 'Territorio da associacao',
+      status: 'Ativa',
+      campaigns: 0,
+      leads: 0,
+      hot: 0,
+      studies: 0,
+      districts: 0,
+      conversion: 0,
+      featured: true
+    };
+  return [association];
+}
+
+function scopedRecordsForUser(records, user) {
+  if (isAdminUser(user)) return records;
+  return associationSlugForUser(user) === 'paulistana' ? records : [];
 }
 
 function BibleStudyAnimation() {
@@ -517,7 +574,7 @@ function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user
           </div>
           <div className={compact ? 'hidden' : 'block'}>
             <strong className="silver-title block text-xl font-black">Amigos NT</strong>
-            <span className="text-xs font-bold text-slate-500">Admin Geral</span>
+            <span className="text-xs font-bold text-slate-500">{accessLabelForUser(user)}</span>
           </div>
         </div>
 
@@ -1031,12 +1088,14 @@ function AdminDashboard({ associations, data, canManageAdmin = false, isAssociat
       <section className={`${panelClass} overflow-hidden p-6 stagger-in`} style={{ animationDelay: '0ms' }}>
         <div className="grid grid-cols-[1.05fr_0.95fr] gap-6 max-xl:grid-cols-1">
           <div>
-            <span className={labelClass}>Painel admin</span>
+            <span className={labelClass}>{canManageAdmin ? 'Painel admin' : 'Acesso por associação'}</span>
             <h1 className="silver-title mt-2 text-5xl font-black leading-tight tracking-normal max-md:text-4xl">
-              Dashboard das associações
+              {canManageAdmin ? 'Dashboard das associações' : associations[0]?.name || 'Associação'}
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
-              Gerencie territórios, campanhas e performance dos leads em um painel central com navegação limpa e efeitos sutis de interação.
+              {canManageAdmin
+                ? 'Gerencie territórios, campanhas e performance dos leads em um painel central com navegação limpa e efeitos sutis de interação.'
+                : 'Acesse somente os dados, leads, campanhas, WhatsApp e relatórios vinculados a esta associação.'}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button className={primaryButtonClass} onClick={onOpenLeads} type="button">
@@ -1156,7 +1215,11 @@ function AdminDashboard({ associations, data, canManageAdmin = false, isAssociat
           <div className={`${panelClass} interactive-card p-5`}>
             <span className={labelClass}>Governança</span>
             <h3 className="mt-2 text-xl font-black text-slate-50">Acesso por nível</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-500">Admin geral vê todas as associações. Gestores e voluntários entram apenas nos territórios e leads permitidos.</p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">
+              {canManageAdmin
+                ? 'Admin geral vê todas as associações. Gestores e voluntários entram apenas nos territórios e leads permitidos.'
+                : 'Este acesso mostra apenas a associação vinculada ao usuário e os dados pertencentes a ela.'}
+            </p>
           </div>
           <div className={`${panelClass} interactive-card p-5`}>
             <span className={labelClass}>Comparativo</span>
@@ -4060,6 +4123,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
   const isLight = theme === 'light';
   const [sidebarCompact, setSidebarCompact] = useState(false);
   const headerNavItems = navigationItemsForUser(user);
+  const title = isAdminUser(user) ? 'Administração Geral' : accessLabelForUser(user);
 
   return (
     <div className={`silver-stage ${isLight ? 'app-light' : 'app-dark'} min-h-screen text-slate-100`}>
@@ -4072,7 +4136,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
             <div className="flex min-w-0 items-center gap-3">
               <div>
               <span className={labelClass}>Amigos NT</span>
-              <h2 className="text-xl font-black text-slate-50">Administração Geral</h2>
+              <h2 className="text-xl font-black text-slate-50">{title}</h2>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -4219,9 +4283,18 @@ export default function CrmApp({ payload: initialPayload = null }) {
     { id: 'audit-export', action: 'Exportação controlada', user: 'Gestão Paulistana', detail: 'Relatório de distritos filtrados disponível', when: 'Hoje' },
     { id: 'audit-ml', action: 'Ranking ML carregado', user: 'Sistema', detail: 'Prioridade operacional aplicada ao dashboard', when: 'Hoje' }
   ]);
-  const records = payload?.records || [];
+  const records = useMemo(() => scopedRecordsForUser(payload?.records || [], user), [payload, user]);
+  const visibleAssociations = useMemo(() => scopedAssociationsForUser(associations, user), [associations, user]);
   const data = useMemo(() => buildAssociationData(records), [records]);
-  const selectedAssociation = associations.find((association) => association.id === selectedAssociationId) || associations[0];
+  const selectedAssociation = visibleAssociations.find((association) => association.id === selectedAssociationId) || visibleAssociations[0];
+
+  useEffect(() => {
+    if (!user || view === 'login') return;
+    if (!canOpenView(user, view)) {
+      setView(defaultViewForUser(user));
+      setViewHistory([]);
+    }
+  }, [user, view]);
 
   useEffect(() => {
     let active = true;
@@ -4295,6 +4368,11 @@ export default function CrmApp({ payload: initialPayload = null }) {
 
   function navigateView(nextView) {
     if (nextView === view) return;
+    if (!canOpenView(user, nextView)) {
+      setViewHistory([]);
+      setView(defaultViewForUser(user));
+      return;
+    }
     setViewHistory((history) => [...history, view].filter((item) => item !== 'login').slice(-20));
     setView(nextView);
   }
@@ -4309,6 +4387,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   }
 
   function openAssociation(id) {
+    if (!visibleAssociations.some((association) => association.id === id)) return;
     setSelectedAssociationId(id);
     navigateView('association');
   }
@@ -4369,7 +4448,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
     ]);
   };
   const adminGeneralProps = {
-    associations,
+    associations: visibleAssociations,
     auditEvents,
     campaigns: adminCampaigns,
     data,
@@ -4378,15 +4457,16 @@ export default function CrmApp({ payload: initialPayload = null }) {
     records,
     users: adminUsers
   };
+  const effectiveView = canOpenView(user, view) ? view : defaultViewForUser(user);
 
   let content = null;
-  if (view === 'admin' || view === 'associations') {
+  if (effectiveView === 'admin' || effectiveView === 'associations') {
     content = (
       <AdminDashboard
-        associations={associations}
+        associations={visibleAssociations}
         canManageAdmin={isAdminUser(user)}
         data={data}
-        isAssociationsView={view === 'associations'}
+        isAssociationsView={effectiveView === 'associations'}
         onAddAssociation={(association) => setAssociations((current) => [association, ...current])}
         onOpenAdminGeneral={() => navigateView('general-admin')}
         onOpenAssociations={() => navigateView('associations')}
@@ -4395,18 +4475,22 @@ export default function CrmApp({ payload: initialPayload = null }) {
         onOpenUsers={() => navigateView('users')}
       />
     );
-  } else if (view === 'leads') {
-    content = <LeadsView associations={associations} data={data} datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={navigateView} records={records} />;
-  } else if (view === 'dataset-history') {
+  } else if (effectiveView === 'leads') {
+    content = <LeadsView associations={visibleAssociations} data={data} datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={navigateView} records={records} />;
+  } else if (effectiveView === 'dataset-history') {
     content = <DatasetHistoryView history={payload?.meta?.datasetUpdateHistory || []} onBack={goBack} />;
-  } else if (['general-admin', 'users', 'campaigns'].includes(view)) {
+  } else if (['general-admin', 'users'].includes(effectiveView)) {
     content = (
       <AdminGeneralView
         {...adminGeneralProps}
-        initialSection={view === 'users' ? 'users' : view === 'campaigns' ? 'campaigns' : 'overview'}
+        initialSection={effectiveView === 'users' ? 'users' : 'overview'}
       />
     );
-  } else if (view === 'association') {
+  } else if (effectiveView === 'campaigns') {
+    content = isAdminUser(user)
+      ? <AdminGeneralView {...adminGeneralProps} initialSection="campaigns" />
+      : <PlaceholderView icon={Radio} subtitle="As campanhas desta associação serão listadas aqui quando estiverem cadastradas." title="Campanhas" />;
+  } else if (effectiveView === 'association') {
     content = (
       <AssociationDashboard
         association={selectedAssociation}
@@ -4418,17 +4502,19 @@ export default function CrmApp({ payload: initialPayload = null }) {
         user={user}
       />
     );
-  } else if (view === 'automations') {
-    content = <AdminGeneralView {...adminGeneralProps} initialSection="distribution" />;
-  } else if (view === 'conversations') {
+  } else if (effectiveView === 'automations') {
+    content = isAdminUser(user)
+      ? <AdminGeneralView {...adminGeneralProps} initialSection="distribution" />
+      : <PlaceholderView icon={MessageCircle} subtitle="O WhatsApp desta associação será exibido aqui com conversas, envios e indicadores próprios." title="WhatsApp" />;
+  } else if (effectiveView === 'conversations') {
     content = <ConversationsView records={records} />;
-  } else if (view === 'ai-agent') {
-    content = <AIAgentView associations={associations} campaigns={adminCampaigns} data={data} records={records} />;
-  } else if (view === 'reports') {
+  } else if (effectiveView === 'ai-agent') {
+    content = <AIAgentView associations={visibleAssociations} campaigns={adminCampaigns} data={data} records={records} />;
+  } else if (effectiveView === 'reports') {
     content = isAdminUser(user)
       ? <AdminGeneralView {...adminGeneralProps} initialSection="audit" />
       : <PlaceholderView icon={PieChart} subtitle="Os relatórios desta associação serão exibidos aqui com base apenas nos dados reais carregados." title="Relatórios" />;
-  } else if (view === 'settings') {
+  } else if (effectiveView === 'settings') {
     content = <SettingsView onToggleTheme={() => setTheme((current) => current === 'light' ? 'dark' : 'light')} theme={theme} />;
   } else {
     content = <AdminGeneralView {...adminGeneralProps} initialSection="audit" />;
@@ -4436,8 +4522,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
 
   return (
     <AppShell
-      current={view === 'association' ? 'associations' : view}
-      canGoBack={view !== defaultViewForUser(user)}
+      current={effectiveView === 'association' ? 'associations' : effectiveView}
+      canGoBack={effectiveView !== defaultViewForUser(user)}
       onBack={goBack}
       onLogout={logout}
       onNavigate={navigateView}

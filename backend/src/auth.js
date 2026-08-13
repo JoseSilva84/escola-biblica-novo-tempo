@@ -23,6 +23,7 @@ export function createSessionToken(user) {
     role: user.role,
     associationId: user.associationId,
     associationName: user.associationName,
+    associationSlug: user.associationSlug,
     iat: now,
     exp: now + 60 * 60 * 8
   }));
@@ -38,7 +39,8 @@ export function publicUser(user) {
     email: user.email,
     role: user.role,
     associationId: user.associationId,
-    associationName: user.association?.name || null
+    associationName: user.association?.name || null,
+    associationSlug: user.association?.slug || null
   };
 }
 
