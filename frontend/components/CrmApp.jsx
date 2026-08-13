@@ -5376,13 +5376,14 @@ function DistrictLeadScoreList({ records = [] }) {
                   </span>
                 </div>
                 <p className="mt-1 break-words text-sm font-semibold text-slate-400">
-                  {lead.bairro || lead.d || 'Local não informado'} · {lead.tel || 'sem telefone'} · {lead.em || 'sem e-mail'}
+                  {lead.bairro || lead.d || 'Local não informado'} · {lead.tel || 'sem telefone'} · {lead.em || 'sem e-mail'} · último contato: {Number.isFinite(Number(lead.raw?.c)) ? `${formatNumber(lead.raw.c)} dias` : 'sem informação'}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-white">WhatsApp: {lead.temTelefone ? 'sim' : 'não'}</span>
                   <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-white">VIP: {lead.vipHistorico ? 'sim' : 'não'}</span>
                   <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-white">Estudo: {lead.estudoAtivo || Number(lead.materiaisQuantidade) > 0 ? 'sim' : 'não'}</span>
                   <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-white">Material: {lead.materialPrincipal || 'não informado'}</span>
+                  <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-white">Último contato: {Number.isFinite(Number(lead.raw?.c)) ? `${formatNumber(lead.raw.c)} dias` : 'sem informação'}</span>
                 </div>
               </div>
               <strong className="rounded-2xl bg-blue-600 px-4 py-2 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)]">
