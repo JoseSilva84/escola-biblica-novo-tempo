@@ -1345,7 +1345,7 @@ function LastDatasetUpdateCard({ update }) {
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {(consolidation?.arquivos || []).map((file) => (
-              <span className="rounded-full border border-emerald-300/30 bg-emerald-500/[0.08] px-3 py-1 text-xs font-bold text-emerald-300" key={file.arquivo}>
+              <span className="rounded-full border border-slate-300 bg-slate-200 px-3 py-1 text-xs font-bold text-slate-950" key={file.arquivo}>
                 {file.arquivo}: {formatNumber(file.novos)} novos
               </span>
             ))}
