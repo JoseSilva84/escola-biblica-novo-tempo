@@ -1102,29 +1102,11 @@ function AdminDashboard({ associations, data, canManageAdmin = false, isAssociat
                 <ClipboardList size={18} />
                 Leads
               </button>
-              {canManageAdmin ? (
-                isAssociationsView ? (
-                  <label className="relative inline-flex min-w-72 items-center">
-                    <select
-                      className={`${primaryButtonClass} w-full appearance-none pr-11`}
-                      defaultValue=""
-                      onChange={(event) => {
-                        if (event.target.value) onOpenAssociation(event.target.value);
-                      }}
-                    >
-                      <option value="">Selecionar associação</option>
-                      {associations.map((association) => (
-                        <option key={association.id} value={association.id}>{association.name}</option>
-                      ))}
-                    </select>
-                    <ChevronRight className="pointer-events-none absolute right-4 text-white" size={18} />
-                  </label>
-                ) : (
-                  <button className={primaryButtonClass} onClick={onOpenAssociations} type="button">
-                    Associações
-                    <ArrowRight size={18} />
-                  </button>
-                )
+              {canManageAdmin && !isAssociationsView ? (
+                <button className={primaryButtonClass} onClick={onOpenAssociations} type="button">
+                  Associações
+                  <ArrowRight size={18} />
+                </button>
               ) : null}
               {canManageAdmin ? (
                 <>
@@ -4799,7 +4781,7 @@ function PlaceholderView({ title, subtitle, icon: Icon }) {
   );
 }
 
-function AppShell({ children, current, onBack, canGoBack = false, onNavigate, onLogout, theme, onToggleTheme, user }) {
+function AppShell({ children, current, onBack, canGoBack = false, onNavigate, onLogout, theme, onToggleTheme, user, associations = [], selectedAssociationId = '', onSelectAssociation }) {
   const isLight = theme === 'light';
   const [sidebarCompact, setSidebarCompact] = useState(false);
   const headerNavItems = navigationItemsForUser(user);
@@ -4819,7 +4801,21 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
               <h2 className="text-xl font-black text-slate-50">{title}</h2>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {isAdminUser(user) && associations.length ? (
+                <label className="relative hidden min-w-64 md:inline-flex">
+                  <select
+                    className="interactive-card h-10 w-full appearance-none rounded-xl border border-slate-900/10 bg-white/75 px-4 pr-10 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)] outline-none transition hover:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-500/12"
+                    onChange={(event) => onSelectAssociation?.(event.target.value)}
+                    value={selectedAssociationId}
+                  >
+                    {associations.map((association) => (
+                      <option key={association.id} value={association.id}>{association.name}</option>
+                    ))}
+                  </select>
+                  <ChevronRight className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-slate-500" size={17} />
+                </label>
+              ) : null}
               {canGoBack ? (
                 <button
                   aria-label="Voltar"
@@ -4963,10 +4959,26 @@ export default function CrmApp({ payload: initialPayload = null }) {
     { id: 'audit-export', action: 'Exportação controlada', user: 'Gestão Paulistana', detail: 'Relatório de distritos filtrados disponível', when: 'Hoje' },
     { id: 'audit-ml', action: 'Ranking ML carregado', user: 'Sistema', detail: 'Prioridade operacional aplicada ao dashboard', when: 'Hoje' }
   ]);
-  const records = useMemo(() => scopedRecordsForUser(payload?.records || [], user), [payload, user]);
+  const baseRecords = useMemo(() => scopedRecordsForUser(payload?.records || [], user), [payload, user]);
   const visibleAssociations = useMemo(() => scopedAssociationsForUser(associations, user), [associations, user]);
-  const data = useMemo(() => buildAssociationData(records), [records]);
   const selectedAssociation = visibleAssociations.find((association) => association.id === selectedAssociationId) || visibleAssociations[0];
+  const selectedAssociationSlug = selectedAssociation?.id || selectedAssociationId;
+  const records = useMemo(() => (
+    isAdminUser(user) && selectedAssociationSlug !== 'paulistana' ? [] : baseRecords
+  ), [baseRecords, selectedAssociationSlug, user]);
+  const data = useMemo(() => buildAssociationData(records), [records]);
+  const filteredAssociations = useMemo(() => {
+    if (!isAdminUser(user)) return visibleAssociations;
+    if (!selectedAssociation) return visibleAssociations;
+    const selectedData = buildAssociationData(records);
+    return [{
+      ...selectedAssociation,
+      leads: selectedData.total,
+      hot: selectedData.hot,
+      studies: selectedData.studies,
+      districts: selectedData.districts
+    }];
+  }, [records, selectedAssociation, user, visibleAssociations]);
 
   useEffect(() => {
     if (!user || view === 'login') return;
@@ -4975,6 +4987,13 @@ export default function CrmApp({ payload: initialPayload = null }) {
       setViewHistory([]);
     }
   }, [user, view]);
+
+  useEffect(() => {
+    if (!visibleAssociations.length) return;
+    if (!visibleAssociations.some((association) => association.id === selectedAssociationId)) {
+      setSelectedAssociationId(visibleAssociations[0].id);
+    }
+  }, [selectedAssociationId, visibleAssociations]);
 
   useEffect(() => {
     let active = true;
@@ -5128,7 +5147,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
     ]);
   };
   const adminGeneralProps = {
-    associations: visibleAssociations,
+    associations: filteredAssociations,
     auditEvents,
     campaigns: adminCampaigns,
     data,
@@ -5143,7 +5162,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   if (effectiveView === 'admin' || effectiveView === 'associations') {
     content = (
       <AdminDashboard
-        associations={visibleAssociations}
+        associations={filteredAssociations}
         canManageAdmin={isAdminUser(user)}
         data={data}
         isAssociationsView={effectiveView === 'associations'}
@@ -5156,7 +5175,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
       />
     );
   } else if (effectiveView === 'leads') {
-    content = <LeadsView associations={visibleAssociations} data={data} datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={navigateView} records={records} />;
+    content = <LeadsView associations={filteredAssociations} data={data} datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={navigateView} records={records} />;
   } else if (effectiveView === 'dataset-history') {
     content = <DatasetHistoryView history={payload?.meta?.datasetUpdateHistory || []} onBack={goBack} />;
   } else if (['general-admin', 'users'].includes(effectiveView)) {
@@ -5189,7 +5208,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   } else if (effectiveView === 'conversations') {
     content = <ConversationsView records={records} />;
   } else if (effectiveView === 'ai-agent') {
-    content = <AIAgentView associations={visibleAssociations} campaigns={adminCampaigns} data={data} records={records} />;
+    content = <AIAgentView associations={filteredAssociations} campaigns={adminCampaigns} data={data} records={records} />;
   } else if (effectiveView === 'reports') {
     content = isAdminUser(user)
       ? <AdminGeneralView {...adminGeneralProps} initialSection="audit" />
@@ -5208,6 +5227,14 @@ export default function CrmApp({ payload: initialPayload = null }) {
       onLogout={logout}
       onNavigate={navigateView}
       onToggleTheme={() => setTheme((current) => current === 'light' ? 'dark' : 'light')}
+      associations={visibleAssociations}
+      selectedAssociationId={selectedAssociation?.id || ''}
+      onSelectAssociation={(id) => {
+        setSelectedAssociationId(id);
+        if (['admin', 'associations', 'association', 'leads'].includes(effectiveView)) {
+          setView(effectiveView === 'admin' ? 'associations' : effectiveView);
+        }
+      }}
       theme={theme}
       user={user}
     >
