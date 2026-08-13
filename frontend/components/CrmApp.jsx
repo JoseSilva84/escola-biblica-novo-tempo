@@ -1791,11 +1791,13 @@ function AnalyticsRankingModal({ ranking, onClose }) {
   const [contactFilter, setContactFilter] = useState('');
   const [contactFilterUnit, setContactFilterUnit] = useState('day');
   const [visibleLimit, setVisibleLimit] = useState(80);
+  const [expandedGroup, setExpandedGroup] = useState(null);
 
   useEffect(() => {
     setContactFilter('');
     setContactFilterUnit('day');
     setVisibleLimit(80);
+    setExpandedGroup(null);
   }, [ranking]);
 
   useEffect(() => {
@@ -1817,6 +1819,10 @@ function AnalyticsRankingModal({ ranking, onClose }) {
   const showContactFilter = ranking.type === 'recentContacts';
   const visibleRows = filteredRows.slice(0, visibleLimit);
   const hasMoreRows = filteredRows.length > visibleRows.length;
+  const expandedNames = expandedGroup?.leadRows?.map((lead) => ({
+    name: lead.n || lead.name || 'Lead sem nome',
+    detail: `${lead.bairro || lead.d || 'Local não informado'} · ${lead.tel || 'sem telefone'} · ${lead.em || 'sem e-mail'}`
+  })) || expandedGroup?.details?.map((name) => ({ name, detail: null })) || [];
 
   return createPortal(
     <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
@@ -1896,7 +1902,11 @@ function AnalyticsRankingModal({ ranking, onClose }) {
                   (row.materialName || row.materialPrincipal) && (row.materialName || row.materialPrincipal) !== 'N/I' ? `Material: ${row.materialName || row.materialPrincipal}` : 'Material não informado'
                 ] : []);
               return (
-                <div className="group relative overflow-hidden grid grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-blue-500/[0.035] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.18)] transition duration-300 hover:-translate-y-1 hover:border-blue-300/45 hover:bg-white/[0.075] hover:shadow-[0_26px_62px_rgba(37,99,235,0.20)] max-md:grid-cols-1" key={`${ranking.title}-${title}-${index}`}>
+                <button className="group relative overflow-hidden grid w-full grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-blue-500/[0.035] p-4 text-left shadow-[0_18px_40px_rgba(15,23,42,0.18)] transition duration-300 hover:-translate-y-1 hover:border-blue-300/45 hover:bg-white/[0.075] hover:shadow-[0_26px_62px_rgba(37,99,235,0.20)] focus:outline-none focus:ring-4 focus:ring-blue-500/15 max-md:grid-cols-1" key={`${ranking.title}-${title}-${index}`} onClick={() => {
+                  if (row.leadRows?.length || details?.length) {
+                    setExpandedGroup({ title, subtitle, metric, details, leadRows: row.leadRows || [] });
+                  }
+                }} type="button">
                   <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/85 to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.18)] transition duration-300 group-hover:scale-105 group-hover:bg-blue-50 group-hover:shadow-[0_16px_34px_rgba(147,197,253,0.22)]">
                     #{index + 1}
@@ -1913,7 +1923,7 @@ function AnalyticsRankingModal({ ranking, onClose }) {
                     ) : null}
                   </div>
                   {metric ? <strong className="rounded-2xl bg-blue-600 px-4 py-2 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)] transition duration-300 group-hover:scale-105 group-hover:bg-blue-500 group-hover:shadow-[0_18px_38px_rgba(37,99,235,0.38)]">{metric}</strong> : null}
-                </div>
+                </button>
               );
             }) : (
               <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-6 text-center text-sm font-semibold text-slate-400">
@@ -1931,6 +1941,44 @@ function AnalyticsRankingModal({ ranking, onClose }) {
             ) : null}
           </div>
         </div>
+        {expandedGroup ? (
+          <div className="absolute inset-0 z-10 grid place-items-center bg-slate-950/78 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-[0_28px_80px_rgba(0,0,0,0.45)]">
+              <div className="flex items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-blue-600/22 via-slate-900 to-slate-950 p-5">
+                <div>
+                  <span className="text-xs font-black uppercase tracking-[0.2em] text-blue-100">Leads vinculados</span>
+                  <h3 className="mt-2 text-2xl font-black text-white">{expandedGroup.title}</h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-300">{expandedGroup.subtitle || `${formatNumber(expandedNames.length)} nomes encontrados`}</p>
+                </div>
+                <button
+                  aria-label="Fechar lista de nomes"
+                  className="group grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/18 bg-white/8 text-white transition duration-300 hover:-translate-y-0.5 hover:border-red-200/60 hover:bg-red-500/18 focus:outline-none focus:ring-4 focus:ring-red-400/20"
+                  onClick={() => setExpandedGroup(null)}
+                  type="button"
+                >
+                  <X className="transition duration-300 group-hover:rotate-90 group-hover:text-red-100" size={18} />
+                </button>
+              </div>
+              <div className="max-h-[58vh] overflow-y-auto p-5">
+                <div className="grid gap-2">
+                  {expandedNames.length ? expandedNames.map((item, index) => (
+                    <div className="grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-white/10 bg-white/[0.055] p-3 transition hover:border-blue-300/45 hover:bg-white/[0.08]" key={`${expandedGroup.title}-${item.name}-${index}`}>
+                      <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-xs font-black text-slate-950">#{index + 1}</span>
+                      <div className="min-w-0">
+                        <strong className="block break-words text-sm font-black text-white">{item.name}</strong>
+                        {item.detail ? <span className="mt-1 block break-words text-xs font-semibold text-slate-400">{item.detail}</span> : null}
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-5 text-center text-sm font-semibold text-slate-400">
+                      Nenhum nome encontrado neste grupo.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body
@@ -2257,7 +2305,8 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
       title: item.name,
       subtitle: `${formatNumber(item.value)} leads vinculados`,
       metric: formatNumber(item.value),
-      details: item.rows.slice(0, 8).map((lead) => lead.n).filter(Boolean)
+      details: item.rows.slice(0, 8).map((lead) => lead.n).filter(Boolean),
+      leadRows: item.rows
     }))
   });
 
