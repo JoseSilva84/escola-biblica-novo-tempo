@@ -5159,13 +5159,40 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const effectiveView = canOpenView(user, view) ? view : defaultViewForUser(user);
 
   let content = null;
-  if (effectiveView === 'admin' || effectiveView === 'associations') {
+  if (effectiveView === 'admin') {
     content = (
       <AdminDashboard
         associations={filteredAssociations}
         canManageAdmin={isAdminUser(user)}
         data={data}
-        isAssociationsView={effectiveView === 'associations'}
+        isAssociationsView={false}
+        onAddAssociation={(association) => setAssociations((current) => [association, ...current])}
+        onOpenAdminGeneral={() => navigateView('general-admin')}
+        onOpenAssociations={() => navigateView('associations')}
+        onOpenAssociation={openAssociation}
+        onOpenLeads={() => navigateView('leads')}
+        onOpenUsers={() => navigateView('users')}
+      />
+    );
+  } else if (effectiveView === 'associations' && isAdminUser(user) && selectedAssociation) {
+    content = (
+      <AssociationDashboard
+        association={selectedAssociation}
+        data={data}
+        onDatasetUpdated={loadDashboard}
+        onOpenDetails={() => openDetailsView(navigateView)}
+        onOpenHistory={() => navigateView('dataset-history')}
+        records={records}
+        user={user}
+      />
+    );
+  } else if (effectiveView === 'associations') {
+    content = (
+      <AdminDashboard
+        associations={filteredAssociations}
+        canManageAdmin={isAdminUser(user)}
+        data={data}
+        isAssociationsView
         onAddAssociation={(association) => setAssociations((current) => [association, ...current])}
         onOpenAdminGeneral={() => navigateView('general-admin')}
         onOpenAssociations={() => navigateView('associations')}
@@ -5231,8 +5258,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
       selectedAssociationId={selectedAssociation?.id || ''}
       onSelectAssociation={(id) => {
         setSelectedAssociationId(id);
-        if (['admin', 'associations', 'association', 'leads'].includes(effectiveView)) {
-          setView(effectiveView === 'admin' ? 'associations' : effectiveView);
+        if (['admin', 'associations', 'association'].includes(effectiveView)) {
+          setView('associations');
         }
       }}
       theme={theme}
