@@ -264,6 +264,25 @@ function readInterestDistrictData() {
   };
 }
 
+function buildInterestDistrictDataFromRecords(records = []) {
+  const byDistrict = {};
+  const districts = new Map();
+  for (const record of records) {
+    const district = record.d || 'Nao informado';
+    const slug = normalizeAssociationLikeSlug(district);
+    if (!byDistrict[slug]) byDistrict[slug] = [];
+    byDistrict[slug].push(transformDashboardRecordToInterest(record));
+    if (!districts.has(slug)) {
+      districts.set(slug, { slug, name: district, file: null, total: 0, generatedFrom: ALUNOS_FILE });
+    }
+    districts.get(slug).total += 1;
+  }
+  return {
+    byDistrict,
+    districts: Array.from(districts.values()).sort((a, b) => a.name.localeCompare(b.name))
+  };
+}
+
 function normalizeAssociationLikeSlug(value) {
   return String(value || '')
     .trim()
@@ -272,6 +291,43 @@ function normalizeAssociationLikeSlug(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'nao-informado';
+}
+
+function transformDashboardRecordToInterest(row) {
+  const [cidade, bairro] = String(row.end || '').split(' - ');
+  const email = normalize(row.em, '');
+  const hasEmail = Boolean(email && email !== 'N/I');
+  const hasPhone = Boolean(row.t);
+  const days = Number(row.c);
+  return {
+    id: normalize(row.id, ''),
+    n: normalize(row.n, 'Lead sem nome'),
+    tel: normalize(row.tel, ''),
+    em: hasEmail ? email : '',
+    d: normalize(row.d, 'Nao informado'),
+    cidade: normalize(cidade, 'Nao informado'),
+    bairro: normalize(bairro, 'Nao informado'),
+    material: normalize(row.materialName || row.tm, 'N/I'),
+    materialPrincipal: normalize(row.materialName || row.tm, 'Nao informado'),
+    ultimoContato: null,
+    vipHistorico: Boolean(row.v),
+    materiaisQuantidade: Number(row.m) || 0,
+    temTelefone: hasPhone ? 1 : 0,
+    telefoneValido: hasPhone ? 1 : 0,
+    temEmail: hasEmail ? 1 : 0,
+    emailValido: hasEmail ? 1 : 0,
+    temDescricao: row.desc && row.desc !== 'N/I' ? 1 : 0,
+    logDiasDesdeContato: Number.isFinite(days) ? Math.log1p(days) : null,
+    tentativaContato: false,
+    dataTentativa: null,
+    canal: null,
+    respondeu: null,
+    demonstrouInteresse: null,
+    aceitouVisita: null,
+    participou: null,
+    observacao: null,
+    raw: row
+  };
 }
 
 function transformInterestPilotRecord(row) {
@@ -326,15 +382,32 @@ export function getDashboardData() {
   const datasetUpdateHistory = readDatasetUpdateHistory();
   const records = alunos.map((row) => transformRecord(row, ranking.byId));
   const interestPilot = readInterestDistrictData();
+  const generatedInterest = buildInterestDistrictDataFromRecords(records);
+  const interestRecordsByDistrict = {
+    ...generatedInterest.byDistrict,
+    ...interestPilot.byDistrict
+  };
+  const interestDistrictMeta = [
+    ...generatedInterest.districts,
+    ...interestPilot.meta.districts
+  ].reduce((map, item) => {
+    map.set(item.slug, { ...(map.get(item.slug) || {}), ...item });
+    return map;
+  }, new Map());
 
   return {
     records,
-    interestRecords: interestPilot.records,
-    interestRecordsByDistrict: interestPilot.byDistrict,
+    interestRecords: interestRecordsByDistrict.alphaville || [],
+    interestRecordsByDistrict,
     meta: {
       total: records.length,
       alunosPath,
-      interestPilot: interestPilot.meta,
+      interestPilot: {
+        ...interestPilot.meta,
+        totalDistricts: interestDistrictMeta.size,
+        totalRecords: Object.values(interestRecordsByDistrict).reduce((sum, rows) => sum + rows.length, 0),
+        districts: Array.from(interestDistrictMeta.values()).sort((a, b) => a.name.localeCompare(b.name))
+      },
       mlSource: ranking.source,
       mlRecords: ranking.byId.size,
       lastDatasetUpdate,
