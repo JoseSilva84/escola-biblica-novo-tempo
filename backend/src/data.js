@@ -10,7 +10,7 @@ const DATASET_DIR = resolveConfiguredPath(process.env.DATASET_DIR)
   || path.resolve(process.cwd(), 'dataset');
 const ML_RANKING_FILE = 'ranking_nao_vip_ml_pandas.csv';
 const ALUNOS_FILE = 'alunos.json';
-const INTEREST_DATA_FILE = 'dados_interesse_Alphaville.json';
+const INTEREST_DATA_PATTERN = /^dados_interesse_(?!distritos_manifest)(.+)\.json$/i;
 const UPDATE_STATUS_FILE = 'ultima_atualizacao_dataset.json';
 const UPDATE_HISTORY_FILE = 'historico_atualizacoes_dataset.json';
 
@@ -217,30 +217,61 @@ function transformRecord(row, ml) {
   };
 }
 
-function readInterestPilotData() {
-  const interestPath = firstExistingPath([
-    resolveConfiguredPath(process.env.INTEREST_DATA_PATH),
-    path.join(DATASET_DIR, INTEREST_DATA_FILE)
-  ]);
-  if (!interestPath) return { records: [], meta: null };
+function readInterestDistrictData() {
+  const configuredPath = resolveConfiguredPath(process.env.INTEREST_DATA_PATH);
+  const files = [];
+  if (configuredPath && fs.existsSync(configuredPath) && fs.statSync(configuredPath).isFile()) {
+    files.push(configuredPath);
+  } else if (fs.existsSync(DATASET_DIR)) {
+    for (const file of fs.readdirSync(DATASET_DIR)) {
+      if (INTEREST_DATA_PATTERN.test(file)) files.push(path.join(DATASET_DIR, file));
+    }
+  }
 
-  try {
-    const payload = JSON.parse(fs.readFileSync(interestPath, 'utf8'));
-    const rows = Array.isArray(payload.registros) ? payload.registros : [];
-    return {
-      records: rows.map(transformInterestPilotRecord),
-      meta: {
-        path: interestPath,
-        district: payload.distrito_piloto || 'Alphaville',
-        total: rows.length,
+  const byDistrict = {};
+  const districts = [];
+  for (const interestPath of files.sort((a, b) => a.localeCompare(b))) {
+    try {
+      const payload = JSON.parse(fs.readFileSync(interestPath, 'utf8'));
+      const rows = Array.isArray(payload.registros) ? payload.registros : [];
+      const district = payload.distrito_piloto || rows[0]?.origem?.distrito || path.basename(interestPath, '.json').replace(/^dados_interesse_/i, '');
+      const slug = normalizeAssociationLikeSlug(district);
+      const records = rows.map(transformInterestPilotRecord);
+      byDistrict[slug] = records;
+      districts.push({
+        slug,
+        name: district,
+        file: interestPath,
+        total: records.length,
         referenceDate: payload.data_referencia || null,
         source: payload.fonte || null,
         schemaVersion: payload.schema_version || null
-      }
-    };
-  } catch {
-    return { records: [], meta: null };
+      });
+    } catch {
+      // Ignora arquivos corrompidos para nao derrubar o dashboard inteiro.
+    }
   }
+
+  const alphaville = districts.find((item) => item.slug === 'alphaville');
+  return {
+    records: alphaville ? byDistrict.alphaville || [] : [],
+    byDistrict,
+    meta: {
+      totalDistricts: districts.length,
+      totalRecords: districts.reduce((sum, item) => sum + item.total, 0),
+      districts
+    }
+  };
+}
+
+function normalizeAssociationLikeSlug(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'nao-informado';
 }
 
 function transformInterestPilotRecord(row) {
@@ -294,11 +325,12 @@ export function getDashboardData() {
   const lastDatasetUpdate = readLastDatasetUpdate();
   const datasetUpdateHistory = readDatasetUpdateHistory();
   const records = alunos.map((row) => transformRecord(row, ranking.byId));
-  const interestPilot = readInterestPilotData();
+  const interestPilot = readInterestDistrictData();
 
   return {
     records,
     interestRecords: interestPilot.records,
+    interestRecordsByDistrict: interestPilot.byDistrict,
     meta: {
       total: records.length,
       alunosPath,

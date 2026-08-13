@@ -140,6 +140,16 @@ function associationSlugForUser(user = {}) {
     .replace(/^-+|-+$/g, '') || 'paulistana';
 }
 
+function slugifyDistrictName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function AppToaster({ theme = 'light' }) {
   const [mounted, setMounted] = useState(false);
 
@@ -5325,6 +5335,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const [restoringSession, setRestoringSession] = useState(false);
   const [theme, setTheme] = useState('light');
   const [selectedAssociationId, setSelectedAssociationId] = useState('paulistana');
+  const [selectedDistrictName, setSelectedDistrictName] = useState('Alphaville');
   const [payload, setPayload] = useState(initialPayload);
   const [viewHistory, setViewHistory] = useState([]);
   const [associations, setAssociations] = useState(() => initialAssociations);
@@ -5345,6 +5356,11 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const interestRecords = useMemo(() => (
     selectedAssociationSlug === 'paulistana' ? payload?.interestRecords || [] : []
   ), [payload, selectedAssociationSlug]);
+  const selectedDistrictInterestRecords = useMemo(() => {
+    if (selectedAssociationSlug !== 'paulistana') return [];
+    const slug = slugifyDistrictName(selectedDistrictName);
+    return payload?.interestRecordsByDistrict?.[slug] || [];
+  }, [payload, selectedAssociationSlug, selectedDistrictName]);
   const data = useMemo(() => buildAssociationData(records), [records]);
   const filteredAssociations = useMemo(() => {
     if (!isAdminUser(user)) return visibleAssociations;
@@ -5505,7 +5521,9 @@ export default function CrmApp({ payload: initialPayload = null }) {
         onBack={goBack}
         onLogout={logout}
         onOpenDistrict={(districtName) => {
-          if (String(districtName || '').toLowerCase() !== 'alphaville') return false;
+          const slug = slugifyDistrictName(districtName);
+          if (!payload?.interestRecordsByDistrict?.[slug]?.length) return false;
+          setSelectedDistrictName(districtName);
           setViewHistory((history) => [...history, 'details'].slice(-20));
           setView('district-interest');
           requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }));
@@ -5619,8 +5637,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
   } else if (effectiveView === 'district-interest') {
     content = (
       <DistrictInterestDashboard
-        districtName="Alphaville"
-        interestRecords={interestRecords}
+        districtName={selectedDistrictName}
+        interestRecords={selectedDistrictInterestRecords}
         onBack={goBack}
       />
     );

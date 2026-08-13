@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from consolidar_planilhas import consolidar_planilhas
 from gerar_alunos_json import DEFAULT_EXCEL, gerar_alunos_json
+from gerar_dados_interesse_distritos import gerar_dados_interesse_distritos
 from treinar_vip_ml import DEFAULT_DATASET_DIR, DEFAULT_REFERENCE_DATE, treinar_vip_ml
 
 UPDATE_STATUS_FILE = "ultima_atualizacao_dataset.json"
@@ -100,15 +101,17 @@ def main() -> None:
 
     metricas_anteriores = read_json(args.saida / ML_METRICS_FILE)
     alunos = gerar_alunos_json(args.arquivo, args.saida / "alunos.json")
+    dados_interesse = gerar_dados_interesse_distritos(args.arquivo, args.saida)
     metricas = treinar_vip_ml(args.arquivo, args.saida, args.data_referencia)
     ml_status = build_ml_status(metricas, metricas_anteriores)
-    resultado = {"consolidacao": consolidacao, "alunos_json": alunos, "ml": metricas, "ml_status": ml_status}
+    resultado = {"consolidacao": consolidacao, "alunos_json": alunos, "dados_interesse": dados_interesse, "ml": metricas, "ml_status": ml_status}
 
     if consolidacao:
         status = {
             "atualizado_em": datetime.now(timezone.utc).isoformat(),
             "arquivo_base": str(args.arquivo),
             "alunos_json": alunos,
+            "dados_interesse": dados_interesse,
             "consolidacao": consolidacao,
             "ml": metricas,
             "ml_status": ml_status,
