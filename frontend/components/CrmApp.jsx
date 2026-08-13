@@ -1824,9 +1824,80 @@ function LeadAnalyticsSection({ data, records = [] }) {
       else acc.recentes += 1;
       return acc;
     }, { recentes: 0, antigos: 0, semInfo: 0 });
+    const ageBuckets = records.reduce((acc, lead) => {
+      const age = Number(lead.a);
+      if (!Number.isFinite(age) || age <= 0) acc.semInfo += 1;
+      else if (age <= 17) acc.ate17 += 1;
+      else if (age <= 24) acc.de18a24 += 1;
+      else if (age <= 34) acc.de25a34 += 1;
+      else if (age <= 44) acc.de35a44 += 1;
+      else if (age <= 59) acc.de45a59 += 1;
+      else acc.acima60 += 1;
+      return acc;
+    }, { ate17: 0, de18a24: 0, de25a34: 0, de35a44: 0, de45a59: 0, acima60: 0, semInfo: 0 });
+    const genderCounts = records.reduce((acc, lead) => {
+      if (lead.g === 'M') acc.masculino += 1;
+      else if (lead.g === 'F') acc.feminino += 1;
+      else acc.naoInformado += 1;
+      return acc;
+    }, { masculino: 0, feminino: 0, naoInformado: 0 });
+    const materialTypeCounts = records.reduce((acc, lead) => {
+      const name = lead.tm && lead.tm !== 'N/I' ? lead.tm : 'Não informado';
+      acc[name] = (acc[name] || 0) + 1;
+      return acc;
+    }, {});
+    const materialNameMap = records.reduce((map, lead) => {
+      const name = lead.materialName && lead.materialName !== 'N/I' ? lead.materialName : 'Não informado';
+      const current = map.get(name) || { name, leads: 0, recebidos: 0 };
+      current.leads += 1;
+      current.recebidos += Number(lead.m) || 0;
+      map.set(name, current);
+      return map;
+    }, new Map());
+    const addressMap = records.reduce((map, lead) => {
+      const address = lead.end && lead.end !== 'N/I' ? lead.end : 'Endereço não informado';
+      const current = map.get(address) || { address, leads: 0, names: [] };
+      current.leads += 1;
+      if (lead.n && current.names.length < 4) current.names.push(lead.n);
+      map.set(address, current);
+      return map;
+    }, new Map());
+    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const birthdaysByMonth = monthNames.map((month, index) => ({
+      month,
+      leads: records
+        .map((lead) => {
+          const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(lead.birthDate || '').trim());
+          if (!match || Number(match[2]) !== index + 1) return null;
+          return { id: lead.id, name: lead.n || 'Lead sem nome', date: lead.birthDate, day: Number(match[1]) };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.day - b.day || a.name.localeCompare(b.name))
+    }));
 
     return {
       funnel: (data?.campaignTrend || []).map((item) => ({ ...item, taxa: pct(item.leads, total) })),
+      whatsapp: [
+        { name: 'Com WhatsApp', value: data?.phone || 0 },
+        { name: 'Sem WhatsApp', value: Math.max(total - (data?.phone || 0), 0) }
+      ],
+      ageGroups: [
+        { name: 'Até 17', value: ageBuckets.ate17 },
+        { name: '18-24', value: ageBuckets.de18a24 },
+        { name: '25-34', value: ageBuckets.de25a34 },
+        { name: '35-44', value: ageBuckets.de35a44 },
+        { name: '45-59', value: ageBuckets.de45a59 },
+        { name: '60+', value: ageBuckets.acima60 },
+        { name: 'Sem idade', value: ageBuckets.semInfo }
+      ],
+      genders: [
+        { name: 'Homens', value: genderCounts.masculino },
+        { name: 'Mulheres', value: genderCounts.feminino },
+        { name: 'Não informado', value: genderCounts.naoInformado }
+      ],
+      materialTypes: Object.entries(materialTypeCounts)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value),
       composition: [
         { name: 'Com WhatsApp', value: data?.phone || 0 },
         { name: 'Sem WhatsApp', value: Math.max(total - (data?.phone || 0), 0) },
@@ -1845,6 +1916,18 @@ function LeadAnalyticsSection({ data, records = [] }) {
         { name: 'Acima de 1 ano', value: recency.antigos },
         { name: 'Sem informação', value: recency.semInfo }
       ],
+      addressRanking: Array.from(addressMap.values())
+        .filter((item) => item.leads > 1)
+        .sort((a, b) => b.leads - a.leads || a.address.localeCompare(b.address))
+        .slice(0, 8),
+      materialRanking: Array.from(materialNameMap.values())
+        .sort((a, b) => b.recebidos - a.recebidos || b.leads - a.leads || a.name.localeCompare(b.name))
+        .slice(0, 8),
+      birthdaysByMonth,
+      recentContacts: records
+        .filter((lead) => Number.isFinite(Number(lead.c)))
+        .sort((a, b) => Number(a.c) - Number(b.c))
+        .slice(0, 10),
       conversion: [
         { name: 'WhatsApp', value: pct(data?.phone || 0, total) },
         { name: 'Quentes', value: pct(data?.hot || 0, total) },
@@ -1986,6 +2069,166 @@ function LeadAnalyticsSection({ data, records = [] }) {
                 <Bar dataKey="value" fill="#a855f7" radius={[0, 8, 8, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </article>
+      </div>
+
+      <div className="grid grid-cols-4 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+        <article className={`${panelClass} p-5`}>
+          <span className={labelClass}>WhatsApp</span>
+          <h3 className="mt-1 text-lg font-black text-slate-50">Registrados e pendentes</h3>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.whatsapp} layout="vertical" margin={{ left: 6, right: 8 }}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
+                <XAxis hide type="number" />
+                <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={104} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
+                <Bar dataKey="value" fill="#10b981" radius={[0, 8, 8, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className={`${panelClass} p-5`}>
+          <span className={labelClass}>Idade</span>
+          <h3 className="mt-1 text-lg font-black text-slate-50">Faixas etárias</h3>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.ageGroups}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
+                <XAxis dataKey="name" interval={0} stroke="#94a3b8" tick={{ fontSize: 10 }} tickLine={false} />
+                <YAxis stroke="#94a3b8" tickFormatter={formatNumber} tickLine={false} width={48} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
+                <Bar dataKey="value" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className={`${panelClass} p-5`}>
+          <span className={labelClass}>Perfil</span>
+          <h3 className="mt-1 text-lg font-black text-slate-50">Homens versus mulheres</h3>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.genders} layout="vertical" margin={{ left: 6, right: 8 }}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
+                <XAxis hide type="number" />
+                <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={104} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
+                <Bar dataKey="value" fill="#6366f1" radius={[0, 8, 8, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className={`${panelClass} p-5`}>
+          <span className={labelClass}>Materiais</span>
+          <h3 className="mt-1 text-lg font-black text-slate-50">Tipos de estudos bíblicos</h3>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.materialTypes} layout="vertical" margin={{ left: 6, right: 8 }}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
+                <XAxis hide type="number" />
+                <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={98} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
+                <Bar dataKey="value" fill="#f59e0b" radius={[0, 8, 8, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
+        <article className={`${panelClass} p-6`}>
+          <span className={labelClass}>Ranking de endereços</span>
+          <h3 className="mt-1 text-xl font-black text-slate-50">Leads com o mesmo endereço</h3>
+          <div className="mt-5 grid gap-3">
+            {analytics.addressRanking.length ? analytics.addressRanking.map((item, index) => (
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-4" key={item.address}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <span className="text-xs font-black uppercase tracking-wide text-blue-200">#{index + 1}</span>
+                    <strong className="mt-1 block break-words text-sm font-black text-slate-50">{item.address}</strong>
+                    <span className="mt-1 block truncate text-xs font-semibold text-slate-500">{item.names.join(', ') || 'Sem nomes vinculados'}</span>
+                  </div>
+                  <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">{formatNumber(item.leads)}</span>
+                </div>
+              </div>
+            )) : (
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400">
+                Nenhum endereço repetido encontrado na base atual.
+              </div>
+            )}
+          </div>
+        </article>
+
+        <article className={`${panelClass} p-6`}>
+          <span className={labelClass}>Ranking de materiais</span>
+          <h3 className="mt-1 text-xl font-black text-slate-50">Materiais recebidos</h3>
+          <div className="mt-5 grid gap-3">
+            {analytics.materialRanking.length ? analytics.materialRanking.map((item, index) => (
+              <div className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/[0.07] bg-slate-950/42 p-4" key={item.name}>
+                <div className="min-w-0">
+                  <span className="text-xs font-black uppercase tracking-wide text-amber-200">#{index + 1}</span>
+                  <strong className="mt-1 block truncate text-sm font-black text-slate-50">{item.name}</strong>
+                  <span className="mt-1 block text-xs font-semibold text-slate-500">{formatNumber(item.leads)} leads vinculados</span>
+                </div>
+                <strong className="text-2xl font-black text-slate-50">{formatNumber(item.recebidos)}</strong>
+              </div>
+            )) : (
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400">
+                Nenhum material recebido registrado na base atual.
+              </div>
+            )}
+          </div>
+        </article>
+      </div>
+
+      <div className="grid grid-cols-[1.1fr_0.9fr] gap-4 max-xl:grid-cols-1">
+        <article className={`${panelClass} p-6`}>
+          <span className={labelClass}>Aniversariantes</span>
+          <h3 className="mt-1 text-xl font-black text-slate-50">Leads por mês do ano</h3>
+          <div className="mt-5 grid grid-cols-3 gap-3 max-2xl:grid-cols-2 max-md:grid-cols-1">
+            {analytics.birthdaysByMonth.map((month) => (
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-4" key={month.month}>
+                <div className="flex items-center justify-between gap-3">
+                  <strong className="text-sm font-black text-slate-50">{month.month}</strong>
+                  <span className="rounded-full bg-slate-700 px-2.5 py-1 text-[11px] font-black text-white">{formatNumber(month.leads.length)}</span>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {month.leads.slice(0, 5).map((lead) => (
+                    <div className="rounded-xl bg-white/[0.045] px-3 py-2" key={`${month.month}-${lead.id}-${lead.date}`}>
+                      <span className="block truncate text-xs font-black text-slate-100">{lead.name}</span>
+                      <span className="block text-[11px] font-semibold text-slate-500">{lead.date}</span>
+                    </div>
+                  ))}
+                  {!month.leads.length ? <span className="text-xs font-semibold text-slate-500">Sem aniversariantes registrados.</span> : null}
+                  {month.leads.length > 5 ? <span className="text-[11px] font-bold text-slate-500">+{formatNumber(month.leads.length - 5)} outros</span> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className={`${panelClass} p-6`}>
+          <span className={labelClass}>Ranking de contato</span>
+          <h3 className="mt-1 text-xl font-black text-slate-50">Leads por contato recente</h3>
+          <div className="mt-5 grid gap-3">
+            {analytics.recentContacts.length ? analytics.recentContacts.map((lead, index) => (
+              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-white/[0.07] bg-slate-950/42 p-4" key={`${lead.id}-${lead.c}`}>
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-500/16 text-xs font-black text-emerald-200">#{index + 1}</span>
+                <div className="min-w-0">
+                  <strong className="block truncate text-sm font-black text-slate-50">{lead.n || 'Lead sem nome'}</strong>
+                  <span className="mt-1 block truncate text-xs font-semibold text-slate-500">{lead.d || 'Distrito não informado'} · {lead.tel || 'sem telefone'}</span>
+                </div>
+                <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white">{formatNumber(lead.c)} dias</span>
+              </div>
+            )) : (
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400">
+                Nenhum contato com data registrada na base atual.
+              </div>
+            )}
           </div>
         </article>
       </div>
