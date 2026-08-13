@@ -1796,7 +1796,27 @@ function DatasetHistoryModal({ history = [], onClose }) {
 }
 
 function AnalyticsRankingModal({ ranking, onClose }) {
+  const [contactFilter, setContactFilter] = useState('');
+  const [contactFilterUnit, setContactFilterUnit] = useState('day');
+
+  useEffect(() => {
+    setContactFilter('');
+    setContactFilterUnit('day');
+  }, [ranking]);
+
+  const filteredRows = useMemo(() => {
+    const rows = ranking?.rows || [];
+    if (ranking?.type !== 'recentContacts') return rows;
+    const value = Number(contactFilter);
+    if (!Number.isFinite(value) || value <= 0) return rows;
+    const multiplier = contactFilterUnit === 'year' ? 365 : contactFilterUnit === 'month' ? 30 : 1;
+    const maxDays = value * multiplier;
+    return rows.filter((row) => Number(row.rawDays) <= maxDays);
+  }, [contactFilter, contactFilterUnit, ranking]);
+
   if (!ranking) return null;
+
+  const showContactFilter = ranking.type === 'recentContacts';
 
   return createPortal(
     <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
@@ -1811,9 +1831,41 @@ function AnalyticsRankingModal({ ranking, onClose }) {
             <X size={20} />
           </button>
         </div>
+        {showContactFilter ? (
+          <div className="border-b border-white/10 bg-slate-900/80 px-6 py-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="grid gap-1">
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Pesquisar até</span>
+                <input
+                  className="h-11 w-32 rounded-2xl border border-white/10 bg-slate-950 px-4 text-sm font-black text-white outline-none transition placeholder:text-slate-600 focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15"
+                  min="1"
+                  onChange={(event) => setContactFilter(event.target.value)}
+                  placeholder="Número"
+                  type="number"
+                  value={contactFilter}
+                />
+              </label>
+              <label className="grid gap-1">
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Período</span>
+                <select
+                  className="h-11 rounded-2xl border border-white/10 bg-slate-950 px-4 text-sm font-black text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15"
+                  onChange={(event) => setContactFilterUnit(event.target.value)}
+                  value={contactFilterUnit}
+                >
+                  <option value="day">Dia</option>
+                  <option value="month">Mês</option>
+                  <option value="year">Ano</option>
+                </select>
+              </label>
+              <span className="rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3 text-xs font-bold text-slate-300">
+                {formatNumber(filteredRows.length)} de {formatNumber(ranking.rows.length)} leads
+              </span>
+            </div>
+          </div>
+        ) : null}
         <div className="max-h-[calc(88vh-150px)] overflow-y-auto p-6">
           <div className="grid gap-3">
-            {ranking.rows.length ? ranking.rows.map((row, index) => (
+            {filteredRows.length ? filteredRows.map((row, index) => (
               <div className="grid grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.18)] max-md:grid-cols-1" key={`${ranking.title}-${row.title}-${index}`}>
                 <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.18)]">
                   #{index + 1}
@@ -1997,7 +2049,55 @@ function LeadAnalyticsSection({ data, records = [] }) {
   const recentContacts = analytics.recentContactsAll.slice(0, 10);
   const rankingButtonClass = 'group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-slate-950/72 via-slate-900/46 to-white/[0.035] p-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.16)] transition duration-300 hover:-translate-y-1 hover:border-blue-300/45 hover:shadow-[0_24px_60px_rgba(37,99,235,0.18)] focus:outline-none focus:ring-4 focus:ring-blue-500/18';
   const rankingNumberClass = 'grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.24)] ring-1 ring-slate-900/5';
+  const seeAllButtonClass = 'inline-flex h-10 items-center justify-center rounded-2xl bg-slate-950 px-4 text-xs font-black uppercase tracking-wide text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-500/15';
   const openRanking = (ranking) => setSelectedRanking(ranking);
+  const openAddressRanking = () => openRanking({
+    kicker: 'Ranking de endereços',
+    title: 'Todos os endereços repetidos',
+    subtitle: 'Sequência completa dos endereços com mais de um lead vinculado.',
+    rows: analytics.addressRankingAll.map((row) => ({
+      title: row.address,
+      subtitle: row.names.join(', ') || 'Sem nomes vinculados',
+      metric: `${formatNumber(row.leads)} leads`
+    }))
+  });
+  const openMaterialRanking = () => openRanking({
+    kicker: 'Ranking de materiais',
+    title: 'Todos os materiais recebidos',
+    subtitle: 'Sequência completa dos materiais, ordenada pela quantidade recebida.',
+    rows: analytics.materialRankingAll.map((row) => ({
+      title: row.name,
+      subtitle: `${formatNumber(row.leads)} leads vinculados`,
+      metric: formatNumber(row.recebidos),
+      details: row.names
+    }))
+  });
+  const openBirthdayRanking = () => openRanking({
+    kicker: 'Aniversariantes',
+    title: 'Todos os aniversariantes',
+    subtitle: 'Sequência completa por mês, com nome e data completa de aniversário.',
+    rows: analytics.birthdaysByMonth.flatMap((month) => month.leads.map((lead) => ({
+      title: lead.name,
+      subtitle: `${month.month} · ${lead.date}`,
+      metric: lead.date
+    })))
+  });
+  const openRecentContactRanking = () => openRanking({
+    type: 'recentContacts',
+    kicker: 'Ranking de contato',
+    title: 'Leads por contato recente',
+    subtitle: 'Lista completa do contato mais recente para o mais distante. Use a pesquisa para limitar por dia, mês ou ano.',
+    rows: analytics.recentContactsAll.map((row) => ({
+      title: row.n || 'Lead sem nome',
+      subtitle: `${row.d || 'Distrito não informado'} · ${row.tel || 'sem telefone'}`,
+      metric: `${formatNumber(row.c)} dias`,
+      rawDays: Number(row.c),
+      details: [
+        row.birthDate && row.birthDate !== 'N/I' ? `Aniversário: ${row.birthDate}` : 'Aniversário não informado',
+        row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
+      ]
+    }))
+  });
 
   return (
     <section className="grid gap-4">
@@ -2195,23 +2295,19 @@ function LeadAnalyticsSection({ data, records = [] }) {
 
       <div className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
         <article className={`${panelClass} p-6`}>
-          <span className={labelClass}>Ranking de endereços</span>
-          <h3 className="mt-1 text-xl font-black text-slate-50">Leads com o mesmo endereço</h3>
+          <div className="flex items-start justify-between gap-4 max-sm:flex-col">
+            <div>
+              <span className={labelClass}>Ranking de endereços</span>
+              <h3 className="mt-1 text-xl font-black text-slate-50">Leads com o mesmo endereço</h3>
+            </div>
+            <button className={seeAllButtonClass} onClick={openAddressRanking} type="button">Ver todos</button>
+          </div>
           <div className="mt-5 grid gap-3">
             {addressRanking.length ? addressRanking.map((item, index) => (
               <button
                 className={rankingButtonClass}
                 key={item.address}
-                onClick={() => openRanking({
-                  kicker: 'Ranking de endereços',
-                  title: item.address,
-                  subtitle: `${formatNumber(item.leads)} leads encontrados com este mesmo endereço.`,
-                  rows: analytics.addressRankingAll.map((row) => ({
-                    title: row.address,
-                    subtitle: row.names.join(', ') || 'Sem nomes vinculados',
-                    metric: `${formatNumber(row.leads)} leads`
-                  }))
-                })}
+                onClick={openAddressRanking}
                 type="button"
               >
                 <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/70 to-transparent opacity-0 transition group-hover:opacity-100" />
@@ -2233,24 +2329,19 @@ function LeadAnalyticsSection({ data, records = [] }) {
         </article>
 
         <article className={`${panelClass} p-6`}>
-          <span className={labelClass}>Ranking de materiais</span>
-          <h3 className="mt-1 text-xl font-black text-slate-50">Materiais recebidos</h3>
+          <div className="flex items-start justify-between gap-4 max-sm:flex-col">
+            <div>
+              <span className={labelClass}>Ranking de materiais</span>
+              <h3 className="mt-1 text-xl font-black text-slate-50">Materiais recebidos</h3>
+            </div>
+            <button className={seeAllButtonClass} onClick={openMaterialRanking} type="button">Ver todos</button>
+          </div>
           <div className="mt-5 grid gap-3">
             {materialRanking.length ? materialRanking.map((item, index) => (
               <button
                 className={rankingButtonClass}
                 key={item.name}
-                onClick={() => openRanking({
-                  kicker: 'Ranking de materiais',
-                  title: item.name,
-                  subtitle: `${formatNumber(item.recebidos)} materiais recebidos em ${formatNumber(item.leads)} leads vinculados.`,
-                  rows: analytics.materialRankingAll.map((row) => ({
-                    title: row.name,
-                    subtitle: `${formatNumber(row.leads)} leads vinculados`,
-                    metric: formatNumber(row.recebidos),
-                    details: row.names
-                  }))
-                })}
+                onClick={openMaterialRanking}
                 type="button"
               >
                 <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/75 to-transparent opacity-0 transition group-hover:opacity-100" />
@@ -2260,7 +2351,7 @@ function LeadAnalyticsSection({ data, records = [] }) {
                     <strong className="block truncate text-base font-black text-slate-50">{item.name}</strong>
                     <span className="mt-1 block text-xs font-semibold text-slate-400">{formatNumber(item.leads)} leads vinculados</span>
                   </div>
-                  <strong className="text-2xl font-black text-white">{formatNumber(item.recebidos)}</strong>
+                  <strong className="rounded-2xl bg-slate-950 px-4 py-2 text-2xl font-black text-amber-200 shadow-[0_14px_30px_rgba(15,23,42,0.22)]">{formatNumber(item.recebidos)}</strong>
                 </div>
               </button>
             )) : (
@@ -2274,8 +2365,13 @@ function LeadAnalyticsSection({ data, records = [] }) {
 
       <div className="grid grid-cols-[1.1fr_0.9fr] gap-4 max-xl:grid-cols-1">
         <article className={`${panelClass} p-6`}>
-          <span className={labelClass}>Aniversariantes</span>
-          <h3 className="mt-1 text-xl font-black text-slate-50">Leads por mês do ano</h3>
+          <div className="flex items-start justify-between gap-4 max-sm:flex-col">
+            <div>
+              <span className={labelClass}>Aniversariantes</span>
+              <h3 className="mt-1 text-xl font-black text-slate-50">Leads por mês do ano</h3>
+            </div>
+            <button className={seeAllButtonClass} onClick={openBirthdayRanking} type="button">Ver todos</button>
+          </div>
           <div className="mt-5 grid grid-cols-3 gap-3 max-2xl:grid-cols-2 max-md:grid-cols-1">
             {analytics.birthdaysByMonth.map((month) => (
               <button
@@ -2314,27 +2410,19 @@ function LeadAnalyticsSection({ data, records = [] }) {
         </article>
 
         <article className={`${panelClass} p-6`}>
-          <span className={labelClass}>Ranking de contato</span>
-          <h3 className="mt-1 text-xl font-black text-slate-50">Leads por contato recente</h3>
+          <div className="flex items-start justify-between gap-4 max-sm:flex-col">
+            <div>
+              <span className={labelClass}>Ranking de contato</span>
+              <h3 className="mt-1 text-xl font-black text-slate-50">Leads por contato recente</h3>
+            </div>
+            <button className={seeAllButtonClass} onClick={openRecentContactRanking} type="button">Ver todos</button>
+          </div>
           <div className="mt-5 grid gap-3">
             {recentContacts.length ? recentContacts.map((lead, index) => (
               <button
                 className={rankingButtonClass}
                 key={`${lead.id}-${lead.c}`}
-                onClick={() => openRanking({
-                  kicker: 'Ranking de contato',
-                  title: 'Leads por contato recente',
-                  subtitle: 'Lista completa ordenada pelo menor número de dias desde o último contato registrado.',
-                  rows: analytics.recentContactsAll.map((row) => ({
-                    title: row.n || 'Lead sem nome',
-                    subtitle: `${row.d || 'Distrito não informado'} · ${row.tel || 'sem telefone'}`,
-                    metric: `${formatNumber(row.c)} dias`,
-                    details: [
-                      row.birthDate && row.birthDate !== 'N/I' ? `Aniversário: ${row.birthDate}` : 'Aniversário não informado',
-                      row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
-                    ]
-                  }))
-                })}
+                onClick={openRecentContactRanking}
                 type="button"
               >
                 <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
