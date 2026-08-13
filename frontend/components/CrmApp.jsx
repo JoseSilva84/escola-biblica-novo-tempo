@@ -70,6 +70,13 @@ const adminNavItems = [
   ['reports', 'Relat\u00f3rios', PieChart],
   ['settings', 'Configura\u00e7\u00f5es', Settings]
 ];
+const associationNavItems = [
+  ['associations', 'Associa\u00e7\u00f5es', Building2],
+  ['leads', 'Leads', ClipboardList],
+  ['campaigns', 'Campanhas', Radio],
+  ['automations', 'WhatsApp', MessageCircle],
+  ['reports', 'Relat\u00f3rios', PieChart]
+];
 const crmPriorityLabels = {
   Hot: 'Quente',
   Warm: 'Potencial',
@@ -88,6 +95,18 @@ function apiFetch(path, options = {}) {
       ...(options.headers || {})
     }
   });
+}
+
+function isAdminUser(user) {
+  return user?.role === 'ADMIN_GERAL';
+}
+
+function navigationItemsForUser(user) {
+  return isAdminUser(user) ? adminNavItems : associationNavItems;
+}
+
+function defaultViewForUser(user) {
+  return isAdminUser(user) ? 'admin' : 'associations';
 }
 
 function AppToaster({ theme = 'light' }) {
@@ -476,12 +495,17 @@ function LoginScreen({ onLogin }) {
 function Sidebar({ compact, current, onNavigate, onLogout, onToggleCompact, user }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  const items = adminNavItems;
+  const items = navigationItemsForUser(user);
 
-  const bottomNavItems = [
-    ['admin', 'Dashboard', LayoutDashboard],
-    ['leads', 'Leads', ClipboardList]
-  ];
+  const bottomNavItems = isAdminUser(user)
+    ? [
+      ['admin', 'Dashboard', LayoutDashboard],
+      ['leads', 'Leads', ClipboardList]
+    ]
+    : [
+      ['associations', 'Associa\u00e7\u00f5es', Building2],
+      ['leads', 'Leads', ClipboardList]
+    ];
 
   return (
     <>
@@ -988,7 +1012,7 @@ function AddAssociationForm({ onAdd }) {
   );
 }
 
-function AdminDashboard({ associations, data, isAssociationsView = false, onOpenAdminGeneral, onOpenAssociations, onOpenAssociation, onOpenLeads, onOpenUsers, onAddAssociation }) {
+function AdminDashboard({ associations, data, canManageAdmin = false, isAssociationsView = false, onOpenAdminGeneral, onOpenAssociations, onOpenAssociation, onOpenLeads, onOpenUsers, onAddAssociation }) {
   const totals = associations.reduce((acc, association) => ({
     leads: acc.leads + association.leads,
     campaigns: acc.campaigns + association.campaigns,
@@ -1041,24 +1065,28 @@ function AdminDashboard({ associations, data, isAssociationsView = false, onOpen
                   <ArrowRight size={18} />
                 </button>
               )}
-              <button
-                className={ghostButtonClass}
-                onClick={() => toast.info('Fila de automações', {
-                  description: 'Em breve você poderá revisar mensagens, etapas e métricas de resposta aqui.'
-                })}
-                type="button"
-              >
-                <WandSparkles size={18} />
-                Revisar automações
-              </button>
-              <button className={ghostButtonClass} onClick={onOpenAdminGeneral} type="button">
-                <ShieldCheck size={18} />
-                Gestao geral
-              </button>
-              <button className={ghostButtonClass} onClick={onOpenUsers} type="button">
-                <UsersRound size={18} />
-                Acessos
-              </button>
+              {canManageAdmin ? (
+                <>
+                  <button
+                    className={ghostButtonClass}
+                    onClick={() => toast.info('Fila de automações', {
+                      description: 'Em breve você poderá revisar mensagens, etapas e métricas de resposta aqui.'
+                    })}
+                    type="button"
+                  >
+                    <WandSparkles size={18} />
+                    Revisar automações
+                  </button>
+                  <button className={ghostButtonClass} onClick={onOpenAdminGeneral} type="button">
+                    <ShieldCheck size={18} />
+                    Gestao geral
+                  </button>
+                  <button className={ghostButtonClass} onClick={onOpenUsers} type="button">
+                    <UsersRound size={18} />
+                    Acessos
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
           <div className="interactive-card min-h-72 rounded-2xl border border-white/[0.07] bg-slate-950/50 p-4 transition duration-300 hover:border-slate-200/25">
@@ -1124,7 +1152,7 @@ function AdminDashboard({ associations, data, isAssociationsView = false, onOpen
         </article>
 
         <aside className="grid gap-4">
-          <AddAssociationForm onAdd={onAddAssociation} />
+          {canManageAdmin ? <AddAssociationForm onAdd={onAddAssociation} /> : null}
           <div className={`${panelClass} interactive-card p-5`}>
             <span className={labelClass}>Governança</span>
             <h3 className="mt-2 text-xl font-black text-slate-50">Acesso por nível</h3>
@@ -4031,6 +4059,7 @@ function PlaceholderView({ title, subtitle, icon: Icon }) {
 function AppShell({ children, current, onBack, canGoBack = false, onNavigate, onLogout, theme, onToggleTheme, user }) {
   const isLight = theme === 'light';
   const [sidebarCompact, setSidebarCompact] = useState(false);
+  const headerNavItems = navigationItemsForUser(user);
 
   return (
     <div className={`silver-stage ${isLight ? 'app-light' : 'app-dark'} min-h-screen text-slate-100`}>
@@ -4101,7 +4130,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Configurações</span>
                     </div>
                     <div className="flex flex-col gap-0.5">
-                      {adminNavItems.map(([id, label, Icon]) => (
+                      {headerNavItems.map(([id, label, Icon]) => (
                         <button
                           className={`group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold transition-all hover:bg-slate-100 hover:text-slate-900 ${current === id ? 'bg-blue-50 text-blue-700' : 'text-slate-600'}`}
                           key={id}
@@ -4227,7 +4256,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
         await loadDashboard();
         if (!active) return;
         setUser(session.user);
-        setView('admin');
+        setView(defaultViewForUser(session.user));
       } catch {
         window.localStorage.removeItem('sevenflow_token');
         if (active) setView('login');
@@ -4272,8 +4301,9 @@ export default function CrmApp({ payload: initialPayload = null }) {
 
   function goBack() {
     setViewHistory((history) => {
-      const previous = history[history.length - 1] || 'admin';
-      setView(previous === 'login' ? 'admin' : previous);
+      const defaultView = defaultViewForUser(user);
+      const previous = history[history.length - 1] || defaultView;
+      setView(previous === 'login' ? defaultView : previous);
       return history.slice(0, -1);
     });
   }
@@ -4304,7 +4334,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
     return <LoginScreen onLogin={async (loggedUser) => {
       await loadDashboard();
       setUser(loggedUser);
-      setView('admin');
+      setView(defaultViewForUser(loggedUser));
     }} />;
   }
 
@@ -4354,6 +4384,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
     content = (
       <AdminDashboard
         associations={associations}
+        canManageAdmin={isAdminUser(user)}
         data={data}
         isAssociationsView={view === 'associations'}
         onAddAssociation={(association) => setAssociations((current) => [association, ...current])}
@@ -4393,6 +4424,10 @@ export default function CrmApp({ payload: initialPayload = null }) {
     content = <ConversationsView records={records} />;
   } else if (view === 'ai-agent') {
     content = <AIAgentView associations={associations} campaigns={adminCampaigns} data={data} records={records} />;
+  } else if (view === 'reports') {
+    content = isAdminUser(user)
+      ? <AdminGeneralView {...adminGeneralProps} initialSection="audit" />
+      : <PlaceholderView icon={PieChart} subtitle="Os relatórios desta associação serão exibidos aqui com base apenas nos dados reais carregados." title="Relatórios" />;
   } else if (view === 'settings') {
     content = <SettingsView onToggleTheme={() => setTheme((current) => current === 'light' ? 'dark' : 'light')} theme={theme} />;
   } else {
@@ -4402,7 +4437,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   return (
     <AppShell
       current={view === 'association' ? 'associations' : view}
-      canGoBack={view !== 'admin'}
+      canGoBack={view !== defaultViewForUser(user)}
       onBack={goBack}
       onLogout={logout}
       onNavigate={navigateView}
