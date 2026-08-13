@@ -1795,6 +1795,204 @@ function DatasetHistoryModal({ history = [], onClose }) {
   );
 }
 
+function LeadAnalyticsSection({ data, records = [] }) {
+  const analytics = useMemo(() => {
+    const total = data?.total || records.length || 0;
+    const priorityLabels = { Hot: 'Quentes', Warm: 'Potenciais', Cool: 'Frios' };
+    const priorityCounts = records.reduce((acc, lead) => {
+      const key = lead.p && priorityLabels[lead.p] ? lead.p : 'none';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const districtMap = records.reduce((map, lead) => {
+      const name = lead.d || 'Sem distrito';
+      const current = map.get(name) || { name, interessados: 0, whatsapp: 0, quentes: 0, estudos: 0 };
+      current.interessados += 1;
+      current.whatsapp += lead.t ? 1 : 0;
+      current.quentes += lead.p === 'Hot' ? 1 : 0;
+      current.estudos += lead.e ? 1 : 0;
+      map.set(name, current);
+      return map;
+    }, new Map());
+    const districtMix = Array.from(districtMap.values())
+      .sort((a, b) => b.interessados - a.interessados)
+      .slice(0, 7);
+    const recency = records.reduce((acc, lead) => {
+      const days = Number(lead.c);
+      if (!Number.isFinite(days)) acc.semInfo += 1;
+      else if (days > 365) acc.antigos += 1;
+      else acc.recentes += 1;
+      return acc;
+    }, { recentes: 0, antigos: 0, semInfo: 0 });
+
+    return {
+      funnel: (data?.campaignTrend || []).map((item) => ({ ...item, taxa: pct(item.leads, total) })),
+      composition: [
+        { name: 'Com WhatsApp', value: data?.phone || 0 },
+        { name: 'Sem WhatsApp', value: Math.max(total - (data?.phone || 0), 0) },
+        { name: 'VIPs', value: data?.vip || 0 },
+        { name: 'Estudos', value: data?.studies || 0 }
+      ],
+      priorities: [
+        { name: 'Quentes', value: priorityCounts.Hot || 0 },
+        { name: 'Potenciais', value: priorityCounts.Warm || 0 },
+        { name: 'Frios', value: priorityCounts.Cool || 0 },
+        { name: 'Sem prioridade', value: priorityCounts.none || 0 }
+      ],
+      districtMix,
+      recency: [
+        { name: 'Contato recente', value: recency.recentes },
+        { name: 'Acima de 1 ano', value: recency.antigos },
+        { name: 'Sem informação', value: recency.semInfo }
+      ],
+      conversion: [
+        { name: 'WhatsApp', value: pct(data?.phone || 0, total) },
+        { name: 'Quentes', value: pct(data?.hot || 0, total) },
+        { name: 'VIPs', value: pct(data?.vip || 0, total) },
+        { name: 'Estudos', value: pct(data?.studies || 0, total) }
+      ]
+    };
+  }, [data, records]);
+
+  const chartTooltip = {
+    background: '#020617',
+    border: '1px solid rgba(226,232,240,0.16)',
+    borderRadius: 12,
+    color: '#e2e8f0'
+  };
+  const emptyData = !records.length && !(data?.total || 0);
+
+  return (
+    <section className="grid gap-4">
+      <div className="flex items-end justify-between gap-4 max-md:flex-col max-md:items-start">
+        <div>
+          <span className={labelClass}>Análise dos leads</span>
+          <h2 className="mt-1 text-2xl font-black text-slate-50">Leitura operacional da base</h2>
+        </div>
+        <span className="rounded-full border border-white/[0.08] bg-slate-950/45 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-300">
+          {emptyData ? 'Sem dados reais' : `${formatNumber(data.total)} registros reais`}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-[1.15fr_0.85fr] gap-4 max-xl:grid-cols-1">
+        <article className={`${panelClass} p-6`}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <span className={labelClass}>Funil</span>
+              <h3 className="mt-1 text-xl font-black text-slate-50">Aquecimento dos interessados</h3>
+            </div>
+            <Gauge className="text-blue-300" size={22} />
+          </div>
+          <div className="h-72">
+            <ResponsiveContainer height="100%" width="100%">
+              <AreaChart data={analytics.funnel}>
+                <defs>
+                  <linearGradient id="leadAnalyticsFunnel" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.55} />
+                    <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.03} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
+                <XAxis dataKey="etapa" stroke="#94a3b8" tickLine={false} />
+                <YAxis stroke="#94a3b8" tickFormatter={formatNumber} tickLine={false} width={70} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
+                <Area dataKey="leads" fill="url(#leadAnalyticsFunnel)" stroke="#60a5fa" strokeWidth={3} type="monotone" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className={`${panelClass} p-6`}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <span className={labelClass}>Cobertura</span>
+              <h3 className="mt-1 text-xl font-black text-slate-50">Taxas por etapa</h3>
+            </div>
+            <CheckCircle2 className="text-emerald-300" size={22} />
+          </div>
+          <div className="h-72">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.conversion}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
+                <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} />
+                <YAxis domain={[0, 100]} stroke="#94a3b8" tickFormatter={(value) => `${value}%`} tickLine={false} width={48} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => `${value}%`} itemStyle={{ color: '#fff' }} />
+                <Bar dataKey="value" fill="#22c55e" radius={[10, 10, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+      </div>
+
+      <div className="grid grid-cols-4 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+        <article className={`${panelClass} p-5`}>
+          <span className={labelClass}>Composição</span>
+          <h3 className="mt-1 text-lg font-black text-slate-50">Base por situação</h3>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.composition} layout="vertical" margin={{ left: 6, right: 8 }}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
+                <XAxis hide type="number" />
+                <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={98} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
+                <Bar dataKey="value" fill="#38bdf8" radius={[0, 8, 8, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className={`${panelClass} p-5`}>
+          <span className={labelClass}>Prioridade</span>
+          <h3 className="mt-1 text-lg font-black text-slate-50">Classificação ML</h3>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.priorities} layout="vertical" margin={{ left: 6, right: 8 }}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
+                <XAxis hide type="number" />
+                <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={102} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
+                <Bar dataKey="value" fill="#f97316" radius={[0, 8, 8, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className={`${panelClass} p-5`}>
+          <span className={labelClass}>Distritos</span>
+          <h3 className="mt-1 text-lg font-black text-slate-50">Concentração operacional</h3>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.districtMix} layout="vertical" margin={{ left: 8, right: 8 }}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
+                <XAxis hide type="number" />
+                <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={92} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
+                <Bar dataKey="interessados" fill="#2563eb" radius={[0, 8, 8, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className={`${panelClass} p-5`}>
+          <span className={labelClass}>Recência</span>
+          <h3 className="mt-1 text-lg font-black text-slate-50">Tempo desde contato</h3>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.recency} layout="vertical" margin={{ left: 6, right: 8 }}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
+                <XAxis hide type="number" />
+                <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={108} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
+                <Bar dataKey="value" fill="#a855f7" radius={[0, 8, 8, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+      </div>
+    </section>
+  );
+}
+
 function AssociationDashboard({ association, data, records = [], onDatasetUpdated, onOpenDetails, onOpenHistory, user }) {
   const automations = [];
 
@@ -1858,6 +2056,8 @@ function AssociationDashboard({ association, data, records = [], onDatasetUpdate
       </section>
 
       <DatasetUploadPanel association={association} onUpdated={onDatasetUpdated} user={user} />
+
+      <LeadAnalyticsSection data={data} records={records} />
 
       <section className="grid grid-cols-[1.15fr_0.85fr] gap-4 max-xl:grid-cols-1">
         <article className={`${panelClass} p-6`}>
