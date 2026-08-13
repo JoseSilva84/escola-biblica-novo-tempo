@@ -2360,7 +2360,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           <span className={labelClass}>Análise dos leads</span>
           <h2 className="mt-1 text-2xl font-black text-slate-50">Leitura operacional da base</h2>
         </div>
-        <span className="rounded-full border border-white/[0.08] bg-slate-950/45 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-300">
+        <span className="rounded-full border border-white/[0.08] bg-white px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-300">
           {emptyData ? 'Sem dados reais' : `${formatNumber(data.total)} registros reais`}
         </span>
       </div>
@@ -2570,7 +2570,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
               <span className={labelClass}>Base piloto Alphaville</span>
               <h2 className="mt-1 text-2xl font-black text-slate-50">Inteligência dos campos ainda não explorados</h2>
             </div>
-            <span className="rounded-full border border-white/[0.08] bg-slate-950/45 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-950">
+            <span className="rounded-full border border-white/[0.08] bg-white px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-950">
               {formatNumber(analytics.pilot.total)} registros reais
             </span>
           </div>
