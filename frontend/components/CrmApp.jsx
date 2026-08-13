@@ -120,8 +120,8 @@ function accessLabelForUser(user) {
 function allowedViewsForUser(user) {
   const menuViews = navigationItemsForUser(user).map(([id]) => id);
   return new Set(isAdminUser(user)
-    ? [...menuViews, 'association', 'details', 'dataset-history', 'general-admin', 'users']
-    : [...menuViews, 'association', 'details']);
+    ? [...menuViews, 'association', 'details', 'district-interest', 'dataset-history', 'general-admin', 'users']
+    : [...menuViews, 'association', 'details', 'district-interest']);
 }
 
 function canOpenView(user, view) {
@@ -1927,7 +1927,7 @@ function AnalyticsRankingModal({ ranking, onClose }) {
   );
 }
 
-function LeadAnalyticsSection({ data, records = [], interestRecords = [] }) {
+function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPilot = false }) {
   const [selectedRanking, setSelectedRanking] = useState(null);
   const analytics = useMemo(() => {
     const total = data?.total || records.length || 0;
@@ -2343,6 +2343,8 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [] }) {
 
   return (
     <section className="grid gap-4">
+      {!onlyPilot ? (
+        <>
       <div className="flex items-end justify-between gap-4 max-md:flex-col max-md:items-start">
         <div>
           <span className={labelClass}>Análise dos leads</span>
@@ -2548,6 +2550,8 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [] }) {
           </div>
         </article>
       </div>
+        </>
+      ) : null}
 
       {analytics.pilot.total ? (
         <div className="grid gap-4">
@@ -2620,6 +2624,8 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [] }) {
         </div>
       ) : null}
 
+      {!onlyPilot ? (
+        <>
       <div className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
         <article className={`${panelClass} p-6`}>
           <div className="flex items-start justify-between gap-4 max-sm:flex-col">
@@ -2769,6 +2775,8 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [] }) {
           </div>
         </article>
       </div>
+        </>
+      ) : null}
       <AnalyticsRankingModal ranking={selectedRanking} onClose={() => setSelectedRanking(null)} />
     </section>
   );
@@ -5234,7 +5242,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
   );
 }
 
-function DetailsShell({ payload, onBack, onLogout, onNavigate, user }) {
+function DetailsShell({ payload, onBack, onLogout, onNavigate, onOpenDistrict, user }) {
   const [sidebarCompact, setSidebarCompact] = useState(true);
 
   return (
@@ -5250,9 +5258,49 @@ function DetailsShell({ payload, onBack, onLogout, onNavigate, user }) {
           user={user}
         />
         <div className="min-w-0 flex-1 overflow-hidden rounded-[1.75rem] max-lg:rounded-none max-lg:pb-24">
-          <DashboardClient onBack={onBack} payload={payload} />
+          <DashboardClient onBack={onBack} onOpenDistrict={onOpenDistrict} payload={payload} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function DistrictInterestDashboard({ districtName = 'Alphaville', interestRecords = [], onBack }) {
+  const data = useMemo(() => ({
+    total: interestRecords.length,
+    phone: interestRecords.filter((lead) => lead.temTelefone).length,
+    hot: interestRecords.filter((lead) => lead.vipHistorico).length,
+    vip: interestRecords.filter((lead) => lead.vipHistorico).length,
+    studies: interestRecords.filter((lead) => Number(lead.materiaisQuantidade) > 0).length,
+    districts: interestRecords.length ? 1 : 0,
+    campaignTrend: [
+      { etapa: 'Base', leads: interestRecords.length },
+      { etapa: 'WhatsApp', leads: interestRecords.filter((lead) => lead.temTelefone).length },
+      { etapa: 'Tentativa', leads: interestRecords.filter((lead) => lead.tentativaContato === true).length },
+      { etapa: 'Resposta', leads: interestRecords.filter((lead) => lead.respondeu === true).length },
+      { etapa: 'Interesse', leads: interestRecords.filter((lead) => lead.demonstrouInteresse === true).length },
+      { etapa: 'Visita', leads: interestRecords.filter((lead) => lead.aceitouVisita === true).length }
+    ]
+  }), [interestRecords]);
+
+  return (
+    <div className="grid gap-6">
+      <section className={`${panelClass} overflow-hidden p-6`}>
+        <div className="flex items-start justify-between gap-4 max-md:flex-col">
+          <div>
+            <span className={labelClass}>Distrito com dados detalhados</span>
+            <h1 className="mt-2 text-4xl font-black tracking-normal text-slate-50 max-md:text-3xl">{districtName}</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
+              Painel exclusivo dos registros reais vindos da base piloto deste distrito.
+            </p>
+          </div>
+          <button className={ghostButtonClass} onClick={onBack} type="button">
+            <ArrowRight className="rotate-180" size={18} />
+            Voltar aos distritos
+          </button>
+        </div>
+      </section>
+      <LeadAnalyticsSection data={data} records={[]} interestRecords={interestRecords} onlyPilot />
     </div>
   );
 }
@@ -5456,6 +5504,13 @@ export default function CrmApp({ payload: initialPayload = null }) {
       <DetailsShell
         onBack={goBack}
         onLogout={logout}
+        onOpenDistrict={(districtName) => {
+          if (String(districtName || '').toLowerCase() !== 'alphaville') return false;
+          setViewHistory((history) => [...history, 'details'].slice(-20));
+          setView('district-interest');
+          requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }));
+          return true;
+        }}
         onNavigate={navigateView}
         payload={payload}
         user={user}
@@ -5513,7 +5568,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
         onDatasetUpdated={loadDashboard}
         onOpenDetails={() => openDetailsView(navigateView)}
         onOpenHistory={() => navigateView('dataset-history')}
-        interestRecords={interestRecords}
+        interestRecords={[]}
         records={records}
         user={user}
       />
@@ -5556,9 +5611,17 @@ export default function CrmApp({ payload: initialPayload = null }) {
         onDatasetUpdated={loadDashboard}
         onOpenDetails={() => openDetailsView(navigateView)}
         onOpenHistory={() => navigateView('dataset-history')}
-        interestRecords={interestRecords}
+        interestRecords={[]}
         records={records}
         user={user}
+      />
+    );
+  } else if (effectiveView === 'district-interest') {
+    content = (
+      <DistrictInterestDashboard
+        districtName="Alphaville"
+        interestRecords={interestRecords}
+        onBack={goBack}
       />
     );
   } else if (effectiveView === 'automations') {

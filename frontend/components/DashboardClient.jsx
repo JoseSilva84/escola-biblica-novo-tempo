@@ -609,7 +609,7 @@ function aggregate(records, filters) {
   return { filtered, kpis, districtList, religionList, tempo };
 }
 
-export default function DashboardClient({ payload, onBack }) {
+export default function DashboardClient({ payload, onBack, onOpenDistrict }) {
   const { records, meta } = payload;
   const districts = useMemo(() => Array.from(new Set(records.map((row) => row.d))).sort((a, b) => a.localeCompare(b)), [records]);
   const [filters, setFilters] = useState({ distrito: 'all', prioridade: 'all', vip: 'all', telefone: 'all', estudos: 'all', genero: 'all', search: '' });
@@ -672,6 +672,10 @@ export default function DashboardClient({ payload, onBack }) {
   const setFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   const resetFilters = () => setFilters({ distrito: 'all', prioridade: 'all', vip: 'all', telefone: 'all', estudos: 'all', genero: 'all', search: '' });
   const clickSort = (col) => setSort((current) => current.col === col ? { col, asc: !current.asc } : { col, asc: col === 'nome' });
+  const openDistrict = (name) => {
+    if (onOpenDistrict?.(name) === true) return;
+    setSelectedDistrictName(name);
+  };
   const exportCsv = () => {
     const header = ['Distrito', 'Total', 'WhatsApp', 'Quente', 'Potencial', 'Morno', 'Frio', 'VIPs', 'Estudos Ativos', 'Pontuação Média'];
     const rows = sortedDistricts.map((district) => [
@@ -922,7 +926,7 @@ export default function DashboardClient({ payload, onBack }) {
                 {sortedDistricts.map((d) => (
                   <tr className="transition hover:bg-white/[0.035]" key={d.nome}>
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-black">
-                      <button className="cursor-pointer text-blue-400 no-underline transition hover:text-blue-300 focus:outline-none focus:ring-4 focus:ring-blue-500/10" onClick={() => setSelectedDistrictName(d.nome)} type="button">{d.nome} ↗</button>
+                      <button className="cursor-pointer text-blue-400 no-underline transition hover:text-blue-300 focus:outline-none focus:ring-4 focus:ring-blue-500/10" onClick={() => openDistrict(d.nome)} type="button">{d.nome} ↗</button>
                     </td>
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-bold tabular-nums">{formatNumber(d.total)}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.035] px-4 py-4 font-bold tabular-nums">{formatNumber(d.telefone)}</td>
