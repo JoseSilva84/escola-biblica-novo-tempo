@@ -1798,11 +1798,17 @@ function DatasetHistoryModal({ history = [], onClose }) {
 function AnalyticsRankingModal({ ranking, onClose }) {
   const [contactFilter, setContactFilter] = useState('');
   const [contactFilterUnit, setContactFilterUnit] = useState('day');
+  const [visibleLimit, setVisibleLimit] = useState(80);
 
   useEffect(() => {
     setContactFilter('');
     setContactFilterUnit('day');
+    setVisibleLimit(80);
   }, [ranking]);
+
+  useEffect(() => {
+    setVisibleLimit(80);
+  }, [contactFilter, contactFilterUnit]);
 
   const filteredRows = useMemo(() => {
     const rows = ranking?.rows || [];
@@ -1811,12 +1817,14 @@ function AnalyticsRankingModal({ ranking, onClose }) {
     if (!Number.isFinite(value) || value <= 0) return rows;
     const multiplier = contactFilterUnit === 'year' ? 365 : contactFilterUnit === 'month' ? 30 : 1;
     const maxDays = value * multiplier;
-    return rows.filter((row) => Number(row.rawDays) <= maxDays);
+    return rows.filter((row) => Number(row.rawDays ?? row.c) <= maxDays);
   }, [contactFilter, contactFilterUnit, ranking]);
 
   if (!ranking) return null;
 
   const showContactFilter = ranking.type === 'recentContacts';
+  const visibleRows = filteredRows.slice(0, visibleLimit);
+  const hasMoreRows = filteredRows.length > visibleRows.length;
 
   return createPortal(
     <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
@@ -1865,29 +1873,47 @@ function AnalyticsRankingModal({ ranking, onClose }) {
         ) : null}
         <div className="max-h-[calc(88vh-150px)] overflow-y-auto p-6">
           <div className="grid gap-3">
-            {filteredRows.length ? filteredRows.map((row, index) => (
-              <div className="grid grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.18)] max-md:grid-cols-1" key={`${ranking.title}-${row.title}-${index}`}>
-                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.18)]">
-                  #{index + 1}
-                </span>
-                <div className="min-w-0">
-                  <strong className="block break-words text-base font-black text-white">{row.title}</strong>
-                  {row.subtitle ? <span className="mt-1 block break-words text-sm font-semibold text-slate-400">{row.subtitle}</span> : null}
-                  {row.details?.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {row.details.map((detail) => (
-                        <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300" key={detail}>{detail}</span>
-                      ))}
-                    </div>
-                  ) : null}
+            {filteredRows.length ? visibleRows.map((row, index) => {
+              const title = row.title || row.n || 'Lead sem nome';
+              const subtitle = row.subtitle || (ranking.type === 'recentContacts' ? `${row.d || 'Distrito não informado'} · ${row.tel || 'sem telefone'}` : null);
+              const metric = row.metric || (ranking.type === 'recentContacts' ? `${formatNumber(row.c)} dias` : null);
+              const details = row.details || (ranking.type === 'recentContacts' ? [
+                row.birthDate && row.birthDate !== 'N/I' ? `Aniversário: ${row.birthDate}` : 'Aniversário não informado',
+                row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
+              ] : []);
+              return (
+                <div className="grid grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.18)] max-md:grid-cols-1" key={`${ranking.title}-${title}-${index}`}>
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.18)]">
+                    #{index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <strong className="block break-words text-base font-black text-white">{title}</strong>
+                    {subtitle ? <span className="mt-1 block break-words text-sm font-semibold text-slate-400">{subtitle}</span> : null}
+                    {details?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {details.map((detail) => (
+                          <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300" key={detail}>{detail}</span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  {metric ? <strong className="rounded-2xl bg-blue-600 px-4 py-2 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)]">{metric}</strong> : null}
                 </div>
-                {row.metric ? <strong className="rounded-2xl bg-blue-600 px-4 py-2 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)]">{row.metric}</strong> : null}
-              </div>
-            )) : (
+              );
+            }) : (
               <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-6 text-center text-sm font-semibold text-slate-400">
                 Nenhum dado real encontrado para este ranking.
               </div>
             )}
+            {hasMoreRows ? (
+              <button
+                className="mx-auto mt-2 inline-flex h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 shadow-[0_16px_34px_rgba(255,255,255,0.14)] transition hover:-translate-y-0.5 hover:bg-blue-50"
+                onClick={() => setVisibleLimit((current) => current + 80)}
+                type="button"
+              >
+                Carregar mais {formatNumber(Math.min(80, filteredRows.length - visibleRows.length))}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -2087,16 +2113,7 @@ function LeadAnalyticsSection({ data, records = [] }) {
     kicker: 'Ranking de contato',
     title: 'Leads por contato recente',
     subtitle: 'Lista completa do contato mais recente para o mais distante. Use a pesquisa para limitar por dia, mês ou ano.',
-    rows: analytics.recentContactsAll.map((row) => ({
-      title: row.n || 'Lead sem nome',
-      subtitle: `${row.d || 'Distrito não informado'} · ${row.tel || 'sem telefone'}`,
-      metric: `${formatNumber(row.c)} dias`,
-      rawDays: Number(row.c),
-      details: [
-        row.birthDate && row.birthDate !== 'N/I' ? `Aniversário: ${row.birthDate}` : 'Aniversário não informado',
-        row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
-      ]
-    }))
+    rows: analytics.recentContactsAll
   });
 
   return (
