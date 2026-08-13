@@ -85,9 +85,11 @@ function scopedDashboardPayload(payload, user = {}) {
   const slug = userAssociationSlug(user);
   const canReadPaulistana = slug === 'paulistana';
   const records = canReadPaulistana ? payload.records : [];
+  const interestRecords = canReadPaulistana ? payload.interestRecords || [] : [];
   return {
     ...payload,
     records,
+    interestRecords,
     meta: {
       ...payload.meta,
       total: records.length,

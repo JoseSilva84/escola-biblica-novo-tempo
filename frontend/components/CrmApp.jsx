@@ -1879,11 +1879,11 @@ function AnalyticsRankingModal({ ranking, onClose }) {
                 || (ranking.type === 'leadList' ? [
                   row.em ? `E-mail: ${row.em}` : 'E-mail não informado',
                   row.tel ? `Telefone: ${row.tel}` : 'Telefone não informado',
-                  row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
+                  (row.materialName || row.materialPrincipal) && (row.materialName || row.materialPrincipal) !== 'N/I' ? `Material: ${row.materialName || row.materialPrincipal}` : 'Material não informado'
                 ] : null)
                 || (ranking.type === 'recentContacts' ? [
                   row.birthDate && row.birthDate !== 'N/I' ? `Aniversário: ${row.birthDate}` : 'Aniversário não informado',
-                  row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
+                  (row.materialName || row.materialPrincipal) && (row.materialName || row.materialPrincipal) !== 'N/I' ? `Material: ${row.materialName || row.materialPrincipal}` : 'Material não informado'
                 ] : []);
               return (
                 <div className="group relative overflow-hidden grid grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-blue-500/[0.035] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.18)] transition duration-300 hover:-translate-y-1 hover:border-blue-300/45 hover:bg-white/[0.075] hover:shadow-[0_26px_62px_rgba(37,99,235,0.20)] max-md:grid-cols-1" key={`${ranking.title}-${title}-${index}`}>
@@ -1927,7 +1927,7 @@ function AnalyticsRankingModal({ ranking, onClose }) {
   );
 }
 
-function LeadAnalyticsSection({ data, records = [] }) {
+function LeadAnalyticsSection({ data, records = [], interestRecords = [] }) {
   const [selectedRanking, setSelectedRanking] = useState(null);
   const analytics = useMemo(() => {
     const total = data?.total || records.length || 0;
@@ -2037,6 +2037,38 @@ function LeadAnalyticsSection({ data, records = [] }) {
         rows: records.filter((lead) => !lead.em && !lead.t)
       }
     ];
+    const countBy = (rows, getKey, labelKey = 'name') => Array.from(rows.reduce((map, lead) => {
+      const key = getKey(lead) || 'Não informado';
+      const current = map.get(key) || { [labelKey]: key, name: key, value: 0, rows: [] };
+      current.value += 1;
+      current.rows.push(lead);
+      map.set(key, current);
+      return map;
+    }, new Map()).values()).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+    const leadGroup = (name, rows) => ({ name, value: rows.length, rows });
+    const boolRows = (field, expected) => interestRecords.filter((lead) => lead[field] === expected);
+    const withValidPhone = interestRecords.filter((lead) => lead.temTelefone && lead.telefoneValido);
+    const withInvalidPhone = interestRecords.filter((lead) => lead.temTelefone && !lead.telefoneValido);
+    const withoutPhone = interestRecords.filter((lead) => !lead.temTelefone);
+    const withValidEmail = interestRecords.filter((lead) => lead.temEmail && lead.emailValido);
+    const withInvalidEmail = interestRecords.filter((lead) => lead.temEmail && !lead.emailValido);
+    const withoutEmail = interestRecords.filter((lead) => !lead.temEmail);
+    const pilotChannelRanking = countBy(interestRecords, (lead) => lead.canal || 'Sem canal registrado');
+    const pilotCityRanking = countBy(interestRecords, (lead) => lead.cidade || 'Não informado');
+    const pilotNeighborhoodRanking = countBy(interestRecords, (lead) => lead.bairro || 'Não informado');
+    const pilotMaterialRanking = countBy(interestRecords, (lead) => lead.materialPrincipal || 'Não informado');
+    const pilotMaterialQuantity = [
+      leadGroup('1 material', interestRecords.filter((lead) => Number(lead.materiaisQuantidade) === 1)),
+      leadGroup('2 materiais', interestRecords.filter((lead) => Number(lead.materiaisQuantidade) === 2)),
+      leadGroup('3 ou mais', interestRecords.filter((lead) => Number(lead.materiaisQuantidade) >= 3)),
+      leadGroup('Sem material', interestRecords.filter((lead) => !Number(lead.materiaisQuantidade)))
+    ];
+    const pilotValidContactGroups = [
+      leadGroup('Telefone e e-mail válidos', interestRecords.filter((lead) => lead.telefoneValido && lead.emailValido)),
+      leadGroup('Só telefone válido', interestRecords.filter((lead) => lead.telefoneValido && !lead.emailValido)),
+      leadGroup('Só e-mail válido', interestRecords.filter((lead) => !lead.telefoneValido && lead.emailValido)),
+      leadGroup('Sem contato válido', interestRecords.filter((lead) => !lead.telefoneValido && !lead.emailValido))
+    ];
 
     return {
       funnel: (data?.campaignTrend || []).map((item) => ({ ...item, taxa: pct(item.leads, total) })),
@@ -2095,9 +2127,68 @@ function LeadAnalyticsSection({ data, records = [] }) {
         { name: 'Quentes', value: pct(data?.hot || 0, total) },
         { name: 'VIPs', value: pct(data?.vip || 0, total) },
         { name: 'Estudos', value: pct(data?.studies || 0, total) }
-      ]
+      ],
+      pilot: {
+        total: interestRecords.length,
+        resultFunnel: [
+          { name: 'Base', value: interestRecords.length },
+          { name: 'Tentativa', value: boolRows('tentativaContato', true).length },
+          { name: 'Respondeu', value: boolRows('respondeu', true).length },
+          { name: 'Interesse', value: boolRows('demonstrouInteresse', true).length },
+          { name: 'Aceitou visita', value: boolRows('aceitouVisita', true).length },
+          { name: 'Participou', value: boolRows('participou', true).length }
+        ],
+        phoneQuality: [
+          leadGroup('Telefone válido', withValidPhone),
+          leadGroup('Telefone inválido', withInvalidPhone),
+          leadGroup('Sem telefone', withoutPhone)
+        ],
+        emailQuality: [
+          leadGroup('E-mail válido', withValidEmail),
+          leadGroup('E-mail inválido', withInvalidEmail),
+          leadGroup('Sem e-mail', withoutEmail)
+        ],
+        contactQuality: pilotValidContactGroups,
+        description: [
+          leadGroup('Com descrição', interestRecords.filter((lead) => lead.temDescricao)),
+          leadGroup('Sem descrição', interestRecords.filter((lead) => !lead.temDescricao))
+        ],
+        vipHistory: [
+          leadGroup('VIP histórico', interestRecords.filter((lead) => lead.vipHistorico)),
+          leadGroup('Não VIP', interestRecords.filter((lead) => !lead.vipHistorico))
+        ],
+        attempts: [
+          leadGroup('Tentativa registrada', boolRows('tentativaContato', true)),
+          leadGroup('Sem tentativa', interestRecords.filter((lead) => lead.tentativaContato !== true))
+        ],
+        responses: [
+          leadGroup('Respondeu', boolRows('respondeu', true)),
+          leadGroup('Não respondeu', boolRows('respondeu', false)),
+          leadGroup('Sem informação', interestRecords.filter((lead) => lead.respondeu === null || lead.respondeu === undefined))
+        ],
+        interest: [
+          leadGroup('Demonstrou interesse', boolRows('demonstrouInteresse', true)),
+          leadGroup('Não demonstrou', boolRows('demonstrouInteresse', false)),
+          leadGroup('Sem informação', interestRecords.filter((lead) => lead.demonstrouInteresse === null || lead.demonstrouInteresse === undefined))
+        ],
+        visits: [
+          leadGroup('Aceitou visita', boolRows('aceitouVisita', true)),
+          leadGroup('Não aceitou', boolRows('aceitouVisita', false)),
+          leadGroup('Sem informação', interestRecords.filter((lead) => lead.aceitouVisita === null || lead.aceitouVisita === undefined))
+        ],
+        participation: [
+          leadGroup('Participou', boolRows('participou', true)),
+          leadGroup('Não participou', boolRows('participou', false)),
+          leadGroup('Sem informação', interestRecords.filter((lead) => lead.participou === null || lead.participou === undefined))
+        ],
+        channels: pilotChannelRanking,
+        cities: pilotCityRanking,
+        neighborhoods: pilotNeighborhoodRanking,
+        materials: pilotMaterialRanking,
+        materialQuantity: pilotMaterialQuantity
+      }
     };
-  }, [data, records]);
+  }, [data, records, interestRecords]);
 
   const chartTooltip = {
     background: '#020617',
@@ -2148,6 +2239,17 @@ function LeadAnalyticsSection({ data, records = [] }) {
     subtitle: `${formatNumber(group.value)} leads encontrados neste grupo.`,
     rows: group.rows
   });
+  const openPilotRanking = (kicker, title, rows) => openRanking({
+    kicker,
+    title,
+    subtitle: 'Ranking calculado diretamente do arquivo de interessados de Alphaville.',
+    rows: rows.map((item) => ({
+      title: item.name,
+      subtitle: `${formatNumber(item.value)} leads vinculados`,
+      metric: formatNumber(item.value),
+      details: item.rows.slice(0, 8).map((lead) => lead.n).filter(Boolean)
+    }))
+  });
 
   function ContactSegmentCard({ kicker, title, groups, tone = 'blue' }) {
     const total = groups.reduce((sum, group) => sum + group.value, 0);
@@ -2185,6 +2287,55 @@ function LeadAnalyticsSection({ data, records = [] }) {
               </button>
             );
           })}
+        </div>
+      </article>
+    );
+  }
+
+  function InsightRankingCard({ kicker, title, rows, tone = 'blue' }) {
+    const colors = {
+      blue: 'via-blue-300/75 bg-blue-600',
+      emerald: 'via-emerald-300/75 bg-emerald-600',
+      amber: 'via-amber-300/75 bg-amber-500',
+      violet: 'via-violet-300/75 bg-violet-600'
+    };
+    const [lineTone, badgeTone] = (colors[tone] || colors.blue).split(' ');
+    const topRows = rows.slice(0, 5);
+
+    return (
+      <article className={`${panelClass} p-6`}>
+        <div className="flex items-start justify-between gap-4 max-sm:flex-col">
+          <div>
+            <span className={labelClass}>{kicker}</span>
+            <h3 className="mt-1 text-xl font-black text-slate-50">{title}</h3>
+          </div>
+          <button className={seeAllButtonClass} onClick={() => openPilotRanking(kicker, title, rows)} type="button">Ver todos</button>
+        </div>
+        <div className="mt-5 grid gap-3">
+          {topRows.length ? topRows.map((item, index) => (
+            <button
+              className={rankingButtonClass}
+              key={`${title}-${item.name}`}
+              onClick={() => openPilotRanking(kicker, title, rows)}
+              type="button"
+            >
+              <span className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent ${lineTone} to-transparent opacity-0 transition group-hover:opacity-100`} />
+              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
+                <span className={rankingNumberClass}>#{index + 1}</span>
+                <div className="min-w-0">
+                  <strong className="block truncate text-base font-black text-slate-50">{item.name}</strong>
+                  <span className="mt-1 block truncate text-xs font-semibold text-slate-400">
+                    {item.rows.slice(0, 3).map((lead) => lead.n).join(', ') || 'Sem nomes vinculados'}
+                  </span>
+                </div>
+                <span className={`rounded-full ${badgeTone} px-3 py-1 text-xs font-black text-white shadow-[0_12px_28px_rgba(37,99,235,0.22)]`}>{formatNumber(item.value)}</span>
+              </div>
+            </button>
+          )) : (
+            <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400">
+              Nenhum dado real encontrado nesta dimensão.
+            </div>
+          )}
         </div>
       </article>
     );
@@ -2398,6 +2549,77 @@ function LeadAnalyticsSection({ data, records = [] }) {
         </article>
       </div>
 
+      {analytics.pilot.total ? (
+        <div className="grid gap-4">
+          <div className="flex items-end justify-between gap-4 max-md:flex-col max-md:items-start">
+            <div>
+              <span className={labelClass}>Base piloto Alphaville</span>
+              <h2 className="mt-1 text-2xl font-black text-slate-50">Inteligência dos campos ainda não explorados</h2>
+            </div>
+            <span className="rounded-full border border-white/[0.08] bg-slate-950/45 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-300">
+              {formatNumber(analytics.pilot.total)} registros reais
+            </span>
+          </div>
+
+          <div className="grid grid-cols-[1.1fr_0.9fr] gap-4 max-xl:grid-cols-1">
+            <article className={`${panelClass} p-6`}>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <span className={labelClass}>Resultados</span>
+                  <h3 className="mt-1 text-xl font-black text-slate-50">Funil operacional do acompanhamento</h3>
+                </div>
+                <ClipboardList className="text-blue-300" size={22} />
+              </div>
+              <div className="h-72">
+                <ResponsiveContainer height="100%" width="100%">
+                  <BarChart data={analytics.pilot.resultFunnel}>
+                    <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
+                    <XAxis dataKey="name" interval={0} stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} />
+                    <YAxis stroke="#94a3b8" tickFormatter={formatNumber} tickLine={false} width={48} />
+                    <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
+                    <Bar dataKey="value" fill="#2563eb" radius={[10, 10, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </article>
+
+            <ContactSegmentCard
+              groups={analytics.pilot.contactQuality}
+              kicker="Contato válido"
+              title="Canais realmente aproveitáveis"
+              tone="emerald"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+            <ContactSegmentCard groups={analytics.pilot.phoneQuality} kicker="Telefone" title="Qualidade do telefone" tone="blue" />
+            <ContactSegmentCard groups={analytics.pilot.emailQuality} kicker="E-mail" title="Qualidade do e-mail" tone="emerald" />
+            <ContactSegmentCard groups={analytics.pilot.description} kicker="Descrição" title="Com e sem descrição" tone="violet" />
+            <ContactSegmentCard groups={analytics.pilot.vipHistory} kicker="Histórico VIP" title="Marcadores históricos" tone="blue" />
+          </div>
+
+          <div className="grid grid-cols-4 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+            <ContactSegmentCard groups={analytics.pilot.attempts} kicker="Tentativas" title="Contato iniciado" tone="blue" />
+            <ContactSegmentCard groups={analytics.pilot.responses} kicker="Respostas" title="Resposta do lead" tone="emerald" />
+            <ContactSegmentCard groups={analytics.pilot.interest} kicker="Interesse" title="Sinal de interesse" tone="violet" />
+            <ContactSegmentCard groups={analytics.pilot.visits} kicker="Visitas" title="Aceite de visita" tone="blue" />
+          </div>
+
+          <div className="grid grid-cols-4 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+            <ContactSegmentCard groups={analytics.pilot.participation} kicker="Participação" title="Presença registrada" tone="emerald" />
+            <ContactSegmentCard groups={analytics.pilot.materialQuantity} kicker="Materiais" title="Quantidade por lead" tone="violet" />
+            <InsightRankingCard kicker="Canais" title="Canais de tentativa" rows={analytics.pilot.channels} tone="blue" />
+            <InsightRankingCard kicker="Material principal" title="Interesse por material" rows={analytics.pilot.materials} tone="amber" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
+            <InsightRankingCard kicker="Cidades" title="Concentração por cidade" rows={analytics.pilot.cities} tone="emerald" />
+            <InsightRankingCard kicker="Bairros" title="Concentração por bairro" rows={analytics.pilot.neighborhoods} tone="blue" />
+            <InsightRankingCard kicker="Materiais" title="Materiais principais" rows={analytics.pilot.materials} tone="violet" />
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
         <article className={`${panelClass} p-6`}>
           <div className="flex items-start justify-between gap-4 max-sm:flex-col">
@@ -2552,7 +2774,7 @@ function LeadAnalyticsSection({ data, records = [] }) {
   );
 }
 
-function AssociationDashboard({ association, data, records = [], onDatasetUpdated, onOpenDetails, onOpenHistory, user }) {
+function AssociationDashboard({ association, data, records = [], interestRecords = [], onDatasetUpdated, onOpenDetails, onOpenHistory, user }) {
   const automations = [];
 
   return (
@@ -2616,7 +2838,7 @@ function AssociationDashboard({ association, data, records = [], onDatasetUpdate
 
       <DatasetUploadPanel association={association} onUpdated={onDatasetUpdated} user={user} />
 
-      <LeadAnalyticsSection data={data} records={records} />
+      <LeadAnalyticsSection data={data} records={records} interestRecords={interestRecords} />
 
       <section className="grid grid-cols-[1.15fr_0.85fr] gap-4 max-xl:grid-cols-1">
         <article className={`${panelClass} p-6`}>
@@ -5072,6 +5294,9 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const records = useMemo(() => (
     isAdminUser(user) && selectedAssociationSlug !== 'paulistana' ? [] : baseRecords
   ), [baseRecords, selectedAssociationSlug, user]);
+  const interestRecords = useMemo(() => (
+    selectedAssociationSlug === 'paulistana' ? payload?.interestRecords || [] : []
+  ), [payload, selectedAssociationSlug]);
   const data = useMemo(() => buildAssociationData(records), [records]);
   const filteredAssociations = useMemo(() => {
     if (!isAdminUser(user)) return visibleAssociations;
@@ -5288,6 +5513,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
         onDatasetUpdated={loadDashboard}
         onOpenDetails={() => openDetailsView(navigateView)}
         onOpenHistory={() => navigateView('dataset-history')}
+        interestRecords={interestRecords}
         records={records}
         user={user}
       />
@@ -5330,6 +5556,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
         onDatasetUpdated={loadDashboard}
         onOpenDetails={() => openDetailsView(navigateView)}
         onOpenHistory={() => navigateView('dataset-history')}
+        interestRecords={interestRecords}
         records={records}
         user={user}
       />

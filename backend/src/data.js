@@ -10,6 +10,7 @@ const DATASET_DIR = resolveConfiguredPath(process.env.DATASET_DIR)
   || path.resolve(process.cwd(), 'dataset');
 const ML_RANKING_FILE = 'ranking_nao_vip_ml_pandas.csv';
 const ALUNOS_FILE = 'alunos.json';
+const INTEREST_DATA_FILE = 'dados_interesse_Alphaville.json';
 const UPDATE_STATUS_FILE = 'ultima_atualizacao_dataset.json';
 const UPDATE_HISTORY_FILE = 'historico_atualizacoes_dataset.json';
 
@@ -216,6 +217,70 @@ function transformRecord(row, ml) {
   };
 }
 
+function readInterestPilotData() {
+  const interestPath = firstExistingPath([
+    resolveConfiguredPath(process.env.INTEREST_DATA_PATH),
+    path.join(DATASET_DIR, INTEREST_DATA_FILE)
+  ]);
+  if (!interestPath) return { records: [], meta: null };
+
+  try {
+    const payload = JSON.parse(fs.readFileSync(interestPath, 'utf8'));
+    const rows = Array.isArray(payload.registros) ? payload.registros : [];
+    return {
+      records: rows.map(transformInterestPilotRecord),
+      meta: {
+        path: interestPath,
+        district: payload.distrito_piloto || 'Alphaville',
+        total: rows.length,
+        referenceDate: payload.data_referencia || null,
+        source: payload.fonte || null,
+        schemaVersion: payload.schema_version || null
+      }
+    };
+  } catch {
+    return { records: [], meta: null };
+  }
+}
+
+function transformInterestPilotRecord(row) {
+  const contato = row?.contato || {};
+  const origem = row?.origem || {};
+  const atributos = row?.atributos_modelo || {};
+  const resultados = row?.resultados || {};
+  const email = normalize(contato.email, '');
+
+  return {
+    id: normalize(row?.id, ''),
+    n: normalize(contato.nome, 'Lead sem nome'),
+    tel: normalize(contato.telefone, ''),
+    em: email === 'N/I' ? '' : email,
+    d: normalize(origem.distrito, 'Alphaville'),
+    cidade: normalize(origem.cidade || atributos.cidade, 'NÃ£o informado'),
+    bairro: normalize(origem.bairro || atributos.bairro, 'NÃ£o informado'),
+    material: normalize(origem.material, 'N/I'),
+    materialPrincipal: normalize(atributos.material_principal, 'NÃ£o informado'),
+    ultimoContato: origem.ultimo_contato || null,
+    vipHistorico: Boolean(origem.vip_historico),
+    materiaisQuantidade: Number(atributos.materiais_quantidade) || 0,
+    temTelefone: Number(atributos.tem_telefone) || 0,
+    telefoneValido: Number(atributos.telefone_valido) || 0,
+    temEmail: Number(atributos.tem_email) || 0,
+    emailValido: Number(atributos.email_valido) || 0,
+    temDescricao: Number(atributos.tem_descricao) || 0,
+    logDiasDesdeContato: Number.isFinite(Number(atributos.log_dias_desde_contato)) ? Number(atributos.log_dias_desde_contato) : null,
+    tentativaContato: resultados.tentativa_contato,
+    dataTentativa: resultados.data_tentativa || null,
+    canal: resultados.canal || null,
+    respondeu: resultados.respondeu,
+    demonstrouInteresse: resultados.demonstrou_interesse,
+    aceitouVisita: resultados.aceitou_visita,
+    participou: resultados.participou,
+    observacao: resultados.observacao || null,
+    raw: row
+  };
+}
+
 export function getDashboardData() {
   const alunosPath = firstExistingPath([
     resolveConfiguredPath(process.env.ALUNOS_DATA_PATH),
@@ -229,12 +294,15 @@ export function getDashboardData() {
   const lastDatasetUpdate = readLastDatasetUpdate();
   const datasetUpdateHistory = readDatasetUpdateHistory();
   const records = alunos.map((row) => transformRecord(row, ranking.byId));
+  const interestPilot = readInterestPilotData();
 
   return {
     records,
+    interestRecords: interestPilot.records,
     meta: {
       total: records.length,
       alunosPath,
+      interestPilot: interestPilot.meta,
       mlSource: ranking.source,
       mlRecords: ranking.byId.size,
       lastDatasetUpdate,
