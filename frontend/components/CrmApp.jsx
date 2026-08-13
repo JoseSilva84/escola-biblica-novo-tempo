@@ -1817,8 +1817,13 @@ function AnalyticsRankingModal({ ranking, onClose }) {
             <h2 className="mt-2 text-2xl font-black text-white">{ranking.title}</h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-slate-300">{ranking.subtitle}</p>
           </div>
-          <button className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/12 bg-white/8 text-white transition hover:bg-white/14" onClick={onClose} type="button">
-            <X size={20} />
+          <button
+            aria-label="Fechar modal"
+            className="group grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/18 bg-white/8 text-white shadow-[0_16px_34px_rgba(0,0,0,0.22)] transition duration-300 hover:-translate-y-0.5 hover:rotate-3 hover:border-red-200/60 hover:bg-red-500/18 hover:shadow-[0_22px_46px_rgba(248,113,113,0.18)] focus:outline-none focus:ring-4 focus:ring-red-400/20"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="transition duration-300 group-hover:rotate-90 group-hover:scale-110 group-hover:text-red-100" size={20} />
           </button>
         </div>
         {showContactFilter ? (
@@ -1881,22 +1886,23 @@ function AnalyticsRankingModal({ ranking, onClose }) {
                   row.materialName && row.materialName !== 'N/I' ? `Material: ${row.materialName}` : 'Material não informado'
                 ] : []);
               return (
-                <div className="grid grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.18)] max-md:grid-cols-1" key={`${ranking.title}-${title}-${index}`}>
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.18)]">
+                <div className="group relative overflow-hidden grid grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-blue-500/[0.035] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.18)] transition duration-300 hover:-translate-y-1 hover:border-blue-300/45 hover:bg-white/[0.075] hover:shadow-[0_26px_62px_rgba(37,99,235,0.20)] max-md:grid-cols-1" key={`${ranking.title}-${title}-${index}`}>
+                  <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/85 to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.18)] transition duration-300 group-hover:scale-105 group-hover:bg-blue-50 group-hover:shadow-[0_16px_34px_rgba(147,197,253,0.22)]">
                     #{index + 1}
                   </span>
                   <div className="min-w-0">
-                    <strong className="block break-words text-base font-black text-white">{title}</strong>
-                    {subtitle ? <span className="mt-1 block break-words text-sm font-semibold text-slate-400">{subtitle}</span> : null}
+                    <strong className="block break-words text-base font-black text-white transition duration-300 group-hover:text-blue-50">{title}</strong>
+                    {subtitle ? <span className="mt-1 block break-words text-sm font-semibold text-slate-400 transition duration-300 group-hover:text-slate-300">{subtitle}</span> : null}
                     {details?.length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {details.map((detail) => (
-                          <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300" key={detail}>{detail}</span>
+                          <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300 transition duration-300 group-hover:border-blue-200/25 group-hover:bg-blue-950/45 group-hover:text-blue-100" key={detail}>{detail}</span>
                         ))}
                       </div>
                     ) : null}
                   </div>
-                  {metric ? <strong className="rounded-2xl bg-blue-600 px-4 py-2 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)]">{metric}</strong> : null}
+                  {metric ? <strong className="rounded-2xl bg-blue-600 px-4 py-2 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)] transition duration-300 group-hover:scale-105 group-hover:bg-blue-500 group-hover:shadow-[0_18px_38px_rgba(37,99,235,0.38)]">{metric}</strong> : null}
                 </div>
               );
             }) : (
