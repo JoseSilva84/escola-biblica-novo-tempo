@@ -71,7 +71,7 @@ const adminNavItems = [
   ['settings', 'Configura\u00e7\u00f5es', Settings]
 ];
 const associationNavItems = [
-  ['associations', 'Associa\u00e7\u00f5es', Building2],
+  ['associations', 'Associa\u00e7\u00e3o', Building2],
   ['leads', 'Leads', ClipboardList],
   ['campaigns', 'Campanhas', Radio],
   ['automations', 'WhatsApp', MessageCircle],
@@ -1102,28 +1102,30 @@ function AdminDashboard({ associations, data, canManageAdmin = false, isAssociat
                 <ClipboardList size={18} />
                 Leads
               </button>
-              {isAssociationsView ? (
-                <label className="relative inline-flex min-w-72 items-center">
-                  <select
-                    className={`${primaryButtonClass} w-full appearance-none pr-11`}
-                    defaultValue=""
-                    onChange={(event) => {
-                      if (event.target.value) onOpenAssociation(event.target.value);
-                    }}
-                  >
-                    <option value="">Selecionar associação</option>
-                    {associations.map((association) => (
-                      <option key={association.id} value={association.id}>{association.name}</option>
-                    ))}
-                  </select>
-                  <ChevronRight className="pointer-events-none absolute right-4 text-white" size={18} />
-                </label>
-              ) : (
-                <button className={primaryButtonClass} onClick={onOpenAssociations} type="button">
-                  Associações
-                  <ArrowRight size={18} />
-                </button>
-              )}
+              {canManageAdmin ? (
+                isAssociationsView ? (
+                  <label className="relative inline-flex min-w-72 items-center">
+                    <select
+                      className={`${primaryButtonClass} w-full appearance-none pr-11`}
+                      defaultValue=""
+                      onChange={(event) => {
+                        if (event.target.value) onOpenAssociation(event.target.value);
+                      }}
+                    >
+                      <option value="">Selecionar associação</option>
+                      {associations.map((association) => (
+                        <option key={association.id} value={association.id}>{association.name}</option>
+                      ))}
+                    </select>
+                    <ChevronRight className="pointer-events-none absolute right-4 text-white" size={18} />
+                  </label>
+                ) : (
+                  <button className={primaryButtonClass} onClick={onOpenAssociations} type="button">
+                    Associações
+                    <ArrowRight size={18} />
+                  </button>
+                )
+              ) : null}
               {canManageAdmin ? (
                 <>
                   <button
@@ -1169,7 +1171,12 @@ function AdminDashboard({ associations, data, canManageAdmin = false, isAssociat
       </section>
 
       <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1 stagger-in" style={{ animationDelay: '100ms' }}>
-        <MetricCard detail={`${associations.length} territórios cadastrados`} icon={Building2} label="Associações" value={formatNumber(associations.length)} />
+        <MetricCard
+          detail={canManageAdmin ? `${associations.length} territórios cadastrados` : 'território vinculado'}
+          icon={Building2}
+          label={canManageAdmin ? 'Associações' : 'Associação'}
+          value={formatNumber(associations.length)}
+        />
         <MetricCard detail="campanhas mapeadas" icon={Radio} label="Campanhas" tone="green" value={formatNumber(totals.campaigns)} />
         <MetricCard detail="com prioridade alta" icon={Sparkles} label="Leads quentes" tone="orange" value={formatNumber(totals.hot)} />
         <MetricCard detail="em acompanhamento" icon={ClipboardList} label="Estudos ativos" tone="violet" value={formatNumber(totals.studies)} />
@@ -1179,13 +1186,15 @@ function AdminDashboard({ associations, data, canManageAdmin = false, isAssociat
         <article className={`${panelClass} p-6`}>
           <div className="mb-5 flex items-center justify-between gap-4 max-md:flex-col max-md:items-start">
             <div>
-              <span className={labelClass}>Associações</span>
-              <h2 className="mt-1 text-2xl font-black text-slate-50">Territórios cadastrados</h2>
+              <span className={labelClass}>{canManageAdmin ? 'Associações' : 'Associação'}</span>
+              <h2 className="mt-1 text-2xl font-black text-slate-50">{canManageAdmin ? 'Territórios cadastrados' : 'Território vinculado'}</h2>
             </div>
-            <div className="relative w-80 max-md:w-full">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
-              <input className="h-11 w-full rounded-xl border border-white/[0.08] bg-slate-950/70 pl-10 pr-3 text-sm font-bold text-slate-200 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10" placeholder="Buscar associação..." />
-            </div>
+            {canManageAdmin ? (
+              <div className="relative w-80 max-md:w-full">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
+                <input className="h-11 w-full rounded-xl border border-white/[0.08] bg-slate-950/70 pl-10 pr-3 text-sm font-bold text-slate-200 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10" placeholder="Buscar associação..." />
+              </div>
+            ) : null}
           </div>
           <div className="grid gap-3">
             {associations.map((association) => (
