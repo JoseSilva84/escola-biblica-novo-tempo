@@ -1308,6 +1308,7 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
 
   const consolidation = lastResult?.result?.consolidacao;
   const ml = lastResult?.result?.ml;
+  const lastHistoryEntry = lastResult?.history;
 
   return (
     <section className={`${panelClass} p-6`}>
@@ -1386,7 +1387,7 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
             <MetricCard detail={`${formatNumber(ml?.vips || 0)} VIPs historicos`} icon={Sparkles} label="ML registros" tone="orange" value={formatNumber(ml?.registros || 0)} />
           </div>
           <div className="mt-5">
-            <LastDatasetUpdateCard update={{
+            <LastDatasetUpdateCard update={lastHistoryEntry || {
               atualizado_em: new Date().toISOString(),
               consolidacao: consolidation,
               ml

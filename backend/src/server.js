@@ -7,6 +7,7 @@ import fsp from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
+import { randomUUID } from 'crypto';
 import { createSessionToken, requireAuth, sessionCookieOptions, validateCredentials, verifySessionToken } from './auth.js';
 import { getDashboardData } from './data.js';
 import { prisma } from './prisma.js';
@@ -208,82 +209,152 @@ function ensureDatasetHistoryTable() {
 }
 
 async function readDatasetHistoryFromDb(limit = 50) {
-  if (!prisma.datasetUploadHistory) return [];
   await ensureDatasetHistoryTable();
-  const rows = await prisma.datasetUploadHistory.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: limit
-  });
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const rows = await prisma.$queryRaw`
+    SELECT
+      "id",
+      "status",
+      "associationId",
+      "associationName",
+      "uploadedById",
+      "uploadedByName",
+      "uploadedByEmail",
+      "uploadedFiles",
+      "summary",
+      "alerts",
+      "newLeads",
+      "rowsBefore",
+      "rowsAfter",
+      "districts",
+      "ml",
+      "createdAt"
+    FROM "DatasetUploadHistory"
+    ORDER BY "createdAt" DESC
+    LIMIT ${safeLimit}
+  `;
   return rows.map(normalizeDatasetHistoryEntry).filter(Boolean);
 }
 
-async function saveDatasetUploadHistory({ result, files, user }) {
-  if (!prisma.datasetUploadHistory) return null;
+async function saveDatasetUploadHistory({ result, files, user, processingStartedAt = new Date(), processingCompletedAt = new Date() }) {
   await ensureDatasetHistoryTable();
   const consolidation = result?.consolidacao || {};
+  const uploadedFiles = files.map((file) => ({
+    name: file.filename,
+    size: file.buffer.length
+  }));
+  const totalUploadBytes = uploadedFiles.reduce((total, file) => total + Number(file.size || 0), 0);
+  const summary = {
+    ...consolidation,
+    processamento: {
+      iniciado_em: processingStartedAt.toISOString(),
+      concluido_em: processingCompletedAt.toISOString(),
+      duracao_ms: Math.max(0, processingCompletedAt.getTime() - processingStartedAt.getTime()),
+      arquivos_enviados: uploadedFiles.length,
+      bytes_enviados: totalUploadBytes
+    }
+  };
   const ml = {
     metricas: result?.ml || null,
     status: result?.ml_status || null
   };
-  return prisma.datasetUploadHistory.create({
-    data: {
-      status: 'COMPLETED',
-      associationId: 'paulistana',
-      associationName: 'Associacao Paulistana',
-      uploadedById: user?.sub || null,
-      uploadedByName: user?.name || null,
-      uploadedByEmail: user?.email || null,
-      uploadedFiles: files.map((file) => ({
-        name: file.filename,
-        size: file.buffer.length
-      })),
-      summary: consolidation,
-      alerts: consolidation.alertas_duplicidade || {},
-      newLeads: Number(consolidation.alunos_novos || 0),
-      rowsBefore: Number(consolidation.linhas_antes || 0),
-      rowsAfter: Number(consolidation.linhas_depois || 0),
-      districts: consolidation.distritos_novos || [],
-      ml
-    }
-  });
+  const id = randomUUID();
+  const rows = await prisma.$queryRaw`
+    INSERT INTO "DatasetUploadHistory" (
+      "id",
+      "status",
+      "associationId",
+      "associationName",
+      "uploadedById",
+      "uploadedByName",
+      "uploadedByEmail",
+      "uploadedFiles",
+      "summary",
+      "alerts",
+      "newLeads",
+      "rowsBefore",
+      "rowsAfter",
+      "districts",
+      "ml",
+      "createdAt"
+    )
+    VALUES (
+      ${id},
+      'COMPLETED',
+      'paulistana',
+      'Associacao Paulistana',
+      ${user?.sub || null},
+      ${user?.name || null},
+      ${user?.email || null},
+      CAST(${JSON.stringify(uploadedFiles)} AS JSONB),
+      CAST(${JSON.stringify(summary)} AS JSONB),
+      CAST(${JSON.stringify(consolidation.alertas_duplicidade || {})} AS JSONB),
+      ${Number(consolidation.alunos_novos || 0)},
+      ${Number(consolidation.linhas_antes || 0)},
+      ${Number(consolidation.linhas_depois || 0)},
+      CAST(${JSON.stringify(consolidation.distritos_novos || [])} AS JSONB),
+      CAST(${JSON.stringify(ml)} AS JSONB),
+      ${processingCompletedAt}
+    )
+    RETURNING *
+  `;
+  return rows[0] || null;
 }
 
 async function importDatasetHistoryFromFiles(entries = []) {
-  if (!prisma.datasetUploadHistory || !entries.length) return [];
+  if (!entries.length) return [];
   await ensureDatasetHistoryTable();
-  const existing = await prisma.datasetUploadHistory.count();
-  if (existing > 0) return [];
+  const [{ count }] = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "DatasetUploadHistory"`;
+  if (count > 0) return [];
 
   for (const entry of entries.slice().reverse()) {
     const consolidation = entry?.consolidacao || {};
     const createdAt = Number.isNaN(Date.parse(entry?.atualizado_em || ''))
       ? new Date()
       : new Date(entry.atualizado_em);
-    await prisma.datasetUploadHistory.create({
-      data: {
-        status: entry?.status || 'IMPORTED',
-        associationId: entry?.associationId || 'paulistana',
-        associationName: entry?.associationName || 'Associacao Paulistana',
-        uploadedFiles: (consolidation.arquivos || []).map((file) => ({
-          name: file.arquivo,
-          read: file.lidos,
-          new: file.novos,
-          existing: file.ja_existiam,
-          duplicated: file.duplicados_upload
-        })),
-        summary: consolidation,
-        alerts: consolidation.alertas_duplicidade || {},
-        newLeads: Number(consolidation.alunos_novos || 0),
-        rowsBefore: Number(consolidation.linhas_antes || 0),
-        rowsAfter: Number(consolidation.linhas_depois || 0),
-        districts: consolidation.distritos_novos || [],
-        ml: {
-          metricas: entry?.ml || null,
-          status: entry?.ml_status || null
-        },
-        createdAt
-      }
-    });
+    const uploadedFiles = (consolidation.arquivos || []).map((file) => ({
+      name: file.arquivo,
+      read: file.lidos,
+      new: file.novos,
+      existing: file.ja_existiam,
+      duplicated: file.duplicados_upload
+    }));
+    const ml = {
+      metricas: entry?.ml || null,
+      status: entry?.ml_status || null
+    };
+    await prisma.$executeRaw`
+      INSERT INTO "DatasetUploadHistory" (
+        "id",
+        "status",
+        "associationId",
+        "associationName",
+        "uploadedFiles",
+        "summary",
+        "alerts",
+        "newLeads",
+        "rowsBefore",
+        "rowsAfter",
+        "districts",
+        "ml",
+        "createdAt"
+      )
+      VALUES (
+        ${randomUUID()},
+        ${entry?.status || 'IMPORTED'},
+        ${entry?.associationId || 'paulistana'},
+        ${entry?.associationName || 'Associacao Paulistana'},
+        CAST(${JSON.stringify(uploadedFiles)} AS JSONB),
+        CAST(${JSON.stringify(consolidation)} AS JSONB),
+        CAST(${JSON.stringify(consolidation.alertas_duplicidade || {})} AS JSONB),
+        ${Number(consolidation.alunos_novos || 0)},
+        ${Number(consolidation.linhas_antes || 0)},
+        ${Number(consolidation.linhas_depois || 0)},
+        CAST(${JSON.stringify(consolidation.distritos_novos || [])} AS JSONB),
+        CAST(${JSON.stringify(ml)} AS JSONB),
+        ${createdAt}
+      )
+    `;
   }
 
   return readDatasetHistoryFromDb(50);
@@ -843,11 +914,19 @@ app.post(
         uploadPaths.push(uploadPath);
       }
 
+      const processingStartedAt = new Date();
       const result = await runDatasetUpdate(uploadPaths);
+      const processingCompletedAt = new Date();
       let savedHistory = null;
       let historyWarning = null;
       try {
-        savedHistory = await saveDatasetUploadHistory({ result, files, user: request.user });
+        savedHistory = await saveDatasetUploadHistory({
+          result,
+          files,
+          user: request.user,
+          processingStartedAt,
+          processingCompletedAt
+        });
       } catch (historyError) {
         historyWarning = historyError.message || 'Historico nao foi salvo no banco.';
         console.error('[dataset:history:error]', historyWarning);
