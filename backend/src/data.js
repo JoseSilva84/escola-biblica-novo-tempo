@@ -326,8 +326,35 @@ function transformDashboardRecordToInterest(row) {
     aceitouVisita: null,
     participou: null,
     observacao: null,
+    score: Number(row.s) || 0,
+    priority: row.p || 'Cold',
+    priorityLabel: row.p === 'Hot' ? 'Quente' : row.p === 'Warm' ? 'Potencial' : row.p === 'Cool' ? 'Morno' : 'Frio',
+    ml: Number(row.ml) || 0,
+    faixa: row.faixa || null,
+    idade: row.a || null,
+    genero: row.g || null,
+    estudoAtivo: Boolean(row.e),
     raw: row
   };
+}
+
+function enrichInterestRowsWithDashboardData(rows = [], recordsById = new Map()) {
+  return rows.map((row) => {
+    const dashboard = recordsById.get(String(row.id));
+    if (!dashboard) return row;
+    return {
+      ...row,
+      score: Number(dashboard.s) || 0,
+      priority: dashboard.p || row.priority || 'Cold',
+      priorityLabel: dashboard.p === 'Hot' ? 'Quente' : dashboard.p === 'Warm' ? 'Potencial' : dashboard.p === 'Cool' ? 'Morno' : 'Frio',
+      ml: Number(dashboard.ml) || 0,
+      faixa: dashboard.faixa || row.faixa || null,
+      idade: dashboard.a || row.idade || null,
+      genero: dashboard.g || row.genero || null,
+      estudoAtivo: Boolean(dashboard.e),
+      raw: dashboard
+    };
+  });
 }
 
 function transformInterestPilotRecord(row) {
@@ -383,9 +410,16 @@ export function getDashboardData() {
   const records = alunos.map((row) => transformRecord(row, ranking.byId));
   const interestPilot = readInterestDistrictData();
   const generatedInterest = buildInterestDistrictDataFromRecords(records);
+  const recordsById = new Map(records.map((record) => [String(record.id), record]));
+  const enrichedPilotByDistrict = Object.fromEntries(
+    Object.entries(interestPilot.byDistrict).map(([slug, rows]) => [
+      slug,
+      enrichInterestRowsWithDashboardData(rows, recordsById)
+    ])
+  );
   const interestRecordsByDistrict = {
     ...generatedInterest.byDistrict,
-    ...interestPilot.byDistrict
+    ...enrichedPilotByDistrict
   };
   const interestDistrictMeta = [
     ...generatedInterest.districts,

@@ -5311,7 +5311,102 @@ function DistrictInterestDashboard({ districtName = 'Alphaville', interestRecord
         </div>
       </section>
       <LeadAnalyticsSection data={data} records={[]} interestRecords={interestRecords} onlyPilot />
+      <DistrictLeadScoreList records={interestRecords} />
     </div>
+  );
+}
+
+function DistrictLeadScoreList({ records = [] }) {
+  const [search, setSearch] = useState('');
+  const [visibleLimit, setVisibleLimit] = useState(80);
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return records
+      .filter((lead) => {
+        if (!term) return true;
+        const haystack = `${lead.n || ''} ${lead.tel || ''} ${lead.em || ''} ${lead.materialPrincipal || ''} ${lead.bairro || ''}`.toLowerCase();
+        return haystack.includes(term);
+      })
+      .sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || String(a.n || '').localeCompare(String(b.n || '')));
+  }, [records, search]);
+  const visible = filtered.slice(0, visibleLimit);
+
+  useEffect(() => {
+    setVisibleLimit(80);
+  }, [search, records]);
+
+  return (
+    <section className={`${panelClass} p-6`}>
+      <div className="mb-5 flex items-start justify-between gap-4 max-lg:flex-col">
+        <div>
+          <span className={labelClass}>Lista operacional</span>
+          <h2 className="mt-1 text-2xl font-black text-slate-50">Leads do distrito por score</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
+            Nomes ordenados pela pontuação operacional, com prioridade, WhatsApp, VIP, estudo ativo e material principal.
+          </p>
+        </div>
+        <label className="relative w-full max-w-md">
+          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input
+            className="h-12 w-full rounded-2xl border border-white/[0.08] bg-slate-950/50 pl-11 pr-4 text-sm font-bold text-slate-50 outline-none transition placeholder:text-slate-500 focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15"
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar nome, telefone, e-mail, bairro..."
+            value={search}
+          />
+        </label>
+      </div>
+
+      <div className="grid gap-3">
+        {visible.length ? visible.map((lead, index) => {
+          const priority = lead.priority || 'Cold';
+          const priorityText = lead.priorityLabel || (priority === 'Hot' ? 'Quente' : priority === 'Warm' ? 'Potencial' : priority === 'Cool' ? 'Morno' : 'Frio');
+          return (
+            <article
+              className="group grid grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/[0.08] bg-gradient-to-br from-slate-950/72 via-slate-900/45 to-white/[0.035] p-4 shadow-[0_18px_42px_rgba(15,23,42,0.16)] transition duration-300 hover:-translate-y-1 hover:border-blue-300/45 hover:shadow-[0_24px_60px_rgba(37,99,235,0.18)] max-md:grid-cols-1"
+              key={`${lead.id}-${lead.n}-${index}`}
+            >
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.18)]">
+                #{index + 1}
+              </span>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong className="break-words text-base font-black text-slate-50">{lead.n || 'Lead sem nome'}</strong>
+                  <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wide ${priority === 'Hot' ? 'bg-orange-600 text-white' : priority === 'Warm' ? 'bg-blue-600 text-white' : priority === 'Cool' ? 'bg-slate-600 text-white' : 'bg-slate-800 text-white'}`}>
+                    {priorityText}
+                  </span>
+                </div>
+                <p className="mt-1 break-words text-sm font-semibold text-slate-400">
+                  {lead.bairro || lead.d || 'Local não informado'} · {lead.tel || 'sem telefone'} · {lead.em || 'sem e-mail'}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300">WhatsApp: {lead.temTelefone ? 'sim' : 'não'}</span>
+                  <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300">VIP: {lead.vipHistorico ? 'sim' : 'não'}</span>
+                  <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300">Estudo: {lead.estudoAtivo || Number(lead.materiaisQuantidade) > 0 ? 'sim' : 'não'}</span>
+                  <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300">Material: {lead.materialPrincipal || 'não informado'}</span>
+                </div>
+              </div>
+              <strong className="rounded-2xl bg-blue-600 px-4 py-2 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)]">
+                {Number(lead.score || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
+              </strong>
+            </article>
+          );
+        }) : (
+          <div className="rounded-2xl border border-white/[0.08] bg-slate-950/45 p-6 text-center text-sm font-semibold text-slate-400">
+            Nenhum lead encontrado para a pesquisa atual.
+          </div>
+        )}
+      </div>
+
+      {filtered.length > visible.length ? (
+        <button
+          className="mx-auto mt-5 flex h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 shadow-[0_16px_34px_rgba(255,255,255,0.14)] transition hover:-translate-y-0.5 hover:bg-blue-50"
+          onClick={() => setVisibleLimit((current) => current + 80)}
+          type="button"
+        >
+          Carregar mais {formatNumber(Math.min(80, filtered.length - visible.length))}
+        </button>
+      ) : null}
+    </section>
   );
 }
 
