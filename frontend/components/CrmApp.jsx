@@ -1810,7 +1810,7 @@ function AssociationDashboard({ association, data, records = [], onDatasetUpdate
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button className={primaryButtonClass} onClick={onOpenDetails} type="button">
-                Ver detalhes dos interessados
+                Análise dos Potenciais
                 <ArrowRight size={18} />
               </button>
               <button
