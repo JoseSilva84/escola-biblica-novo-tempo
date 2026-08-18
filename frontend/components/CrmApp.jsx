@@ -2988,12 +2988,113 @@ function AssociationDashboard({ association, data, records = [], interestRecords
   );
 }
 
+function leadNeighborhood(lead) {
+  const parts = String(lead?.end || '').split(' - ').map((part) => part.trim()).filter(Boolean);
+  return parts[1] || 'Nao informado';
+}
+
+function leadMaterial(lead) {
+  return lead?.materialName || lead?.tm || 'Nao informado';
+}
+
+function leadAgeGroup(lead) {
+  const age = Number(lead?.a);
+  if (!Number.isFinite(age) || age <= 0) return 'Sem idade';
+  if (age <= 17) return 'Ate 17';
+  if (age <= 29) return '18 a 29';
+  if (age <= 44) return '30 a 44';
+  if (age <= 59) return '45 a 59';
+  return '60+';
+}
+
+function leadGenderLabel(value) {
+  if (value === 'F') return 'Feminino';
+  if (value === 'M') return 'Masculino';
+  return 'Nao informado';
+}
+
+function topOptions(records, getValue, limit = null) {
+  const counts = records.reduce((map, lead) => {
+    const value = getValue(lead) || 'Nao informado';
+    map.set(value, (map.get(value) || 0) + 1);
+    return map;
+  }, new Map());
+  return Array.from(counts.entries())
+    .map(([value, count]) => ({ value, label: value, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, limit || undefined);
+}
+
+function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear, compact = false }) {
+  const [query, setQuery] = useState('');
+  const visibleOptions = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    const filtered = term
+      ? options.filter((option) => option.label.toLowerCase().includes(term))
+      : options;
+    const selectedOptions = options.filter((option) => selected.includes(option.value));
+    return [
+      ...selectedOptions,
+      ...filtered.filter((option) => !selected.includes(option.value))
+    ].slice(0, compact ? 24 : 80);
+  }, [compact, options, query, selected]);
+
+  return (
+    <div className="min-w-0">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{title}</span>
+        {selected.length ? (
+          <button className="text-[11px] font-black uppercase tracking-wide text-blue-300 transition hover:text-blue-200" onClick={onClear} type="button">
+            Limpar
+          </button>
+        ) : null}
+      </div>
+      {options.length > 12 ? (
+        <label className="relative mb-2 block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
+          <input
+            className="h-10 w-full rounded-xl border border-white/[0.08] bg-slate-950/70 pl-9 pr-3 text-xs font-bold text-slate-100 outline-none placeholder:text-slate-600"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={`Buscar ${title.toLowerCase()}`}
+            value={query}
+          />
+        </label>
+      ) : null}
+      <div className={`flex flex-wrap gap-2 ${compact ? 'max-h-28 overflow-auto pr-1' : 'max-h-40 overflow-auto pr-1'}`}>
+        {visibleOptions.map((option) => {
+          const active = selected.includes(option.value);
+          return (
+            <button
+              className={`inline-flex min-h-9 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition ${active ? 'border-blue-300 bg-blue-600 text-white shadow-[0_12px_26px_rgba(37,99,235,0.24)]' : 'border-white/[0.08] bg-slate-950/65 text-slate-300 hover:border-blue-300/40 hover:bg-blue-500/10 hover:text-blue-100'}`}
+              key={option.value}
+              onClick={() => onToggle(option.value)}
+              type="button"
+            >
+              <span>{option.label}</span>
+              {hasNumber(option.count) ? <span className={active ? 'text-white/75' : 'text-slate-500'}>{formatNumber(option.count)}</span> : null}
+            </button>
+          );
+        })}
+        {!visibleOptions.length ? <span className="text-xs font-bold text-slate-500">Nenhuma opcao encontrada.</span> : null}
+      </div>
+    </div>
+  );
+}
+
 function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetUpdate, records = [], onNavigate }) {
   const [filters, setFilters] = useState({
     association: 'paulistana',
-    distrito: 'all',
-    prioridade: 'all',
-    status: 'all',
+    districts: [],
+    neighborhoods: [],
+    materials: [],
+    ageGroups: [],
+    genders: [],
+    priorities: [],
+    whatsapp: 'all',
+    email: 'all',
+    study: 'all',
+    vip: 'all',
+    recency: 'all',
     search: ''
   });
   const [selectedLead, setSelectedLead] = useState(null);
@@ -3003,20 +3104,53 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
     () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [records]
   );
+  const neighborhoodOptions = useMemo(() => topOptions(records, leadNeighborhood), [records]);
+  const materialOptions = useMemo(() => topOptions(records, leadMaterial), [records]);
+  const ageOptions = useMemo(() => ['Ate 17', '18 a 29', '30 a 44', '45 a 59', '60+', 'Sem idade'].map((value) => ({
+    value,
+    label: value,
+    count: records.filter((lead) => leadAgeGroup(lead) === value).length
+  })).filter((option) => option.count > 0), [records]);
+  const genderOptions = useMemo(() => ['F', 'M', 'N'].map((value) => ({
+    value,
+    label: leadGenderLabel(value),
+    count: records.filter((lead) => (lead.g || 'N') === value).length
+  })).filter((option) => option.count > 0), [records]);
+  const priorityOptions = useMemo(() => ['Hot', 'Warm', 'Cool', 'Cold'].map((value) => ({
+    value,
+    label: crmPriorityLabels[value],
+    count: records.filter((lead) => lead.p === value).length
+  })), [records]);
+  const districtOptions = useMemo(() => districts.map((district) => ({
+    value: district,
+    label: district,
+    count: records.filter((lead) => lead.d === district).length
+  })), [districts, records]);
 
   const filteredLeads = useMemo(() => {
     const term = filters.search.trim().toLowerCase();
     return records
       .filter((lead) => {
         if (filters.association !== 'paulistana') return false;
-        if (filters.distrito !== 'all' && lead.d !== filters.distrito) return false;
-        if (filters.prioridade !== 'all' && lead.p !== filters.prioridade) return false;
-        if (filters.status === 'whatsapp' && !lead.t) return false;
-        if (filters.status === 'study' && !lead.e) return false;
-        if (filters.status === 'vip' && !lead.v) return false;
-        if (filters.status === 'no-recent-contact' && (lead.c === null || lead.c <= 365)) return false;
+        if (filters.districts.length && !filters.districts.includes(lead.d)) return false;
+        if (filters.neighborhoods.length && !filters.neighborhoods.includes(leadNeighborhood(lead))) return false;
+        if (filters.materials.length && !filters.materials.includes(leadMaterial(lead))) return false;
+        if (filters.ageGroups.length && !filters.ageGroups.includes(leadAgeGroup(lead))) return false;
+        if (filters.genders.length && !filters.genders.includes(lead.g || 'N')) return false;
+        if (filters.priorities.length && !filters.priorities.includes(lead.p)) return false;
+        if (filters.whatsapp === 'with' && !lead.t) return false;
+        if (filters.whatsapp === 'without' && lead.t) return false;
+        if (filters.email === 'with' && !lead.em) return false;
+        if (filters.email === 'without' && lead.em) return false;
+        if (filters.study === 'with' && !lead.e) return false;
+        if (filters.study === 'without' && lead.e) return false;
+        if (filters.vip === 'with' && !lead.v) return false;
+        if (filters.vip === 'without' && lead.v) return false;
+        if (filters.recency === 'recent' && (lead.c === null || lead.c > 365)) return false;
+        if (filters.recency === 'old' && (lead.c === null || lead.c <= 365)) return false;
+        if (filters.recency === 'unknown' && lead.c !== null) return false;
         if (term) {
-          const haystack = `${lead.n || ''} ${lead.tel || ''} ${lead.em || ''} ${lead.d || ''} ${lead.id || ''}`.toLowerCase();
+          const haystack = `${lead.n || ''} ${lead.tel || ''} ${lead.em || ''} ${lead.d || ''} ${leadNeighborhood(lead)} ${leadMaterial(lead)} ${lead.id || ''}`.toLowerCase();
           if (!haystack.includes(term)) return false;
         }
         return true;
@@ -3031,6 +3165,38 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
 
   function setFilter(key, value) {
     setFilters((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleArrayFilter(key, value) {
+    setFilters((current) => {
+      const values = current[key] || [];
+      return {
+        ...current,
+        [key]: values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
+      };
+    });
+  }
+
+  function clearArrayFilter(key) {
+    setFilters((current) => ({ ...current, [key]: [] }));
+  }
+
+  function clearAllFilters() {
+    setFilters({
+      association: 'paulistana',
+      districts: [],
+      neighborhoods: [],
+      materials: [],
+      ageGroups: [],
+      genders: [],
+      priorities: [],
+      whatsapp: 'all',
+      email: 'all',
+      study: 'all',
+      vip: 'all',
+      recency: 'all',
+      search: ''
+    });
   }
 
   function toggleLead(lead) {
@@ -3059,12 +3225,16 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
 
   function exportLeads() {
     const rowsToExport = selectedLeads.length ? selectedLeads : filteredLeads;
-    const header = ['Nome', 'WhatsApp', 'Email', 'Distrito', 'Prioridade ML', 'Score', 'VIP', 'Estudo ativo'];
+    const header = ['Nome', 'WhatsApp', 'Email', 'Distrito', 'Bairro', 'Material', 'Idade', 'Genero', 'Prioridade ML', 'Score', 'VIP', 'Estudo ativo'];
     const rows = rowsToExport.map((lead) => [
       lead.n,
       phoneDigits(lead.tel),
       lead.em || '',
       lead.d,
+      leadNeighborhood(lead),
+      leadMaterial(lead),
+      lead.a || '',
+      leadGenderLabel(lead.g || 'N'),
       crmPriorityLabels[lead.p] || lead.p,
       lead.s,
       lead.v ? 'Sim' : 'Nao',
@@ -3135,7 +3305,7 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1.4fr] gap-3 max-xl:grid-cols-2 max-md:grid-cols-1">
+        <div className="grid grid-cols-[1fr_1.6fr] gap-3 max-xl:grid-cols-1">
           <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
             Associacao
             <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter('association', event.target.value)} value={filters.association}>
@@ -3146,36 +3316,81 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
             </select>
           </label>
           <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-            Distrito
-            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter('distrito', event.target.value)} value={filters.distrito}>
-              <option value="all">Todos os distritos</option>
-              {districts.map((district) => <option key={district} value={district}>{district}</option>)}
-            </select>
-          </label>
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-            Prioridade ML
-            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter('prioridade', event.target.value)} value={filters.prioridade}>
-              <option value="all">Todas</option>
-              <option value="Hot">Quentes</option>
-              <option value="Warm">Potenciais</option>
-              <option value="Cool">Mornos</option>
-              <option value="Cold">Frios</option>
-            </select>
-          </label>
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-            Segmento
-            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter('status', event.target.value)} value={filters.status}>
-              <option value="all">Todos</option>
-              <option value="whatsapp">Com WhatsApp</option>
-              <option value="study">Estudo ativo</option>
-              <option value="vip">VIP</option>
-              <option value="no-recent-contact">Sem contato recente</option>
-            </select>
-          </label>
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
             Buscar
             <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none placeholder:text-slate-600" onChange={(event) => setFilter('search', event.target.value)} placeholder="Nome, email, distrito ou WhatsApp" value={filters.search} />
           </label>
+        </div>
+
+        <div className="mt-5 grid gap-5 rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4">
+          <div className="grid grid-cols-2 gap-5 max-xl:grid-cols-1">
+            <AdvancedFilterGroup
+              title="Distritos"
+              options={districtOptions}
+              selected={filters.districts}
+              onToggle={(value) => toggleArrayFilter('districts', value)}
+              onClear={() => clearArrayFilter('districts')}
+            />
+            <AdvancedFilterGroup
+              title="Bairros"
+              options={neighborhoodOptions}
+              selected={filters.neighborhoods}
+              onToggle={(value) => toggleArrayFilter('neighborhoods', value)}
+              onClear={() => clearArrayFilter('neighborhoods')}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-5 max-xl:grid-cols-1">
+            <AdvancedFilterGroup
+              title="Materiais"
+              options={materialOptions}
+              selected={filters.materials}
+              onToggle={(value) => toggleArrayFilter('materials', value)}
+              onClear={() => clearArrayFilter('materials')}
+            />
+            <div className="grid gap-5">
+              <AdvancedFilterGroup
+                compact
+                title="Prioridade"
+                options={priorityOptions}
+                selected={filters.priorities}
+                onToggle={(value) => toggleArrayFilter('priorities', value)}
+                onClear={() => clearArrayFilter('priorities')}
+              />
+              <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1">
+                <AdvancedFilterGroup
+                  compact
+                  title="Idade"
+                  options={ageOptions}
+                  selected={filters.ageGroups}
+                  onToggle={(value) => toggleArrayFilter('ageGroups', value)}
+                  onClear={() => clearArrayFilter('ageGroups')}
+                />
+                <AdvancedFilterGroup
+                  compact
+                  title="Genero"
+                  options={genderOptions}
+                  selected={filters.genders}
+                  onToggle={(value) => toggleArrayFilter('genders', value)}
+                  onClear={() => clearArrayFilter('genders')}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-5 gap-3 max-2xl:grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+            {[
+              ['whatsapp', 'WhatsApp', [['all', 'Todos'], ['with', 'Com WhatsApp'], ['without', 'Sem WhatsApp']]],
+              ['email', 'E-mail', [['all', 'Todos'], ['with', 'Com e-mail'], ['without', 'Sem e-mail']]],
+              ['study', 'Estudos', [['all', 'Todos'], ['with', 'Com estudo'], ['without', 'Sem estudo']]],
+              ['vip', 'VIP', [['all', 'Todos'], ['with', 'VIP'], ['without', 'Nao VIP']]],
+              ['recency', 'Contato', [['all', 'Todos'], ['recent', 'Ate 1 ano'], ['old', '+ de 1 ano'], ['unknown', 'Sem data']]]
+            ].map(([key, label, options]) => (
+              <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500" key={key}>
+                {label}
+                <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter(key, event.target.value)} value={filters[key]}>
+                  {options.map(([value, optionLabel]) => <option key={value} value={value}>{optionLabel}</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -3183,6 +3398,10 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
             {formatNumber(filteredLeads.length)} leads encontrados. Exibindo {formatNumber(visibleLeads.length)}.
           </span>
           <div className="flex flex-wrap gap-2">
+            <button className={ghostButtonClass} onClick={clearAllFilters} type="button">
+              <X size={18} />
+              Limpar filtros
+            </button>
             <button className={ghostButtonClass} onClick={selectVisibleLeads} type="button">
               <CheckCircle2 size={18} />
               Selecionar visiveis
@@ -3200,7 +3419,7 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
               title="Abrir detalhes do primeiro lead visivel ou selecionado"
             >
               <tr className="bg-slate-950/85 text-left transition hover:bg-slate-900">
-                {['Selecionar', 'Nome', 'WhatsApp', 'Distrito', 'Prioridade ML', 'Status', 'Score', 'Acoes'].map((head) => (
+                {['Selecionar', 'Nome', 'WhatsApp', 'Distrito', 'Bairro', 'Material', 'Idade', 'Genero', 'Prioridade ML', 'Status', 'Score', 'Acoes'].map((head) => (
                   <th className="sticky top-0 z-[1] whitespace-nowrap border-b border-white/[0.12] bg-slate-950/95 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white/80" key={head}>{head}</th>
                 ))}
               </tr>
@@ -3221,6 +3440,10 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
                     </td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black tabular-nums text-emerald-400">{phoneDigits(lead.tel) || 'sem telefone'}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-bold text-slate-300">{lead.d}</td>
+                    <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-400">{leadNeighborhood(lead)}</td>
+                    <td className="max-w-[16rem] truncate border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-400">{leadMaterial(lead)}</td>
+                    <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-300">{lead.a || 'sem idade'}</td>
+                    <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-300">{leadGenderLabel(lead.g || 'N')}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
                       <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${lead.p === 'Hot' ? 'bg-orange-500 text-white' : lead.p === 'Warm' ? 'bg-amber-500 text-white' : 'bg-slate-600 text-white'}`}>
                         {crmPriorityLabels[lead.p] || lead.p}
