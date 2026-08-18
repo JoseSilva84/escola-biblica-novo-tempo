@@ -3025,6 +3025,15 @@ function topOptions(records, getValue, limit = null) {
     .slice(0, limit || undefined);
 }
 
+function relatedDistrictsForNeighborhoods(records, neighborhoods) {
+  if (!neighborhoods.length) return [];
+  return Array.from(new Set(records
+    .filter((lead) => neighborhoods.includes(leadNeighborhood(lead)))
+    .map((lead) => lead.d)
+    .filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b));
+}
+
 function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear, compact = false }) {
   const [query, setQuery] = useState('');
   const visibleOptions = useMemo(() => {
@@ -3104,7 +3113,13 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
     () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [records]
   );
-  const neighborhoodOptions = useMemo(() => topOptions(records, leadNeighborhood), [records]);
+  const districtScopedRecords = useMemo(() => (
+    filters.districts.length ? records.filter((lead) => filters.districts.includes(lead.d)) : records
+  ), [filters.districts, records]);
+  const neighborhoodScopedRecords = useMemo(() => (
+    filters.neighborhoods.length ? records.filter((lead) => filters.neighborhoods.includes(leadNeighborhood(lead))) : records
+  ), [filters.neighborhoods, records]);
+  const neighborhoodOptions = useMemo(() => topOptions(districtScopedRecords, leadNeighborhood), [districtScopedRecords]);
   const materialOptions = useMemo(() => topOptions(records, leadMaterial), [records]);
   const ageOptions = useMemo(() => ['Ate 17', '18 a 29', '30 a 44', '45 a 59', '60+', 'Sem idade'].map((value) => ({
     value,
@@ -3121,11 +3136,16 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
     label: crmPriorityLabels[value],
     count: records.filter((lead) => lead.p === value).length
   })), [records]);
-  const districtOptions = useMemo(() => districts.map((district) => ({
+  const districtOptions = useMemo(() => {
+    const districtSource = filters.neighborhoods.length
+      ? Array.from(new Set(neighborhoodScopedRecords.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b))
+      : districts;
+    return districtSource.map((district) => ({
     value: district,
     label: district,
-    count: records.filter((lead) => lead.d === district).length
-  })), [districts, records]);
+    count: neighborhoodScopedRecords.filter((lead) => lead.d === district).length
+  }));
+  }, [districts, filters.neighborhoods.length, neighborhoodScopedRecords]);
 
   const filteredLeads = useMemo(() => {
     const term = filters.search.trim().toLowerCase();
@@ -3170,15 +3190,27 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
   function toggleArrayFilter(key, value) {
     setFilters((current) => {
       const values = current[key] || [];
+      const nextValues = values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+      if (key === 'neighborhoods') {
+        return {
+          ...current,
+          neighborhoods: nextValues,
+          districts: relatedDistrictsForNeighborhoods(records, nextValues)
+        };
+      }
       return {
         ...current,
-        [key]: values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
+        [key]: nextValues
       };
     });
   }
 
   function clearArrayFilter(key) {
-    setFilters((current) => ({ ...current, [key]: [] }));
+    setFilters((current) => ({
+      ...current,
+      [key]: [],
+      ...(key === 'neighborhoods' ? { districts: [] } : {})
+    }));
   }
 
   function clearAllFilters() {
