@@ -222,6 +222,13 @@ function cachedCoordinatesForLead(lead, cache) {
     ? lead.addr
     : [lead.end, lead.d, 'SP', 'Brasil'].filter(Boolean).join(', ');
   const cached = cache[geocodeKey(fullAddress)];
+  if (cached?.notFound) {
+    return {
+      geoNotFound: true,
+      geoSource: cached.source || 'nominatim',
+      geoDisplayName: cached.displayName || ''
+    };
+  }
   if (!cached || !Number.isFinite(Number(cached.lat)) || !Number.isFinite(Number(cached.lng))) return {};
   return {
     lat: Number(cached.lat),

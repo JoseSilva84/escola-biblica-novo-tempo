@@ -3239,6 +3239,10 @@ function LeadsOpenStreetMap({ leads = [], churches = [] }) {
         for (const { lead, point } of mappableLeads) {
           const fullAddress = fullLeadAddress(lead);
           const precisionLabel = point.precision === 'Endereco' ? 'Endereco exato' : 'Ponto aproximado';
+          const needsGoogleCheck = point.precision !== 'Endereco' || lead.geoNotFound;
+          const precisionWarning = lead.geoNotFound
+            ? 'Coordenada nao encontrada no OSM. Conferir ou corrigir endereco pelo Google Maps.'
+            : 'Coordenada aproximada. Conferir precisao no Google Maps.';
           const priorityStyle = leadMapPriorityStyle(lead.p);
           const marker = L.circleMarker([point.lat, point.lng], {
             radius: lead.p === 'Hot' ? 8 : 7,
@@ -3255,6 +3259,7 @@ function LeadsOpenStreetMap({ leads = [], churches = [] }) {
             <span>${escapeMapHtml(fullAddress)}</span><br>
             ${escapeMapHtml(lead.tel || 'sem telefone')}<br>
             <small>${escapeMapHtml(precisionLabel)}</small><br>
+            ${needsGoogleCheck ? `<small style="display:block;color:#b45309;font-weight:700;max-width:260px">${escapeMapHtml(precisionWarning)}</small>` : ''}
             <a href="${openStreetMapSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no OSM</a><br>
             <a href="${googleMapsSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no Google Maps (precisao)</a>
           `);

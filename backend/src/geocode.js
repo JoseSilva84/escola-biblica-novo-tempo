@@ -228,7 +228,7 @@ function pendingLeads(records, cache, limit) {
     .map((lead) => ({ lead, address: fullLeadAddress(lead) }))
     .filter(({ lead, address }) => {
       const key = geocodeKey(address);
-      if (!address || address === 'N/I' || seen.has(key) || cache[key]?.lat) return false;
+      if (!address || address === 'N/I' || seen.has(key) || cache[key]?.lat || cache[key]?.notFound) return false;
       seen.add(key);
       return lead?.d && key.length > 10;
     })
