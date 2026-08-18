@@ -17,7 +17,8 @@ let job = {
   failed: 0,
   skipped: 0,
   limit: 0,
-  message: 'Nenhuma rotina em execucao.'
+  message: 'Nenhuma rotina em execucao.',
+  notFoundItems: []
 };
 
 let geocodeTableReady = null;
@@ -272,6 +273,9 @@ async function geocodeLeadAddress(lead, address) {
 
 export async function geocodeStatus() {
   const cache = await hydrateGeocodeCacheFromDb();
+  if (!job.running && job.finishedAt) {
+    invalidateDashboardCache();
+  }
   const payload = getDashboardData();
   const total = payload.records.length;
   const withCoordinates = payload.records.filter((lead) => Number.isFinite(Number(lead.lat)) && Number.isFinite(Number(lead.lng))).length;
@@ -297,7 +301,8 @@ export function startGeocodingBatch({ limit = 100 } = {}) {
     failed: 0,
     skipped: 0,
     limit: batchLimit,
-    message: 'Geocodificacao iniciada.'
+    message: 'Geocodificacao iniciada.',
+    notFoundItems: []
   };
 
   runBatch(batchLimit).catch((error) => {
@@ -329,7 +334,20 @@ async function runBatch(limit) {
       cache[key] = entry;
       await saveLeadGeocodeToDb({ key, lead, address, entry });
       if (point) job.saved += 1;
-      else job.skipped += 1;
+      else {
+        job.skipped += 1;
+        job.notFoundItems = [
+          ...job.notFoundItems,
+          {
+            id: lead.id,
+            name: lead.n || 'Lead sem nome',
+            address,
+            district: lead.d || '',
+            neighborhood: leadNeighborhood(lead) || '',
+            attempts: entry.attempts || []
+          }
+        ].slice(-50);
+      }
       job.processed += 1;
       job.message = `${job.processed}/${batch.length} processados. Ultimo: ${lead.n || address}`;
       await writeGeocodeCache(cache);

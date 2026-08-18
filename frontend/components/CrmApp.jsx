@@ -3488,6 +3488,8 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
   const [geocodeInfo, setGeocodeInfo] = useState(null);
   const [geocodeLoading, setGeocodeLoading] = useState(false);
+  const [showGeocodeMisses, setShowGeocodeMisses] = useState(false);
+  const geocodeWasRunningRef = useRef(false);
   const churchesForMap = useMemo(() => {
     const districtNamesBySlug = officialDistricts.reduce((map, district) => ({
       ...map,
@@ -3619,15 +3621,20 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
     const response = await apiFetch('/api/geocode/status');
     if (!response.ok) return;
     const info = await response.json();
+    const justFinished = geocodeWasRunningRef.current && !info.running;
+    geocodeWasRunningRef.current = Boolean(info.running);
     setGeocodeInfo(info);
-    if (refreshDashboard && !info.running && onDatasetUpdated) {
-      onDatasetUpdated().catch(() => {});
+    if ((refreshDashboard || justFinished) && !info.running && onDatasetUpdated) {
+      await onDatasetUpdated().catch(() => {});
+      const refreshed = await apiFetch('/api/geocode/status').then((nextResponse) => nextResponse.ok ? nextResponse.json() : null).catch(() => null);
+      if (refreshed) setGeocodeInfo(refreshed);
     }
   }
 
   async function startGeocodeBatch() {
     if (!canRunGeocode || geocodeLoading || geocodeInfo?.running) return;
     setGeocodeLoading(true);
+    setShowGeocodeMisses(false);
     try {
       const response = await apiFetch('/api/geocode/run', {
         method: 'POST',
@@ -3637,6 +3644,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       const info = await response.json().catch(() => null);
       if (info) setGeocodeInfo(info);
       if (response.ok) {
+        geocodeWasRunningRef.current = true;
         toast.success('Geocodificacao iniciada', {
           description: 'O backend vai salvar coordenadas aos poucos, sem travar o sistema.'
         });
@@ -3934,7 +3942,16 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                   ? `${formatNumber(geocodeInfo.leadsWithCoordinates)} leads com coordenada real. ${formatNumber(geocodeInfo.pendingEstimate)} ainda pendente(s).`
                   : 'Carregando status das coordenadas...'}
               </p>
-              {geocodeInfo?.message ? <p className="mt-1 text-xs font-semibold text-emerald-800">{geocodeInfo.message}</p> : null}
+              {geocodeInfo?.message ? (
+                <p className="mt-1 text-xs font-semibold text-emerald-800">
+                  {geocodeInfo.message}
+                  {geocodeInfo.notFoundItems?.length ? (
+                    <button className="ml-2 font-black text-emerald-950 underline decoration-emerald-500/50 underline-offset-2" onClick={() => setShowGeocodeMisses(true)} type="button">
+                      Ver {formatNumber(geocodeInfo.notFoundItems.length)} sem resultado
+                    </button>
+                  ) : null}
+                </p>
+              ) : null}
             </div>
             <button
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(22,163,74,0.24)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
@@ -4027,6 +4044,35 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
           </table>
         </div>
       </section>
+
+      {showGeocodeMisses ? (
+        <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <div className="max-h-[86vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_34px_110px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 p-5">
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Geocodificacao</span>
+                <h3 className="mt-1 text-xl font-black text-slate-950">Enderecos sem resultado</h3>
+              </div>
+              <button className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100" onClick={() => setShowGeocodeMisses(false)} type="button">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="max-h-[68vh] overflow-auto p-5">
+              {(geocodeInfo?.notFoundItems || []).map((item) => (
+                <article className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-4" key={`${item.id}-${item.address}`}>
+                  <strong className="block text-sm font-black text-slate-950">{item.name}</strong>
+                  <p className="mt-1 text-sm font-semibold text-slate-700">{item.address}</p>
+                  <p className="mt-1 text-xs font-bold text-slate-500">{item.district}{item.neighborhood ? ` - ${item.neighborhood}` : ''}</p>
+                  {item.attempts?.length ? (
+                    <p className="mt-2 text-xs font-semibold text-slate-500">Tentativas: {item.attempts.join(' | ')}</p>
+                  ) : null}
+                </article>
+              ))}
+              {!geocodeInfo?.notFoundItems?.length ? <p className="text-sm font-semibold text-slate-600">Nenhum endereco sem resultado no ultimo lote.</p> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <LeadDetailModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
     </div>
