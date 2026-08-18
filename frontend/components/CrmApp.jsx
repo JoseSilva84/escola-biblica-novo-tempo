@@ -3069,6 +3069,19 @@ function cityFromAddress(lead) {
   return compactParts[0] || lead?.d || 'Sao Paulo';
 }
 
+function fullLeadAddress(lead) {
+  const fullAddress = String(lead?.addr || '').trim();
+  if (fullAddress && fullAddress !== 'N/I') return fullAddress;
+  const compactAddress = String(lead?.end || '').trim();
+  const neighborhood = leadNeighborhood(lead);
+  const parts = [compactAddress, neighborhood, lead?.d, 'SP', 'Brasil']
+    .filter((part, index, list) => {
+      const value = String(part || '').trim();
+      return value && value !== 'N/I' && list.findIndex((item) => String(item || '').trim() === value) === index;
+    });
+  return parts.join(' - ') || 'Endereco nao informado';
+}
+
 function approximateLeadPoint(lead) {
   if (Number.isFinite(Number(lead?.lat)) && Number.isFinite(Number(lead?.lng))) {
     return { lat: Number(lead.lat), lng: Number(lead.lng), precision: 'Endereco' };
@@ -3086,7 +3099,7 @@ function approximateLeadPoint(lead) {
 }
 
 function openStreetMapSearchUrl(lead) {
-  const query = [lead?.addr, lead?.end, lead?.d, 'SP', 'Brasil'].filter(Boolean).join(', ');
+  const query = [fullLeadAddress(lead), lead?.d, 'SP', 'Brasil'].filter(Boolean).join(', ');
   return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`;
 }
 
@@ -3131,6 +3144,8 @@ function LeadsOpenStreetMap({ leads = [] }) {
         const bounds = L.latLngBounds([]);
 
         for (const { lead, point } of mappableLeads) {
+          const fullAddress = fullLeadAddress(lead);
+          const precisionLabel = point.precision === 'Endereco' ? 'Endereco exato' : 'Ponto aproximado';
           const marker = L.circleMarker([point.lat, point.lng], {
             radius: 7,
             color: '#ffffff',
@@ -3142,8 +3157,10 @@ function LeadsOpenStreetMap({ leads = [] }) {
             <strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>
             ${escapeMapHtml(lead.d || '')}<br>
             ${escapeMapHtml(leadNeighborhood(lead))}<br>
+            <span>${escapeMapHtml(fullAddress)}</span><br>
             ${escapeMapHtml(lead.tel || 'sem telefone')}<br>
-            <small>${escapeMapHtml(point.precision)}</small>
+            <small>${escapeMapHtml(precisionLabel)}</small><br>
+            <a href="${openStreetMapSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no OSM</a>
           `);
           markersRef.current.push(marker);
           bounds.extend([point.lat, point.lng]);
@@ -3166,8 +3183,7 @@ function LeadsOpenStreetMap({ leads = [] }) {
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-white via-blue-50/70 to-emerald-50/70 p-5">
         <div>
           <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Mapa dos leads filtrados</span>
-          <h3 className="mt-1 text-2xl font-black text-slate-950">Pontos no OpenStreetMap</h3>
-          <p className="mt-1 text-sm font-semibold text-slate-600">{formatNumber(mappableLeads.length)} pontos aproximados exibidos a partir do filtro atual, sem API paga.</p>
+          <h3 className="mt-1 text-2xl font-black text-slate-950">Pontos com Leads</h3>
         </div>
         {sampleLead ? (
           <a className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800" href={openStreetMapSearchUrl(sampleLead.lead)} rel="noreferrer" target="_blank">
