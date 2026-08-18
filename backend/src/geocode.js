@@ -183,6 +183,10 @@ export async function hydrateGeocodeCacheFromDb() {
       SELECT
         "addressHash",
         "address",
+        "externalLeadId",
+        "leadName",
+        "district",
+        "neighborhood",
         "latitude",
         "longitude",
         "provider",
@@ -202,6 +206,10 @@ export async function hydrateGeocodeCacheFromDb() {
   for (const row of rows) {
     const next = {
       address: row.address,
+      id: row.externalLeadId,
+      name: row.leadName || '',
+      district: row.district || '',
+      neighborhood: row.neighborhood || '',
       lat: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
       lng: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
       source: row.provider || 'nominatim',
@@ -220,6 +228,56 @@ export async function hydrateGeocodeCacheFromDb() {
     invalidateDashboardCache();
   }
   return cache;
+}
+
+function notFoundItemsFromCache(cache, limit = 100) {
+  return Object.entries(cache)
+    .filter(([, entry]) => entry?.notFound)
+    .map(([key, entry]) => ({
+      key,
+      id: entry.id || null,
+      name: entry.name || 'Lead sem nome',
+      address: entry.address || '',
+      district: entry.district || '',
+      neighborhood: entry.neighborhood || '',
+      attempts: entry.attempts || [],
+      updatedAt: entry.updatedAt || null
+    }))
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
+    .slice(0, limit);
+}
+
+async function notFoundItemsFromDb(limit = 100) {
+  try {
+    await ensureLeadGeocodeTable();
+    const rows = await prisma.$queryRaw`
+      SELECT
+        "addressHash",
+        "externalLeadId",
+        "leadName",
+        "address",
+        "district",
+        "neighborhood",
+        "geocodedAt"
+      FROM "LeadGeocode"
+      WHERE "notFound" = true
+      ORDER BY "geocodedAt" DESC
+      LIMIT ${limit}
+    `;
+    return rows.map((row) => ({
+      key: row.addressHash,
+      id: row.externalLeadId,
+      name: row.leadName || 'Lead sem nome',
+      address: row.address || '',
+      district: row.district || '',
+      neighborhood: row.neighborhood || '',
+      attempts: [],
+      updatedAt: row.geocodedAt ? new Date(row.geocodedAt).toISOString() : null
+    }));
+  } catch (error) {
+    console.error('[geocode:not-found-history:error]', error.message);
+    return null;
+  }
 }
 
 function pendingLeads(records, cache, limit) {
@@ -273,6 +331,8 @@ async function geocodeLeadAddress(lead, address) {
 
 export async function geocodeStatus() {
   const cache = await hydrateGeocodeCacheFromDb();
+  const dbNotFoundItems = await notFoundItemsFromDb(100);
+  const notFoundItems = dbNotFoundItems || notFoundItemsFromCache(cache, 100);
   if (!job.running && job.finishedAt) {
     invalidateDashboardCache();
   }
@@ -283,6 +343,8 @@ export async function geocodeStatus() {
     ...job,
     cachePath: geocodeCachePath(),
     cachedAddresses: Object.keys(cache).length,
+    notFoundTotal: notFoundItems.length,
+    notFoundItems: job.running && job.notFoundItems.length ? job.notFoundItems : notFoundItems,
     totalLeads: total,
     leadsWithCoordinates: withCoordinates,
     pendingEstimate: Math.max(0, total - withCoordinates)
@@ -329,8 +391,8 @@ async function runBatch(limit) {
       const result = await geocodeLeadAddress(lead, address);
       const point = result?.lat ? result : null;
       const entry = point
-        ? { ...point, source: 'nominatim', address, updatedAt: new Date().toISOString() }
-        : { notFound: true, source: 'nominatim', address, attempts: result?.attempts || [], updatedAt: new Date().toISOString() };
+        ? { ...point, source: 'nominatim', address, id: lead.id, name: lead.n || '', district: lead.d || '', neighborhood: leadNeighborhood(lead) || '', updatedAt: new Date().toISOString() }
+        : { notFound: true, source: 'nominatim', address, id: lead.id, name: lead.n || '', district: lead.d || '', neighborhood: leadNeighborhood(lead) || '', attempts: result?.attempts || [], updatedAt: new Date().toISOString() };
       cache[key] = entry;
       await saveLeadGeocodeToDb({ key, lead, address, entry });
       if (point) job.saved += 1;

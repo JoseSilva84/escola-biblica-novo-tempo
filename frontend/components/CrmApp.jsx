@@ -3952,7 +3952,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                   {geocodeInfo.message}
                   {geocodeInfo.notFoundItems?.length ? (
                     <button className="ml-2 font-black text-emerald-950 underline decoration-emerald-500/50 underline-offset-2" onClick={() => setShowGeocodeMisses(true)} type="button">
-                      Ver {formatNumber(geocodeInfo.notFoundItems.length)} sem resultado
+                      Ver historico de {formatNumber(geocodeInfo.notFoundItems.length)} sem resultado
                     </button>
                   ) : null}
                 </p>
@@ -4056,7 +4056,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 p-5">
               <div>
                 <span className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Geocodificacao</span>
-                <h3 className="mt-1 text-xl font-black text-slate-950">Enderecos sem resultado</h3>
+                <h3 className="mt-1 text-xl font-black text-slate-950">Historico sem coordenadas</h3>
               </div>
               <button className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100" onClick={() => setShowGeocodeMisses(false)} type="button">
                 <X size={18} />
@@ -4068,12 +4068,13 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                   <strong className="block text-sm font-black text-slate-950">{item.name}</strong>
                   <p className="mt-1 text-sm font-semibold text-slate-700">{item.address}</p>
                   <p className="mt-1 text-xs font-bold text-slate-500">{item.district}{item.neighborhood ? ` - ${item.neighborhood}` : ''}</p>
+                  {item.updatedAt ? <p className="mt-1 text-xs font-bold text-slate-400">Tentado em {formatDatasetDate(item.updatedAt)}</p> : null}
                   {item.attempts?.length ? (
                     <p className="mt-2 text-xs font-semibold text-slate-500">Tentativas: {item.attempts.join(' | ')}</p>
                   ) : null}
                 </article>
               ))}
-              {!geocodeInfo?.notFoundItems?.length ? <p className="text-sm font-semibold text-slate-600">Nenhum endereco sem resultado no ultimo lote.</p> : null}
+              {!geocodeInfo?.notFoundItems?.length ? <p className="text-sm font-semibold text-slate-600">Nenhum endereco sem resultado registrado.</p> : null}
             </div>
           </div>
         </div>
