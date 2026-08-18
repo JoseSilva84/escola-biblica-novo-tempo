@@ -3152,7 +3152,7 @@ function leadMapPriorityStyle(priority) {
 }
 
 function churchMapPoint(church, districtLeadPoints = {}) {
-  if (Number.isFinite(Number(church?.lat)) && Number.isFinite(Number(church?.lng))) {
+  if (church?.lat !== null && church?.lat !== undefined && church?.lng !== null && church?.lng !== undefined && Number.isFinite(Number(church.lat)) && Number.isFinite(Number(church.lng))) {
     return { lat: Number(church.lat), lng: Number(church.lng), precision: 'Endereco' };
   }
   const districtSlug = church?.districtSlug || slugifyDistrictName(church?.districtName);
@@ -3285,7 +3285,12 @@ function LeadsOpenStreetMap({ leads = [], churches = [] }) {
           bounds.extend([point.lat, point.lng]);
         }
 
-        if (mappableLeads.length || churchPoints.length) map.fitBounds(bounds.pad(0.18), { maxZoom: 14 });
+        if (mappableLeads.length) {
+          const leadBounds = L.latLngBounds(mappableLeads.map(({ point }) => [point.lat, point.lng]));
+          map.fitBounds(leadBounds.pad(0.18), { maxZoom: 14 });
+        } else if (churchPoints.length) {
+          map.fitBounds(bounds.pad(0.18), { maxZoom: 14 });
+        }
         else map.setView(cityMapCenters['sao-paulo'], 10);
         setStatus('ready');
       } catch {
