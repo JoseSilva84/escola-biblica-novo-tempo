@@ -3187,7 +3187,7 @@ function LeadsOpenStreetMap({ leads = [] }) {
             ${escapeMapHtml(lead.tel || 'sem telefone')}<br>
             <small>${escapeMapHtml(precisionLabel)}</small><br>
             <a href="${openStreetMapSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no OSM</a><br>
-            <a href="${googleMapsSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no Google Maps</a>
+            <a href="${googleMapsSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no Google Maps (precisao)</a>
           `);
           markersRef.current.push(marker);
           bounds.extend([point.lat, point.lng]);
