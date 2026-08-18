@@ -263,6 +263,7 @@ function transformRecord(row, ml) {
     materialName: mainMaterialName(row.Material),
     tel: normalize(row.Telefone, ''),
     em: email === 'N/I' ? '' : email,
+    addr: normalize(row['EndereÃ§o'] || row['Endereço'] || row.Endereco, ''),
     end: compactAddress(row),
     desc: descricao === 'N/I' ? 'N/I' : descricao
   };

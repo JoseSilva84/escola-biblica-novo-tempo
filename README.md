@@ -78,6 +78,12 @@ ADMIN_NAME="Admin"
 DATASET_DIR="../dataset"
 ```
 
+No frontend, configure a chave publica do Google Maps quando quiser exibir os pontos dos leads no mapa:
+
+```env
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="sua-chave-publica-google-maps"
+```
+
 Preparar Prisma e usuario admin:
 
 ```bash

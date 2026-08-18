@@ -32,6 +32,7 @@ import {
   LayoutDashboard,
   Lock,
   LogOut,
+  MapPin,
   Menu,
   MessageCircle,
   Moon,
@@ -59,6 +60,7 @@ const primaryButtonClass = 'primary-button-glow group relative inline-flex h-11 
 const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-semibold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
 const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slate-950/60 shadow-[0_28px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.035] backdrop-blur-2xl';
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 const adminNavItems = [
   ['admin', 'Dashboard', LayoutDashboard],
   ['associations', 'Associa\u00e7\u00f5es', Building2],
@@ -3013,6 +3015,192 @@ function leadGenderLabel(value) {
   return 'Nao informado';
 }
 
+function googleMapsAddressForLead(lead) {
+  const address = lead?.addr && lead.addr !== 'N/I' ? lead.addr : '';
+  const fallback = [lead?.end, lead?.d, 'Sao Paulo', 'SP', 'Brasil'].filter(Boolean).join(', ');
+  return address || fallback;
+}
+
+function googleMapsSearchUrl(lead) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(googleMapsAddressForLead(lead))}`;
+}
+
+function escapeMapHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]));
+}
+
+function loadGoogleMaps() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('Mapa indisponivel no servidor.'));
+  if (window.google?.maps) return Promise.resolve(window.google.maps);
+  if (window.__sevenflowGoogleMapsPromise) return window.__sevenflowGoogleMapsPromise;
+  window.__sevenflowGoogleMapsPromise = new Promise((resolve, reject) => {
+    const callbackName = `sevenflowGoogleMapsReady_${Date.now()}`;
+    window[callbackName] = () => {
+      delete window[callbackName];
+      resolve(window.google.maps);
+    };
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&callback=${callbackName}`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => reject(new Error('Nao foi possivel carregar o Google Maps.'));
+    document.head.appendChild(script);
+  });
+  return window.__sevenflowGoogleMapsPromise;
+}
+
+function geocodeCacheKey(lead) {
+  return `sevenflow_geo_${lead?.id || googleMapsAddressForLead(lead)}`;
+}
+
+function readCachedGeocode(lead) {
+  try {
+    const cached = window.localStorage.getItem(geocodeCacheKey(lead));
+    return cached ? JSON.parse(cached) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedGeocode(lead, location) {
+  try {
+    window.localStorage.setItem(geocodeCacheKey(lead), JSON.stringify(location));
+  } catch {
+    // Cache local pode estar indisponivel em modo privado.
+  }
+}
+
+function LeadsGoogleMap({ leads = [] }) {
+  const mapRef = useRef(null);
+  const markersRef = useRef([]);
+  const [status, setStatus] = useState('idle');
+  const [mappedCount, setMappedCount] = useState(0);
+  const mappableLeads = useMemo(() => leads.filter((lead) => googleMapsAddressForLead(lead)).slice(0, 80), [leads]);
+  const sampleLead = mappableLeads[0];
+
+  useEffect(() => {
+    let active = true;
+    if (!GOOGLE_MAPS_API_KEY || !mapRef.current || !mappableLeads.length) {
+      setMappedCount(0);
+      return () => { active = false; };
+    }
+
+    async function renderMap() {
+      setStatus('loading');
+      try {
+        const maps = await loadGoogleMaps();
+        if (!active) return;
+        const map = new maps.Map(mapRef.current, {
+          center: { lat: -23.55052, lng: -46.633308 },
+          zoom: 11,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: true
+        });
+        const geocoder = new maps.Geocoder();
+        const bounds = new maps.LatLngBounds();
+        const nextMarkers = [];
+
+        for (const lead of mappableLeads) {
+          if (!active) return;
+          let point = readCachedGeocode(lead);
+          if (!point) {
+            const result = await geocoder.geocode({ address: googleMapsAddressForLead(lead) }).catch(() => null);
+            const location = result?.results?.[0]?.geometry?.location;
+            if (!location) continue;
+            point = { lat: location.lat(), lng: location.lng() };
+            writeCachedGeocode(lead, point);
+            await new Promise((resolve) => setTimeout(resolve, 110));
+          }
+          const marker = new maps.Marker({
+            position: point,
+            map,
+            title: lead.n,
+            icon: {
+              path: maps.SymbolPath.CIRCLE,
+              scale: 7,
+              fillColor: '#2563eb',
+              fillOpacity: 0.95,
+              strokeColor: '#ffffff',
+              strokeWeight: 2
+            }
+          });
+          const info = new maps.InfoWindow({
+            content: `<strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>${escapeMapHtml(lead.d || '')}<br>${escapeMapHtml(leadNeighborhood(lead))}<br>${escapeMapHtml(lead.tel || 'sem telefone')}`
+          });
+          marker.addListener('click', () => info.open({ anchor: marker, map }));
+          nextMarkers.push(marker);
+          bounds.extend(point);
+        }
+
+        markersRef.current.forEach((marker) => marker.setMap(null));
+        markersRef.current = nextMarkers;
+        if (nextMarkers.length) map.fitBounds(bounds, 56);
+        if (active) {
+          setMappedCount(nextMarkers.length);
+          setStatus('ready');
+        }
+      } catch {
+        if (active) setStatus('error');
+      }
+    }
+
+    renderMap();
+    return () => { active = false; };
+  }, [mappableLeads]);
+
+  return (
+    <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)]">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-white via-blue-50/70 to-emerald-50/70 p-5">
+        <div>
+          <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Mapa dos leads filtrados</span>
+          <h3 className="mt-1 text-2xl font-black text-slate-950">Pontos no Google Maps</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-600">
+            {GOOGLE_MAPS_API_KEY ? `${formatNumber(mappedCount)} pontos exibidos de ate ${formatNumber(mappableLeads.length)} leads do filtro atual.` : 'Configure a chave do Google Maps para exibir os pontos dentro do sistema.'}
+          </p>
+        </div>
+        {sampleLead ? (
+          <a className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800" href={googleMapsSearchUrl(sampleLead)} rel="noreferrer" target="_blank">
+            <MapPin size={18} />
+            Abrir no Maps
+          </a>
+        ) : null}
+      </div>
+      {GOOGLE_MAPS_API_KEY ? (
+        <div className="relative h-[28rem] bg-slate-100">
+          <div className="h-full w-full" ref={mapRef} />
+          {status === 'loading' ? (
+            <div className="absolute inset-x-4 top-4 rounded-2xl border border-blue-200 bg-white/92 px-4 py-3 text-sm font-bold text-blue-900 shadow-lg backdrop-blur">
+              Geocodificando enderecos filtrados...
+            </div>
+          ) : null}
+          {status === 'error' ? (
+            <div className="absolute inset-x-4 top-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800 shadow-lg">
+              Nao foi possivel carregar o Google Maps. Verifique a chave e as APIs habilitadas.
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="grid min-h-[18rem] place-items-center bg-slate-50 p-6 text-center">
+          <div className="max-w-xl">
+            <MapPin className="mx-auto text-blue-600" size={38} />
+            <h4 className="mt-4 text-xl font-black text-slate-950">Google Maps pronto para conectar</h4>
+            <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-600">
+              Adicione `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` no frontend com Maps JavaScript API e Geocoding API habilitadas.
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function topOptions(records, getValue, limit = null) {
   const counts = records.reduce((map, lead) => {
     const value = getValue(lead) || 'Nao informado';
@@ -3493,6 +3681,10 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
             ))}
           </div>
         </div>
+        </div>
+
+        <div className="mt-5">
+          <LeadsGoogleMap leads={filteredLeads} />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
