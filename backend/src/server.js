@@ -8,14 +8,17 @@ import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
 import { randomUUID } from 'crypto';
+import { gzip } from 'zlib';
+import { promisify } from 'util';
 import { createSessionToken, requireAuth, sessionCookieOptions, validateCredentials, verifySessionToken } from './auth.js';
-import { getDashboardData } from './data.js';
+import { getDashboardData, invalidateDashboardCache } from './data.js';
 import { prisma } from './prisma.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
 const DATASET_DIR = resolveDatasetDir();
 const MAX_DATASET_UPLOAD_BYTES = Number(process.env.DATASET_UPLOAD_LIMIT_BYTES || 150 * 1024 * 1024);
+const gzipAsync = promisify(gzip);
 
 function resolveDatasetDir() {
   if (process.env.DATASET_DIR) return path.resolve(process.env.DATASET_DIR);
@@ -104,6 +107,18 @@ function scopedDashboardPayload(payload, user = {}) {
       }
     }
   };
+}
+
+async function sendDashboardJson(request, response, payload) {
+  const body = JSON.stringify(payload);
+  if (/\bgzip\b/i.test(String(request.headers['accept-encoding'] || ''))) {
+    const compressed = await gzipAsync(Buffer.from(body));
+    response.set('Content-Encoding', 'gzip');
+    response.set('Vary', 'Accept-Encoding');
+    response.type('application/json').send(compressed);
+    return;
+  }
+  response.type('application/json').send(body);
 }
 
 function splitBuffer(buffer, separator) {
@@ -965,6 +980,7 @@ app.post(
 
       const processingStartedAt = new Date();
       const result = await runDatasetUpdate(uploadPaths);
+      invalidateDashboardCache();
       const processingCompletedAt = new Date();
       let savedHistory = null;
       let historyWarning = null;
@@ -1064,7 +1080,7 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
   } catch (error) {
     console.error('[dashboard:dataset-history:error]', error.message);
   }
-  response.json(scopedDashboardPayload(payload, request.user));
+  await sendDashboardJson(request, response, scopedDashboardPayload(payload, request.user));
 });
 
 app.get('/api/dataset/history', requireAuth, requireAdminGeral, async (_request, response) => {

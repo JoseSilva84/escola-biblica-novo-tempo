@@ -13,6 +13,7 @@ const ALUNOS_FILE = 'alunos.json';
 const INTEREST_DATA_PATTERN = /^dados_interesse_(?!distritos_manifest)(.+)\.json$/i;
 const UPDATE_STATUS_FILE = 'ultima_atualizacao_dataset.json';
 const UPDATE_HISTORY_FILE = 'historico_atualizacoes_dataset.json';
+let dashboardCache = null;
 
 function resolveConfiguredPath(value) {
   if (!value) return null;
@@ -22,6 +23,49 @@ function resolveConfiguredPath(value) {
 function firstExistingPath(paths) {
   return paths.find((candidate) => candidate && fs.existsSync(candidate)) || null;
 }
+
+function fileCachePart(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return `${filePath || 'missing'}:missing`;
+  const stat = fs.statSync(filePath);
+  return `${filePath}:${stat.mtimeMs}:${stat.size}`;
+}
+
+function dashboardCacheKey(alunosPath) {
+  const rankingPath = firstExistingPath([
+    resolveConfiguredPath(process.env.ML_RANKING_PATH),
+    path.join(DATASET_DIR, ML_RANKING_FILE)
+  ]);
+  const updatePath = firstExistingPath([
+    resolveConfiguredPath(process.env.DATASET_UPDATE_STATUS_PATH),
+    path.join(DATASET_DIR, UPDATE_STATUS_FILE)
+  ]);
+  const historyPath = firstExistingPath([
+    resolveConfiguredPath(process.env.DATASET_UPDATE_HISTORY_PATH),
+    path.join(DATASET_DIR, UPDATE_HISTORY_FILE)
+  ]);
+  const interestDataPath = resolveConfiguredPath(process.env.INTEREST_DATA_PATH);
+  const interestPaths = [];
+  if (interestDataPath && fs.existsSync(interestDataPath) && fs.statSync(interestDataPath).isFile()) {
+    interestPaths.push(interestDataPath);
+  } else if (fs.existsSync(DATASET_DIR)) {
+    for (const file of fs.readdirSync(DATASET_DIR)) {
+      if (INTEREST_DATA_PATTERN.test(file)) interestPaths.push(path.join(DATASET_DIR, file));
+    }
+  }
+
+  return [
+    fileCachePart(alunosPath),
+    fileCachePart(rankingPath),
+    fileCachePart(updatePath),
+    fileCachePart(historyPath),
+    ...interestPaths.sort((a, b) => a.localeCompare(b)).map(fileCachePart)
+  ].join('|');
+}
+
+export function invalidateDashboardCache() {
+  dashboardCache = null;
+}
+
 function splitCsvLine(line) {
   const cells = [];
   let value = '';
@@ -403,6 +447,12 @@ export function getDashboardData() {
   if (!alunosPath) {
     throw new Error(`Arquivo ${ALUNOS_FILE} nao encontrado. Configure ALUNOS_DATA_PATH ou coloque o arquivo em ${DATASET_DIR}.`);
   }
+
+  const cacheKey = dashboardCacheKey(alunosPath);
+  if (dashboardCache?.key === cacheKey) {
+    return dashboardCache.payload;
+  }
+
   const alunos = JSON.parse(fs.readFileSync(alunosPath, 'utf8'));
   const ranking = readMlRanking();
   const lastDatasetUpdate = readLastDatasetUpdate();
@@ -429,7 +479,7 @@ export function getDashboardData() {
     return map;
   }, new Map());
 
-  return {
+  const payload = {
     records,
     interestRecords: interestRecordsByDistrict.alphaville || [],
     interestRecordsByDistrict,
@@ -450,4 +500,6 @@ export function getDashboardData() {
       model: 'ranking_nao_vip_ml_pandas.csv + regra operacional do notebook analise_vip_ml.ipynb'
     }
   };
+  dashboardCache = { key: cacheKey, payload };
+  return payload;
 }
