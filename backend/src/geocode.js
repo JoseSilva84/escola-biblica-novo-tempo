@@ -1,4 +1,3 @@
-import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
 import { getDashboardData, invalidateDashboardCache } from './data.js';
@@ -77,6 +76,46 @@ function fullLeadAddress(lead) {
 function leadNeighborhood(lead) {
   const [, bairro] = String(lead?.end || '').split(' - ');
   return String(bairro || '').trim() || null;
+}
+
+function compactText(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+-\s+/g, ' - ')
+    .trim();
+}
+
+function stripCep(value) {
+  return compactText(value).replace(/\s*-\s*CEP:?\s*\d{5}-?\d{3}\s*$/i, '').trim();
+}
+
+function cityFromLead(lead) {
+  const parts = String(lead?.addr || lead?.end || '').split(' - ').map((part) => part.trim()).filter(Boolean);
+  const stateIndex = parts.findIndex((part) => /^[A-Z]{2}$/i.test(part));
+  if (stateIndex > 0) return parts[stateIndex - 1];
+  const [city] = String(lead?.end || '').split(' - ');
+  return compactText(city || lead?.d || 'Sao Paulo');
+}
+
+function streetNumberFromAddress(address) {
+  const firstPart = stripCep(address).split(' - ')[0] || '';
+  const match = /^(.+?),\s*(\d+[A-Za-z]?)\b/.exec(firstPart);
+  if (!match) return compactText(firstPart);
+  return compactText(`${match[1]}, ${match[2]}`);
+}
+
+function geocodeQueriesForLead(lead, address) {
+  const cleanAddress = stripCep(address);
+  const streetNumber = streetNumberFromAddress(cleanAddress);
+  const neighborhood = leadNeighborhood(lead);
+  const city = cityFromLead(lead);
+  const queries = [
+    cleanAddress,
+    [streetNumber, neighborhood, city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [streetNumber, city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [neighborhood, city, 'SP', 'Brasil'].filter(Boolean).join(', ')
+  ];
+  return [...new Set(queries.map(compactText).filter((query) => query.length > 10))];
 }
 
 async function saveLeadGeocodeToDb({ key, lead, address, entry }) {
@@ -188,19 +227,19 @@ function pendingLeads(records, cache, limit) {
     .map((lead) => ({ lead, address: fullLeadAddress(lead) }))
     .filter(({ lead, address }) => {
       const key = geocodeKey(address);
-      if (!address || address === 'N/I' || seen.has(key) || cache[key]?.lat || cache[key]?.notFound) return false;
+      if (!address || address === 'N/I' || seen.has(key) || cache[key]?.lat) return false;
       seen.add(key);
       return lead?.d && key.length > 10;
     })
     .slice(0, limit);
 }
 
-async function geocodeAddress(address) {
+async function geocodeQuery(query) {
   const url = new URL(NOMINATIM_URL);
   url.searchParams.set('format', 'jsonv2');
   url.searchParams.set('limit', '1');
   url.searchParams.set('countrycodes', 'br');
-  url.searchParams.set('q', address);
+  url.searchParams.set('q', query);
   const response = await fetch(url, {
     headers: {
       'Accept': 'application/json',
@@ -218,6 +257,17 @@ async function geocodeAddress(address) {
     type: result.type || '',
     importance: Number(result.importance) || null
   };
+}
+
+async function geocodeLeadAddress(lead, address) {
+  const queries = geocodeQueriesForLead(lead, address);
+  for (let index = 0; index < queries.length; index++) {
+    const query = queries[index];
+    const point = await geocodeQuery(query);
+    if (point) return { ...point, matchedQuery: query, attempts: queries };
+    if (index < queries.length - 1) await sleep(GEOCODE_DELAY_MS);
+  }
+  return { point: null, attempts: queries };
 }
 
 export async function geocodeStatus() {
@@ -271,10 +321,11 @@ async function runBatch(limit) {
   for (const { address, lead } of batch) {
     const key = geocodeKey(address);
     try {
-      const point = await geocodeAddress(address);
+      const result = await geocodeLeadAddress(lead, address);
+      const point = result?.lat ? result : null;
       const entry = point
         ? { ...point, source: 'nominatim', address, updatedAt: new Date().toISOString() }
-        : { notFound: true, source: 'nominatim', address, updatedAt: new Date().toISOString() };
+        : { notFound: true, source: 'nominatim', address, attempts: result?.attempts || [], updatedAt: new Date().toISOString() };
       cache[key] = entry;
       await saveLeadGeocodeToDb({ key, lead, address, entry });
       if (point) job.saved += 1;
