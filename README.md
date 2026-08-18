@@ -78,11 +78,7 @@ ADMIN_NAME="Admin"
 DATASET_DIR="../dataset"
 ```
 
-No frontend, configure a chave publica do Google Maps quando quiser exibir os pontos dos leads no mapa:
-
-```env
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="sua-chave-publica-google-maps"
-```
+O mapa de leads usa Leaflet com blocos do OpenStreetMap e nao exige chave de API.
 
 Preparar Prisma e usuario admin:
 

@@ -60,7 +60,6 @@ const primaryButtonClass = 'primary-button-glow group relative inline-flex h-11 
 const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-semibold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
 const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slate-950/60 shadow-[0_28px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.035] backdrop-blur-2xl';
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 const adminNavItems = [
   ['admin', 'Dashboard', LayoutDashboard],
   ['associations', 'Associa\u00e7\u00f5es', Building2],
@@ -3015,16 +3014,6 @@ function leadGenderLabel(value) {
   return 'Nao informado';
 }
 
-function googleMapsAddressForLead(lead) {
-  const address = lead?.addr && lead.addr !== 'N/I' ? lead.addr : '';
-  const fallback = [lead?.end, lead?.d, 'Sao Paulo', 'SP', 'Brasil'].filter(Boolean).join(', ');
-  return address || fallback;
-}
-
-function googleMapsSearchUrl(lead) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(googleMapsAddressForLead(lead))}`;
-}
-
 function escapeMapHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -3035,117 +3024,134 @@ function escapeMapHtml(value) {
   }[char]));
 }
 
-function loadGoogleMaps() {
-  if (typeof window === 'undefined') return Promise.reject(new Error('Mapa indisponivel no servidor.'));
-  if (window.google?.maps) return Promise.resolve(window.google.maps);
-  if (window.__sevenflowGoogleMapsPromise) return window.__sevenflowGoogleMapsPromise;
-  window.__sevenflowGoogleMapsPromise = new Promise((resolve, reject) => {
-    const callbackName = `sevenflowGoogleMapsReady_${Date.now()}`;
-    window[callbackName] = () => {
-      delete window[callbackName];
-      resolve(window.google.maps);
-    };
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&callback=${callbackName}`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = () => reject(new Error('Nao foi possivel carregar o Google Maps.'));
-    document.head.appendChild(script);
-  });
-  return window.__sevenflowGoogleMapsPromise;
-}
+const cityMapCenters = {
+  'sao-paulo': [-23.55052, -46.63331],
+  osasco: [-23.53288, -46.79178],
+  carapicuiba: [-23.52272, -46.835],
+  barueri: [-23.51056, -46.87611],
+  jandira: [-23.5275, -46.9025],
+  itapevi: [-23.5488, -46.9336],
+  cotia: [-23.6039, -46.9192],
+  ibiuna: [-23.6596, -47.222],
+  mairinque: [-23.5458, -47.1833],
+  'sao-roque': [-23.5292, -47.1353],
+  'santana-de-parnaiba': [-23.4439, -46.9178],
+  aracariguama: [-23.4366, -47.0608],
+  aluminio: [-23.5306, -47.2547],
+  mirandopolis: [-23.6093, -46.6413]
+};
 
-function geocodeCacheKey(lead) {
-  return `sevenflow_geo_${lead?.id || googleMapsAddressForLead(lead)}`;
-}
-
-function readCachedGeocode(lead) {
-  try {
-    const cached = window.localStorage.getItem(geocodeCacheKey(lead));
-    return cached ? JSON.parse(cached) : null;
-  } catch {
-    return null;
+function stableHash(value) {
+  let hash = 0;
+  const text = String(value || '');
+  for (let index = 0; index < text.length; index++) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(index);
+    hash |= 0;
   }
+  return Math.abs(hash);
 }
 
-function writeCachedGeocode(lead, location) {
-  try {
-    window.localStorage.setItem(geocodeCacheKey(lead), JSON.stringify(location));
-  } catch {
-    // Cache local pode estar indisponivel em modo privado.
+function slugForMap(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function cityFromAddress(lead) {
+  const address = String(lead?.addr || '');
+  const parts = address.split(' - ').map((part) => part.trim()).filter(Boolean);
+  const stateIndex = parts.findIndex((part) => /^[A-Z]{2}$/.test(part));
+  if (stateIndex > 0) return parts[stateIndex - 1];
+  const compactParts = String(lead?.end || '').split(' - ').map((part) => part.trim()).filter(Boolean);
+  return compactParts[0] || lead?.d || 'Sao Paulo';
+}
+
+function approximateLeadPoint(lead) {
+  if (Number.isFinite(Number(lead?.lat)) && Number.isFinite(Number(lead?.lng))) {
+    return { lat: Number(lead.lat), lng: Number(lead.lng), precision: 'Endereco' };
   }
+  const city = cityFromAddress(lead);
+  const center = cityMapCenters[slugForMap(city)] || cityMapCenters[slugForMap(lead?.d)] || cityMapCenters['sao-paulo'];
+  const hash = stableHash(`${lead?.d}|${leadNeighborhood(lead)}|${lead?.addr}|${lead?.id}`);
+  const angle = (hash % 360) * (Math.PI / 180);
+  const radius = 0.004 + ((hash % 900) / 100000);
+  return {
+    lat: center[0] + Math.sin(angle) * radius,
+    lng: center[1] + Math.cos(angle) * radius,
+    precision: 'Aproximado'
+  };
 }
 
-function LeadsGoogleMap({ leads = [] }) {
+function openStreetMapSearchUrl(lead) {
+  const query = [lead?.addr, lead?.end, lead?.d, 'SP', 'Brasil'].filter(Boolean).join(', ');
+  return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`;
+}
+
+function LeadsOpenStreetMap({ leads = [] }) {
   const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const [status, setStatus] = useState('idle');
-  const [mappedCount, setMappedCount] = useState(0);
-  const mappableLeads = useMemo(() => leads.filter((lead) => googleMapsAddressForLead(lead)).slice(0, 80), [leads]);
+  const mappableLeads = useMemo(() => leads.slice(0, 300).map((lead) => ({
+    lead,
+    point: approximateLeadPoint(lead)
+  })), [leads]);
   const sampleLead = mappableLeads[0];
 
   useEffect(() => {
     let active = true;
-    if (!GOOGLE_MAPS_API_KEY || !mapRef.current || !mappableLeads.length) {
-      setMappedCount(0);
+    if (!mapRef.current) {
       return () => { active = false; };
     }
 
     async function renderMap() {
       setStatus('loading');
       try {
-        const maps = await loadGoogleMaps();
+        const L = await import('leaflet');
         if (!active) return;
-        const map = new maps.Map(mapRef.current, {
-          center: { lat: -23.55052, lng: -46.633308 },
-          zoom: 11,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: true
+
+        const map = mapInstanceRef.current || L.map(mapRef.current, {
+          center: cityMapCenters['sao-paulo'],
+          zoom: 10,
+          scrollWheelZoom: false
         });
-        const geocoder = new maps.Geocoder();
-        const bounds = new maps.LatLngBounds();
-        const nextMarkers = [];
-
-        for (const lead of mappableLeads) {
-          if (!active) return;
-          let point = readCachedGeocode(lead);
-          if (!point) {
-            const result = await geocoder.geocode({ address: googleMapsAddressForLead(lead) }).catch(() => null);
-            const location = result?.results?.[0]?.geometry?.location;
-            if (!location) continue;
-            point = { lat: location.lat(), lng: location.lng() };
-            writeCachedGeocode(lead, point);
-            await new Promise((resolve) => setTimeout(resolve, 110));
-          }
-          const marker = new maps.Marker({
-            position: point,
-            map,
-            title: lead.n,
-            icon: {
-              path: maps.SymbolPath.CIRCLE,
-              scale: 7,
-              fillColor: '#2563eb',
-              fillOpacity: 0.95,
-              strokeColor: '#ffffff',
-              strokeWeight: 2
-            }
-          });
-          const info = new maps.InfoWindow({
-            content: `<strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>${escapeMapHtml(lead.d || '')}<br>${escapeMapHtml(leadNeighborhood(lead))}<br>${escapeMapHtml(lead.tel || 'sem telefone')}`
-          });
-          marker.addListener('click', () => info.open({ anchor: marker, map }));
-          nextMarkers.push(marker);
-          bounds.extend(point);
+        if (!mapInstanceRef.current) {
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
+          }).addTo(map);
+          mapInstanceRef.current = map;
         }
 
-        markersRef.current.forEach((marker) => marker.setMap(null));
-        markersRef.current = nextMarkers;
-        if (nextMarkers.length) map.fitBounds(bounds, 56);
-        if (active) {
-          setMappedCount(nextMarkers.length);
-          setStatus('ready');
+        markersRef.current.forEach((marker) => marker.remove());
+        markersRef.current = [];
+        const bounds = L.latLngBounds([]);
+
+        for (const { lead, point } of mappableLeads) {
+          const marker = L.circleMarker([point.lat, point.lng], {
+            radius: 7,
+            color: '#ffffff',
+            weight: 2,
+            fillColor: '#2563eb',
+            fillOpacity: 0.92
+          }).addTo(map);
+          marker.bindPopup(`
+            <strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>
+            ${escapeMapHtml(lead.d || '')}<br>
+            ${escapeMapHtml(leadNeighborhood(lead))}<br>
+            ${escapeMapHtml(lead.tel || 'sem telefone')}<br>
+            <small>${escapeMapHtml(point.precision)}</small>
+          `);
+          markersRef.current.push(marker);
+          bounds.extend([point.lat, point.lng]);
         }
+
+        if (mappableLeads.length) map.fitBounds(bounds.pad(0.18), { maxZoom: 14 });
+        else map.setView(cityMapCenters['sao-paulo'], 10);
+        setStatus('ready');
       } catch {
         if (active) setStatus('error');
       }
@@ -3160,43 +3166,32 @@ function LeadsGoogleMap({ leads = [] }) {
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-white via-blue-50/70 to-emerald-50/70 p-5">
         <div>
           <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Mapa dos leads filtrados</span>
-          <h3 className="mt-1 text-2xl font-black text-slate-950">Pontos no Google Maps</h3>
-          <p className="mt-1 text-sm font-semibold text-slate-600">
-            {GOOGLE_MAPS_API_KEY ? `${formatNumber(mappedCount)} pontos exibidos de ate ${formatNumber(mappableLeads.length)} leads do filtro atual.` : 'Configure a chave do Google Maps para exibir os pontos dentro do sistema.'}
-          </p>
+          <h3 className="mt-1 text-2xl font-black text-slate-950">Pontos no OpenStreetMap</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-600">{formatNumber(mappableLeads.length)} pontos aproximados exibidos a partir do filtro atual, sem API paga.</p>
         </div>
         {sampleLead ? (
-          <a className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800" href={googleMapsSearchUrl(sampleLead)} rel="noreferrer" target="_blank">
+          <a className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800" href={openStreetMapSearchUrl(sampleLead.lead)} rel="noreferrer" target="_blank">
             <MapPin size={18} />
-            Abrir no Maps
+            Abrir no OSM
           </a>
         ) : null}
       </div>
-      {GOOGLE_MAPS_API_KEY ? (
-        <div className="relative h-[28rem] bg-slate-100">
-          <div className="h-full w-full" ref={mapRef} />
-          {status === 'loading' ? (
-            <div className="absolute inset-x-4 top-4 rounded-2xl border border-blue-200 bg-white/92 px-4 py-3 text-sm font-bold text-blue-900 shadow-lg backdrop-blur">
-              Geocodificando enderecos filtrados...
-            </div>
-          ) : null}
-          {status === 'error' ? (
-            <div className="absolute inset-x-4 top-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800 shadow-lg">
-              Nao foi possivel carregar o Google Maps. Verifique a chave e as APIs habilitadas.
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <div className="grid min-h-[18rem] place-items-center bg-slate-50 p-6 text-center">
-          <div className="max-w-xl">
-            <MapPin className="mx-auto text-blue-600" size={38} />
-            <h4 className="mt-4 text-xl font-black text-slate-950">Google Maps pronto para conectar</h4>
-            <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-600">
-              Adicione `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` no frontend com Maps JavaScript API e Geocoding API habilitadas.
-            </p>
+      <div className="relative h-[28rem] bg-slate-100">
+        <div className="h-full w-full" ref={mapRef} />
+        {status === 'loading' ? (
+          <div className="absolute inset-x-4 top-4 rounded-2xl border border-blue-200 bg-white/92 px-4 py-3 text-sm font-bold text-blue-900 shadow-lg backdrop-blur">
+            Montando mapa sem custo por API...
           </div>
+        ) : null}
+        {status === 'error' ? (
+          <div className="absolute inset-x-4 top-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800 shadow-lg">
+            Nao foi possivel carregar o mapa. Verifique a conexao com os blocos do OpenStreetMap.
+          </div>
+        ) : null}
+        <div className="absolute bottom-4 left-4 max-w-xl rounded-2xl border border-amber-200 bg-amber-50/95 px-4 py-3 text-xs font-bold leading-relaxed text-amber-900 shadow-lg backdrop-blur">
+          Sem geocodificacao paga: pontos aproximados por cidade, distrito e bairro. Quando houver latitude/longitude real importada, o mapa usa a posicao exata.
         </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -3684,7 +3679,7 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
         </div>
 
         <div className="mt-5">
-          <LeadsGoogleMap leads={filteredLeads} />
+          <LeadsOpenStreetMap leads={filteredLeads} />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
