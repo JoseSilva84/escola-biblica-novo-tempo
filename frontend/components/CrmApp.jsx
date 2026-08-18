@@ -3103,6 +3103,22 @@ function openStreetMapSearchUrl(lead) {
   return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`;
 }
 
+function googleMapsSearchUrl(lead) {
+  const query = [fullLeadAddress(lead), lead?.d, 'SP', 'Brasil'].filter(Boolean).join(', ');
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+const leadMapPriorityStyles = {
+  Hot: { label: 'Quente', color: '#dc2626' },
+  Warm: { label: 'Potencial', color: '#f97316' },
+  Cool: { label: 'Morno', color: '#2563eb' },
+  Cold: { label: 'Frio', color: '#334155' }
+};
+
+function leadMapPriorityStyle(priority) {
+  return leadMapPriorityStyles[priority] || leadMapPriorityStyles.Cold;
+}
+
 function LeadsOpenStreetMap({ leads = [] }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -3146,21 +3162,24 @@ function LeadsOpenStreetMap({ leads = [] }) {
         for (const { lead, point } of mappableLeads) {
           const fullAddress = fullLeadAddress(lead);
           const precisionLabel = point.precision === 'Endereco' ? 'Endereco exato' : 'Ponto aproximado';
+          const priorityStyle = leadMapPriorityStyle(lead.p);
           const marker = L.circleMarker([point.lat, point.lng], {
-            radius: 7,
+            radius: lead.p === 'Hot' ? 8 : 7,
             color: '#ffffff',
             weight: 2,
-            fillColor: '#2563eb',
-            fillOpacity: 0.92
+            fillColor: priorityStyle.color,
+            fillOpacity: 0.94
           }).addTo(map);
           marker.bindPopup(`
             <strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>
+            <strong style="color:${priorityStyle.color}">${escapeMapHtml(priorityStyle.label)}</strong><br>
             ${escapeMapHtml(lead.d || '')}<br>
             ${escapeMapHtml(leadNeighborhood(lead))}<br>
             <span>${escapeMapHtml(fullAddress)}</span><br>
             ${escapeMapHtml(lead.tel || 'sem telefone')}<br>
             <small>${escapeMapHtml(precisionLabel)}</small><br>
-            <a href="${openStreetMapSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no OSM</a>
+            <a href="${openStreetMapSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no OSM</a><br>
+            <a href="${googleMapsSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no Google Maps</a>
           `);
           markersRef.current.push(marker);
           bounds.extend([point.lat, point.lng]);
@@ -3184,6 +3203,14 @@ function LeadsOpenStreetMap({ leads = [] }) {
         <div>
           <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Mapa dos leads filtrados</span>
           <h3 className="mt-1 text-2xl font-black text-slate-950">Pontos com Leads</h3>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {Object.entries(leadMapPriorityStyles).map(([key, item]) => (
+            <span key={key} className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/85 px-3 py-2 text-xs font-black text-slate-700 shadow-sm">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+              {item.label}
+            </span>
+          ))}
         </div>
         {sampleLead ? (
           <a className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800" href={openStreetMapSearchUrl(sampleLead.lead)} rel="noreferrer" target="_blank">
