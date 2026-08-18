@@ -12,6 +12,7 @@ import { gzip } from 'zlib';
 import { promisify } from 'util';
 import { createSessionToken, requireAuth, sessionCookieOptions, validateCredentials, verifySessionToken } from './auth.js';
 import { districtSlug, getDashboardData, invalidateDashboardCache } from './data.js';
+import { geocodeStatus, hydrateGeocodeCacheFromDb, startGeocodingBatch } from './geocode.js';
 import { prisma } from './prisma.js';
 
 const app = express();
@@ -1069,6 +1070,11 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
   response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   response.set('Pragma', 'no-cache');
   response.set('Expires', '0');
+  try {
+    await hydrateGeocodeCacheFromDb();
+  } catch (error) {
+    console.error('[dashboard:geocode-cache:error]', error.message);
+  }
   const payload = getDashboardData();
   try {
     if (isAdminGeralUser(request.user) || userAssociationSlug(request.user) === 'paulistana') {
@@ -1110,6 +1116,15 @@ app.get('/api/dashboard/district-interest/:slug', requireAuth, async (request, r
   const payload = getDashboardData();
   const records = payload.interestRecordsByDistrict?.[slug] || [];
   response.json({ slug, records });
+});
+
+app.get('/api/geocode/status', requireAuth, requireAdminGeral, async (_request, response) => {
+  response.json(await geocodeStatus());
+});
+
+app.post('/api/geocode/run', requireAuth, requireAdminGeral, async (request, response) => {
+  const result = startGeocodingBatch({ limit: request.body?.limit });
+  response.status(result.started ? 202 : 409).json(result.started ? result.status : await geocodeStatus());
 });
 
 app.get('/api/dataset/history', requireAuth, requireAdminGeral, async (_request, response) => {

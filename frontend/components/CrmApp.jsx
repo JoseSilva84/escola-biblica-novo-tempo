@@ -3468,7 +3468,7 @@ function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear,
   );
 }
 
-function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateHistory = [], lastDatasetUpdate, officialDistricts = [], records = [], onNavigate }) {
+function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateHistory = [], lastDatasetUpdate, officialDistricts = [], records = [], onDatasetUpdated, onNavigate, user }) {
   const [filters, setFilters] = useState({
     association: 'paulistana',
     districts: [],
@@ -3486,6 +3486,8 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   });
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
+  const [geocodeInfo, setGeocodeInfo] = useState(null);
+  const [geocodeLoading, setGeocodeLoading] = useState(false);
   const churchesForMap = useMemo(() => {
     const districtNamesBySlug = officialDistricts.reduce((map, district) => ({
       ...map,
@@ -3610,6 +3612,55 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const mapLeads = selectedLeads.length ? selectedLeads : filteredLeads;
   const hotWithWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
   const staleLeads = records.filter((lead) => lead.t && lead.c !== null && lead.c > 365).length;
+  const canRunGeocode = isAdminUser(user);
+
+  async function loadGeocodeInfo({ refreshDashboard = false } = {}) {
+    if (!canRunGeocode) return;
+    const response = await apiFetch('/api/geocode/status');
+    if (!response.ok) return;
+    const info = await response.json();
+    setGeocodeInfo(info);
+    if (refreshDashboard && !info.running && onDatasetUpdated) {
+      onDatasetUpdated().catch(() => {});
+    }
+  }
+
+  async function startGeocodeBatch() {
+    if (!canRunGeocode || geocodeLoading || geocodeInfo?.running) return;
+    setGeocodeLoading(true);
+    try {
+      const response = await apiFetch('/api/geocode/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 250 })
+      });
+      const info = await response.json().catch(() => null);
+      if (info) setGeocodeInfo(info);
+      if (response.ok) {
+        toast.success('Geocodificacao iniciada', {
+          description: 'O backend vai salvar coordenadas aos poucos, sem travar o sistema.'
+        });
+      } else {
+        toast.info('Geocodificacao ja esta em andamento.');
+      }
+    } catch {
+      toast.error('Nao foi possivel iniciar a geocodificacao.');
+    } finally {
+      setGeocodeLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadGeocodeInfo().catch(() => {});
+  }, [canRunGeocode]);
+
+  useEffect(() => {
+    if (!canRunGeocode || !geocodeInfo?.running) return undefined;
+    const timer = window.setInterval(() => {
+      loadGeocodeInfo({ refreshDashboard: true }).catch(() => {});
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [canRunGeocode, geocodeInfo?.running]);
 
   function setFilter(key, value) {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -3873,6 +3924,29 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         <div className="mt-5">
           <LeadsOpenStreetMap churches={churchesForMap} leads={mapLeads} />
         </div>
+
+        {canRunGeocode ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/85 p-4 text-sm shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
+            <div>
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Precisao do mapa</span>
+              <p className="mt-1 font-bold text-emerald-950">
+                {geocodeInfo
+                  ? `${formatNumber(geocodeInfo.leadsWithCoordinates)} leads com coordenada real. ${formatNumber(geocodeInfo.pendingEstimate)} ainda pendente(s).`
+                  : 'Carregando status das coordenadas...'}
+              </p>
+              {geocodeInfo?.message ? <p className="mt-1 text-xs font-semibold text-emerald-800">{geocodeInfo.message}</p> : null}
+            </div>
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(22,163,74,0.24)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={geocodeLoading || geocodeInfo?.running}
+              onClick={startGeocodeBatch}
+              type="button"
+            >
+              <MapPin size={18} />
+              {geocodeInfo?.running ? 'Geocodificando...' : 'Geocodificar 250'}
+            </button>
+          </div>
+        ) : null}
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm font-semibold text-slate-500">
@@ -6535,8 +6609,10 @@ export default function CrmApp({ payload: initialPayload = null }) {
         datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []}
         lastDatasetUpdate={payload?.meta?.lastDatasetUpdate}
         officialDistricts={payload?.meta?.territory?.districts || []}
+        onDatasetUpdated={loadDashboard}
         onNavigate={navigateView}
         records={records}
+        user={user}
       />
     );
   } else if (effectiveView === 'dataset-history') {

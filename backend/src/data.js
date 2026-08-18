@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { geocodeKey, readGeocodeCache } from './geocodeCache.js';
 
 const DATASET_DIR = resolveConfiguredPath(process.env.DATASET_DIR)
   || firstExistingPath([
@@ -56,6 +57,10 @@ function dashboardCacheKey(alunosPath) {
     resolveConfiguredPath(process.env.DATASET_UPDATE_HISTORY_PATH),
     path.join(DATASET_DIR, UPDATE_HISTORY_FILE)
   ]);
+  const geocodePath = firstExistingPath([
+    resolveConfiguredPath(process.env.GEOCODE_CACHE_PATH),
+    path.join(DATASET_DIR, 'geocode-cache.json')
+  ]);
   const interestDataPath = resolveConfiguredPath(process.env.INTEREST_DATA_PATH);
   const interestPaths = [];
   if (interestDataPath && fs.existsSync(interestDataPath) && fs.statSync(interestDataPath).isFile()) {
@@ -73,6 +78,7 @@ function dashboardCacheKey(alunosPath) {
     fileCachePart(rankingPath),
     fileCachePart(updatePath),
     fileCachePart(historyPath),
+    fileCachePart(geocodePath),
     ...interestPaths.sort((a, b) => a.localeCompare(b)).map(fileCachePart)
   ].join('|');
 }
@@ -211,6 +217,21 @@ function compactAddress(row) {
   return [cidade, bairro].filter(Boolean).join(' - ') || 'N/I';
 }
 
+function cachedCoordinatesForLead(lead, cache) {
+  const fullAddress = lead.addr && lead.addr !== 'N/I'
+    ? lead.addr
+    : [lead.end, lead.d, 'SP', 'Brasil'].filter(Boolean).join(', ');
+  const cached = cache[geocodeKey(fullAddress)];
+  if (!cached || !Number.isFinite(Number(cached.lat)) || !Number.isFinite(Number(cached.lng))) return {};
+  return {
+    lat: Number(cached.lat),
+    lng: Number(cached.lng),
+    geoSource: cached.source || 'cache',
+    geoPrecision: cached.type || 'endereco',
+    geoDisplayName: cached.displayName || ''
+  };
+}
+
 function genderCode(value) {
   const text = normalize(value, '').toLowerCase();
   if (text.startsWith('masc')) return 'M';
@@ -238,7 +259,7 @@ function scoreForVip(row) {
   return 0.4 + 0.4 * recency + 0.2 * contact;
 }
 
-function transformRecord(row, ml) {
+function transformRecord(row, ml, geocodeCache = {}) {
   const vip = normalize(row.Vip, 'Não').toLowerCase() === 'sim' ? 1 : 0;
   const mlRow = ml.get(Number(row.ID));
   const priorityScore = mlRow?.priority ?? (vip ? scoreForVip(row) : 0);
@@ -250,7 +271,7 @@ function transformRecord(row, ml) {
   const descricao = normalize(row.Descrição, 'N/I');
   const lastContactDate = normalize(row['Data do Último Contato'], '');
 
-  return {
+  const lead = {
     id: Number(row.ID),
     d: normalize(row.Distrito, 'Não informado'),
     n: `${normalize(row.Aluno, '')} ${normalize(row.Sobrenome, '')}`.trim() || 'N/I',
@@ -276,6 +297,10 @@ function transformRecord(row, ml) {
     addr: normalize(row['EndereÃ§o'] || row['Endereço'] || row.Endereco, ''),
     end: compactAddress(row),
     desc: descricao === 'N/I' ? 'N/I' : descricao
+  };
+  return {
+    ...lead,
+    ...cachedCoordinatesForLead(lead, geocodeCache)
   };
 }
 
@@ -562,11 +587,12 @@ export function getDashboardData() {
   const ranking = readMlRanking();
   const lastDatasetUpdate = readLastDatasetUpdate();
   const datasetUpdateHistory = readDatasetUpdateHistory();
+  const geocodeCache = readGeocodeCache();
   const paulistanaRows = territory.allowedDistrictSlugs
     ? alunos.filter((row) => territory.allowedDistrictSlugs.has(districtSlug(row.Distrito)))
     : alunos;
   const records = paulistanaRows.map((row) => {
-    const record = transformRecord(row, ranking.byId);
+    const record = transformRecord(row, ranking.byId, geocodeCache);
     const officialName = territory.districtNameBySlug?.get(districtSlug(row.Distrito));
     return officialName ? { ...record, d: officialName } : record;
   });

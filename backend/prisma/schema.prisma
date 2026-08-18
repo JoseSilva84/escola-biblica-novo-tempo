@@ -139,6 +139,28 @@ model Lead {
   @@index([districtId])
 }
 
+model LeadGeocode {
+  addressHash    String   @id
+  externalLeadId Int?
+  leadName       String?
+  address        String
+  district       String?
+  neighborhood   String?
+  latitude       Float?
+  longitude      Float?
+  provider       String   @default("nominatim")
+  precision      String?
+  displayName    String?
+  notFound       Boolean  @default(false)
+  geocodedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([externalLeadId])
+  @@index([district])
+  @@index([notFound])
+}
+
 model CampaignLead {
   id         String   @id @default(cuid())
   campaignId String

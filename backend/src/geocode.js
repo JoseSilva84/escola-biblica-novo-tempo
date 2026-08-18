@@ -1,0 +1,300 @@
+import fs from 'fs';
+import fsp from 'fs/promises';
+import path from 'path';
+import { getDashboardData, invalidateDashboardCache } from './data.js';
+import { geocodeCachePath, geocodeKey, readGeocodeCache } from './geocodeCache.js';
+import { prisma } from './prisma.js';
+
+const GEOCODE_DELAY_MS = Number(process.env.GEOCODE_DELAY_MS || 1100);
+const NOMINATIM_URL = process.env.NOMINATIM_URL || 'https://nominatim.openstreetmap.org/search';
+const USER_AGENT = process.env.NOMINATIM_USER_AGENT || 'AmigosNT-CRM/1.0 contato@sevenflowia.tech';
+
+let job = {
+  running: false,
+  startedAt: null,
+  finishedAt: null,
+  processed: 0,
+  saved: 0,
+  failed: 0,
+  skipped: 0,
+  limit: 0,
+  message: 'Nenhuma rotina em execucao.'
+};
+
+let geocodeTableReady = null;
+
+async function ensureLeadGeocodeTable() {
+  if (geocodeTableReady) return geocodeTableReady;
+  geocodeTableReady = (async () => {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "LeadGeocode" (
+        "addressHash" TEXT NOT NULL,
+        "externalLeadId" INTEGER,
+        "leadName" TEXT,
+        "address" TEXT NOT NULL,
+        "district" TEXT,
+        "neighborhood" TEXT,
+        "latitude" DOUBLE PRECISION,
+        "longitude" DOUBLE PRECISION,
+        "provider" TEXT NOT NULL DEFAULT 'nominatim',
+        "precision" TEXT,
+        "displayName" TEXT,
+        "notFound" BOOLEAN NOT NULL DEFAULT false,
+        "geocodedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "LeadGeocode_pkey" PRIMARY KEY ("addressHash")
+      )
+    `);
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "LeadGeocode_externalLeadId_idx" ON "LeadGeocode"("externalLeadId")');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "LeadGeocode_district_idx" ON "LeadGeocode"("district")');
+    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "LeadGeocode_notFound_idx" ON "LeadGeocode"("notFound")');
+  })();
+  try {
+    return await geocodeTableReady;
+  } catch (error) {
+    geocodeTableReady = null;
+    throw error;
+  }
+}
+
+async function writeGeocodeCache(cache) {
+  const filePath = geocodeCachePath();
+  await fsp.mkdir(path.dirname(filePath), { recursive: true });
+  await fsp.writeFile(filePath, JSON.stringify(cache, null, 2), 'utf8');
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function fullLeadAddress(lead) {
+  const address = String(lead?.addr || '').trim();
+  if (address && address !== 'N/I') return address;
+  return [lead?.end, lead?.d, 'SP', 'Brasil'].filter(Boolean).join(', ');
+}
+
+function leadNeighborhood(lead) {
+  const [, bairro] = String(lead?.end || '').split(' - ');
+  return String(bairro || '').trim() || null;
+}
+
+async function saveLeadGeocodeToDb({ key, lead, address, entry }) {
+  try {
+    await ensureLeadGeocodeTable();
+    await prisma.$executeRaw`
+      INSERT INTO "LeadGeocode" (
+        "addressHash",
+        "externalLeadId",
+        "leadName",
+        "address",
+        "district",
+        "neighborhood",
+        "latitude",
+        "longitude",
+        "provider",
+        "precision",
+        "displayName",
+        "notFound",
+        "geocodedAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${key},
+        ${Number.isFinite(Number(lead?.id)) ? Number(lead.id) : null},
+        ${lead?.n || null},
+        ${address},
+        ${lead?.d || null},
+        ${leadNeighborhood(lead)},
+        ${Number.isFinite(Number(entry?.lat)) ? Number(entry.lat) : null},
+        ${Number.isFinite(Number(entry?.lng)) ? Number(entry.lng) : null},
+        ${entry?.source || 'nominatim'},
+        ${entry?.type || null},
+        ${entry?.displayName || null},
+        ${Boolean(entry?.notFound)},
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+      )
+      ON CONFLICT ("addressHash") DO UPDATE SET
+        "externalLeadId" = EXCLUDED."externalLeadId",
+        "leadName" = EXCLUDED."leadName",
+        "address" = EXCLUDED."address",
+        "district" = EXCLUDED."district",
+        "neighborhood" = EXCLUDED."neighborhood",
+        "latitude" = EXCLUDED."latitude",
+        "longitude" = EXCLUDED."longitude",
+        "provider" = EXCLUDED."provider",
+        "precision" = EXCLUDED."precision",
+        "displayName" = EXCLUDED."displayName",
+        "notFound" = EXCLUDED."notFound",
+        "geocodedAt" = CURRENT_TIMESTAMP,
+        "updatedAt" = CURRENT_TIMESTAMP
+    `;
+  } catch (error) {
+    console.error('[geocode:db-save:error]', error.message);
+  }
+}
+
+export async function hydrateGeocodeCacheFromDb() {
+  let rows = [];
+  try {
+    await ensureLeadGeocodeTable();
+    rows = await prisma.$queryRaw`
+      SELECT
+        "addressHash",
+        "address",
+        "latitude",
+        "longitude",
+        "provider",
+        "precision",
+        "displayName",
+        "notFound",
+        "geocodedAt"
+      FROM "LeadGeocode"
+    `;
+  } catch (error) {
+    console.error('[geocode:db-read:error]', error.message);
+    return readGeocodeCache();
+  }
+  if (!rows.length) return readGeocodeCache();
+  const cache = readGeocodeCache();
+  let changed = false;
+  for (const row of rows) {
+    const next = {
+      address: row.address,
+      lat: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
+      lng: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
+      source: row.provider || 'nominatim',
+      type: row.precision || '',
+      displayName: row.displayName || '',
+      notFound: Boolean(row.notFound),
+      updatedAt: row.geocodedAt ? new Date(row.geocodedAt).toISOString() : new Date().toISOString()
+    };
+    if (JSON.stringify(cache[row.addressHash]) !== JSON.stringify(next)) {
+      cache[row.addressHash] = next;
+      changed = true;
+    }
+  }
+  if (changed) {
+    await writeGeocodeCache(cache);
+    invalidateDashboardCache();
+  }
+  return cache;
+}
+
+function pendingLeads(records, cache, limit) {
+  const seen = new Set();
+  return records
+    .map((lead) => ({ lead, address: fullLeadAddress(lead) }))
+    .filter(({ lead, address }) => {
+      const key = geocodeKey(address);
+      if (!address || address === 'N/I' || seen.has(key) || cache[key]?.lat || cache[key]?.notFound) return false;
+      seen.add(key);
+      return lead?.d && key.length > 10;
+    })
+    .slice(0, limit);
+}
+
+async function geocodeAddress(address) {
+  const url = new URL(NOMINATIM_URL);
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('limit', '1');
+  url.searchParams.set('countrycodes', 'br');
+  url.searchParams.set('q', address);
+  const response = await fetch(url, {
+    headers: {
+      'Accept': 'application/json',
+      'User-Agent': USER_AGENT
+    }
+  });
+  if (!response.ok) throw new Error(`Nominatim respondeu ${response.status}`);
+  const results = await response.json();
+  const result = Array.isArray(results) ? results[0] : null;
+  if (!result?.lat || !result?.lon) return null;
+  return {
+    lat: Number(result.lat),
+    lng: Number(result.lon),
+    displayName: result.display_name || '',
+    type: result.type || '',
+    importance: Number(result.importance) || null
+  };
+}
+
+export async function geocodeStatus() {
+  const cache = await hydrateGeocodeCacheFromDb();
+  const payload = getDashboardData();
+  const total = payload.records.length;
+  const withCoordinates = payload.records.filter((lead) => Number.isFinite(Number(lead.lat)) && Number.isFinite(Number(lead.lng))).length;
+  return {
+    ...job,
+    cachePath: geocodeCachePath(),
+    cachedAddresses: Object.keys(cache).length,
+    totalLeads: total,
+    leadsWithCoordinates: withCoordinates,
+    pendingEstimate: Math.max(0, total - withCoordinates)
+  };
+}
+
+export function startGeocodingBatch({ limit = 100 } = {}) {
+  if (job.running) return { started: false, status: job };
+  const batchLimit = Math.max(1, Math.min(Number(limit) || 100, 1000));
+  job = {
+    running: true,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    processed: 0,
+    saved: 0,
+    failed: 0,
+    skipped: 0,
+    limit: batchLimit,
+    message: 'Geocodificacao iniciada.'
+  };
+
+  runBatch(batchLimit).catch((error) => {
+    job = {
+      ...job,
+      running: false,
+      finishedAt: new Date().toISOString(),
+      message: error.message || 'A rotina de geocodificacao falhou.'
+    };
+  });
+
+  return { started: true, status: job };
+}
+
+async function runBatch(limit) {
+  const cache = await hydrateGeocodeCacheFromDb();
+  const payload = getDashboardData();
+  const batch = pendingLeads(payload.records, cache, limit);
+  job.message = `Processando ${batch.length} endereco(s) pendente(s).`;
+
+  for (const { address, lead } of batch) {
+    const key = geocodeKey(address);
+    try {
+      const point = await geocodeAddress(address);
+      const entry = point
+        ? { ...point, source: 'nominatim', address, updatedAt: new Date().toISOString() }
+        : { notFound: true, source: 'nominatim', address, updatedAt: new Date().toISOString() };
+      cache[key] = entry;
+      await saveLeadGeocodeToDb({ key, lead, address, entry });
+      if (point) job.saved += 1;
+      else job.skipped += 1;
+      job.processed += 1;
+      job.message = `${job.processed}/${batch.length} processados. Ultimo: ${lead.n || address}`;
+      await writeGeocodeCache(cache);
+    } catch (error) {
+      job.failed += 1;
+      job.processed += 1;
+      job.message = `${job.processed}/${batch.length} processados. Falha: ${error.message}`;
+    }
+    if (job.processed < batch.length) await sleep(GEOCODE_DELAY_MS);
+  }
+
+  job = {
+    ...job,
+    running: false,
+    finishedAt: new Date().toISOString(),
+    message: `Concluido: ${job.saved} coordenada(s) salvas, ${job.skipped} sem resultado, ${job.failed} falha(s).`
+  };
+  invalidateDashboardCache();
+}
