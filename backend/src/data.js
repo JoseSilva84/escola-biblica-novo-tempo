@@ -402,7 +402,7 @@ function readPaulistanaTerritory() {
     const churchMatch = /^-\s+(.+)$/.exec(line.trim());
     if (churchMatch && currentDistrict) {
       churchesByDistrict[districtSlug(currentDistrict)].push(
-        churchMatch[1].replace(/\s+\(GP\)\s*$/i, '').trim()
+        parseChurchEntry(churchMatch[1])
       );
     }
   }
@@ -413,6 +413,22 @@ function readPaulistanaTerritory() {
     districtNameBySlug,
     churchesByDistrict,
     allowedDistrictSlugs: new Set(districts.map((district) => district.slug))
+  };
+}
+
+function parseChurchEntry(value) {
+  const parts = String(value || '')
+    .replace(/\s+\(GP\)\s*$/i, '')
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const [name = '', address = '', coordinates = ''] = parts;
+  const coordinateMatch = /(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/.exec(coordinates);
+  return {
+    name,
+    address,
+    lat: coordinateMatch ? Number(coordinateMatch[1]) : null,
+    lng: coordinateMatch ? Number(coordinateMatch[2]) : null
   };
 }
 

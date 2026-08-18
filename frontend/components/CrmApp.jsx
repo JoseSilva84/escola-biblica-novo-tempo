@@ -22,6 +22,7 @@ import {
   CheckCheck,
   CheckCircle2,
   ChevronRight,
+  Church,
   ClipboardList,
   Crown,
   Database,
@@ -3108,6 +3109,14 @@ function googleMapsSearchUrl(lead) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
+function churchMapSearchUrl(church, provider = 'osm') {
+  const query = [church?.address, church?.name, church?.districtName, 'SP', 'Brasil']
+    .filter(Boolean)
+    .join(', ');
+  if (provider === 'google') return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`;
+}
+
 const leadMapPriorityStyles = {
   Hot: { label: 'Quente', color: '#dc2626' },
   Warm: { label: 'Potencial', color: '#f97316' },
@@ -3119,7 +3128,29 @@ function leadMapPriorityStyle(priority) {
   return leadMapPriorityStyles[priority] || leadMapPriorityStyles.Cold;
 }
 
-function LeadsOpenStreetMap({ leads = [] }) {
+function churchMapPoint(church, districtLeadPoints = {}) {
+  if (Number.isFinite(Number(church?.lat)) && Number.isFinite(Number(church?.lng))) {
+    return { lat: Number(church.lat), lng: Number(church.lng), precision: 'Endereco' };
+  }
+  const districtSlug = church?.districtSlug || slugifyDistrictName(church?.districtName);
+  const districtPoints = districtLeadPoints[districtSlug] || [];
+  const center = districtPoints.length
+    ? [
+        districtPoints.reduce((sum, point) => sum + point.lat, 0) / districtPoints.length,
+        districtPoints.reduce((sum, point) => sum + point.lng, 0) / districtPoints.length
+      ]
+    : (cityMapCenters[slugForMap(church?.districtName)] || cityMapCenters['sao-paulo']);
+  const hash = stableHash(`${church?.districtName}|${church?.name}`);
+  const angle = (hash % 360) * (Math.PI / 180);
+  const radius = 0.002 + ((hash % 450) / 100000);
+  return {
+    lat: center[0] + Math.sin(angle) * radius,
+    lng: center[1] + Math.cos(angle) * radius,
+    precision: 'Aproximado'
+  };
+}
+
+function LeadsOpenStreetMap({ leads = [], churches = [] }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -3136,6 +3167,21 @@ function LeadsOpenStreetMap({ leads = [] }) {
     lead,
     point: approximateLeadPoint(lead)
   })), [activeMapPriority, leads]);
+  const churchPoints = useMemo(() => {
+    const districtLeadPoints = mappableLeads.reduce((map, item) => {
+      const slug = slugifyDistrictName(item.lead?.d);
+      if (!map[slug]) map[slug] = [];
+      map[slug].push(item.point);
+      return map;
+    }, {});
+    const visibleDistricts = new Set(mappableLeads.map((item) => slugifyDistrictName(item.lead?.d)).filter(Boolean));
+    return churches
+      .filter((church) => !visibleDistricts.size || visibleDistricts.has(church.districtSlug || slugifyDistrictName(church.districtName)))
+      .map((church) => ({
+        church,
+        point: churchMapPoint(church, districtLeadPoints)
+      }));
+  }, [churches, mappableLeads]);
   const sampleLead = mappableLeads[0];
 
   useEffect(() => {
@@ -3193,7 +3239,29 @@ function LeadsOpenStreetMap({ leads = [] }) {
           bounds.extend([point.lat, point.lng]);
         }
 
-        if (mappableLeads.length) map.fitBounds(bounds.pad(0.18), { maxZoom: 14 });
+        for (const { church, point } of churchPoints) {
+          const precisionLabel = point.precision === 'Endereco' ? 'Endereco exato' : 'Distrito aproximado';
+          const churchMarker = L.circleMarker([point.lat, point.lng], {
+            radius: 9,
+            color: '#ffffff',
+            weight: 3,
+            fillColor: '#16a34a',
+            fillOpacity: 0.95
+          }).addTo(map);
+          churchMarker.bindPopup(`
+            <strong>${escapeMapHtml(church.name || 'Igreja Adventista')}</strong><br>
+            <strong style="color:#16a34a">Igreja Adventista</strong><br>
+            ${escapeMapHtml(church.districtName || '')}<br>
+            ${church.address ? `${escapeMapHtml(church.address)}<br>` : ''}
+            <small>${escapeMapHtml(precisionLabel)}</small><br>
+            <a href="${churchMapSearchUrl(church, 'osm')}" target="_blank" rel="noreferrer">Abrir igreja no OSM</a><br>
+            <a href="${churchMapSearchUrl(church, 'google')}" target="_blank" rel="noreferrer">Abrir igreja no Google Maps (precisao)</a>
+          `);
+          markersRef.current.push(churchMarker);
+          bounds.extend([point.lat, point.lng]);
+        }
+
+        if (mappableLeads.length || churchPoints.length) map.fitBounds(bounds.pad(0.18), { maxZoom: 14 });
         else map.setView(cityMapCenters['sao-paulo'], 10);
         setStatus('ready');
       } catch {
@@ -3203,7 +3271,7 @@ function LeadsOpenStreetMap({ leads = [] }) {
 
     renderMap();
     return () => { active = false; };
-  }, [mappableLeads]);
+  }, [churchPoints, mappableLeads]);
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)]">
@@ -3233,6 +3301,11 @@ function LeadsOpenStreetMap({ leads = [] }) {
               </span>
             </button>
           ))}
+          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 shadow-sm">
+            <Church size={14} />
+            Igrejas
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] text-emerald-700">{formatNumber(churchPoints.length)}</span>
+          </span>
         </div>
         {sampleLead ? (
           <a className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800" href={openStreetMapSearchUrl(sampleLead.lead)} rel="noreferrer" target="_blank">
@@ -3366,7 +3439,7 @@ function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear,
   );
 }
 
-function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetUpdate, records = [], onNavigate }) {
+function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateHistory = [], lastDatasetUpdate, officialDistricts = [], records = [], onNavigate }) {
   const [filters, setFilters] = useState({
     association: 'paulistana',
     districts: [],
@@ -3384,6 +3457,26 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
   });
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
+  const churchesForMap = useMemo(() => {
+    const districtNamesBySlug = officialDistricts.reduce((map, district) => ({
+      ...map,
+      [district.slug || slugifyDistrictName(district.name)]: district.name
+    }), {});
+    return Object.entries(churchesByDistrict || {}).flatMap(([districtSlug, entries]) => {
+      const districtName = districtNamesBySlug[districtSlug] || districtSlug;
+      return (entries || []).map((entry) => {
+        const church = typeof entry === 'string' ? { name: entry } : entry;
+        return {
+          address: church.address || '',
+          districtName,
+          districtSlug,
+          lat: church.lat,
+          lng: church.lng,
+          name: church.name || 'Igreja Adventista'
+        };
+      });
+    });
+  }, [churchesByDistrict, officialDistricts]);
 
   const districts = useMemo(
     () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -3744,7 +3837,7 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
         </div>
 
         <div className="mt-5">
-          <LeadsOpenStreetMap leads={filteredLeads} />
+          <LeadsOpenStreetMap churches={churchesForMap} leads={filteredLeads} />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -6399,7 +6492,18 @@ export default function CrmApp({ payload: initialPayload = null }) {
       />
     );
   } else if (effectiveView === 'leads') {
-    content = <LeadsView associations={filteredAssociations} data={data} datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []} lastDatasetUpdate={payload?.meta?.lastDatasetUpdate} onNavigate={navigateView} records={records} />;
+    content = (
+      <LeadsView
+        associations={filteredAssociations}
+        churchesByDistrict={payload?.meta?.territory?.churchesByDistrict || {}}
+        data={data}
+        datasetUpdateHistory={payload?.meta?.datasetUpdateHistory || []}
+        lastDatasetUpdate={payload?.meta?.lastDatasetUpdate}
+        officialDistricts={payload?.meta?.territory?.districts || []}
+        onNavigate={navigateView}
+        records={records}
+      />
+    );
   } else if (effectiveView === 'dataset-history') {
     content = <DatasetHistoryView history={payload?.meta?.datasetUpdateHistory || []} onBack={goBack} />;
   } else if (['general-admin', 'users'].includes(effectiveView)) {
