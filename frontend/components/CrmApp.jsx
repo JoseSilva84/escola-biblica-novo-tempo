@@ -3034,6 +3034,34 @@ function relatedDistrictsForNeighborhoods(records, neighborhoods) {
   )).sort((a, b) => a.localeCompare(b));
 }
 
+function leadMatchesFilterGroup(lead, filters, ignoredGroups = []) {
+  const ignored = new Set(ignoredGroups);
+  const term = filters.search.trim().toLowerCase();
+  if (!ignored.has('association') && filters.association !== 'paulistana') return false;
+  if (!ignored.has('districts') && filters.districts.length && !filters.districts.includes(lead.d)) return false;
+  if (!ignored.has('neighborhoods') && filters.neighborhoods.length && !filters.neighborhoods.includes(leadNeighborhood(lead))) return false;
+  if (!ignored.has('materials') && filters.materials.length && !filters.materials.includes(leadMaterial(lead))) return false;
+  if (!ignored.has('ageGroups') && filters.ageGroups.length && !filters.ageGroups.includes(leadAgeGroup(lead))) return false;
+  if (!ignored.has('genders') && filters.genders.length && !filters.genders.includes(lead.g || 'N')) return false;
+  if (!ignored.has('priorities') && filters.priorities.length && !filters.priorities.includes(lead.p)) return false;
+  if (!ignored.has('whatsapp') && filters.whatsapp === 'with' && !lead.t) return false;
+  if (!ignored.has('whatsapp') && filters.whatsapp === 'without' && lead.t) return false;
+  if (!ignored.has('email') && filters.email === 'with' && !lead.em) return false;
+  if (!ignored.has('email') && filters.email === 'without' && lead.em) return false;
+  if (!ignored.has('study') && filters.study === 'with' && !lead.e) return false;
+  if (!ignored.has('study') && filters.study === 'without' && lead.e) return false;
+  if (!ignored.has('vip') && filters.vip === 'with' && !lead.v) return false;
+  if (!ignored.has('vip') && filters.vip === 'without' && lead.v) return false;
+  if (!ignored.has('recency') && filters.recency === 'recent' && (lead.c === null || lead.c > 365)) return false;
+  if (!ignored.has('recency') && filters.recency === 'old' && (lead.c === null || lead.c <= 365)) return false;
+  if (!ignored.has('recency') && filters.recency === 'unknown' && lead.c !== null) return false;
+  if (!ignored.has('search') && term) {
+    const haystack = `${lead.n || ''} ${lead.tel || ''} ${lead.em || ''} ${lead.d || ''} ${leadNeighborhood(lead)} ${leadMaterial(lead)} ${lead.id || ''}`.toLowerCase();
+    if (!haystack.includes(term)) return false;
+  }
+  return true;
+}
+
 function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear, compact = false }) {
   const [query, setQuery] = useState('');
   const visibleOptions = useMemo(() => {
@@ -3113,68 +3141,97 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
     () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [records]
   );
-  const districtScopedRecords = useMemo(() => (
-    filters.districts.length ? records.filter((lead) => filters.districts.includes(lead.d)) : records
-  ), [filters.districts, records]);
-  const neighborhoodScopedRecords = useMemo(() => (
-    filters.neighborhoods.length ? records.filter((lead) => filters.neighborhoods.includes(leadNeighborhood(lead))) : records
-  ), [filters.neighborhoods, records]);
-  const neighborhoodOptions = useMemo(() => topOptions(districtScopedRecords, leadNeighborhood), [districtScopedRecords]);
-  const materialOptions = useMemo(() => topOptions(records, leadMaterial), [records]);
+  const recordsForDistrictOptions = useMemo(
+    () => records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['districts'])),
+    [filters, records]
+  );
+  const recordsForNeighborhoodOptions = useMemo(
+    () => records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['neighborhoods'])),
+    [filters, records]
+  );
+  const recordsForMaterialOptions = useMemo(
+    () => records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['materials'])),
+    [filters, records]
+  );
+  const recordsForAgeOptions = useMemo(
+    () => records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['ageGroups'])),
+    [filters, records]
+  );
+  const recordsForGenderOptions = useMemo(
+    () => records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['genders'])),
+    [filters, records]
+  );
+  const recordsForPriorityOptions = useMemo(
+    () => records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['priorities'])),
+    [filters, records]
+  );
+  const recordsForToggleOptions = useMemo(
+    () => ({
+      whatsapp: records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['whatsapp'])),
+      email: records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['email'])),
+      study: records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['study'])),
+      vip: records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['vip'])),
+      recency: records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['recency']))
+    }),
+    [filters, records]
+  );
+  const neighborhoodOptions = useMemo(() => topOptions(recordsForNeighborhoodOptions, leadNeighborhood), [recordsForNeighborhoodOptions]);
+  const materialOptions = useMemo(() => topOptions(recordsForMaterialOptions, leadMaterial), [recordsForMaterialOptions]);
   const ageOptions = useMemo(() => ['Ate 17', '18 a 29', '30 a 44', '45 a 59', '60+', 'Sem idade'].map((value) => ({
     value,
     label: value,
-    count: records.filter((lead) => leadAgeGroup(lead) === value).length
-  })).filter((option) => option.count > 0), [records]);
+    count: recordsForAgeOptions.filter((lead) => leadAgeGroup(lead) === value).length
+  })).filter((option) => option.count > 0), [recordsForAgeOptions]);
   const genderOptions = useMemo(() => ['F', 'M', 'N'].map((value) => ({
     value,
     label: leadGenderLabel(value),
-    count: records.filter((lead) => (lead.g || 'N') === value).length
-  })).filter((option) => option.count > 0), [records]);
+    count: recordsForGenderOptions.filter((lead) => (lead.g || 'N') === value).length
+  })).filter((option) => option.count > 0), [recordsForGenderOptions]);
   const priorityOptions = useMemo(() => ['Hot', 'Warm', 'Cool', 'Cold'].map((value) => ({
     value,
     label: crmPriorityLabels[value],
-    count: records.filter((lead) => lead.p === value).length
-  })), [records]);
+    count: recordsForPriorityOptions.filter((lead) => lead.p === value).length
+  })), [recordsForPriorityOptions]);
   const districtOptions = useMemo(() => {
-    const districtSource = filters.neighborhoods.length
-      ? Array.from(new Set(neighborhoodScopedRecords.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b))
-      : districts;
+    const districtSource = Array.from(new Set(recordsForDistrictOptions.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b));
     return districtSource.map((district) => ({
     value: district,
     label: district,
-    count: neighborhoodScopedRecords.filter((lead) => lead.d === district).length
+    count: recordsForDistrictOptions.filter((lead) => lead.d === district).length
   }));
-  }, [districts, filters.neighborhoods.length, neighborhoodScopedRecords]);
+  }, [recordsForDistrictOptions]);
+  const selectFilterOptions = useMemo(() => ({
+    whatsapp: [
+      ['all', `Todos (${formatNumber(recordsForToggleOptions.whatsapp.length)})`],
+      ['with', `Com WhatsApp (${formatNumber(recordsForToggleOptions.whatsapp.filter((lead) => lead.t).length)})`],
+      ['without', `Sem WhatsApp (${formatNumber(recordsForToggleOptions.whatsapp.filter((lead) => !lead.t).length)})`]
+    ],
+    email: [
+      ['all', `Todos (${formatNumber(recordsForToggleOptions.email.length)})`],
+      ['with', `Com e-mail (${formatNumber(recordsForToggleOptions.email.filter((lead) => lead.em).length)})`],
+      ['without', `Sem e-mail (${formatNumber(recordsForToggleOptions.email.filter((lead) => !lead.em).length)})`]
+    ],
+    study: [
+      ['all', `Todos (${formatNumber(recordsForToggleOptions.study.length)})`],
+      ['with', `Com estudo (${formatNumber(recordsForToggleOptions.study.filter((lead) => lead.e).length)})`],
+      ['without', `Sem estudo (${formatNumber(recordsForToggleOptions.study.filter((lead) => !lead.e).length)})`]
+    ],
+    vip: [
+      ['all', `Todos (${formatNumber(recordsForToggleOptions.vip.length)})`],
+      ['with', `VIP (${formatNumber(recordsForToggleOptions.vip.filter((lead) => lead.v).length)})`],
+      ['without', `Nao VIP (${formatNumber(recordsForToggleOptions.vip.filter((lead) => !lead.v).length)})`]
+    ],
+    recency: [
+      ['all', `Todos (${formatNumber(recordsForToggleOptions.recency.length)})`],
+      ['recent', `Ate 1 ano (${formatNumber(recordsForToggleOptions.recency.filter((lead) => lead.c !== null && lead.c <= 365).length)})`],
+      ['old', `+ de 1 ano (${formatNumber(recordsForToggleOptions.recency.filter((lead) => lead.c !== null && lead.c > 365).length)})`],
+      ['unknown', `Sem data (${formatNumber(recordsForToggleOptions.recency.filter((lead) => lead.c === null).length)})`]
+    ]
+  }), [recordsForToggleOptions]);
 
   const filteredLeads = useMemo(() => {
-    const term = filters.search.trim().toLowerCase();
     return records
-      .filter((lead) => {
-        if (filters.association !== 'paulistana') return false;
-        if (filters.districts.length && !filters.districts.includes(lead.d)) return false;
-        if (filters.neighborhoods.length && !filters.neighborhoods.includes(leadNeighborhood(lead))) return false;
-        if (filters.materials.length && !filters.materials.includes(leadMaterial(lead))) return false;
-        if (filters.ageGroups.length && !filters.ageGroups.includes(leadAgeGroup(lead))) return false;
-        if (filters.genders.length && !filters.genders.includes(lead.g || 'N')) return false;
-        if (filters.priorities.length && !filters.priorities.includes(lead.p)) return false;
-        if (filters.whatsapp === 'with' && !lead.t) return false;
-        if (filters.whatsapp === 'without' && lead.t) return false;
-        if (filters.email === 'with' && !lead.em) return false;
-        if (filters.email === 'without' && lead.em) return false;
-        if (filters.study === 'with' && !lead.e) return false;
-        if (filters.study === 'without' && lead.e) return false;
-        if (filters.vip === 'with' && !lead.v) return false;
-        if (filters.vip === 'without' && lead.v) return false;
-        if (filters.recency === 'recent' && (lead.c === null || lead.c > 365)) return false;
-        if (filters.recency === 'old' && (lead.c === null || lead.c <= 365)) return false;
-        if (filters.recency === 'unknown' && lead.c !== null) return false;
-        if (term) {
-          const haystack = `${lead.n || ''} ${lead.tel || ''} ${lead.em || ''} ${lead.d || ''} ${leadNeighborhood(lead)} ${leadMaterial(lead)} ${lead.id || ''}`.toLowerCase();
-          if (!haystack.includes(term)) return false;
-        }
-        return true;
-      })
+      .filter((lead) => leadMatchesFilterGroup(lead, filters))
       .sort((a, b) => (b.s || 0) - (a.s || 0));
   }, [filters, records]);
 
@@ -3421,11 +3478,11 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
           </div>
           <div className="grid grid-cols-5 gap-3 max-2xl:grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
             {[
-              ['whatsapp', 'WhatsApp', [['all', 'Todos'], ['with', 'Com WhatsApp'], ['without', 'Sem WhatsApp']]],
-              ['email', 'E-mail', [['all', 'Todos'], ['with', 'Com e-mail'], ['without', 'Sem e-mail']]],
-              ['study', 'Estudos', [['all', 'Todos'], ['with', 'Com estudo'], ['without', 'Sem estudo']]],
-              ['vip', 'VIP', [['all', 'Todos'], ['with', 'VIP'], ['without', 'Nao VIP']]],
-              ['recency', 'Contato', [['all', 'Todos'], ['recent', 'Ate 1 ano'], ['old', '+ de 1 ano'], ['unknown', 'Sem data']]]
+              ['whatsapp', 'WhatsApp', selectFilterOptions.whatsapp],
+              ['email', 'E-mail', selectFilterOptions.email],
+              ['study', 'Estudos', selectFilterOptions.study],
+              ['vip', 'VIP', selectFilterOptions.vip],
+              ['recency', 'Contato', selectFilterOptions.recency]
             ].map(([key, label, options]) => (
               <label className="grid gap-2 rounded-2xl border border-slate-200 bg-white/80 p-4 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 shadow-[0_14px_34px_rgba(15,23,42,0.07)] ring-1 ring-white/70" key={key}>
                 {label}
