@@ -200,6 +200,29 @@ function formatDatasetDate(value) {
   }).format(date);
 }
 
+function formatBrDateOnly(value) {
+  const text = String(value || '').trim();
+  return /^\d{2}\/\d{2}\/\d{4}$/.test(text) ? text : 'data nao informada';
+}
+
+function formatElapsedContactTime(days) {
+  const totalDays = Number(days);
+  if (!Number.isFinite(totalDays)) return 'tempo nao informado';
+  if (totalDays < 30) return `${formatNumber(totalDays)} dia${totalDays === 1 ? '' : 's'}`;
+  if (totalDays < 365) {
+    const months = Math.floor(totalDays / 30);
+    const remainingDays = totalDays % 30;
+    return remainingDays
+      ? `${formatNumber(months)} mes${months === 1 ? '' : 'es'} e ${formatNumber(remainingDays)} dia${remainingDays === 1 ? '' : 's'}`
+      : `${formatNumber(months)} mes${months === 1 ? '' : 'es'}`;
+  }
+  const years = Math.floor(totalDays / 365);
+  const remainingMonths = Math.floor((totalDays % 365) / 30);
+  return remainingMonths
+    ? `${formatNumber(years)} ano${years === 1 ? '' : 's'} e ${formatNumber(remainingMonths)} mes${remainingMonths === 1 ? '' : 'es'}`
+    : `${formatNumber(years)} ano${years === 1 ? '' : 's'}`;
+}
+
 function hasNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
@@ -752,7 +775,7 @@ function whatsappHistoryForLead(lead) {
   if (lead.c !== null && lead.c !== undefined) {
     history.push({
       title: 'Ultimo contato',
-      detail: `Contato registrado ha ${formatNumber(lead.c)} dias.`,
+      detail: `Contato em ${formatBrDateOnly(lead.lastContactDate)}. Decorrido ate hoje: ${formatElapsedContactTime(lead.c)} (${formatNumber(lead.c)} dias).`,
       tone: 'bg-blue-500/10 border-blue-400/20 text-blue-100'
     });
   }

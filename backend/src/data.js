@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 
-const DATA_REFERENCIA = new Date('2026-06-08T00:00:00');
 const DATASET_DIR = resolveConfiguredPath(process.env.DATASET_DIR)
   || firstExistingPath([
     path.resolve(process.cwd(), 'dataset'),
@@ -29,6 +28,14 @@ function fileCachePart(filePath) {
   if (!filePath || !fs.existsSync(filePath)) return `${filePath || 'missing'}:missing`;
   const stat = fs.statSync(filePath);
   return `${filePath}:${stat.mtimeMs}:${stat.size}`;
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function todayReferenceDate() {
+  return new Date(`${todayKey()}T00:00:00`);
 }
 
 function dashboardCacheKey(alunosPath) {
@@ -60,6 +67,7 @@ function dashboardCacheKey(alunosPath) {
   }
 
   return [
+    todayKey(),
     fileCachePart(alunosPath),
     fileCachePart(territoryPath),
     fileCachePart(rankingPath),
@@ -173,7 +181,7 @@ function parseBrDate(value) {
 function daysSince(value) {
   const date = parseBrDate(value);
   if (!date) return null;
-  return Math.max(0, Math.round((DATA_REFERENCIA - date) / 86400000));
+  return Math.max(0, Math.round((todayReferenceDate() - date) / 86400000));
 }
 
 function materialCount(value) {
@@ -240,6 +248,7 @@ function transformRecord(row, ml) {
   const email = normalize(row.Email, '');
   const religiao = normalize(row.Religião, 'Não informado');
   const descricao = normalize(row.Descrição, 'N/I');
+  const lastContactDate = normalize(row['Data do Último Contato'], '');
 
   return {
     id: Number(row.ID),
@@ -255,7 +264,8 @@ function transformRecord(row, ml) {
     t: digits.length >= 10 ? 1 : 0,
     e: /\(em andamento\)/i.test(String(row.Material ?? '')) ? 1 : 0,
     m: materialCount(row.Material),
-    c: daysSince(row['Data do Último Contato']),
+    c: daysSince(lastContactDate),
+    lastContactDate,
     a: Number.parseInt(normalize(row.Idade, ''), 10) || null,
     birthDate: normalize(row['Data de aniversário'], 'N/I'),
     g: genderCode(row.Sexo),
@@ -448,7 +458,7 @@ function transformDashboardRecordToInterest(row) {
     bairro: normalize(bairro, 'Nao informado'),
     material: normalize(row.materialName || row.tm, 'N/I'),
     materialPrincipal: normalize(row.materialName || row.tm, 'Nao informado'),
-    ultimoContato: null,
+    ultimoContato: row.lastContactDate || null,
     vipHistorico: Boolean(row.v),
     materiaisQuantidade: Number(row.m) || 0,
     temTelefone: hasPhone ? 1 : 0,
@@ -605,7 +615,7 @@ export function getDashboardData() {
       mlRecords: ranking.byId.size,
       lastDatasetUpdate,
       datasetUpdateHistory,
-      referenceDate: '2026-06-08',
+      referenceDate: todayKey(),
       model: 'ranking_nao_vip_ml_pandas.csv + regra operacional do notebook analise_vip_ml.ipynb'
     }
   };
