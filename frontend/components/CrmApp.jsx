@@ -3124,10 +3124,18 @@ function LeadsOpenStreetMap({ leads = [] }) {
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const [status, setStatus] = useState('idle');
-  const mappableLeads = useMemo(() => leads.slice(0, 300).map((lead) => ({
+  const [activeMapPriority, setActiveMapPriority] = useState('');
+  const priorityCounts = useMemo(() => leads.reduce((counts, lead) => {
+    const priority = leadMapPriorityStyles[lead.p] ? lead.p : 'Cold';
+    return { ...counts, [priority]: (counts[priority] || 0) + 1 };
+  }, {}), [leads]);
+  const mappableLeads = useMemo(() => leads
+    .filter((lead) => !activeMapPriority || lead.p === activeMapPriority || (activeMapPriority === 'Cold' && !leadMapPriorityStyles[lead.p]))
+    .slice(0, 300)
+    .map((lead) => ({
     lead,
     point: approximateLeadPoint(lead)
-  })), [leads]);
+  })), [activeMapPriority, leads]);
   const sampleLead = mappableLeads[0];
 
   useEffect(() => {
@@ -3206,10 +3214,24 @@ function LeadsOpenStreetMap({ leads = [] }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {Object.entries(leadMapPriorityStyles).map(([key, item]) => (
-            <span key={key} className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/85 px-3 py-2 text-xs font-black text-slate-700 shadow-sm">
+            <button
+              key={key}
+              type="button"
+              aria-pressed={activeMapPriority === key}
+              onClick={() => setActiveMapPriority((current) => (current === key ? '' : key))}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-black shadow-sm transition ${
+                activeMapPriority === key
+                  ? 'border-slate-900 bg-slate-950 text-white'
+                  : 'border-white/80 bg-white/85 text-slate-700 hover:border-blue-200 hover:bg-blue-50'
+              }`}
+              title={activeMapPriority === key ? 'Clique para mostrar todos' : `Mostrar somente ${item.label}`}
+            >
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
               {item.label}
-            </span>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] ${activeMapPriority === key ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                {formatNumber(priorityCounts[key] || 0)}
+              </span>
+            </button>
           ))}
         </div>
         {sampleLead ? (
