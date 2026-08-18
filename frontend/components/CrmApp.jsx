@@ -3040,11 +3040,11 @@ function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear,
   }, [compact, options, query, selected]);
 
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-[0_14px_34px_rgba(15,23,42,0.07)] ring-1 ring-white/70">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{title}</span>
+        <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">{title}</span>
         {selected.length ? (
-          <button className="text-[11px] font-black uppercase tracking-wide text-blue-300 transition hover:text-blue-200" onClick={onClear} type="button">
+          <button className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-blue-700 transition hover:bg-blue-100" onClick={onClear} type="button">
             Limpar
           </button>
         ) : null}
@@ -3053,7 +3053,7 @@ function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear,
         <label className="relative mb-2 block">
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
           <input
-            className="h-10 w-full rounded-xl border border-white/[0.08] bg-slate-950/70 pl-9 pr-3 text-xs font-bold text-slate-100 outline-none placeholder:text-slate-600"
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-bold text-slate-800 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10"
             onChange={(event) => setQuery(event.target.value)}
             placeholder={`Buscar ${title.toLowerCase()}`}
             value={query}
@@ -3065,13 +3065,13 @@ function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear,
           const active = selected.includes(option.value);
           return (
             <button
-              className={`inline-flex min-h-9 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition ${active ? 'border-blue-300 bg-blue-600 text-white shadow-[0_12px_26px_rgba(37,99,235,0.24)]' : 'border-white/[0.08] bg-slate-950/65 text-slate-300 hover:border-blue-300/40 hover:bg-blue-500/10 hover:text-blue-100'}`}
+              className={`inline-flex min-h-9 max-w-full items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition ${active ? 'border-blue-500 bg-blue-600 text-white shadow-[0_12px_26px_rgba(37,99,235,0.24)]' : 'border-slate-200 bg-slate-50 text-slate-700 shadow-sm hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800'}`}
               key={option.value}
               onClick={() => onToggle(option.value)}
               type="button"
             >
-              <span>{option.label}</span>
-              {hasNumber(option.count) ? <span className={active ? 'text-white/75' : 'text-slate-500'}>{formatNumber(option.count)}</span> : null}
+              <span className="truncate">{option.label}</span>
+              {hasNumber(option.count) ? <span className={`rounded-full px-2 py-0.5 text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-white text-slate-500'}`}>{formatNumber(option.count)}</span> : null}
             </button>
           );
         })}
@@ -3305,23 +3305,35 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
           </div>
         </div>
 
+        <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-slate-50 to-blue-50/55 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.10)] ring-1 ring-white/80">
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Filtragem avancada</span>
+              <h3 className="mt-1 text-2xl font-black text-slate-950">Encontrar leads certos</h3>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right">
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Resultado</span>
+              <strong className="block text-2xl font-black text-emerald-950">{formatNumber(filteredLeads.length)}</strong>
+            </div>
+          </div>
+
         <div className="grid grid-cols-[1fr_1.6fr] gap-3 max-xl:grid-cols-1">
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">
             Associacao
-            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter('association', event.target.value)} value={filters.association}>
+            <select className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setFilter('association', event.target.value)} value={filters.association}>
               <option value="paulistana">Associacao Paulistana</option>
               {associations.filter((association) => association.id !== 'paulistana').map((association) => (
                 <option disabled key={association.id} value={association.id}>{association.name}</option>
               ))}
             </select>
           </label>
-          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+          <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">
             Buscar
-            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none placeholder:text-slate-600" onChange={(event) => setFilter('search', event.target.value)} placeholder="Nome, email, distrito ou WhatsApp" value={filters.search} />
+            <input className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setFilter('search', event.target.value)} placeholder="Nome, email, distrito ou WhatsApp" value={filters.search} />
           </label>
         </div>
 
-        <div className="mt-5 grid gap-5 rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4">
+        <div className="mt-5 grid gap-5">
           <div className="grid grid-cols-2 gap-5 max-xl:grid-cols-1">
             <AdvancedFilterGroup
               title="Distritos"
@@ -3383,14 +3395,15 @@ function LeadsView({ associations, data, datasetUpdateHistory = [], lastDatasetU
               ['vip', 'VIP', [['all', 'Todos'], ['with', 'VIP'], ['without', 'Nao VIP']]],
               ['recency', 'Contato', [['all', 'Todos'], ['recent', 'Ate 1 ano'], ['old', '+ de 1 ano'], ['unknown', 'Sem data']]]
             ].map(([key, label, options]) => (
-              <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500" key={key}>
+              <label className="grid gap-2 rounded-2xl border border-slate-200 bg-white/80 p-4 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 shadow-[0_14px_34px_rgba(15,23,42,0.07)] ring-1 ring-white/70" key={key}>
                 {label}
-                <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setFilter(key, event.target.value)} value={filters[key]}>
+                <select className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setFilter(key, event.target.value)} value={filters[key]}>
                   {options.map(([value, optionLabel]) => <option key={value} value={value}>{optionLabel}</option>)}
                 </select>
               </label>
             ))}
           </div>
+        </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
