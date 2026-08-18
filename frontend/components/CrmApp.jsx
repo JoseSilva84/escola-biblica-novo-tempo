@@ -3153,7 +3153,7 @@ function LeadsOpenStreetMap({ leads = [] }) {
         const map = mapInstanceRef.current || L.map(mapRef.current, {
           center: cityMapCenters['sao-paulo'],
           zoom: 10,
-          scrollWheelZoom: false
+          scrollWheelZoom: true
         });
         if (!mapInstanceRef.current) {
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
