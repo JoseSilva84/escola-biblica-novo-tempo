@@ -35,10 +35,12 @@ WORKDIR /app/backend
 
 COPY backend/src ./src
 COPY dataset /app/dataset
+COPY regiaoDistritoIgreja.md /app/regiaoDistritoIgreja.md
 
 ENV NODE_ENV=production
 ENV PORT=4000
 ENV DATASET_DIR=/app/dataset
+ENV PAULISTANA_TERRITORY_PATH=/app/regiaoDistritoIgreja.md
 ENV DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
 
 RUN if [ "$AUTO_UPDATE_DATASET" = "true" ]; then \

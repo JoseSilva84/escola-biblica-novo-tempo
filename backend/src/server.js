@@ -11,7 +11,7 @@ import { randomUUID } from 'crypto';
 import { gzip } from 'zlib';
 import { promisify } from 'util';
 import { createSessionToken, requireAuth, sessionCookieOptions, validateCredentials, verifySessionToken } from './auth.js';
-import { getDashboardData, invalidateDashboardCache } from './data.js';
+import { districtSlug, getDashboardData, invalidateDashboardCache } from './data.js';
 import { prisma } from './prisma.js';
 
 const app = express();
@@ -1101,7 +1101,7 @@ app.get('/api/dashboard/district-interest/:slug', requireAuth, async (request, r
   response.set('Pragma', 'no-cache');
   response.set('Expires', '0');
 
-  const slug = normalizeAssociationSlug(request.params.slug);
+  const slug = districtSlug(request.params.slug);
   if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
     response.status(403).json({ message: 'Acesso nao permitido para este distrito.' });
     return;

@@ -10,6 +10,7 @@ const DATASET_DIR = resolveConfiguredPath(process.env.DATASET_DIR)
   || path.resolve(process.cwd(), 'dataset');
 const ML_RANKING_FILE = 'ranking_nao_vip_ml_pandas.csv';
 const ALUNOS_FILE = 'alunos.json';
+const PAULISTANA_TERRITORY_FILE = 'regiaoDistritoIgreja.md';
 const INTEREST_DATA_PATTERN = /^dados_interesse_(?!distritos_manifest)(.+)\.json$/i;
 const UPDATE_STATUS_FILE = 'ultima_atualizacao_dataset.json';
 const UPDATE_HISTORY_FILE = 'historico_atualizacoes_dataset.json';
@@ -31,6 +32,11 @@ function fileCachePart(filePath) {
 }
 
 function dashboardCacheKey(alunosPath) {
+  const territoryPath = firstExistingPath([
+    resolveConfiguredPath(process.env.PAULISTANA_TERRITORY_PATH),
+    path.join(DATASET_DIR, PAULISTANA_TERRITORY_FILE),
+    path.resolve(DATASET_DIR, '..', PAULISTANA_TERRITORY_FILE)
+  ]);
   const rankingPath = firstExistingPath([
     resolveConfiguredPath(process.env.ML_RANKING_PATH),
     path.join(DATASET_DIR, ML_RANKING_FILE)
@@ -55,6 +61,7 @@ function dashboardCacheKey(alunosPath) {
 
   return [
     fileCachePart(alunosPath),
+    fileCachePart(territoryPath),
     fileCachePart(rankingPath),
     fileCachePart(updatePath),
     fileCachePart(historyPath),
@@ -262,6 +269,7 @@ function transformRecord(row, ml) {
 }
 
 function readInterestDistrictData() {
+  const territory = readPaulistanaTerritory();
   const configuredPath = resolveConfiguredPath(process.env.INTEREST_DATA_PATH);
   const files = [];
   if (configuredPath && fs.existsSync(configuredPath) && fs.statSync(configuredPath).isFile()) {
@@ -279,7 +287,8 @@ function readInterestDistrictData() {
       const payload = JSON.parse(fs.readFileSync(interestPath, 'utf8'));
       const rows = Array.isArray(payload.registros) ? payload.registros : [];
       const district = payload.distrito_piloto || rows[0]?.origem?.distrito || path.basename(interestPath, '.json').replace(/^dados_interesse_/i, '');
-      const slug = normalizeAssociationLikeSlug(district);
+      const slug = districtSlug(district);
+      if (territory.allowedDistrictSlugs && !territory.allowedDistrictSlugs.has(slug)) continue;
       const records = rows.map(transformInterestPilotRecord);
       byDistrict[slug] = records;
       districts.push({
@@ -313,7 +322,7 @@ function buildInterestDistrictDataFromRecords(records = []) {
   const districts = new Map();
   for (const record of records) {
     const district = record.d || 'Nao informado';
-    const slug = normalizeAssociationLikeSlug(district);
+    const slug = districtSlug(district);
     if (!byDistrict[slug]) byDistrict[slug] = [];
     byDistrict[slug].push(transformDashboardRecordToInterest(record));
     if (!districts.has(slug)) {
@@ -335,6 +344,75 @@ function normalizeAssociationLikeSlug(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'nao-informado';
+}
+
+export function districtSlug(value) {
+  const slug = normalizeAssociationLikeSlug(value)
+    .replace(/\bjd\b/g, 'jardim')
+    .replace(/\bpq\b/g, 'parque')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const aliases = {
+    'bairro-do-feital': 'feital',
+    'barueri': 'barueri-central',
+    'central-de-cotia': 'cotia',
+    'central-de-sao-paulo': 'central-paulistana',
+    'jardim-arpoador': 'jardim-arpoador',
+    'jardim-bela-vista': 'jardim-bela-vista',
+    'jardim-boa-vista': 'jardim-boa-vista',
+    'jardim-da-graca': 'jardim-da-graca',
+    'jardim-helena-maria': 'jardim-helena-maria',
+    'jardim-rosemary': 'jardim-rosemary',
+    'jardim-silveira': 'jardim-silveira',
+    'jardim-silviania': 'jardim-silviania',
+    'vargem-grande-paulista': 'vargem-grande-paulista'
+  };
+  return aliases[slug] || slug;
+}
+
+function readPaulistanaTerritory() {
+  const territoryPath = firstExistingPath([
+    resolveConfiguredPath(process.env.PAULISTANA_TERRITORY_PATH),
+    path.join(DATASET_DIR, PAULISTANA_TERRITORY_FILE),
+    path.resolve(DATASET_DIR, '..', PAULISTANA_TERRITORY_FILE)
+  ]);
+
+  if (!territoryPath) {
+    throw new Error(`Arquivo ${PAULISTANA_TERRITORY_FILE} nao encontrado. Configure PAULISTANA_TERRITORY_PATH para filtrar a Associacao Paulistana.`);
+  }
+
+  const text = fs.readFileSync(territoryPath, 'utf8').replace(/^\uFEFF/, '');
+  const districts = [];
+  const churchesByDistrict = {};
+  const districtNameBySlug = new Map();
+  let currentDistrict = null;
+
+  for (const line of text.split(/\r?\n/)) {
+    const districtMatch = /^\*\*(.+?)\*\*/.exec(line.trim());
+    if (districtMatch) {
+      currentDistrict = normalize(districtMatch[1], '');
+      const slug = districtSlug(currentDistrict);
+      districts.push({ name: currentDistrict, slug });
+      districtNameBySlug.set(slug, currentDistrict);
+      churchesByDistrict[slug] = [];
+      continue;
+    }
+
+    const churchMatch = /^-\s+(.+)$/.exec(line.trim());
+    if (churchMatch && currentDistrict) {
+      churchesByDistrict[districtSlug(currentDistrict)].push(
+        churchMatch[1].replace(/\s+\(GP\)\s*$/i, '').trim()
+      );
+    }
+  }
+
+  return {
+    path: territoryPath,
+    districts,
+    districtNameBySlug,
+    churchesByDistrict,
+    allowedDistrictSlugs: new Set(districts.map((district) => district.slug))
+  };
 }
 
 function transformDashboardRecordToInterest(row) {
@@ -452,11 +530,19 @@ export function getDashboardData() {
     return dashboardCache.payload;
   }
 
+  const territory = readPaulistanaTerritory();
   const alunos = JSON.parse(fs.readFileSync(alunosPath, 'utf8'));
   const ranking = readMlRanking();
   const lastDatasetUpdate = readLastDatasetUpdate();
   const datasetUpdateHistory = readDatasetUpdateHistory();
-  const records = alunos.map((row) => transformRecord(row, ranking.byId));
+  const paulistanaRows = territory.allowedDistrictSlugs
+    ? alunos.filter((row) => territory.allowedDistrictSlugs.has(districtSlug(row.Distrito)))
+    : alunos;
+  const records = paulistanaRows.map((row) => {
+    const record = transformRecord(row, ranking.byId);
+    const officialName = territory.districtNameBySlug?.get(districtSlug(row.Distrito));
+    return officialName ? { ...record, d: officialName } : record;
+  });
   const interestPilot = readInterestDistrictData();
   const generatedInterest = buildInterestDistrictDataFromRecords(records);
   const recordsById = new Map(records.map((record) => [String(record.id), record]));
@@ -485,6 +571,13 @@ export function getDashboardData() {
     meta: {
       total: records.length,
       alunosPath,
+      territory: {
+        path: territory.path,
+        districts: territory.districts,
+        churchesByDistrict: territory.churchesByDistrict,
+        originalDistricts: new Set(alunos.map((row) => districtSlug(row.Distrito))).size,
+        filteredOutRecords: alunos.length - paulistanaRows.length
+      },
       interestPilot: {
         ...interestPilot.meta,
         totalDistricts: interestDistrictMeta.size,
