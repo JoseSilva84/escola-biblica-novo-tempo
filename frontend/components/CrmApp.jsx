@@ -3579,6 +3579,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
 
   const visibleLeads = filteredLeads.slice(0, 300);
   const selectedLeads = filteredLeads.filter((lead) => selectedLeadIds.has(lead.id));
+  const mapLeads = selectedLeads.length ? selectedLeads : filteredLeads;
   const hotWithWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
   const staleLeads = records.filter((lead) => lead.t && lead.c !== null && lead.c > 365).length;
 
@@ -3640,6 +3641,10 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       }
       return next;
     });
+  }
+
+  function selectLeadOnMap(lead) {
+    setSelectedLeadIds(new Set([lead.id]));
   }
 
   function selectVisibleLeads() {
@@ -3838,12 +3843,13 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         </div>
 
         <div className="mt-5">
-          <LeadsOpenStreetMap churches={churchesForMap} leads={filteredLeads} />
+          <LeadsOpenStreetMap churches={churchesForMap} leads={mapLeads} />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm font-semibold text-slate-500">
             {formatNumber(filteredLeads.length)} leads encontrados. Exibindo {formatNumber(visibleLeads.length)}.
+            {selectedLeads.length ? ` Mapa focado em ${formatNumber(selectedLeads.length)} selecionado(s).` : ''}
           </span>
           <div className="flex flex-wrap gap-2">
             <button className={ghostButtonClass} onClick={clearAllFilters} type="button">
@@ -3881,7 +3887,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                       <input aria-label={`Selecionar ${lead.n}`} checked={checked} className="h-4 w-4 accent-blue-600" onChange={() => toggleLead(lead)} onClick={(event) => event.stopPropagation()} type="checkbox" />
                     </td>
                     <td className="min-w-[15rem] border-b border-white/[0.04] px-4 py-3">
-                      <button className="text-left" onClick={() => setSelectedLead(lead)} type="button">
+                      <button className="text-left" onClick={(event) => { event.stopPropagation(); selectLeadOnMap(lead); }} title={`Mostrar somente ${lead.n} no mapa`} type="button">
                         <strong className="block text-slate-50">{lead.n}</strong>
                         <span className="text-xs font-semibold text-slate-500">ID {lead.id} · {lead.em || 'sem email'}</span>
                       </button>
