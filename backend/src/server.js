@@ -109,6 +109,13 @@ function scopedDashboardPayload(payload, user = {}) {
   };
 }
 
+function omitInterestDistrictPayloads(payload) {
+  return {
+    ...payload,
+    interestRecordsByDistrict: {}
+  };
+}
+
 async function sendDashboardJson(request, response, payload) {
   const body = JSON.stringify(payload);
   if (/\bgzip\b/i.test(String(request.headers['accept-encoding'] || ''))) {
@@ -1080,7 +1087,29 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
   } catch (error) {
     console.error('[dashboard:dataset-history:error]', error.message);
   }
-  await sendDashboardJson(request, response, scopedDashboardPayload(payload, request.user));
+  const scopedPayload = scopedDashboardPayload(payload, request.user);
+  const shouldIncludeInterestDistricts = request.query?.includeInterestDistricts === '1';
+  await sendDashboardJson(
+    request,
+    response,
+    shouldIncludeInterestDistricts ? scopedPayload : omitInterestDistrictPayloads(scopedPayload)
+  );
+});
+
+app.get('/api/dashboard/district-interest/:slug', requireAuth, async (request, response) => {
+  response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.set('Pragma', 'no-cache');
+  response.set('Expires', '0');
+
+  const slug = normalizeAssociationSlug(request.params.slug);
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.status(403).json({ message: 'Acesso nao permitido para este distrito.' });
+    return;
+  }
+
+  const payload = getDashboardData();
+  const records = payload.interestRecordsByDistrict?.[slug] || [];
+  response.json({ slug, records });
 });
 
 app.get('/api/dataset/history', requireAuth, requireAdminGeral, async (_request, response) => {

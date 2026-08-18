@@ -377,8 +377,7 @@ function transformDashboardRecordToInterest(row) {
     faixa: row.faixa || null,
     idade: row.a || null,
     genero: row.g || null,
-    estudoAtivo: Boolean(row.e),
-    raw: row
+    estudoAtivo: Boolean(row.e)
   };
 }
 

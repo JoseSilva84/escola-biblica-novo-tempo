@@ -5365,6 +5365,20 @@ function DistrictInterestDashboard({ districtName = 'Alphaville', interestRecord
   );
 }
 
+function DashboardLoadingView({ title = 'Carregando base', subtitle = 'Preparando o dashboard administrativo...' }) {
+  return (
+    <section className={`${panelClass} grid min-h-[420px] place-items-center p-6 text-center`}>
+      <div>
+        <div className="login-loading-spinner mx-auto mb-5">
+          <Gauge size={22} />
+        </div>
+        <h1 className="text-2xl font-black text-slate-50">{title}</h1>
+        <p className="mt-2 text-sm font-semibold text-slate-400">{subtitle}</p>
+      </div>
+    </section>
+  );
+}
+
 function DistrictLeadScoreList({ records = [] }) {
   const [search, setSearch] = useState('');
   const [visibleLimit, setVisibleLimit] = useState(80);
@@ -5482,6 +5496,9 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const [selectedAssociationId, setSelectedAssociationId] = useState('paulistana');
   const [selectedDistrictName, setSelectedDistrictName] = useState('Alphaville');
   const [payload, setPayload] = useState(initialPayload);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [districtInterestBySlug, setDistrictInterestBySlug] = useState({});
+  const [loadingDistrictSlug, setLoadingDistrictSlug] = useState(null);
   const [viewHistory, setViewHistory] = useState([]);
   const [associations, setAssociations] = useState(() => initialAssociations);
   const [adminUsers, setAdminUsers] = useState(() => buildAdminUsers(initialAssociations));
@@ -5504,8 +5521,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const selectedDistrictInterestRecords = useMemo(() => {
     if (selectedAssociationSlug !== 'paulistana') return [];
     const slug = slugifyDistrictName(selectedDistrictName);
-    return payload?.interestRecordsByDistrict?.[slug] || [];
-  }, [payload, selectedAssociationSlug, selectedDistrictName]);
+    return districtInterestBySlug[slug] || payload?.interestRecordsByDistrict?.[slug] || [];
+  }, [districtInterestBySlug, payload, selectedAssociationSlug, selectedDistrictName]);
   const data = useMemo(() => buildAssociationData(records), [records]);
   const filteredAssociations = useMemo(() => {
     if (!isAdminUser(user)) return visibleAssociations;
@@ -5565,10 +5582,16 @@ export default function CrmApp({ payload: initialPayload = null }) {
           return;
         }
 
-        await loadDashboard();
         if (!active) return;
         setUser(session.user);
         setView(defaultViewForUser(session.user));
+        loadDashboard().catch(() => {
+          if (active) {
+            toast.error('Backend nao foi lido', {
+              description: 'Sua sessao foi restaurada, mas os dados do dashboard ainda nao carregaram.'
+            });
+          }
+        });
       } catch {
         window.localStorage.removeItem('sevenflow_token');
         if (active) setView('login');
@@ -5585,16 +5608,49 @@ export default function CrmApp({ payload: initialPayload = null }) {
   }, []);
 
   async function loadDashboard() {
-    const response = await apiFetch(`/api/dashboard?refresh=${Date.now()}`);
-    if (!response.ok) {
-      throw new Error('Nao foi possivel carregar os dados do backend.');
+    setDashboardLoading(true);
+    try {
+      const response = await apiFetch('/api/dashboard');
+      if (!response.ok) {
+        throw new Error('Nao foi possivel carregar os dados do backend.');
+      }
+      const nextPayload = await response.json();
+      const nextAssociations = buildInitialAssociations(nextPayload.records);
+      setPayload(nextPayload);
+      setAssociations(nextAssociations);
+      setAdminUsers(buildAdminUsers(nextAssociations));
+      setAdminCampaigns(buildAdminCampaigns(nextAssociations));
+      setDistrictInterestBySlug({});
+    } finally {
+      setDashboardLoading(false);
     }
-    const nextPayload = await response.json();
-    const nextAssociations = buildInitialAssociations(nextPayload.records);
-    setPayload(nextPayload);
-    setAssociations(nextAssociations);
-    setAdminUsers(buildAdminUsers(nextAssociations));
-    setAdminCampaigns(buildAdminCampaigns(nextAssociations));
+  }
+
+  async function openDistrictInterest(districtName) {
+    const slug = slugifyDistrictName(districtName);
+    setSelectedDistrictName(districtName);
+    setViewHistory((history) => [...history, 'details'].slice(-20));
+    setView('district-interest');
+    requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }));
+
+    if (districtInterestBySlug[slug]?.length || payload?.interestRecordsByDistrict?.[slug]?.length) return;
+
+    setLoadingDistrictSlug(slug);
+    try {
+      const response = await apiFetch(`/api/dashboard/district-interest/${encodeURIComponent(slug)}`);
+      if (!response.ok) throw new Error('Nao foi possivel carregar o distrito.');
+      const result = await response.json();
+      setDistrictInterestBySlug((current) => ({
+        ...current,
+        [slug]: result.records || []
+      }));
+    } catch {
+      toast.error('Distrito nao foi carregado', {
+        description: 'Tente abrir este distrito novamente em alguns instantes.'
+      });
+    } finally {
+      setLoadingDistrictSlug(null);
+    }
   }
 
   async function logout() {
@@ -5650,14 +5706,33 @@ export default function CrmApp({ payload: initialPayload = null }) {
 
   if (view === 'login') {
     return <LoginScreen onLogin={async (loggedUser) => {
-      await loadDashboard();
       setUser(loggedUser);
       setView(defaultViewForUser(loggedUser));
+      loadDashboard().catch(() => {
+        toast.error('Backend nao foi lido', {
+          description: 'A autenticacao funcionou, mas os dados do dashboard nao foram carregados.'
+        });
+      });
     }} />;
   }
 
   if (!payload) {
-    return null;
+    return (
+      <AppShell
+        current={view}
+        onBack={goBack}
+        onLogout={logout}
+        onNavigate={navigateView}
+        onToggleTheme={() => setTheme((current) => current === 'light' ? 'dark' : 'light')}
+        associations={visibleAssociations}
+        selectedAssociationId={selectedAssociation?.id || ''}
+        onSelectAssociation={setSelectedAssociationId}
+        theme={theme}
+        user={user}
+      >
+        <DashboardLoadingView />
+      </AppShell>
+    );
   }
 
   if (view === 'details') {
@@ -5666,12 +5741,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
         onBack={goBack}
         onLogout={logout}
         onOpenDistrict={(districtName) => {
-          const slug = slugifyDistrictName(districtName);
-          if (!payload?.interestRecordsByDistrict?.[slug]?.length) return false;
-          setSelectedDistrictName(districtName);
-          setViewHistory((history) => [...history, 'details'].slice(-20));
-          setView('district-interest');
-          requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }));
+          openDistrictInterest(districtName);
           return true;
         }}
         onNavigate={navigateView}
@@ -5780,7 +5850,13 @@ export default function CrmApp({ payload: initialPayload = null }) {
       />
     );
   } else if (effectiveView === 'district-interest') {
-    content = (
+    const selectedDistrictSlug = slugifyDistrictName(selectedDistrictName);
+    content = loadingDistrictSlug === selectedDistrictSlug && !selectedDistrictInterestRecords.length ? (
+      <DashboardLoadingView
+        title="Carregando distrito"
+        subtitle={`Preparando os registros de ${selectedDistrictName}...`}
+      />
+    ) : (
       <DistrictInterestDashboard
         districtName={selectedDistrictName}
         interestRecords={selectedDistrictInterestRecords}
