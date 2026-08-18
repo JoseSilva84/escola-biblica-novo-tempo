@@ -3241,13 +3241,14 @@ function LeadsOpenStreetMap({ leads = [], churches = [] }) {
 
         for (const { church, point } of churchPoints) {
           const precisionLabel = point.precision === 'Endereco' ? 'Endereco exato' : 'Distrito aproximado';
-          const churchMarker = L.circleMarker([point.lat, point.lng], {
-            radius: 9,
-            color: '#ffffff',
-            weight: 3,
-            fillColor: '#16a34a',
-            fillOpacity: 0.95
-          }).addTo(map);
+          const churchIcon = L.divIcon({
+            className: 'church-map-marker',
+            html: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v4"/><path d="M10 5h4"/><path d="M5 22V10l7-4 7 4v12"/><path d="M2 22h20"/><path d="M10 22v-5a2 2 0 0 1 4 0v5"/><path d="M9 13h6"/></svg>',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+            popupAnchor: [0, -14]
+          });
+          const churchMarker = L.marker([point.lat, point.lng], { icon: churchIcon }).addTo(map);
           churchMarker.bindPopup(`
             <strong>${escapeMapHtml(church.name || 'Igreja Adventista')}</strong><br>
             <strong style="color:#16a34a">Igreja Adventista</strong><br>

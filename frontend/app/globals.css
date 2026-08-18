@@ -54,6 +54,33 @@
 }
 
 @layer utilities {
+  .church-map-marker {
+    align-items: center;
+    background: #16a34a;
+    border: 3px solid #ffffff;
+    border-radius: 999px;
+    box-shadow: 0 10px 24px rgba(22, 163, 74, 0.34);
+    color: #ffffff;
+    display: flex;
+    font-size: 16px;
+    font-weight: 900;
+    height: 28px;
+    justify-content: center;
+    line-height: 1;
+    width: 28px;
+  }
+
+  .church-map-marker svg {
+    display: block;
+    fill: none;
+    height: 16px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.25;
+    width: 16px;
+  }
+
   .silver-stage {
     position: relative;
     background:
