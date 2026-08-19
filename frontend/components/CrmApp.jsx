@@ -3579,13 +3579,14 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
 
       <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
         {overviewCards.map(([label, value, detail, Icon, tone]) => (
-          <div className={`rounded-2xl border p-5 shadow-[0_18px_46px_rgba(15,23,42,0.16)] ${tone}`} key={label}>
+          <div className={`group relative overflow-hidden rounded-2xl border p-5 shadow-[0_18px_46px_rgba(15,23,42,0.16)] transition duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_26px_70px_rgba(15,23,42,0.22)] ${tone}`} key={label}>
+            <span className="pointer-events-none absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.02) 46%, rgba(255,255,255,0.18))' }} />
             <div className="flex items-start justify-between gap-3">
               <div>
                 <span className="text-[11px] font-black uppercase tracking-[0.14em] text-white/85">{label}</span>
                 <strong className="mt-2 block text-4xl font-black tracking-normal">{formatNumber(value)}</strong>
               </div>
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.24)]">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.24)] transition duration-300 group-hover:-translate-y-0.5 group-hover:scale-105 group-hover:shadow-[0_16px_34px_rgba(15,23,42,0.34)]">
                 <Icon size={20} />
               </span>
             </div>
