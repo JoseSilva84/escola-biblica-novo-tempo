@@ -83,6 +83,26 @@ async function writeGeocodeCache(cache) {
   await fsp.writeFile(filePath, JSON.stringify(cache, null, 2), 'utf8');
 }
 
+async function deleteChurchNotFoundFromDb(churches = []) {
+  const keys = churches.map((church) => geocodeKey(church.address)).filter(Boolean);
+  if (!keys.length) return 0;
+  try {
+    await ensureLeadGeocodeTable();
+    let deleted = 0;
+    for (const key of keys) {
+      deleted += await prisma.$executeRaw`
+        DELETE FROM "LeadGeocode"
+        WHERE "addressHash" = ${key}
+          AND "notFound" = true
+      `;
+    }
+    return deleted;
+  } catch (error) {
+    console.error('[geocode:church-reset:error]', error.message);
+    return 0;
+  }
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -447,11 +467,12 @@ export async function geocodeStatus() {
   };
 }
 
-export function startGeocodingBatch({ limit = 100, district = '', scope = 'leads' } = {}) {
+export function startGeocodingBatch({ limit = 100, district = '', scope = 'leads', force = false } = {}) {
   if (job.running) return { started: false, status: job };
   const batchLimit = Math.max(1, Math.min(Number(limit) || 100, 1000));
   const targetDistrict = compactText(district);
   const targetScope = scope === 'churches' ? 'churches' : 'leads';
+  const forceChurchRetry = targetScope === 'churches' || Boolean(force);
   job = {
     running: true,
     startedAt: new Date().toISOString(),
@@ -470,7 +491,7 @@ export function startGeocodingBatch({ limit = 100, district = '', scope = 'leads
   };
 
   const runner = targetScope === 'churches'
-    ? runChurchBatch(batchLimit)
+    ? runChurchBatch(batchLimit, { force: forceChurchRetry })
     : runBatch(batchLimit, targetDistrict);
   runner.catch((error) => {
     job = {
@@ -489,13 +510,15 @@ function hasCompletedChurchGeocode(church, cache) {
   return Boolean(entry && Number.isFinite(Number(entry.lat)) && Number.isFinite(Number(entry.lng)));
 }
 
-function pendingChurches(cache, limit) {
+function pendingChurches(cache, limit, { force = false } = {}) {
   const addressBook = readChurchAddressBook();
   const seen = new Set();
   return addressBook.rows
     .filter((church) => {
       const key = geocodeKey(church.address);
-      if (!church.address || church.address === 'N/I' || seen.has(key) || hasCompletedChurchGeocode(church, cache)) return false;
+      if (!church.address || church.address === 'N/I' || seen.has(key)) return false;
+      if (!force && hasCompletedChurchGeocode(church, cache)) return false;
+      if (force && hasCompletedChurchGeocode(church, cache)) return false;
       seen.add(key);
       return key.length > 10;
     })
@@ -534,10 +557,25 @@ function fallbackChurchPoint(church) {
   };
 }
 
-async function runChurchBatch(limit) {
+async function runChurchBatch(limit, { force = false } = {}) {
   const cache = await hydrateGeocodeCacheFromDb();
-  const batch = pendingChurches(cache, limit);
-  job.message = `Processando ${batch.length} endereco(s) de igreja pendente(s).`;
+  const addressBook = readChurchAddressBook();
+  if (force) {
+    let resetCount = 0;
+    for (const church of addressBook.rows) {
+      const key = geocodeKey(church.address);
+      if (cache[key]?.notFound) {
+        delete cache[key];
+        resetCount += 1;
+      }
+    }
+    const dbResetCount = await deleteChurchNotFoundFromDb(addressBook.rows);
+    if (resetCount || dbResetCount) await writeGeocodeCache(cache);
+  }
+  const batch = pendingChurches(cache, limit, { force });
+  job.message = force
+    ? `Reprocessando ${batch.length} igreja(s) sem coordenada.`
+    : `Processando ${batch.length} endereco(s) de igreja pendente(s).`;
 
   for (const church of batch) {
     const address = church.address;

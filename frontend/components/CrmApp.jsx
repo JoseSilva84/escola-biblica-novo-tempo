@@ -3680,7 +3680,8 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         body: JSON.stringify({
           limit: geocodeChurchesSelected ? 1000 : 250,
           district: geocodeChurchesSelected ? null : geocodeDistrict || null,
-          scope: geocodeChurchesSelected ? 'churches' : 'leads'
+          scope: geocodeChurchesSelected ? 'churches' : 'leads',
+          force: geocodeChurchesSelected
         })
       });
       const info = await response.json().catch(() => null);
