@@ -2515,8 +2515,8 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
         </article>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
-        <article className={`${panelClass} p-5`}>
+      <div className="grid grid-cols-5 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+        <article className={`${panelClass} p-5 col-span-1 max-2xl:col-span-1`}>
           <span className={labelClass}>Composição</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Base por situação</h3>
           <div className="mt-4 h-56">
@@ -2532,7 +2532,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           </div>
         </article>
 
-        <article className={`${panelClass} p-5`}>
+        <article className={`${panelClass} p-5 col-span-1 max-2xl:col-span-1`}>
           <span className={labelClass}>Prioridade</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Classificação ML</h3>
           <div className="mt-4 h-56">
@@ -2548,7 +2548,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           </div>
         </article>
 
-        <article className={`${panelClass} p-5`}>
+        <article className={`${panelClass} p-5 col-span-1 max-2xl:col-span-2 max-lg:col-span-1`}>
           <span className={labelClass}>Distritos</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Concentração operacional</h3>
           <div className="mt-4 h-56">
@@ -2564,31 +2564,29 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           </div>
         </article>
 
-        <article className={`${panelClass} p-5`}>
+        <article className={`${panelClass} p-5 col-span-2 max-2xl:col-span-2 max-lg:col-span-1`}>
           <span className={labelClass}>Recência</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Tempo desde contato</h3>
-          <div className="mt-4 h-96 overflow-y-auto pr-2">
-            <div style={{ height: 800 }}>
-              <ResponsiveContainer height="100%" width="100%">
-                <BarChart data={analytics.recency} layout="vertical" margin={{ left: 6, right: 8 }}>
-                  <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
-                  <XAxis hide type="number" />
-                  <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={108} />
-                  <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
-                  <Bar 
-                    dataKey="value" 
-                    fill="#a855f7" 
-                    radius={[0, 8, 8, 0]} 
-                    onClick={(data) => {
-                      if (data && data.payload) {
-                        openLeadGroup('Recência', data.payload);
-                      }
-                    }}
-                    style={{ cursor: 'pointer' }}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          <div className="mt-4 h-64">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.recency} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
+                <XAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 10, angle: -45, textAnchor: 'end' }} tickLine={false} interval={0} />
+                <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} tickFormatter={formatNumber} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
+                <Bar 
+                  dataKey="value" 
+                  fill="#a855f7" 
+                  radius={[4, 4, 0, 0]} 
+                  onClick={(data) => {
+                    if (data && data.payload) {
+                      openLeadGroup('Recência', data.payload);
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </article>
       </div>
