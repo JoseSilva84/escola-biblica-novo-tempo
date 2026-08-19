@@ -1,6 +1,6 @@
 import fsp from 'fs/promises';
 import path from 'path';
-import { getDashboardData, invalidateDashboardCache } from './data.js';
+import { getDashboardData, invalidateDashboardCache, readChurchAddressBook } from './data.js';
 import { geocodeCachePath, geocodeKey, readGeocodeCache } from './geocodeCache.js';
 import { prisma } from './prisma.js';
 
@@ -18,6 +18,7 @@ let job = {
   skipped: 0,
   limit: 0,
   district: '',
+  scope: 'leads',
   message: 'Nenhuma rotina em execucao.',
   notFoundItems: []
 };
@@ -116,6 +117,17 @@ function geocodeQueriesForLead(lead, address) {
     [streetNumber, neighborhood, city, 'SP', 'Brasil'].filter(Boolean).join(', '),
     [streetNumber, city, 'SP', 'Brasil'].filter(Boolean).join(', '),
     [neighborhood, city, 'SP', 'Brasil'].filter(Boolean).join(', ')
+  ];
+  return [...new Set(queries.map(compactText).filter((query) => query.length > 10))];
+}
+
+function geocodeQueriesForChurch(church, address) {
+  const cleanAddress = stripCep(address);
+  const streetNumber = streetNumberFromAddress(cleanAddress);
+  const queries = [
+    cleanAddress,
+    [streetNumber, church?.neighborhood, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [church?.name, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', ')
   ];
   return [...new Set(queries.map(compactText).filter((query) => query.length > 10))];
 }
@@ -345,8 +357,14 @@ export async function geocodeStatus() {
     invalidateDashboardCache();
   }
   const payload = getDashboardData();
+  const churchAddressBook = readChurchAddressBook();
   const total = payload.records.length;
   const withCoordinates = payload.records.filter((lead) => Number.isFinite(Number(lead.lat)) && Number.isFinite(Number(lead.lng))).length;
+  const churchRows = churchAddressBook.rows || [];
+  const churchesWithCoordinates = churchRows.filter((church) => {
+    const cached = cache[geocodeKey(church.address)];
+    return cached && !cached.notFound && Number.isFinite(Number(cached.lat)) && Number.isFinite(Number(cached.lng));
+  }).length;
   return {
     ...job,
     cachePath: geocodeCachePath(),
@@ -355,14 +373,18 @@ export async function geocodeStatus() {
     notFoundItems: job.running && job.notFoundItems.length ? job.notFoundItems : notFoundItems,
     totalLeads: total,
     leadsWithCoordinates: withCoordinates,
-    pendingEstimate: Math.max(0, total - withCoordinates)
+    pendingEstimate: Math.max(0, total - withCoordinates),
+    totalChurches: churchRows.length,
+    churchesWithCoordinates,
+    churchPendingEstimate: Math.max(0, churchRows.length - churchesWithCoordinates)
   };
 }
 
-export function startGeocodingBatch({ limit = 100, district = '' } = {}) {
+export function startGeocodingBatch({ limit = 100, district = '', scope = 'leads' } = {}) {
   if (job.running) return { started: false, status: job };
   const batchLimit = Math.max(1, Math.min(Number(limit) || 100, 1000));
   const targetDistrict = compactText(district);
+  const targetScope = scope === 'churches' ? 'churches' : 'leads';
   job = {
     running: true,
     startedAt: new Date().toISOString(),
@@ -373,11 +395,17 @@ export function startGeocodingBatch({ limit = 100, district = '' } = {}) {
     skipped: 0,
     limit: batchLimit,
     district: targetDistrict,
-    message: targetDistrict ? `Geocodificacao iniciada para ${targetDistrict}.` : 'Geocodificacao iniciada.',
+    scope: targetScope,
+    message: targetScope === 'churches'
+      ? 'Geocodificacao iniciada para igrejas.'
+      : targetDistrict ? `Geocodificacao iniciada para ${targetDistrict}.` : 'Geocodificacao iniciada.',
     notFoundItems: []
   };
 
-  runBatch(batchLimit, targetDistrict).catch((error) => {
+  const runner = targetScope === 'churches'
+    ? runChurchBatch(batchLimit)
+    : runBatch(batchLimit, targetDistrict);
+  runner.catch((error) => {
     job = {
       ...job,
       running: false,
@@ -387,6 +415,91 @@ export function startGeocodingBatch({ limit = 100, district = '' } = {}) {
   });
 
   return { started: true, status: job };
+}
+
+function hasCompletedChurchGeocode(church, cache) {
+  return hasCompletedGeocode(cache[geocodeKey(church.address)]);
+}
+
+function pendingChurches(cache, limit) {
+  const addressBook = readChurchAddressBook();
+  const seen = new Set();
+  return addressBook.rows
+    .filter((church) => {
+      const key = geocodeKey(church.address);
+      if (!church.address || church.address === 'N/I' || seen.has(key) || hasCompletedChurchGeocode(church, cache)) return false;
+      seen.add(key);
+      return key.length > 10;
+    })
+    .slice(0, limit);
+}
+
+async function geocodeChurchAddress(church) {
+  const queries = geocodeQueriesForChurch(church, church.address);
+  for (let index = 0; index < queries.length; index++) {
+    const query = queries[index];
+    const point = await geocodeQuery(query);
+    if (point) return { ...point, matchedQuery: query, attempts: queries };
+    if (index < queries.length - 1) await sleep(GEOCODE_DELAY_MS);
+  }
+  return { point: null, attempts: queries };
+}
+
+async function runChurchBatch(limit) {
+  const cache = await hydrateGeocodeCacheFromDb();
+  const batch = pendingChurches(cache, limit);
+  job.message = `Processando ${batch.length} endereco(s) de igreja pendente(s).`;
+
+  for (const church of batch) {
+    const address = church.address;
+    const key = geocodeKey(address);
+    const leadLikeChurch = {
+      id: null,
+      n: church.name || 'Igreja Adventista',
+      d: church.city || '',
+      end: [church.city, church.neighborhood].filter(Boolean).join(' - ')
+    };
+    try {
+      const result = await geocodeChurchAddress(church);
+      const point = result?.lat ? result : null;
+      const entry = point
+        ? { ...point, source: 'nominatim', address, id: null, name: church.name || '', district: church.city || '', neighborhood: church.neighborhood || '', updatedAt: new Date().toISOString() }
+        : { notFound: true, source: 'nominatim', address, id: null, name: church.name || '', district: church.city || '', neighborhood: church.neighborhood || '', attempts: result?.attempts || [], updatedAt: new Date().toISOString() };
+      cache[key] = entry;
+      await saveLeadGeocodeToDb({ key, lead: leadLikeChurch, address, entry });
+      if (point) job.saved += 1;
+      else {
+        job.skipped += 1;
+        job.notFoundItems = [
+          ...job.notFoundItems,
+          {
+            id: null,
+            name: church.name || 'Igreja Adventista',
+            address,
+            district: church.city || '',
+            neighborhood: church.neighborhood || '',
+            attempts: entry.attempts || []
+          }
+        ].slice(-50);
+      }
+      job.processed += 1;
+      job.message = `${job.processed}/${batch.length} igrejas processadas. Ultima: ${church.name || address}`;
+      await writeGeocodeCache(cache);
+    } catch (error) {
+      job.failed += 1;
+      job.processed += 1;
+      job.message = `${job.processed}/${batch.length} igrejas processadas. Falha: ${error.message}`;
+    }
+    if (job.processed < batch.length) await sleep(GEOCODE_DELAY_MS);
+  }
+
+  job = {
+    ...job,
+    running: false,
+    finishedAt: new Date().toISOString(),
+    message: `Concluido em igrejas: ${job.saved} coordenada(s) salvas, ${job.skipped} sem resultado, ${job.failed} falha(s).`
+  };
+  invalidateDashboardCache();
 }
 
 async function runBatch(limit, district = '') {

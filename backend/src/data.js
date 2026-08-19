@@ -11,6 +11,7 @@ const DATASET_DIR = resolveConfiguredPath(process.env.DATASET_DIR)
 const ML_RANKING_FILE = 'ranking_nao_vip_ml_pandas.csv';
 const ALUNOS_FILE = 'alunos.json';
 const PAULISTANA_TERRITORY_FILE = 'regiaoDistritoIgreja.md';
+const CHURCH_ADDRESS_FILE = 'igreja_endereco.md';
 const INTEREST_DATA_PATTERN = /^dados_interesse_(?!distritos_manifest)(.+)\.json$/i;
 const UPDATE_STATUS_FILE = 'ultima_atualizacao_dataset.json';
 const UPDATE_HISTORY_FILE = 'historico_atualizacoes_dataset.json';
@@ -45,6 +46,11 @@ function dashboardCacheKey(alunosPath) {
     path.join(DATASET_DIR, PAULISTANA_TERRITORY_FILE),
     path.resolve(DATASET_DIR, '..', PAULISTANA_TERRITORY_FILE)
   ]);
+  const churchAddressPath = firstExistingPath([
+    resolveConfiguredPath(process.env.CHURCH_ADDRESS_PATH),
+    path.join(DATASET_DIR, CHURCH_ADDRESS_FILE),
+    path.resolve(DATASET_DIR, '..', CHURCH_ADDRESS_FILE)
+  ]);
   const rankingPath = firstExistingPath([
     resolveConfiguredPath(process.env.ML_RANKING_PATH),
     path.join(DATASET_DIR, ML_RANKING_FILE)
@@ -75,6 +81,7 @@ function dashboardCacheKey(alunosPath) {
     todayKey(),
     fileCachePart(alunosPath),
     fileCachePart(territoryPath),
+    fileCachePart(churchAddressPath),
     fileCachePart(rankingPath),
     fileCachePart(updatePath),
     fileCachePart(historyPath),
@@ -474,6 +481,100 @@ function parseChurchEntry(value) {
   };
 }
 
+function churchLookupKey(value) {
+  return String(value || '')
+    .replace(/\s+\(GP\)\s*$/i, '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/^comunid\b/g, 'comunidade')
+    .replace(/\bjd\b/g, 'jardim')
+    .replace(/\bpq\b/g, 'parque')
+    .replace(/\bnt\b/g, 'novo tempo')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function splitMarkdownTableLine(line) {
+  return String(line || '')
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim());
+}
+
+export function readChurchAddressBook() {
+  const addressPath = firstExistingPath([
+    resolveConfiguredPath(process.env.CHURCH_ADDRESS_PATH),
+    path.join(DATASET_DIR, CHURCH_ADDRESS_FILE),
+    path.resolve(DATASET_DIR, '..', CHURCH_ADDRESS_FILE)
+  ]);
+  if (!addressPath) return { path: null, byName: new Map(), rows: [] };
+
+  const text = fs.readFileSync(addressPath, 'utf8').replace(/^\uFEFF/, '');
+  const rows = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!/^\s*\|/.test(line) || /^\s*\|\s*-+/.test(line) || /Igreja\s*\|/i.test(line)) continue;
+    const [name, street, neighborhood, cep, city] = splitMarkdownTableLine(line);
+    if (!name || !street || !city) continue;
+    const address = [street, neighborhood, cep, city, 'SP', 'Brasil'].filter(Boolean).join(', ');
+    rows.push({
+      name,
+      street,
+      neighborhood,
+      cep,
+      city,
+      address
+    });
+  }
+
+  const byName = new Map();
+  for (const row of rows) {
+    const key = churchLookupKey(row.name);
+    byName.set(key, row);
+    const withoutTrailingRoman = key.replace(/\s+(?:i|ii|iii|iv|v)$/i, '').trim();
+    if (withoutTrailingRoman !== key && !byName.has(withoutTrailingRoman)) {
+      byName.set(withoutTrailingRoman, row);
+    }
+  }
+  return { path: addressPath, byName, rows };
+}
+
+function applyChurchAddressesToTerritory(territory, addressBook, geocodeCache = {}) {
+  const churchesByDistrict = Object.fromEntries(
+    Object.entries(territory.churchesByDistrict || {}).map(([slug, churches]) => [
+      slug,
+      churches.map((church) => {
+        const addressInfo = addressBook.byName.get(churchLookupKey(church.name));
+        if (!addressInfo) return church;
+        const cached = geocodeCache[geocodeKey(addressInfo.address)];
+        const cachedCoordinates = cached && !cached.notFound && Number.isFinite(Number(cached.lat)) && Number.isFinite(Number(cached.lng))
+          ? {
+              lat: Number(cached.lat),
+              lng: Number(cached.lng),
+              geoSource: cached.source || 'cache',
+              geoPrecision: cached.type || 'endereco',
+              geoDisplayName: cached.displayName || ''
+            }
+          : {};
+        return {
+          ...church,
+          address: addressInfo.address,
+          street: addressInfo.street,
+          neighborhood: addressInfo.neighborhood,
+          cep: addressInfo.cep,
+          city: addressInfo.city,
+          ...cachedCoordinates
+        };
+      })
+    ])
+  );
+  return { ...territory, churchesByDistrict, churchAddressPath: addressBook.path };
+}
+
 function transformDashboardRecordToInterest(row) {
   const [cidade, bairro] = String(row.end || '').split(' - ');
   const email = normalize(row.em, '');
@@ -589,12 +690,14 @@ export function getDashboardData() {
     return dashboardCache.payload;
   }
 
-  const territory = readPaulistanaTerritory();
+  let territory = readPaulistanaTerritory();
   const alunos = JSON.parse(fs.readFileSync(alunosPath, 'utf8'));
   const ranking = readMlRanking();
   const lastDatasetUpdate = readLastDatasetUpdate();
   const datasetUpdateHistory = readDatasetUpdateHistory();
   const geocodeCache = readGeocodeCache();
+  const churchAddressBook = readChurchAddressBook();
+  territory = applyChurchAddressesToTerritory(territory, churchAddressBook, geocodeCache);
   const paulistanaRows = territory.allowedDistrictSlugs
     ? alunos.filter((row) => territory.allowedDistrictSlugs.has(districtSlug(row.Distrito)))
     : alunos;
@@ -633,6 +736,8 @@ export function getDashboardData() {
       alunosPath,
       territory: {
         path: territory.path,
+        churchAddressPath: territory.churchAddressPath,
+        churchAddressTotal: churchAddressBook.rows.length,
         districts: territory.districts,
         churchesByDistrict: territory.churchesByDistrict,
         originalDistricts: new Set(alunos.map((row) => districtSlug(row.Distrito))).size,

@@ -1123,7 +1123,7 @@ app.get('/api/geocode/status', requireAuth, requireAdminGeral, async (_request, 
 });
 
 app.post('/api/geocode/run', requireAuth, requireAdminGeral, async (request, response) => {
-  const result = startGeocodingBatch({ limit: request.body?.limit, district: request.body?.district });
+  const result = startGeocodingBatch({ limit: request.body?.limit, district: request.body?.district, scope: request.body?.scope });
   response.status(result.started ? 202 : 409).json(result.started ? result.status : await geocodeStatus());
 });
 

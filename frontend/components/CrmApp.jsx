@@ -61,6 +61,7 @@ const primaryButtonClass = 'primary-button-glow group relative inline-flex h-11 
 const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-semibold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
 const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slate-950/60 shadow-[0_28px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.035] backdrop-blur-2xl';
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+const GEOCODE_CHURCHES_VALUE = '__churches__';
 const adminNavItems = [
   ['admin', 'Dashboard', LayoutDashboard],
   ['associations', 'Associa\u00e7\u00f5es', Building2],
@@ -3521,6 +3522,9 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
           address: church.address || '',
           districtName,
           districtSlug,
+          geoDisplayName: church.geoDisplayName || '',
+          geoPrecision: church.geoPrecision || '',
+          geoSource: church.geoSource || '',
           lat: church.lat,
           lng: church.lng,
           name: church.name || 'Igreja Adventista'
@@ -3643,6 +3647,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const hotWithWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
   const staleLeads = records.filter((lead) => lead.t && lead.c !== null && lead.c > 365).length;
   const canRunGeocode = isAdminUser(user);
+  const geocodeChurchesSelected = geocodeDistrict === GEOCODE_CHURCHES_VALUE;
 
   async function loadGeocodeInfo({ refreshDashboard = false } = {}) {
     if (!canRunGeocode) return;
@@ -3667,14 +3672,20 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       const response = await apiFetch('/api/geocode/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 250, district: geocodeDistrict || null })
+        body: JSON.stringify({
+          limit: geocodeChurchesSelected ? 1000 : 250,
+          district: geocodeChurchesSelected ? null : geocodeDistrict || null,
+          scope: geocodeChurchesSelected ? 'churches' : 'leads'
+        })
       });
       const info = await response.json().catch(() => null);
       if (info) setGeocodeInfo(info);
       if (response.ok) {
         geocodeWasRunningRef.current = true;
         toast.success('Geocodificacao iniciada', {
-          description: geocodeDistrict
+          description: geocodeChurchesSelected
+            ? 'O backend vai salvar coordenadas das igrejas usando os enderecos oficiais.'
+            : geocodeDistrict
             ? `O backend vai salvar coordenadas de ${geocodeDistrict} aos poucos, sem travar o sistema.`
             : 'O backend vai salvar coordenadas aos poucos, sem travar o sistema.'
         });
@@ -3972,7 +3983,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
               <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Precisao do mapa</span>
               <p className="mt-1 font-bold text-emerald-950">
                 {geocodeInfo
-                  ? `${formatNumber(geocodeInfo.leadsWithCoordinates)} leads com coordenada real. ${formatNumber(geocodeInfo.pendingEstimate)} ainda pendente(s).`
+                  ? `${formatNumber(geocodeInfo.leadsWithCoordinates)} leads com coordenada real. ${formatNumber(geocodeInfo.pendingEstimate)} ainda pendente(s). ${formatNumber(geocodeInfo.churchesWithCoordinates)} igrejas geocodificada(s). ${formatNumber(geocodeInfo.churchPendingEstimate)} igreja(s) pendente(s).`
                   : 'Carregando status das coordenadas...'}
               </p>
               {geocodeInfo?.message ? (
@@ -3996,6 +4007,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                   value={geocodeDistrict}
                 >
                   <option value="">Todos os distritos</option>
+                  <option value={GEOCODE_CHURCHES_VALUE}>Igrejas</option>
                   {districts.map((district) => (
                     <option key={district} value={district}>{district}</option>
                   ))}
@@ -4008,7 +4020,11 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                 type="button"
               >
                 <MapPin size={18} />
-                {geocodeInfo?.running ? 'Geocodificando...' : geocodeDistrict ? 'Geocodificar distrito' : 'Geocodificar 250'}
+                {geocodeInfo?.running
+                  ? 'Geocodificando...'
+                  : geocodeChurchesSelected
+                  ? 'Geocodificar igrejas'
+                  : geocodeDistrict ? 'Geocodificar distrito' : 'Geocodificar 250'}
               </button>
             </div>
           </div>
