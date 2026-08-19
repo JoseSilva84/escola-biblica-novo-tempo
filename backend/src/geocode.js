@@ -396,14 +396,15 @@ function pendingLeads(records, cache, limit, district = '', { leadId = null, for
   const seen = new Set();
   const targetDistrict = compactText(district).toLowerCase();
   const targetLeadId = Number(leadId);
+  const hasTargetLead = Number.isFinite(targetLeadId) && targetLeadId > 0;
   return records
     .map((lead) => ({ lead, address: fullLeadAddress(lead) }))
     .filter(({ lead, address }) => {
-      if (Number.isFinite(targetLeadId) && Number(lead?.id) !== targetLeadId) return false;
+      if (hasTargetLead && Number(lead?.id) !== targetLeadId) return false;
       if (targetDistrict && compactText(lead?.d).toLowerCase() !== targetDistrict) return false;
       const key = geocodeKey(address);
       if (!address || address === 'N/I' || seen.has(key)) return false;
-      if (!force && hasCompletedGeocode(cache[key])) return false;
+      if (hasCompletedGeocode(cache[key]) && !(hasTargetLead && force)) return false;
       seen.add(key);
       return lead?.d && key.length > 10;
     })
