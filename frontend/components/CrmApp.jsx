@@ -123,7 +123,7 @@ function accessLabelForUser(user) {
 function allowedViewsForUser(user) {
   const menuViews = navigationItemsForUser(user).map(([id]) => id);
   return new Set(isAdminUser(user)
-    ? [...menuViews, 'association', 'details', 'district-interest', 'dataset-history', 'general-admin', 'users']
+    ? [...menuViews, 'association', 'details', 'district-interest', 'dataset-history', 'geolocation', 'general-admin', 'users']
     : [...menuViews, 'association', 'details', 'district-interest']);
 }
 
@@ -3400,6 +3400,310 @@ function relatedDistrictsForNeighborhoods(records, neighborhoods) {
   )).sort((a, b) => a.localeCompare(b));
 }
 
+function isApproximateGeo(item) {
+  return Number.isFinite(Number(item?.lat))
+    && Number.isFinite(Number(item?.lng))
+    && /aproximado|fallback/i.test(String(item?.geoPrecision || item?.geoSource || ''));
+}
+
+function hasGeoPoint(item) {
+  return Number.isFinite(Number(item?.lat)) && Number.isFinite(Number(item?.lng));
+}
+
+function geoStatusForItem(item) {
+  if (!hasGeoPoint(item)) return item?.geoNotFound ? 'notFound' : 'pending';
+  return isApproximateGeo(item) ? 'approximate' : 'exact';
+}
+
+function buildGeolocationDistricts(records = [], churchesByDistrict = {}, officialDistricts = []) {
+  const districtNamesBySlug = officialDistricts.reduce((map, district) => ({
+    ...map,
+    [district.slug || slugifyDistrictName(district.name)]: district.name
+  }), {});
+  const byDistrict = new Map();
+  const ensureDistrict = (name, slug = slugifyDistrictName(name)) => {
+    const districtName = name || districtNamesBySlug[slug] || 'Sem distrito';
+    if (!byDistrict.has(slug)) {
+      byDistrict.set(slug, {
+        slug,
+        name: districtName,
+        leads: [],
+        churches: [],
+        leadStats: { total: 0, exact: 0, approximate: 0, pending: 0, notFound: 0 },
+        churchStats: { total: 0, exact: 0, approximate: 0, pending: 0 }
+      });
+    }
+    return byDistrict.get(slug);
+  };
+
+  for (const lead of records) {
+    const district = ensureDistrict(lead.d);
+    const status = geoStatusForItem(lead);
+    district.leads.push({ ...lead, geoStatus: status });
+    district.leadStats.total += 1;
+    if (status === 'exact') district.leadStats.exact += 1;
+    else if (status === 'approximate') district.leadStats.approximate += 1;
+    else if (status === 'notFound') {
+      district.leadStats.notFound += 1;
+      district.leadStats.pending += 1;
+    } else district.leadStats.pending += 1;
+  }
+
+  for (const [districtSlug, churches] of Object.entries(churchesByDistrict || {})) {
+    const district = ensureDistrict(districtNamesBySlug[districtSlug] || districtSlug, districtSlug);
+    for (const church of churches || []) {
+      const status = geoStatusForItem(church);
+      district.churches.push({ ...church, geoStatus: status });
+      district.churchStats.total += 1;
+      if (status === 'exact') district.churchStats.exact += 1;
+      else if (status === 'approximate') district.churchStats.approximate += 1;
+      else district.churchStats.pending += 1;
+    }
+  }
+
+  return Array.from(byDistrict.values())
+    .map((district) => ({
+      ...district,
+      leads: district.leads.sort((a, b) => String(a.n || '').localeCompare(String(b.n || ''))),
+      churches: district.churches.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+    }))
+    .sort((a, b) => (b.leadStats.pending + b.churchStats.pending) - (a.leadStats.pending + a.churchStats.pending) || a.name.localeCompare(b.name));
+}
+
+function statusLabel(status) {
+  if (status === 'exact') return 'Exato';
+  if (status === 'approximate') return 'Aproximado';
+  if (status === 'notFound') return 'Sem resultado';
+  return 'Pendente';
+}
+
+function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBack, onDatasetUpdated, records = [] }) {
+  const [selectedSlug, setSelectedSlug] = useState('');
+  const [activeStatus, setActiveStatus] = useState('needs');
+  const [updatingLeadId, setUpdatingLeadId] = useState(null);
+  const districts = useMemo(
+    () => buildGeolocationDistricts(records, churchesByDistrict, officialDistricts),
+    [churchesByDistrict, officialDistricts, records]
+  );
+  const selectedDistrict = districts.find((district) => district.slug === selectedSlug) || districts[0] || null;
+  const totals = useMemo(() => districts.reduce((sum, district) => ({
+    leads: sum.leads + district.leadStats.total,
+    exact: sum.exact + district.leadStats.exact,
+    approximate: sum.approximate + district.leadStats.approximate,
+    pending: sum.pending + district.leadStats.pending,
+    notFound: sum.notFound + district.leadStats.notFound,
+    churches: sum.churches + district.churchStats.total,
+    churchesPending: sum.churchesPending + district.churchStats.pending
+  }), { leads: 0, exact: 0, approximate: 0, pending: 0, notFound: 0, churches: 0, churchesPending: 0 }), [districts]);
+
+  useEffect(() => {
+    if (!selectedSlug && districts[0]?.slug) setSelectedSlug(districts[0].slug);
+  }, [districts, selectedSlug]);
+
+  const visibleLeads = useMemo(() => {
+    const leads = selectedDistrict?.leads || [];
+    if (activeStatus === 'needs') return leads.filter((lead) => ['pending', 'notFound', 'approximate'].includes(lead.geoStatus));
+    if (activeStatus === 'all') return leads;
+    return leads.filter((lead) => lead.geoStatus === activeStatus);
+  }, [activeStatus, selectedDistrict]);
+
+  async function updateLead(lead) {
+    if (!lead?.id || updatingLeadId) return;
+    setUpdatingLeadId(lead.id);
+    try {
+      const response = await apiFetch('/api/geocode/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id, limit: 1, force: true })
+      });
+      if (response.ok) {
+        toast.success('Geocodificacao iniciada', { description: `Atualizando ${lead.n || `lead ${lead.id}`}.` });
+        window.setTimeout(() => onDatasetUpdated?.().catch(() => {}), 4500);
+      } else {
+        toast.info('Geocodificacao em andamento', { description: 'Aguarde a rotina atual terminar para atualizar este lead.' });
+      }
+    } catch {
+      toast.error('Nao foi possivel iniciar a atualizacao deste lead.');
+    } finally {
+      setUpdatingLeadId(null);
+    }
+  }
+
+  return (
+    <div className="grid gap-6">
+      <section className={`${panelClass} p-6`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <span className={labelClass}>Geolocalizacao</span>
+            <h1 className="mt-2 text-4xl font-black tracking-normal text-slate-50">Painel de coordenadas</h1>
+            <p className="mt-3 max-w-3xl text-sm font-semibold leading-relaxed text-slate-400">
+              Acompanhe por distrito quais leads e igrejas tem coordenada exata, aproximada ou ainda precisam ser atualizados.
+            </p>
+          </div>
+          <button className={ghostButtonClass} onClick={onBack} type="button">
+            <ArrowRight className="rotate-180" size={18} />
+            Voltar
+          </button>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
+        <MetricCard detail="com latitude e longitude" icon={MapPin} label="Leads geocodificados" value={formatNumber(totals.exact + totals.approximate)} />
+        <MetricCard detail="precisao de endereco" icon={CheckCircle2} label="Exatos" tone="green" value={formatNumber(totals.exact)} />
+        <MetricCard detail="usar com conferencia" icon={Bell} label="Aproximados" tone="orange" value={formatNumber(totals.approximate)} />
+        <MetricCard detail={`${formatNumber(totals.notFound)} sem resultado anterior`} icon={X} label="Pendentes" tone="violet" value={formatNumber(totals.pending)} />
+      </section>
+
+      <section className="grid grid-cols-[0.9fr_1.4fr] gap-5 max-2xl:grid-cols-1">
+        <div className={`${panelClass} max-h-[44rem] overflow-auto p-5`}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <span className={labelClass}>Distritos</span>
+              <h2 className="mt-1 text-2xl font-black text-slate-50">Resumo operacional</h2>
+            </div>
+            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-slate-200">{formatNumber(districts.length)}</span>
+          </div>
+          <div className="grid gap-3">
+            {districts.map((district) => {
+              const active = selectedDistrict?.slug === district.slug;
+              const needs = district.leadStats.pending + district.leadStats.approximate + district.churchStats.pending;
+              return (
+                <button
+                  className={`rounded-2xl border p-4 text-left transition ${active ? 'border-emerald-300 bg-emerald-500/15' : 'border-white/[0.07] bg-slate-950/45 hover:bg-white/[0.06]'}`}
+                  key={district.slug}
+                  onClick={() => setSelectedSlug(district.slug)}
+                  type="button"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <strong className="min-w-0 truncate text-sm font-black text-slate-50">{district.name}</strong>
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-black ${needs ? 'bg-amber-400 text-slate-950' : 'bg-emerald-500 text-white'}`}>
+                      {needs ? `${formatNumber(needs)} revisar` : 'ok'}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px] font-black uppercase text-slate-400">
+                    <span>Exato<br /><b className="text-emerald-300">{formatNumber(district.leadStats.exact)}</b></span>
+                    <span>Aprox.<br /><b className="text-amber-300">{formatNumber(district.leadStats.approximate)}</b></span>
+                    <span>Pend.<br /><b className="text-red-300">{formatNumber(district.leadStats.pending)}</b></span>
+                    <span>Igrejas<br /><b className="text-blue-200">{formatNumber(district.churchStats.exact + district.churchStats.approximate)}/{formatNumber(district.churchStats.total)}</b></span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className={`${panelClass} overflow-hidden p-5`}>
+          {selectedDistrict ? (
+            <>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <span className={labelClass}>Distrito selecionado</span>
+                  <h2 className="mt-1 text-3xl font-black text-slate-50">{selectedDistrict.name}</h2>
+                  <p className="mt-2 text-sm font-semibold text-slate-400">
+                    {formatNumber(selectedDistrict.leadStats.total)} leads e {formatNumber(selectedDistrict.churchStats.total)} igrejas acompanhados.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    ['needs', 'Revisar'],
+                    ['pending', 'Pendentes'],
+                    ['approximate', 'Aproximados'],
+                    ['exact', 'Exatos'],
+                    ['all', 'Todos']
+                  ].map(([value, label]) => (
+                    <button
+                      className={`h-10 rounded-xl px-3 text-xs font-black transition ${activeStatus === value ? 'bg-white text-slate-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
+                      key={value}
+                      onClick={() => setActiveStatus(value)}
+                      type="button"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+                {[
+                  ['Exatos', selectedDistrict.leadStats.exact, 'text-emerald-300'],
+                  ['Aproximados', selectedDistrict.leadStats.approximate, 'text-amber-300'],
+                  ['Pendentes', selectedDistrict.leadStats.pending, 'text-red-300'],
+                  ['Igrejas pendentes', selectedDistrict.churchStats.pending, 'text-blue-200']
+                ].map(([label, value, color]) => (
+                  <div className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4" key={label}>
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
+                    <strong className={`mt-1 block text-2xl font-black ${color}`}>{formatNumber(value)}</strong>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 max-h-[29rem] overflow-auto rounded-2xl border border-white/[0.07]">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-slate-950/90 text-left">
+                      {['Nome', 'Status', 'Endereco', 'WhatsApp', 'Acao'].map((head) => (
+                        <th className="sticky top-0 z-[1] border-b border-white/[0.1] bg-slate-950 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white/75" key={head}>{head}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleLeads.slice(0, 500).map((lead) => (
+                      <tr className="hover:bg-white/[0.035]" key={lead.id}>
+                        <td className="border-b border-white/[0.04] px-4 py-3">
+                          <strong className="block text-slate-50">{lead.n}</strong>
+                          <span className="text-xs font-semibold text-slate-500">ID {lead.id} · {leadNeighborhood(lead)}</span>
+                        </td>
+                        <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
+                          <span className={`rounded-full px-3 py-1 text-xs font-black ${lead.geoStatus === 'exact' ? 'bg-emerald-500 text-white' : lead.geoStatus === 'approximate' ? 'bg-amber-400 text-slate-950' : 'bg-red-500 text-white'}`}>
+                            {statusLabel(lead.geoStatus)}
+                          </span>
+                        </td>
+                        <td className="max-w-[28rem] border-b border-white/[0.04] px-4 py-3 text-xs font-semibold text-slate-400">{fullLeadAddress(lead)}</td>
+                        <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black text-emerald-300">{phoneDigits(lead.tel) || 'sem telefone'}</td>
+                        <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
+                          <button
+                            className="h-9 rounded-xl bg-emerald-600 px-3 text-xs font-black text-white transition hover:bg-emerald-500 disabled:opacity-60"
+                            disabled={updatingLeadId === lead.id}
+                            onClick={() => updateLead(lead)}
+                            type="button"
+                          >
+                            {updatingLeadId === lead.id ? 'Enviando...' : 'Atualizar'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!visibleLeads.length ? <p className="p-5 text-sm font-semibold text-slate-400">Nenhum lead nesta categoria.</p> : null}
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-4">
+                <span className={labelClass}>Igrejas do distrito</span>
+                <div className="mt-3 grid grid-cols-2 gap-3 max-lg:grid-cols-1">
+                  {selectedDistrict.churches.map((church) => (
+                    <div className="rounded-xl border border-white/[0.07] bg-slate-950/35 p-3" key={`${selectedDistrict.slug}-${church.name}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <strong className="text-sm font-black text-slate-50">{church.name}</strong>
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-black ${church.geoStatus === 'exact' ? 'bg-emerald-500 text-white' : church.geoStatus === 'approximate' ? 'bg-amber-400 text-slate-950' : 'bg-red-500 text-white'}`}>
+                          {statusLabel(church.geoStatus)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-400">{church.address || 'Endereco nao informado'}</p>
+                    </div>
+                  ))}
+                  {!selectedDistrict.churches.length ? <p className="text-sm font-semibold text-slate-400">Nenhuma igreja cadastrada neste distrito.</p> : null}
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm font-semibold text-slate-400">Nenhum distrito disponivel.</p>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function leadMatchesFilterGroup(lead, filters, ignoredGroups = []) {
   const ignored = new Set(ignoredGroups);
   const term = filters.search.trim().toLowerCase();
@@ -4009,6 +4313,14 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
               ) : null}
             </div>
             <div className="flex flex-wrap items-end justify-end gap-3">
+              <button
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white/80 px-4 text-sm font-black text-emerald-950 shadow-sm transition hover:bg-emerald-50"
+                onClick={() => onNavigate('geolocation')}
+                type="button"
+              >
+                <ClipboardList size={18} />
+                Ver geolocalizacao
+              </button>
               <label className="grid min-w-[14rem] gap-1 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-800">
                 Distrito
                 <select
@@ -6741,6 +7053,16 @@ export default function CrmApp({ payload: initialPayload = null }) {
     );
   } else if (effectiveView === 'dataset-history') {
     content = <DatasetHistoryView history={payload?.meta?.datasetUpdateHistory || []} onBack={goBack} />;
+  } else if (effectiveView === 'geolocation') {
+    content = (
+      <GeolocationView
+        churchesByDistrict={payload?.meta?.territory?.churchesByDistrict || {}}
+        officialDistricts={payload?.meta?.territory?.districts || []}
+        onBack={goBack}
+        onDatasetUpdated={loadDashboard}
+        records={records}
+      />
+    );
   } else if (['general-admin', 'users'].includes(effectiveView)) {
     content = (
       <AdminGeneralView

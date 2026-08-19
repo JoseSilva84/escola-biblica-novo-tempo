@@ -392,15 +392,18 @@ function hasCompletedGeocode(entry) {
   return Boolean(Number.isFinite(Number(entry?.lat)) && Number.isFinite(Number(entry?.lng)));
 }
 
-function pendingLeads(records, cache, limit, district = '') {
+function pendingLeads(records, cache, limit, district = '', { leadId = null, force = false } = {}) {
   const seen = new Set();
   const targetDistrict = compactText(district).toLowerCase();
+  const targetLeadId = Number(leadId);
   return records
     .map((lead) => ({ lead, address: fullLeadAddress(lead) }))
     .filter(({ lead, address }) => {
+      if (Number.isFinite(targetLeadId) && Number(lead?.id) !== targetLeadId) return false;
       if (targetDistrict && compactText(lead?.d).toLowerCase() !== targetDistrict) return false;
       const key = geocodeKey(address);
-      if (!address || address === 'N/I' || seen.has(key) || hasCompletedGeocode(cache[key])) return false;
+      if (!address || address === 'N/I' || seen.has(key)) return false;
+      if (!force && hasCompletedGeocode(cache[key])) return false;
       seen.add(key);
       return lead?.d && key.length > 10;
     })
@@ -502,9 +505,11 @@ export async function geocodeStatus() {
   };
 }
 
-export function startGeocodingBatch({ limit = 100, district = '', scope = 'leads', force = false } = {}) {
+export function startGeocodingBatch({ limit = 100, district = '', scope = 'leads', force = false, leadId = null } = {}) {
   if (job.running) return { started: false, status: job };
-  const batchLimit = Math.max(1, Math.min(Number(limit) || 100, 1000));
+  const targetLeadId = Number(leadId);
+  const hasTargetLead = Number.isFinite(targetLeadId) && targetLeadId > 0;
+  const batchLimit = hasTargetLead ? 1 : Math.max(1, Math.min(Number(limit) || 100, 1000));
   const targetDistrict = compactText(district);
   const targetScope = scope === 'churches' ? 'churches' : 'leads';
   const forceChurchRetry = targetScope === 'churches' || Boolean(force);
@@ -519,7 +524,9 @@ export function startGeocodingBatch({ limit = 100, district = '', scope = 'leads
     limit: batchLimit,
     district: targetDistrict,
     scope: targetScope,
-    message: targetScope === 'churches'
+    message: hasTargetLead
+      ? `Geocodificacao iniciada para lead ${targetLeadId}.`
+      : targetScope === 'churches'
       ? 'Geocodificacao iniciada para igrejas.'
       : targetDistrict ? `Geocodificacao iniciada para ${targetDistrict}.` : 'Geocodificacao iniciada.',
     notFoundItems: []
@@ -527,7 +534,7 @@ export function startGeocodingBatch({ limit = 100, district = '', scope = 'leads
 
   const runner = targetScope === 'churches'
     ? runChurchBatch(batchLimit, { force: forceChurchRetry })
-    : runBatch(batchLimit, targetDistrict);
+    : runBatch(batchLimit, targetDistrict, { leadId: hasTargetLead ? targetLeadId : null, force: Boolean(force) || hasTargetLead });
   runner.catch((error) => {
     job = {
       ...job,
@@ -664,11 +671,13 @@ async function runChurchBatch(limit, { force = false } = {}) {
   invalidateDashboardCache();
 }
 
-async function runBatch(limit, district = '') {
+async function runBatch(limit, district = '', { leadId = null, force = false } = {}) {
   const cache = await hydrateGeocodeCacheFromDb();
   const payload = getDashboardData();
-  const batch = pendingLeads(payload.records, cache, limit, district);
-  job.message = district
+  const batch = pendingLeads(payload.records, cache, limit, district, { leadId, force });
+  job.message = leadId
+    ? `Processando lead ${leadId}.`
+    : district
     ? `Processando ${batch.length} endereco(s) pendente(s) em ${district}.`
     : `Processando ${batch.length} endereco(s) pendente(s).`;
 
@@ -712,7 +721,9 @@ async function runBatch(limit, district = '') {
     ...job,
     running: false,
     finishedAt: new Date().toISOString(),
-    message: district
+    message: leadId
+      ? `Concluido lead ${leadId}: ${job.saved} coordenada(s) salvas, ${job.skipped} sem resultado, ${job.failed} falha(s).`
+      : district
       ? `Concluido em ${district}: ${job.saved} coordenada(s) salvas, ${job.skipped} sem resultado, ${job.failed} falha(s).`
       : `Concluido: ${job.saved} coordenada(s) salvas, ${job.skipped} sem resultado, ${job.failed} falha(s).`
   };

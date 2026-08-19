@@ -1127,7 +1127,8 @@ app.post('/api/geocode/run', requireAuth, requireAdminGeral, async (request, res
     limit: request.body?.limit,
     district: request.body?.district,
     scope: request.body?.scope,
-    force: Boolean(request.body?.force)
+    force: Boolean(request.body?.force),
+    leadId: request.body?.leadId
   });
   response.status(result.started ? 202 : 409).json(result.started ? result.status : await geocodeStatus());
 });
