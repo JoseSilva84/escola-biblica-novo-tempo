@@ -186,14 +186,22 @@ function streetNumberFromAddress(address) {
 
 function geocodeQueriesForLead(lead, address) {
   const cleanAddress = stripCep(address);
+  const expandedAddress = expandAddressTerms(cleanAddress);
   const streetNumber = streetNumberFromAddress(cleanAddress);
+  const expandedStreetNumber = expandAddressTerms(streetNumber);
   const neighborhood = leadNeighborhood(lead);
+  const expandedNeighborhood = expandAddressTerms(neighborhood);
   const city = cityFromLead(lead);
   const queries = [
     cleanAddress,
+    expandedAddress,
     [streetNumber, neighborhood, city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [expandedStreetNumber, expandedNeighborhood, city, 'SP', 'Brasil'].filter(Boolean).join(', '),
     [streetNumber, city, 'SP', 'Brasil'].filter(Boolean).join(', '),
-    [neighborhood, city, 'SP', 'Brasil'].filter(Boolean).join(', ')
+    [expandedStreetNumber, city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [neighborhood, city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [expandedNeighborhood, city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [city, 'SP', 'Brasil'].filter(Boolean).join(', ')
   ];
   return [...new Set(queries.map(compactText).filter((query) => query.length > 10))];
 }
@@ -381,8 +389,7 @@ async function notFoundItemsFromDb(limit = 100) {
 }
 
 function hasCompletedGeocode(entry) {
-  return Boolean(entry?.notFound)
-    || (Number.isFinite(Number(entry?.lat)) && Number.isFinite(Number(entry?.lng)));
+  return Boolean(Number.isFinite(Number(entry?.lat)) && Number.isFinite(Number(entry?.lng)));
 }
 
 function pendingLeads(records, cache, limit, district = '') {
@@ -433,7 +440,29 @@ async function geocodeLeadAddress(lead, address) {
     if (point) return { ...point, matchedQuery: query, attempts: queries };
     if (index < queries.length - 1) await sleep(GEOCODE_DELAY_MS);
   }
-  return { point: null, attempts: queries };
+  const fallback = fallbackLeadPoint(lead, address);
+  return fallback
+    ? { ...fallback, attempts: queries }
+    : { point: null, attempts: queries };
+}
+
+function fallbackLeadPoint(lead, address) {
+  const city = cityFromLead(lead);
+  const center = CITY_FALLBACK_CENTERS[slugText(city)] || CITY_FALLBACK_CENTERS[slugText(lead?.d)];
+  if (!center) return null;
+  const hash = stableHash(`${lead?.id}|${lead?.d}|${leadNeighborhood(lead)}|${address}`);
+  const angle = (hash % 360) * (Math.PI / 180);
+  const radius = 0.0025 + ((hash % 1200) / 100000);
+  return {
+    lat: center[0] + Math.sin(angle) * radius,
+    lng: center[1] + Math.cos(angle) * radius,
+    displayName: `Ponto aproximado em ${city || lead?.d || 'SP'}; endereco nao localizado pelo OSM`,
+    type: 'cidade-aproximado',
+    importance: null,
+    matchedQuery: `${city || lead?.d || 'SP'}, Brasil`,
+    approximate: true,
+    source: 'fallback'
+  };
 }
 
 export async function geocodeStatus() {
@@ -447,6 +476,11 @@ export async function geocodeStatus() {
   const churchAddressBook = readChurchAddressBook();
   const total = payload.records.length;
   const withCoordinates = payload.records.filter((lead) => Number.isFinite(Number(lead.lat)) && Number.isFinite(Number(lead.lng))).length;
+  const approximateLeads = payload.records.filter((lead) =>
+    Number.isFinite(Number(lead.lat))
+    && Number.isFinite(Number(lead.lng))
+    && /aproximado/i.test(String(lead.geoPrecision || lead.geoSource || ''))
+  ).length;
   const churchRows = churchAddressBook.rows || [];
   const churchesWithCoordinates = churchRows.filter((church) => {
     const cached = cache[geocodeKey(church.address)];
@@ -460,6 +494,7 @@ export async function geocodeStatus() {
     notFoundItems: job.running && job.notFoundItems.length ? job.notFoundItems : notFoundItems,
     totalLeads: total,
     leadsWithCoordinates: withCoordinates,
+    leadsWithApproximateCoordinates: approximateLeads,
     pendingEstimate: Math.max(0, total - withCoordinates),
     totalChurches: churchRows.length,
     churchesWithCoordinates,
@@ -643,7 +678,7 @@ async function runBatch(limit, district = '') {
       const result = await geocodeLeadAddress(lead, address);
       const point = result?.lat ? result : null;
       const entry = point
-        ? { ...point, source: 'nominatim', address, id: lead.id, name: lead.n || '', district: lead.d || '', neighborhood: leadNeighborhood(lead) || '', updatedAt: new Date().toISOString() }
+        ? { ...point, source: point.source || 'nominatim', address, id: lead.id, name: lead.n || '', district: lead.d || '', neighborhood: leadNeighborhood(lead) || '', updatedAt: new Date().toISOString() }
         : { notFound: true, source: 'nominatim', address, id: lead.id, name: lead.n || '', district: lead.d || '', neighborhood: leadNeighborhood(lead) || '', attempts: result?.attempts || [], updatedAt: new Date().toISOString() };
       cache[key] = entry;
       await saveLeadGeocodeToDb({ key, lead, address, entry });

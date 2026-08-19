@@ -3109,7 +3109,12 @@ function fullLeadAddress(lead) {
 
 function approximateLeadPoint(lead) {
   if (Number.isFinite(Number(lead?.lat)) && Number.isFinite(Number(lead?.lng))) {
-    return { lat: Number(lead.lat), lng: Number(lead.lng), precision: 'Endereco' };
+    const precisionText = String(lead?.geoPrecision || lead?.geoSource || '').toLowerCase();
+    return {
+      lat: Number(lead.lat),
+      lng: Number(lead.lng),
+      precision: precisionText.includes('aproximado') || precisionText.includes('fallback') ? 'Aproximado' : 'Endereco'
+    };
   }
   const city = cityFromAddress(lead);
   const center = cityMapCenters[slugForMap(city)] || cityMapCenters[slugForMap(lead?.d)] || cityMapCenters['sao-paulo'];
@@ -3989,7 +3994,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
               <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Precisao do mapa</span>
               <p className="mt-1 font-bold text-emerald-950">
                 {geocodeInfo
-                  ? `${formatNumber(geocodeInfo.leadsWithCoordinates)} leads com coordenada real. ${formatNumber(geocodeInfo.pendingEstimate)} ainda pendente(s). ${formatNumber(geocodeInfo.churchesWithCoordinates)} igrejas geocodificada(s). ${formatNumber(geocodeInfo.churchPendingEstimate)} igreja(s) pendente(s).`
+                  ? `${formatNumber(geocodeInfo.leadsWithCoordinates)} leads com coordenada. ${formatNumber(geocodeInfo.leadsWithApproximateCoordinates || 0)} aproximada(s). ${formatNumber(geocodeInfo.pendingEstimate)} ainda pendente(s). ${formatNumber(geocodeInfo.churchesWithCoordinates)} igrejas geocodificada(s). ${formatNumber(geocodeInfo.churchPendingEstimate)} igreja(s) pendente(s).`
                   : 'Carregando status das coordenadas...'}
               </p>
               {geocodeInfo?.message ? (
