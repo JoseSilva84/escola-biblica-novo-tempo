@@ -17,6 +17,7 @@ let job = {
   failed: 0,
   skipped: 0,
   limit: 0,
+  district: '',
   message: 'Nenhuma rotina em execucao.',
   notFoundItems: []
 };
@@ -280,13 +281,20 @@ async function notFoundItemsFromDb(limit = 100) {
   }
 }
 
-function pendingLeads(records, cache, limit) {
+function hasCompletedGeocode(entry) {
+  return Boolean(entry?.notFound)
+    || (Number.isFinite(Number(entry?.lat)) && Number.isFinite(Number(entry?.lng)));
+}
+
+function pendingLeads(records, cache, limit, district = '') {
   const seen = new Set();
+  const targetDistrict = compactText(district).toLowerCase();
   return records
     .map((lead) => ({ lead, address: fullLeadAddress(lead) }))
     .filter(({ lead, address }) => {
+      if (targetDistrict && compactText(lead?.d).toLowerCase() !== targetDistrict) return false;
       const key = geocodeKey(address);
-      if (!address || address === 'N/I' || seen.has(key) || cache[key]?.lat || cache[key]?.notFound) return false;
+      if (!address || address === 'N/I' || seen.has(key) || hasCompletedGeocode(cache[key])) return false;
       seen.add(key);
       return lead?.d && key.length > 10;
     })
@@ -351,9 +359,10 @@ export async function geocodeStatus() {
   };
 }
 
-export function startGeocodingBatch({ limit = 100 } = {}) {
+export function startGeocodingBatch({ limit = 100, district = '' } = {}) {
   if (job.running) return { started: false, status: job };
   const batchLimit = Math.max(1, Math.min(Number(limit) || 100, 1000));
+  const targetDistrict = compactText(district);
   job = {
     running: true,
     startedAt: new Date().toISOString(),
@@ -363,11 +372,12 @@ export function startGeocodingBatch({ limit = 100 } = {}) {
     failed: 0,
     skipped: 0,
     limit: batchLimit,
-    message: 'Geocodificacao iniciada.',
+    district: targetDistrict,
+    message: targetDistrict ? `Geocodificacao iniciada para ${targetDistrict}.` : 'Geocodificacao iniciada.',
     notFoundItems: []
   };
 
-  runBatch(batchLimit).catch((error) => {
+  runBatch(batchLimit, targetDistrict).catch((error) => {
     job = {
       ...job,
       running: false,
@@ -379,11 +389,13 @@ export function startGeocodingBatch({ limit = 100 } = {}) {
   return { started: true, status: job };
 }
 
-async function runBatch(limit) {
+async function runBatch(limit, district = '') {
   const cache = await hydrateGeocodeCacheFromDb();
   const payload = getDashboardData();
-  const batch = pendingLeads(payload.records, cache, limit);
-  job.message = `Processando ${batch.length} endereco(s) pendente(s).`;
+  const batch = pendingLeads(payload.records, cache, limit, district);
+  job.message = district
+    ? `Processando ${batch.length} endereco(s) pendente(s) em ${district}.`
+    : `Processando ${batch.length} endereco(s) pendente(s).`;
 
   for (const { address, lead } of batch) {
     const key = geocodeKey(address);
@@ -425,7 +437,9 @@ async function runBatch(limit) {
     ...job,
     running: false,
     finishedAt: new Date().toISOString(),
-    message: `Concluido: ${job.saved} coordenada(s) salvas, ${job.skipped} sem resultado, ${job.failed} falha(s).`
+    message: district
+      ? `Concluido em ${district}: ${job.saved} coordenada(s) salvas, ${job.skipped} sem resultado, ${job.failed} falha(s).`
+      : `Concluido: ${job.saved} coordenada(s) salvas, ${job.skipped} sem resultado, ${job.failed} falha(s).`
   };
   invalidateDashboardCache();
 }

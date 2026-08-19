@@ -3505,6 +3505,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
   const [geocodeInfo, setGeocodeInfo] = useState(null);
   const [geocodeLoading, setGeocodeLoading] = useState(false);
+  const [geocodeDistrict, setGeocodeDistrict] = useState('');
   const [showGeocodeMisses, setShowGeocodeMisses] = useState(false);
   const geocodeWasRunningRef = useRef(false);
   const churchesForMap = useMemo(() => {
@@ -3666,14 +3667,16 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       const response = await apiFetch('/api/geocode/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 250 })
+        body: JSON.stringify({ limit: 250, district: geocodeDistrict || null })
       });
       const info = await response.json().catch(() => null);
       if (info) setGeocodeInfo(info);
       if (response.ok) {
         geocodeWasRunningRef.current = true;
         toast.success('Geocodificacao iniciada', {
-          description: 'O backend vai salvar coordenadas aos poucos, sem travar o sistema.'
+          description: geocodeDistrict
+            ? `O backend vai salvar coordenadas de ${geocodeDistrict} aos poucos, sem travar o sistema.`
+            : 'O backend vai salvar coordenadas aos poucos, sem travar o sistema.'
         });
       } else {
         toast.info('Geocodificacao ja esta em andamento.');
@@ -3964,8 +3967,8 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         </div>
 
         {canRunGeocode ? (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/85 p-4 text-sm shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
-            <div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/85 p-4 text-sm shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
+            <div className="min-w-[18rem] flex-1">
               <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Precisao do mapa</span>
               <p className="mt-1 font-bold text-emerald-950">
                 {geocodeInfo
@@ -3983,15 +3986,31 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                 </p>
               ) : null}
             </div>
-            <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(22,163,74,0.24)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={geocodeLoading || geocodeInfo?.running}
-              onClick={startGeocodeBatch}
-              type="button"
-            >
-              <MapPin size={18} />
-              {geocodeInfo?.running ? 'Geocodificando...' : 'Geocodificar 250'}
-            </button>
+            <div className="flex flex-wrap items-end justify-end gap-3">
+              <label className="grid min-w-[14rem] gap-1 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                Distrito
+                <select
+                  className="h-11 rounded-xl border border-emerald-200 bg-white/80 px-3 text-sm font-black normal-case tracking-normal text-emerald-950 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
+                  disabled={geocodeLoading || geocodeInfo?.running}
+                  onChange={(event) => setGeocodeDistrict(event.target.value)}
+                  value={geocodeDistrict}
+                >
+                  <option value="">Todos os distritos</option>
+                  {districts.map((district) => (
+                    <option key={district} value={district}>{district}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(22,163,74,0.24)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={geocodeLoading || geocodeInfo?.running}
+                onClick={startGeocodeBatch}
+                type="button"
+              >
+                <MapPin size={18} />
+                {geocodeInfo?.running ? 'Geocodificando...' : geocodeDistrict ? 'Geocodificar distrito' : 'Geocodificar 250'}
+              </button>
+            </div>
           </div>
         ) : null}
 
