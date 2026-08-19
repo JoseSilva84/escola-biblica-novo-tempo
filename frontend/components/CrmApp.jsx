@@ -3033,6 +3033,42 @@ function leadAgeGroup(lead) {
   return '60+';
 }
 
+const contactTimeRanges = [
+  { value: 'month:1', label: 'Ate 1 mes', min: 0, max: 30 },
+  ...Array.from({ length: 10 }, (_, index) => {
+    const month = index + 2;
+    return {
+      value: `month:${month}`,
+      label: `${month} meses`,
+      min: ((month - 1) * 30) + 1,
+      max: month * 30
+    };
+  }),
+  { value: 'year:1', label: '1 ano', min: (11 * 30) + 1, max: 365 },
+  ...Array.from({ length: 9 }, (_, index) => {
+    const year = index + 2;
+    return {
+      value: `year:${year}`,
+      label: `${year} anos`,
+      min: ((year - 1) * 365) + 1,
+      max: year * 365
+    };
+  }),
+  { value: 'over:10', label: 'Mais de 10 anos', min: (10 * 365) + 1, max: Infinity },
+  { value: 'unknown', label: 'Sem data', min: null, max: null }
+];
+
+function leadContactTimeRange(lead) {
+  if (lead?.c === null || lead?.c === undefined) return 'unknown';
+  const days = Number(lead.c);
+  if (!Number.isFinite(days) || days < 0) return 'unknown';
+  return contactTimeRanges.find((range) => (
+    Number.isFinite(range.min)
+    && days >= range.min
+    && days <= range.max
+  ))?.value || 'over:10';
+}
+
 function leadGenderLabel(value) {
   if (value === 'F') return 'Feminino';
   if (value === 'M') return 'Masculino';
@@ -3771,9 +3807,7 @@ function leadMatchesFilterGroup(lead, filters, ignoredGroups = []) {
   if (!ignored.has('religion') && filters.religion === 'adventist' && !isAdventistReligion(lead.r)) return false;
   if (!ignored.has('religion') && filters.religion === 'non-adventist' && isAdventistReligion(lead.r)) return false;
   if (!ignored.has('religion') && filters.religion.startsWith('religion:') && leadReligionValue(lead) !== filters.religion.slice('religion:'.length)) return false;
-  if (!ignored.has('recency') && filters.recency === 'recent' && (lead.c === null || lead.c > 365)) return false;
-  if (!ignored.has('recency') && filters.recency === 'old' && (lead.c === null || lead.c <= 365)) return false;
-  if (!ignored.has('recency') && filters.recency === 'unknown' && lead.c !== null) return false;
+  if (!ignored.has('recency') && filters.recency !== 'all' && leadContactTimeRange(lead) !== filters.recency) return false;
   if (!ignored.has('search') && term) {
     const haystack = `${lead.n || ''} ${lead.tel || ''} ${lead.em || ''} ${lead.d || ''} ${leadNeighborhood(lead)} ${leadMaterial(lead)} ${lead.r || ''} ${lead.id || ''}`.toLowerCase();
     if (!haystack.includes(term)) return false;
@@ -3989,9 +4023,10 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
     ],
     recency: [
       ['all', `Todos (${formatNumber(recordsForToggleOptions.recency.length)})`],
-      ['recent', `Ate 1 ano (${formatNumber(recordsForToggleOptions.recency.filter((lead) => lead.c !== null && lead.c <= 365).length)})`],
-      ['old', `+ de 1 ano (${formatNumber(recordsForToggleOptions.recency.filter((lead) => lead.c !== null && lead.c > 365).length)})`],
-      ['unknown', `Sem data (${formatNumber(recordsForToggleOptions.recency.filter((lead) => lead.c === null).length)})`]
+      ...contactTimeRanges.map((range) => [
+        range.value,
+        `${range.label} (${formatNumber(recordsForToggleOptions.recency.filter((lead) => leadContactTimeRange(lead) === range.value).length)})`
+      ])
     ]
   }), [recordsForToggleOptions]);
 
@@ -4321,7 +4356,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
               ['study', 'Estudos', selectFilterOptions.study],
               ['vip', 'VIP', selectFilterOptions.vip],
               ['religion', 'Religiao', selectFilterOptions.religion],
-              ['recency', 'Contato', selectFilterOptions.recency]
+              ['recency', 'Tempo', selectFilterOptions.recency]
             ].map(([key, label, options]) => (
               <label className="grid min-w-0 gap-2 rounded-2xl border border-slate-200 bg-white/80 p-4 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 shadow-[0_14px_34px_rgba(15,23,42,0.07)] ring-1 ring-white/70" key={key}>
                 {label}
