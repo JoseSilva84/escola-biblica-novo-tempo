@@ -3436,6 +3436,10 @@ function buildGeolocationDistricts(records = [], churchesByDistrict = {}, offici
     return byDistrict.get(slug);
   };
 
+  for (const district of officialDistricts || []) {
+    ensureDistrict(district.name, district.slug || slugifyDistrictName(district.name));
+  }
+
   for (const lead of records) {
     const district = ensureDistrict(lead.d);
     const status = geoStatusForItem(lead);
@@ -3480,6 +3484,7 @@ function statusLabel(status) {
 function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBack, onDatasetUpdated, records = [] }) {
   const [selectedSlug, setSelectedSlug] = useState('');
   const [activeStatus, setActiveStatus] = useState('needs');
+  const [searchTerm, setSearchTerm] = useState('');
   const [updatingLeadId, setUpdatingLeadId] = useState(null);
   const districts = useMemo(
     () => buildGeolocationDistricts(records, churchesByDistrict, officialDistricts),
@@ -3500,12 +3505,37 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
     if (!selectedSlug && districts[0]?.slug) setSelectedSlug(districts[0].slug);
   }, [districts, selectedSlug]);
 
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const visibleDistricts = useMemo(() => {
+    if (!normalizedSearch) return districts;
+    return districts.filter((district) => {
+      const districtMatches = district.name.toLowerCase().includes(normalizedSearch);
+      const leadMatches = district.leads.some((lead) => `${lead.n || ''} ${lead.id || ''} ${leadNeighborhood(lead)} ${lead.tel || ''}`.toLowerCase().includes(normalizedSearch));
+      const churchMatches = district.churches.some((church) => `${church.name || ''} ${church.address || ''}`.toLowerCase().includes(normalizedSearch));
+      return districtMatches || leadMatches || churchMatches;
+    });
+  }, [districts, normalizedSearch]);
+
   const visibleLeads = useMemo(() => {
     const leads = selectedDistrict?.leads || [];
-    if (activeStatus === 'needs') return leads.filter((lead) => ['pending', 'notFound', 'approximate'].includes(lead.geoStatus));
-    if (activeStatus === 'all') return leads;
-    return leads.filter((lead) => lead.geoStatus === activeStatus);
-  }, [activeStatus, selectedDistrict]);
+    const statusFiltered = activeStatus === 'needs'
+      ? leads.filter((lead) => ['pending', 'notFound', 'approximate'].includes(lead.geoStatus))
+      : activeStatus === 'all' ? leads : leads.filter((lead) => lead.geoStatus === activeStatus);
+    if (!normalizedSearch) return statusFiltered;
+    return statusFiltered.filter((lead) => `${lead.n || ''} ${lead.id || ''} ${lead.d || ''} ${leadNeighborhood(lead)} ${lead.tel || ''} ${fullLeadAddress(lead)}`.toLowerCase().includes(normalizedSearch));
+  }, [activeStatus, normalizedSearch, selectedDistrict]);
+  const overviewCards = [
+    ['Leads geocodificados', totals.exact + totals.approximate, 'com latitude e longitude', MapPin, 'border-blue-200 bg-white text-blue-700'],
+    ['Exatos', totals.exact, 'precisao de endereco', CheckCircle2, 'border-emerald-200 bg-white text-emerald-700'],
+    ['Aproximados', totals.approximate, 'usar com conferencia', Bell, 'border-amber-200 bg-white text-amber-700'],
+    ['Pendentes', totals.pending, `${formatNumber(totals.notFound)} sem resultado anterior`, X, 'border-rose-200 bg-white text-rose-700']
+  ];
+  const detailCards = [
+    ['Exatos', selectedDistrict?.leadStats.exact || 0, 'border-emerald-200 bg-emerald-50 text-emerald-700'],
+    ['Aproximados', selectedDistrict?.leadStats.approximate || 0, 'border-amber-200 bg-amber-50 text-amber-700'],
+    ['Pendentes', selectedDistrict?.leadStats.pending || 0, 'border-rose-200 bg-rose-50 text-rose-700'],
+    ['Igrejas pendentes', selectedDistrict?.churchStats.pending || 0, 'border-sky-200 bg-sky-50 text-sky-700']
+  ];
 
   async function updateLead(lead) {
     if (!lead?.id || updatingLeadId) return;
@@ -3531,12 +3561,12 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
 
   return (
     <div className="grid gap-6">
-      <section className={`${panelClass} p-6`}>
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <span className={labelClass}>Geolocalizacao</span>
-            <h1 className="mt-2 text-4xl font-black tracking-normal text-slate-50">Painel de coordenadas</h1>
-            <p className="mt-3 max-w-3xl text-sm font-semibold leading-relaxed text-slate-400">
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Geolocalizacao</span>
+            <h1 className="mt-2 text-4xl font-black tracking-normal text-slate-950">Painel de coordenadas</h1>
+            <p className="mt-3 max-w-3xl text-sm font-semibold leading-relaxed text-slate-600">
               Acompanhe por distrito quais leads e igrejas tem coordenada exata, aproximada ou ainda precisam ser atualizados.
             </p>
           </div>
@@ -3548,58 +3578,78 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
       </section>
 
       <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
-        <MetricCard detail="com latitude e longitude" icon={MapPin} label="Leads geocodificados" value={formatNumber(totals.exact + totals.approximate)} />
-        <MetricCard detail="precisao de endereco" icon={CheckCircle2} label="Exatos" tone="green" value={formatNumber(totals.exact)} />
-        <MetricCard detail="usar com conferencia" icon={Bell} label="Aproximados" tone="orange" value={formatNumber(totals.approximate)} />
-        <MetricCard detail={`${formatNumber(totals.notFound)} sem resultado anterior`} icon={X} label="Pendentes" tone="violet" value={formatNumber(totals.pending)} />
+        {overviewCards.map(([label, value, detail, Icon, tone]) => (
+          <div className={`rounded-2xl border p-5 shadow-[0_16px_42px_rgba(15,23,42,0.07)] ${tone}`} key={label}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
+                <strong className="mt-2 block text-4xl font-black tracking-normal">{formatNumber(value)}</strong>
+              </div>
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)]">
+                <Icon size={20} />
+              </span>
+            </div>
+            <p className="mt-3 text-xs font-bold text-slate-500">{detail}</p>
+          </div>
+        ))}
       </section>
 
       <section className="grid grid-cols-[0.9fr_1.4fr] gap-5 max-2xl:grid-cols-1">
-        <div className={`${panelClass} max-h-[44rem] overflow-auto p-5`}>
+        <div className="max-h-[44rem] overflow-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <span className={labelClass}>Distritos</span>
-              <h2 className="mt-1 text-2xl font-black text-slate-50">Resumo operacional</h2>
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Distritos</span>
+              <h2 className="mt-1 text-2xl font-black text-slate-950">Resumo operacional</h2>
             </div>
-            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-slate-200">{formatNumber(districts.length)}</span>
+            <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">{formatNumber(visibleDistricts.length)}/{formatNumber(districts.length)}</span>
           </div>
+          <label className="relative mb-4 block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
+            <input
+              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Buscar distrito, lead, ID, telefone ou igreja"
+              value={searchTerm}
+            />
+          </label>
           <div className="grid gap-3">
-            {districts.map((district) => {
+            {visibleDistricts.map((district) => {
               const active = selectedDistrict?.slug === district.slug;
               const needs = district.leadStats.pending + district.leadStats.approximate + district.churchStats.pending;
               return (
                 <button
-                  className={`rounded-2xl border p-4 text-left transition ${active ? 'border-emerald-300 bg-emerald-500/15' : 'border-white/[0.07] bg-slate-950/45 hover:bg-white/[0.06]'}`}
+                  className={`rounded-2xl border p-4 text-left shadow-sm transition ${active ? 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100' : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'}`}
                   key={district.slug}
                   onClick={() => setSelectedSlug(district.slug)}
                   type="button"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <strong className="min-w-0 truncate text-sm font-black text-slate-50">{district.name}</strong>
+                    <strong className="min-w-0 truncate text-sm font-black text-slate-950">{district.name}</strong>
                     <span className={`rounded-full px-2 py-1 text-[10px] font-black ${needs ? 'bg-amber-400 text-slate-950' : 'bg-emerald-500 text-white'}`}>
                       {needs ? `${formatNumber(needs)} revisar` : 'ok'}
                     </span>
                   </div>
-                  <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px] font-black uppercase text-slate-400">
-                    <span>Exato<br /><b className="text-emerald-300">{formatNumber(district.leadStats.exact)}</b></span>
-                    <span>Aprox.<br /><b className="text-amber-300">{formatNumber(district.leadStats.approximate)}</b></span>
-                    <span>Pend.<br /><b className="text-red-300">{formatNumber(district.leadStats.pending)}</b></span>
-                    <span>Igrejas<br /><b className="text-blue-200">{formatNumber(district.churchStats.exact + district.churchStats.approximate)}/{formatNumber(district.churchStats.total)}</b></span>
+                  <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px] font-black uppercase text-slate-500">
+                    <span>Exato<br /><b className="text-base text-emerald-700">{formatNumber(district.leadStats.exact)}</b></span>
+                    <span>Aprox.<br /><b className="text-base text-amber-600">{formatNumber(district.leadStats.approximate)}</b></span>
+                    <span>Pend.<br /><b className="text-base text-rose-600">{formatNumber(district.leadStats.pending)}</b></span>
+                    <span>Igrejas<br /><b className="text-base text-sky-700">{formatNumber(district.churchStats.exact + district.churchStats.approximate)}/{formatNumber(district.churchStats.total)}</b></span>
                   </div>
                 </button>
               );
             })}
+            {!visibleDistricts.length ? <p className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">Nenhum distrito, lead ou igreja encontrado para essa busca.</p> : null}
           </div>
         </div>
 
-        <div className={`${panelClass} overflow-hidden p-5`}>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           {selectedDistrict ? (
             <>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <span className={labelClass}>Distrito selecionado</span>
-                  <h2 className="mt-1 text-3xl font-black text-slate-50">{selectedDistrict.name}</h2>
-                  <p className="mt-2 text-sm font-semibold text-slate-400">
+                  <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Distrito selecionado</span>
+                  <h2 className="mt-1 text-3xl font-black text-slate-950">{selectedDistrict.name}</h2>
+                  <p className="mt-2 text-sm font-semibold text-slate-600">
                     {formatNumber(selectedDistrict.leadStats.total)} leads e {formatNumber(selectedDistrict.churchStats.total)} igrejas acompanhados.
                   </p>
                 </div>
@@ -3612,7 +3662,7 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
                     ['all', 'Todos']
                   ].map(([value, label]) => (
                     <button
-                      className={`h-10 rounded-xl px-3 text-xs font-black transition ${activeStatus === value ? 'bg-white text-slate-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'}`}
+                      className={`h-10 rounded-xl px-3 text-xs font-black transition ${activeStatus === value ? 'bg-slate-950 text-white shadow-[0_12px_26px_rgba(15,23,42,0.18)]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                       key={value}
                       onClick={() => setActiveStatus(value)}
                       type="button"
@@ -3624,20 +3674,15 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
               </div>
 
               <div className="mt-5 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
-                {[
-                  ['Exatos', selectedDistrict.leadStats.exact, 'text-emerald-300'],
-                  ['Aproximados', selectedDistrict.leadStats.approximate, 'text-amber-300'],
-                  ['Pendentes', selectedDistrict.leadStats.pending, 'text-red-300'],
-                  ['Igrejas pendentes', selectedDistrict.churchStats.pending, 'text-blue-200']
-                ].map(([label, value, color]) => (
-                  <div className="rounded-2xl border border-white/[0.07] bg-slate-950/45 p-4" key={label}>
+                {detailCards.map(([label, value, tone]) => (
+                  <div className={`rounded-2xl border p-4 shadow-sm ${tone}`} key={label}>
                     <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
-                    <strong className={`mt-1 block text-2xl font-black ${color}`}>{formatNumber(value)}</strong>
+                    <strong className="mt-1 block text-3xl font-black">{formatNumber(value)}</strong>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-5 max-h-[29rem] overflow-auto rounded-2xl border border-white/[0.07]">
+              <div className="mt-5 max-h-[29rem] overflow-auto rounded-2xl border border-slate-200">
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="bg-slate-950/90 text-left">
@@ -3648,21 +3693,21 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
                   </thead>
                   <tbody>
                     {visibleLeads.slice(0, 500).map((lead) => (
-                      <tr className="hover:bg-white/[0.035]" key={lead.id}>
-                        <td className="border-b border-white/[0.04] px-4 py-3">
-                          <strong className="block text-slate-50">{lead.n}</strong>
+                      <tr className="hover:bg-slate-50" key={lead.id}>
+                        <td className="border-b border-slate-100 px-4 py-3">
+                          <strong className="block text-slate-950">{lead.n}</strong>
                           <span className="text-xs font-semibold text-slate-500">ID {lead.id} · {leadNeighborhood(lead)}</span>
                         </td>
-                        <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
+                        <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3">
                           <span className={`rounded-full px-3 py-1 text-xs font-black ${lead.geoStatus === 'exact' ? 'bg-emerald-500 text-white' : lead.geoStatus === 'approximate' ? 'bg-amber-400 text-slate-950' : 'bg-red-500 text-white'}`}>
                             {statusLabel(lead.geoStatus)}
                           </span>
                         </td>
-                        <td className="max-w-[28rem] border-b border-white/[0.04] px-4 py-3 text-xs font-semibold text-slate-400">{fullLeadAddress(lead)}</td>
-                        <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black text-emerald-300">{phoneDigits(lead.tel) || 'sem telefone'}</td>
-                        <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
+                        <td className="max-w-[28rem] border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-600">{fullLeadAddress(lead)}</td>
+                        <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3 font-black text-slate-950">{phoneDigits(lead.tel) || 'sem telefone'}</td>
+                        <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3">
                           <button
-                            className="h-9 rounded-xl bg-emerald-600 px-3 text-xs font-black text-white transition hover:bg-emerald-500 disabled:opacity-60"
+                            className="h-9 rounded-xl bg-slate-950 px-3 text-xs font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
                             disabled={updatingLeadId === lead.id}
                             onClick={() => updateLead(lead)}
                             type="button"
@@ -3674,24 +3719,24 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
                     ))}
                   </tbody>
                 </table>
-                {!visibleLeads.length ? <p className="p-5 text-sm font-semibold text-slate-400">Nenhum lead nesta categoria.</p> : null}
+                {!visibleLeads.length ? <p className="p-5 text-sm font-semibold text-slate-600">Nenhum lead nesta categoria.</p> : null}
               </div>
 
-              <div className="mt-5 rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-4">
-                <span className={labelClass}>Igrejas do distrito</span>
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">Igrejas do distrito</span>
                 <div className="mt-3 grid grid-cols-2 gap-3 max-lg:grid-cols-1">
                   {selectedDistrict.churches.map((church) => (
-                    <div className="rounded-xl border border-white/[0.07] bg-slate-950/35 p-3" key={`${selectedDistrict.slug}-${church.name}`}>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" key={`${selectedDistrict.slug}-${church.name}`}>
                       <div className="flex items-start justify-between gap-3">
-                        <strong className="text-sm font-black text-slate-50">{church.name}</strong>
+                        <strong className="text-sm font-black text-slate-950">{church.name}</strong>
                         <span className={`rounded-full px-2 py-1 text-[10px] font-black ${church.geoStatus === 'exact' ? 'bg-emerald-500 text-white' : church.geoStatus === 'approximate' ? 'bg-amber-400 text-slate-950' : 'bg-red-500 text-white'}`}>
                           {statusLabel(church.geoStatus)}
                         </span>
                       </div>
-                      <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-400">{church.address || 'Endereco nao informado'}</p>
+                      <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-600">{church.address || 'Endereco nao informado'}</p>
                     </div>
                   ))}
-                  {!selectedDistrict.churches.length ? <p className="text-sm font-semibold text-slate-400">Nenhuma igreja cadastrada neste distrito.</p> : null}
+                  {!selectedDistrict.churches.length ? <p className="text-sm font-semibold text-slate-600">Nenhuma igreja cadastrada neste distrito.</p> : null}
                 </div>
               </div>
             </>
