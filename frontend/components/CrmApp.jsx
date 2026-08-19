@@ -2034,13 +2034,42 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
     const districtMix = Array.from(districtMap.values())
       .sort((a, b) => b.interessados - a.interessados)
       .slice(0, 7);
-    const recency = records.reduce((acc, lead) => {
+    const recencyGroups = records.reduce((acc, lead) => {
       const days = Number(lead.c);
-      if (!Number.isFinite(days)) acc.semInfo += 1;
-      else if (days > 365) acc.antigos += 1;
-      else acc.recentes += 1;
+      if (!Number.isFinite(days) || days < 0) {
+        acc.semInfo.push(lead);
+      } else if (days < 30) {
+        acc.recente.push(lead);
+      } else if (days < 365) {
+        const months = Math.floor(days / 30);
+        const m = months > 11 ? 11 : months;
+        if (!acc.meses[m]) acc.meses[m] = [];
+        acc.meses[m].push(lead);
+      } else {
+        const years = Math.floor(days / 365);
+        if (years > 10) {
+          acc.acima10anos.push(lead);
+        } else {
+          if (!acc.anos[years]) acc.anos[years] = [];
+          acc.anos[years].push(lead);
+        }
+      }
       return acc;
-    }, { recentes: 0, antigos: 0, semInfo: 0 });
+    }, { recente: [], meses: {}, anos: {}, acima10anos: [], semInfo: [] });
+
+    const recencyList = [
+      { name: 'Contato recente', value: recencyGroups.recente.length, rows: recencyGroups.recente }
+    ];
+    for (let i = 1; i <= 11; i++) {
+      const rows = recencyGroups.meses[i] || [];
+      recencyList.push({ name: i === 1 ? '1 mês' : `${i} meses`, value: rows.length, rows });
+    }
+    for (let i = 1; i <= 10; i++) {
+      const rows = recencyGroups.anos[i] || [];
+      recencyList.push({ name: i === 1 ? '1 ano' : `${i} anos`, value: rows.length, rows });
+    }
+    recencyList.push({ name: 'Acima de 10 anos', value: recencyGroups.acima10anos.length, rows: recencyGroups.acima10anos });
+    recencyList.push({ name: 'Sem informação', value: recencyGroups.semInfo.length, rows: recencyGroups.semInfo });
     const ageBuckets = records.reduce((acc, lead) => {
       const age = Number(lead.a);
       if (!Number.isFinite(age) || age <= 0) acc.semInfo += 1;
@@ -2192,11 +2221,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
         { name: 'Sem prioridade', value: priorityCounts.none || 0 }
       ],
       districtMix,
-      recency: [
-        { name: 'Contato recente', value: recency.recentes },
-        { name: 'Acima de 1 ano', value: recency.antigos },
-        { name: 'Sem informação', value: recency.semInfo }
-      ],
+      recency: recencyList,
       addressRankingAll: Array.from(addressMap.values())
         .filter((item) => item.leads > 1)
         .sort((a, b) => b.leads - a.leads || a.address.localeCompare(b.address)),
@@ -2542,16 +2567,28 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
         <article className={`${panelClass} p-5`}>
           <span className={labelClass}>Recência</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Tempo desde contato</h3>
-          <div className="mt-4 h-56">
-            <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={analytics.recency} layout="vertical" margin={{ left: 6, right: 8 }}>
-                <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
-                <XAxis hide type="number" />
-                <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={108} />
-                <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
-                <Bar dataKey="value" fill="#a855f7" radius={[0, 8, 8, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="mt-4 h-96 overflow-y-auto pr-2">
+            <div style={{ height: 800 }}>
+              <ResponsiveContainer height="100%" width="100%">
+                <BarChart data={analytics.recency} layout="vertical" margin={{ left: 6, right: 8 }}>
+                  <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
+                  <XAxis hide type="number" />
+                  <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={108} />
+                  <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
+                  <Bar 
+                    dataKey="value" 
+                    fill="#a855f7" 
+                    radius={[0, 8, 8, 0]} 
+                    onClick={(data) => {
+                      if (data && data.payload) {
+                        openLeadGroup('Recência', data.payload);
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </article>
       </div>
