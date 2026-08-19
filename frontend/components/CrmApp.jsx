@@ -3525,10 +3525,10 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
     return statusFiltered.filter((lead) => `${lead.n || ''} ${lead.id || ''} ${lead.d || ''} ${leadNeighborhood(lead)} ${lead.tel || ''} ${fullLeadAddress(lead)}`.toLowerCase().includes(normalizedSearch));
   }, [activeStatus, normalizedSearch, selectedDistrict]);
   const overviewCards = [
-    ['Leads geocodificados', totals.exact + totals.approximate, 'com latitude e longitude', MapPin, 'border-blue-200 bg-white text-blue-700'],
-    ['Exatos', totals.exact, 'precisao de endereco', CheckCircle2, 'border-emerald-200 bg-white text-emerald-700'],
-    ['Aproximados', totals.approximate, 'usar com conferencia', Bell, 'border-amber-200 bg-white text-amber-700'],
-    ['Pendentes', totals.pending, `${formatNumber(totals.notFound)} sem resultado anterior`, X, 'border-rose-200 bg-white text-rose-700']
+    ['Leads geocodificados', totals.exact + totals.approximate, 'com latitude e longitude', MapPin, 'border-blue-200 text-blue-700'],
+    ['Exatos', totals.exact, 'precisao de endereco', CheckCircle2, 'border-emerald-200 text-emerald-700'],
+    ['Aproximados', totals.approximate, 'usar com conferencia', Bell, 'border-amber-200 text-amber-700'],
+    ['Pendentes', totals.pending, `${formatNumber(totals.notFound)} sem resultado anterior`, X, 'border-rose-200 text-rose-700']
   ];
   const detailCards = [
     ['Exatos', selectedDistrict?.leadStats.exact || 0, 'border-emerald-200 bg-emerald-50 text-emerald-700'],
@@ -3579,7 +3579,7 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
 
       <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
         {overviewCards.map(([label, value, detail, Icon, tone]) => (
-          <div className={`rounded-2xl border p-5 shadow-[0_16px_42px_rgba(15,23,42,0.07)] ${tone}`} key={label}>
+          <div className={`rounded-2xl border bg-white p-5 shadow-[0_16px_42px_rgba(15,23,42,0.07)] ${tone}`} key={label}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
