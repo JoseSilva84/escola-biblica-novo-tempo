@@ -3525,10 +3525,10 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
     return statusFiltered.filter((lead) => `${lead.n || ''} ${lead.id || ''} ${lead.d || ''} ${leadNeighborhood(lead)} ${lead.tel || ''} ${fullLeadAddress(lead)}`.toLowerCase().includes(normalizedSearch));
   }, [activeStatus, normalizedSearch, selectedDistrict]);
   const overviewCards = [
-    ['Leads geocodificados', totals.exact + totals.approximate, 'com latitude e longitude', MapPin, 'border-blue-200 text-blue-700'],
-    ['Exatos', totals.exact, 'precisao de endereco', CheckCircle2, 'border-emerald-200 text-emerald-700'],
-    ['Aproximados', totals.approximate, 'usar com conferencia', Bell, 'border-amber-200 text-amber-700'],
-    ['Pendentes', totals.pending, `${formatNumber(totals.notFound)} sem resultado anterior`, X, 'border-rose-200 text-rose-700']
+    ['Leads geocodificados', totals.exact + totals.approximate, 'com latitude e longitude', MapPin, 'border-blue-500 bg-blue-600 text-white'],
+    ['Exatos', totals.exact, 'precisao de endereco', CheckCircle2, 'border-emerald-500 bg-emerald-600 text-white'],
+    ['Aproximados', totals.approximate, 'usar com conferencia', Bell, 'border-orange-500 bg-orange-600 text-white'],
+    ['Pendentes', totals.pending, `${formatNumber(totals.notFound)} sem resultado anterior`, X, 'border-fuchsia-500 bg-fuchsia-600 text-white']
   ];
   const detailCards = [
     ['Exatos', selectedDistrict?.leadStats.exact || 0, 'border-emerald-200 bg-emerald-50 text-emerald-700'],
@@ -3579,17 +3579,17 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
 
       <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
         {overviewCards.map(([label, value, detail, Icon, tone]) => (
-          <div className={`rounded-2xl border bg-white p-5 shadow-[0_16px_42px_rgba(15,23,42,0.07)] ${tone}`} key={label}>
+          <div className={`rounded-2xl border p-5 shadow-[0_18px_46px_rgba(15,23,42,0.16)] ${tone}`} key={label}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
+                <span className="text-[11px] font-black uppercase tracking-[0.14em] text-white/85">{label}</span>
                 <strong className="mt-2 block text-4xl font-black tracking-normal">{formatNumber(value)}</strong>
               </div>
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)]">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.24)]">
                 <Icon size={20} />
               </span>
             </div>
-            <p className="mt-3 text-xs font-bold text-slate-500">{detail}</p>
+            <p className="mt-3 text-xs font-bold text-white/85">{detail}</p>
           </div>
         ))}
       </section>
