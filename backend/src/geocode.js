@@ -7,6 +7,23 @@ import { prisma } from './prisma.js';
 const GEOCODE_DELAY_MS = Number(process.env.GEOCODE_DELAY_MS || 1100);
 const NOMINATIM_URL = process.env.NOMINATIM_URL || 'https://nominatim.openstreetmap.org/search';
 const USER_AGENT = process.env.NOMINATIM_USER_AGENT || 'AmigosNT-CRM/1.0 contato@sevenflowia.tech';
+const CITY_FALLBACK_CENTERS = {
+  'aluminio': [-23.5307, -47.2546],
+  'aracariguama': [-23.4366, -47.0608],
+  'barueri': [-23.5112, -46.8764],
+  'carapicuiba': [-23.5226, -46.8350],
+  'cotia': [-23.6039, -46.9191],
+  'ibiuna': [-23.6565, -47.2220],
+  'itapevi': [-23.5488, -46.9332],
+  'jandira': [-23.5275, -46.9029],
+  'mairinque': [-23.5457, -47.1833],
+  'osasco': [-23.5329, -46.7918],
+  'pirapora-do-bom-jesus': [-23.3965, -46.9991],
+  'santana-de-parnaiba': [-23.4439, -46.9178],
+  'sao-paulo': [-23.5505, -46.6333],
+  'sao-roque': [-23.5299, -47.1353],
+  'vargem-grande-paulista': [-23.6038, -47.0269]
+};
 
 let job = {
   running: false,
@@ -88,8 +105,48 @@ function compactText(value) {
     .trim();
 }
 
+function slugText(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function stableHash(value) {
+  const text = String(value || '');
+  let hash = 0;
+  for (let index = 0; index < text.length; index++) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
 function stripCep(value) {
-  return compactText(value).replace(/\s*-\s*CEP:?\s*\d{5}-?\d{3}\s*$/i, '').trim();
+  return compactText(value)
+    .replace(/\s*-\s*CEP:?\s*\d{5}-?\d{3}\s*$/i, '')
+    .replace(/,\s*\d{5}-?\d{3}\s*,/g, ',')
+    .replace(/,\s*,+/g, ',')
+    .trim();
+}
+
+function expandAddressTerms(value) {
+  return compactText(value)
+    .replace(/\bR\.\s*/gi, 'Rua ')
+    .replace(/\bAv\.\s*/gi, 'Avenida ')
+    .replace(/\bAl\.\s*/gi, 'Alameda ')
+    .replace(/\bEstr\.\s*/gi, 'Estrada ')
+    .replace(/\bRod\.\s*/gi, 'Rodovia ')
+    .replace(/\bJd\.\s*/gi, 'Jardim ')
+    .replace(/\bPq\.\s*/gi, 'Parque ')
+    .replace(/\bProf\.\s*/gi, 'Professor ')
+    .replace(/\bProfa\.\s*/gi, 'Professora ')
+    .replace(/\bDr\.\s*/gi, 'Doutor ')
+    .replace(/\bDra\.\s*/gi, 'Doutora ')
+    .replace(/\bs\/n\b/gi, 'sem numero');
 }
 
 function cityFromLead(lead) {
@@ -123,11 +180,21 @@ function geocodeQueriesForLead(lead, address) {
 
 function geocodeQueriesForChurch(church, address) {
   const cleanAddress = stripCep(address);
+  const expandedAddress = expandAddressTerms(cleanAddress);
   const streetNumber = streetNumberFromAddress(cleanAddress);
+  const expandedStreetNumber = expandAddressTerms(streetNumber);
+  const expandedNeighborhood = expandAddressTerms(church?.neighborhood);
   const queries = [
     cleanAddress,
+    expandedAddress,
     [streetNumber, church?.neighborhood, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', '),
-    [church?.name, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', ')
+    [expandedStreetNumber, expandedNeighborhood, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [streetNumber, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [expandedStreetNumber, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [church?.name, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [`Igreja Adventista ${church?.name || ''}`, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [expandedNeighborhood, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', '),
+    [church?.neighborhood, church?.city, 'SP', 'Brasil'].filter(Boolean).join(', ')
   ];
   return [...new Set(queries.map(compactText).filter((query) => query.length > 10))];
 }
@@ -418,7 +485,8 @@ export function startGeocodingBatch({ limit = 100, district = '', scope = 'leads
 }
 
 function hasCompletedChurchGeocode(church, cache) {
-  return hasCompletedGeocode(cache[geocodeKey(church.address)]);
+  const entry = cache[geocodeKey(church.address)];
+  return Boolean(entry && Number.isFinite(Number(entry.lat)) && Number.isFinite(Number(entry.lng)));
 }
 
 function pendingChurches(cache, limit) {
@@ -442,7 +510,28 @@ async function geocodeChurchAddress(church) {
     if (point) return { ...point, matchedQuery: query, attempts: queries };
     if (index < queries.length - 1) await sleep(GEOCODE_DELAY_MS);
   }
-  return { point: null, attempts: queries };
+  const fallback = fallbackChurchPoint(church);
+  return fallback
+    ? { ...fallback, attempts: queries }
+    : { point: null, attempts: queries };
+}
+
+function fallbackChurchPoint(church) {
+  const center = CITY_FALLBACK_CENTERS[slugText(church?.city)];
+  if (!center) return null;
+  const hash = stableHash(`${church?.name}|${church?.address}`);
+  const angle = (hash % 360) * (Math.PI / 180);
+  const radius = 0.0015 + ((hash % 900) / 100000);
+  return {
+    lat: center[0] + Math.sin(angle) * radius,
+    lng: center[1] + Math.cos(angle) * radius,
+    displayName: `Ponto aproximado em ${church?.city || 'SP'}; endereco nao localizado pelo OSM`,
+    type: 'cidade-aproximado',
+    importance: null,
+    matchedQuery: `${church?.city || 'SP'}, Brasil`,
+    approximate: true,
+    source: 'fallback'
+  };
 }
 
 async function runChurchBatch(limit) {
@@ -463,7 +552,7 @@ async function runChurchBatch(limit) {
       const result = await geocodeChurchAddress(church);
       const point = result?.lat ? result : null;
       const entry = point
-        ? { ...point, source: 'nominatim', address, id: null, name: church.name || '', district: church.city || '', neighborhood: church.neighborhood || '', updatedAt: new Date().toISOString() }
+        ? { ...point, source: point.source || 'nominatim', address, id: null, name: church.name || '', district: church.city || '', neighborhood: church.neighborhood || '', updatedAt: new Date().toISOString() }
         : { notFound: true, source: 'nominatim', address, id: null, name: church.name || '', district: church.city || '', neighborhood: church.neighborhood || '', attempts: result?.attempts || [], updatedAt: new Date().toISOString() };
       cache[key] = entry;
       await saveLeadGeocodeToDb({ key, lead: leadLikeChurch, address, entry });

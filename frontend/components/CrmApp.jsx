@@ -3154,7 +3154,12 @@ function leadMapPriorityStyle(priority) {
 
 function churchMapPoint(church, districtLeadPoints = {}) {
   if (church?.lat !== null && church?.lat !== undefined && church?.lng !== null && church?.lng !== undefined && Number.isFinite(Number(church.lat)) && Number.isFinite(Number(church.lng))) {
-    return { lat: Number(church.lat), lng: Number(church.lng), precision: 'Endereco' };
+    const precisionText = String(church?.geoPrecision || '').toLowerCase();
+    return {
+      lat: Number(church.lat),
+      lng: Number(church.lng),
+      precision: precisionText.includes('aproximado') ? 'Aproximado' : 'Endereco'
+    };
   }
   const districtSlug = church?.districtSlug || slugifyDistrictName(church?.districtName);
   const districtPoints = districtLeadPoints[districtSlug] || [];
