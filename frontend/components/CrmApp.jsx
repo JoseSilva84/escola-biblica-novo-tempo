@@ -68,7 +68,7 @@ const adminNavItems = [
   ['campaigns', 'Campanhas', Radio],
   ['automations', 'WhatsApp', MessageCircle],
   ['conversations', 'Conversas', MessageCircle],
-  ['ai-agent', 'IA', WandSparkles],
+  ['ai-agent', 'Agente IA', WandSparkles],
   ['reports', 'Relat\u00f3rios', PieChart],
   ['settings', 'Configura\u00e7\u00f5es', Settings]
 ];
@@ -3407,14 +3407,25 @@ function leadMatchesFilterGroup(lead, filters, ignoredGroups = []) {
   if (!ignored.has('study') && filters.study === 'without' && lead.e) return false;
   if (!ignored.has('vip') && filters.vip === 'with' && !lead.v) return false;
   if (!ignored.has('vip') && filters.vip === 'without' && lead.v) return false;
+  if (!ignored.has('religion') && filters.religion === 'adventist' && !isAdventistReligion(lead.r)) return false;
+  if (!ignored.has('religion') && filters.religion === 'non-adventist' && isAdventistReligion(lead.r)) return false;
+  if (!ignored.has('religion') && filters.religion.startsWith('religion:') && leadReligionValue(lead) !== filters.religion.slice('religion:'.length)) return false;
   if (!ignored.has('recency') && filters.recency === 'recent' && (lead.c === null || lead.c > 365)) return false;
   if (!ignored.has('recency') && filters.recency === 'old' && (lead.c === null || lead.c <= 365)) return false;
   if (!ignored.has('recency') && filters.recency === 'unknown' && lead.c !== null) return false;
   if (!ignored.has('search') && term) {
-    const haystack = `${lead.n || ''} ${lead.tel || ''} ${lead.em || ''} ${lead.d || ''} ${leadNeighborhood(lead)} ${leadMaterial(lead)} ${lead.id || ''}`.toLowerCase();
+    const haystack = `${lead.n || ''} ${lead.tel || ''} ${lead.em || ''} ${lead.d || ''} ${leadNeighborhood(lead)} ${leadMaterial(lead)} ${lead.r || ''} ${lead.id || ''}`.toLowerCase();
     if (!haystack.includes(term)) return false;
   }
   return true;
+}
+
+function isAdventistReligion(value) {
+  return slugifyDistrictName(value).includes('adventista');
+}
+
+function leadReligionValue(lead) {
+  return String(lead?.r || 'Nao informado').trim() || 'Nao informado';
 }
 
 function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear, compact = false }) {
@@ -3486,6 +3497,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
     email: 'all',
     study: 'all',
     vip: 'all',
+    religion: 'all',
     recency: 'all',
     search: ''
   });
@@ -3550,6 +3562,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       email: records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['email'])),
       study: records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['study'])),
       vip: records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['vip'])),
+      religion: records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['religion'])),
       recency: records.filter((lead) => leadMatchesFilterGroup(lead, filters, ['recency']))
     }),
     [filters, records]
@@ -3599,6 +3612,15 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       ['all', `Todos (${formatNumber(recordsForToggleOptions.vip.length)})`],
       ['with', `VIP (${formatNumber(recordsForToggleOptions.vip.filter((lead) => lead.v).length)})`],
       ['without', `Nao VIP (${formatNumber(recordsForToggleOptions.vip.filter((lead) => !lead.v).length)})`]
+    ],
+    religion: [
+      ['all', `Todos (${formatNumber(recordsForToggleOptions.religion.length)})`],
+      ['adventist', `Adventista (${formatNumber(recordsForToggleOptions.religion.filter((lead) => isAdventistReligion(lead.r)).length)})`],
+      ['non-adventist', `Nao Adventista (${formatNumber(recordsForToggleOptions.religion.filter((lead) => !isAdventistReligion(lead.r)).length)})`],
+      ...topOptions(
+        recordsForToggleOptions.religion.filter((lead) => !isAdventistReligion(lead.r)),
+        leadReligionValue
+      ).map((option) => [`religion:${option.value}`, `${option.label} (${formatNumber(option.count)})`])
     ],
     recency: [
       ['all', `Todos (${formatNumber(recordsForToggleOptions.recency.length)})`],
@@ -3718,6 +3740,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       email: 'all',
       study: 'all',
       vip: 'all',
+      religion: 'all',
       recency: 'all',
       search: ''
     });
@@ -3753,7 +3776,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
 
   function exportLeads() {
     const rowsToExport = selectedLeads.length ? selectedLeads : filteredLeads;
-    const header = ['Nome', 'WhatsApp', 'Email', 'Distrito', 'Bairro', 'Material', 'Idade', 'Genero', 'Prioridade ML', 'Score', 'VIP', 'Estudo ativo'];
+    const header = ['Nome', 'WhatsApp', 'Email', 'Distrito', 'Bairro', 'Material', 'Religiao', 'Idade', 'Genero', 'Prioridade ML', 'Score', 'VIP', 'Estudo ativo'];
     const rows = rowsToExport.map((lead) => [
       lead.n,
       phoneDigits(lead.tel),
@@ -3761,6 +3784,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       lead.d,
       leadNeighborhood(lead),
       leadMaterial(lead),
+      lead.r || 'Nao informado',
       lead.a || '',
       leadGenderLabel(lead.g || 'N'),
       crmPriorityLabels[lead.p] || lead.p,
@@ -3921,11 +3945,12 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
               ['email', 'E-mail', selectFilterOptions.email],
               ['study', 'Estudos', selectFilterOptions.study],
               ['vip', 'VIP', selectFilterOptions.vip],
+              ['religion', 'Religiao', selectFilterOptions.religion],
               ['recency', 'Contato', selectFilterOptions.recency]
             ].map(([key, label, options]) => (
-              <label className="grid gap-2 rounded-2xl border border-slate-200 bg-white/80 p-4 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 shadow-[0_14px_34px_rgba(15,23,42,0.07)] ring-1 ring-white/70" key={key}>
+              <label className="grid min-w-0 gap-2 rounded-2xl border border-slate-200 bg-white/80 p-4 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 shadow-[0_14px_34px_rgba(15,23,42,0.07)] ring-1 ring-white/70" key={key}>
                 {label}
-                <select className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setFilter(key, event.target.value)} value={filters[key]}>
+                <select className="h-11 w-full min-w-0 max-w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-8 text-sm font-bold text-slate-800 shadow-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setFilter(key, event.target.value)} value={filters[key]}>
                   {options.map(([value, optionLabel]) => <option key={value} value={value}>{optionLabel}</option>)}
                 </select>
               </label>
@@ -3997,7 +4022,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
               title="Abrir detalhes do primeiro lead visivel ou selecionado"
             >
               <tr className="bg-slate-950/85 text-left transition hover:bg-slate-900">
-                {['Selecionar', 'Nome', 'WhatsApp', 'Distrito', 'Bairro', 'Material', 'Idade', 'Genero', 'Prioridade ML', 'Status', 'Score', 'Acoes'].map((head) => (
+                {['Selecionar', 'Nome', 'WhatsApp', 'Distrito', 'Bairro', 'Material', 'Religiao', 'Idade', 'Genero', 'Prioridade ML', 'Status', 'Score', 'Acoes'].map((head) => (
                   <th className="sticky top-0 z-[1] whitespace-nowrap border-b border-white/[0.12] bg-slate-950/95 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white/80" key={head}>{head}</th>
                 ))}
               </tr>
@@ -4020,6 +4045,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-bold text-slate-300">{lead.d}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-400">{leadNeighborhood(lead)}</td>
                     <td className="max-w-[16rem] truncate border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-400">{leadMaterial(lead)}</td>
+                    <td className="max-w-[12rem] truncate border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-300">{lead.r || 'Nao informado'}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-300">{lead.a || 'sem idade'}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-300">{leadGenderLabel(lead.g || 'N')}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
@@ -6019,7 +6045,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
       <div className="flex min-h-screen gap-4 p-4 max-lg:flex-col max-lg:p-0">
       <Sidebar compact={sidebarCompact} current={current} onLogout={onLogout} onNavigate={onNavigate} onToggleCompact={() => setSidebarCompact((value) => !value)} user={user} />
       <div className="flex min-h-[calc(100vh-2rem)] min-w-0 flex-1 flex-col overflow-visible rounded-[1.75rem] max-lg:min-h-screen max-lg:rounded-none">
-        <header className="sticky top-4 z-50 shrink-0 rounded-t-[1.75rem] border-b border-white/[0.07] bg-slate-950/60 px-8 py-4 backdrop-blur-2xl max-lg:top-0 max-lg:rounded-none max-md:px-4">
+        <header className="app-header-glass sticky top-4 z-50 shrink-0 rounded-t-[1.75rem] border-b border-white/[0.07] bg-slate-950/40 px-8 py-4 backdrop-blur-2xl max-lg:top-0 max-lg:rounded-none max-md:px-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <div>
@@ -6031,7 +6057,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
               {isAdminUser(user) && associations.length ? (
                 <label className="relative hidden min-w-64 md:inline-flex">
                   <select
-                    className="interactive-card h-10 w-full appearance-none rounded-xl border border-slate-900/10 bg-white/75 px-4 pr-10 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)] outline-none transition hover:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-500/12"
+                    className="app-header-control interactive-card h-10 w-full appearance-none rounded-xl border border-slate-900/10 bg-white/55 px-4 pr-10 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)] outline-none transition hover:bg-white/70 focus:border-blue-300 focus:ring-4 focus:ring-blue-500/12"
                     onChange={(event) => onSelectAssociation?.(event.target.value)}
                     value={selectedAssociationId}
                   >
@@ -6045,7 +6071,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
               {canGoBack ? (
                 <button
                   aria-label="Voltar"
-                  className="interactive-card grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-900/10 bg-white/70 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
+                  className="app-header-control interactive-card grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-900/10 bg-white/55 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
                   onClick={onBack}
                   type="button"
                 >
@@ -6053,7 +6079,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
                 </button>
               ) : null}
               <button
-                className="interactive-card inline-flex h-10 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/70 px-3 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
+                className="app-header-control interactive-card inline-flex h-10 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/55 px-3 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
                 onClick={() => {
                   onToggleTheme();
                   toast.message(isLight ? 'Modo dark ativado' : 'Modo light prateado ativado', {
@@ -6066,7 +6092,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
                 {isLight ? 'Dark' : 'Light'}
               </button>
               <button
-                className="interactive-card relative grid h-10 w-10 place-items-center rounded-xl border border-slate-900/10 bg-white/70 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
+                className="app-header-control interactive-card relative grid h-10 w-10 place-items-center rounded-xl border border-slate-900/10 bg-white/55 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
                 onClick={() => toast('0 notificacoes operacionais', {
                   description: '0 leads sem resposta, 0 visitas pendentes e 0 automacoes prontas para revisao.',
                   action: {
@@ -6082,7 +6108,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
               </button>
               <div className="group relative hidden md:block">
                 <button
-                  className="interactive-card inline-flex h-10 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/70 px-4 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
+                  className="app-header-control interactive-card inline-flex h-10 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/55 px-4 text-sm font-black text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
                   type="button"
                 >
                   <span className="grid h-6 w-6 place-items-center rounded bg-slate-900/10 text-slate-800">
