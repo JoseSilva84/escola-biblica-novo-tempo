@@ -3553,6 +3553,21 @@ function fullLeadAddress(lead) {
   return parts.join(' - ') || 'Endereco nao informado';
 }
 
+function leadStreetAndNumber(lead) {
+  const fullAddress = String(lead?.addr || '').trim();
+  if (!fullAddress || fullAddress === 'N/I') return 'Rua e número não informados';
+  const streetAndNumber = fullAddress
+    .split(/\s+-\s+/)[0]
+    .replace(/,\s*,+/g, ', ')
+    .replace(/,\s*$/, '')
+    .trim();
+  return streetAndNumber
+    .replace(/^Rua\s+Rua\s+/i, 'Rua ')
+    .replace(/^Rua\s+Avenida\s+/i, 'Avenida ')
+    .replace(/^Rua\s+Av\.?\s+/i, 'Av. ')
+    || 'Rua e número não informados';
+}
+
 function approximateLeadPoint(lead) {
   if (Number.isFinite(Number(lead?.lat)) && Number.isFinite(Number(lead?.lng))) {
     const precisionText = String(lead?.geoPrecision || lead?.geoSource || '').toLowerCase();
@@ -4748,21 +4763,21 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         pdf.text('#', margin + 2, 29.8);
         pdf.text('NOME E CONTATO', margin + 12, 29.8);
         pdf.text('PRIORIDADE', margin + 101, 29.8);
-        pdf.text('DISTRITO / BAIRRO', margin + 131, 29.8);
+        pdf.text('DISTRITO, BAIRRO E ENDEREÇO', margin + 131, 29.8);
       };
 
       let listY = 36;
       pdf.addPage();
       drawListHeader();
       rowsToExport.forEach((lead, index) => {
-        if (listY + 10 > pageHeight - 15) {
+        if (listY + 12 > pageHeight - 15) {
           pdf.addPage();
           drawListHeader();
           listY = 36;
         }
         if (index % 2 === 0) {
           pdf.setFillColor(248, 250, 252);
-          pdf.rect(margin, listY - 2.5, contentWidth, 10, 'F');
+          pdf.rect(margin, listY - 2.5, contentWidth, 12, 'F');
         }
         pdf.setTextColor(71, 85, 105);
         pdf.setFont('helvetica', 'bold');
@@ -4783,10 +4798,14 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         pdf.setFontSize(6.8);
         pdf.text(crmPriorityLabels[lead.p] || 'Sem prioridade', margin + 113.5, listY + 2.7, { align: 'center' });
         pdf.setTextColor(51, 65, 85);
-        pdf.setFont('helvetica', 'normal');
+        pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(7.2);
-        pdf.text(truncateText(`${lead.d || 'Sem distrito'} / ${leadNeighborhood(lead)}`, 51), margin + 131, listY + 2.3);
-        listY += 10;
+        pdf.text(truncateText(`${lead.d || 'Sem distrito'} / ${leadNeighborhood(lead)}`, 51), margin + 131, listY + 0.8);
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(6.8);
+        pdf.text(truncateText(leadStreetAndNumber(lead), 51), margin + 131, listY + 5.1);
+        listY += 12;
       });
 
       const totalPages = pdf.getNumberOfPages();
