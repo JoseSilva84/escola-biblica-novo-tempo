@@ -2011,10 +2011,38 @@ function AnalyticsRankingModal({ ranking, onClose }) {
   );
 }
 
-function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPilot = false }) {
+function LeadAnalyticsSection({ data: allData, records: allRecords = [], interestRecords: allInterestRecords = [], onlyPilot = false }) {
   const [selectedRanking, setSelectedRanking] = useState(null);
   const [birthdayMonth, setBirthdayMonth] = useState('');
   const [birthdayDay, setBirthdayDay] = useState('');
+  const [districtFilter, setDistrictFilter] = useState('');
+  const districtOptions = useMemo(() => Array.from(new Set([
+    ...allRecords.map((lead) => lead.d),
+    ...allInterestRecords.map((lead) => lead.d || lead.distrito)
+  ].filter(Boolean))).sort((a, b) => a.localeCompare(b)), [allInterestRecords, allRecords]);
+  const records = useMemo(
+    () => districtFilter ? allRecords.filter((lead) => lead.d === districtFilter) : allRecords,
+    [allRecords, districtFilter]
+  );
+  const interestRecords = useMemo(
+    () => districtFilter ? allInterestRecords.filter((lead) => (lead.d || lead.distrito) === districtFilter) : allInterestRecords,
+    [allInterestRecords, districtFilter]
+  );
+  const data = useMemo(
+    () => districtFilter ? buildAssociationData(records) : allData,
+    [allData, districtFilter, records]
+  );
+
+  useEffect(() => {
+    if (districtFilter && !districtOptions.includes(districtFilter)) setDistrictFilter('');
+  }, [districtFilter, districtOptions]);
+
+  useEffect(() => {
+    setSelectedRanking(null);
+    setBirthdayMonth('');
+    setBirthdayDay('');
+  }, [districtFilter]);
+
   const analytics = useMemo(() => {
     const total = data?.total || records.length || 0;
     const priorityLabels = { Hot: 'Quentes', Warm: 'Potenciais', Cool: 'Frios' };
@@ -2478,9 +2506,26 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           <span className={labelClass}>Análise dos leads</span>
           <h2 className="mt-1 text-2xl font-black text-slate-50">Leitura operacional da base</h2>
         </div>
-        <span className="rounded-full border border-white/[0.08] bg-white px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-300">
-          {emptyData ? 'Sem dados reais' : `${formatNumber(data.total)} registros reais`}
-        </span>
+        <div className="flex flex-wrap items-center justify-end gap-3 max-md:w-full max-md:justify-start">
+          <label className="relative min-w-64 max-sm:w-full">
+            <span className="sr-only">Filtrar leitura operacional por distrito</span>
+            <MapPin className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-blue-600" size={16} />
+            <select
+              className="h-11 w-full appearance-none rounded-2xl border border-white/10 bg-slate-950/80 pl-10 pr-10 text-sm font-black text-white shadow-[0_12px_30px_rgba(15,23,42,0.09)] outline-none transition hover:border-blue-300 focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15"
+              onChange={(event) => setDistrictFilter(event.target.value)}
+              value={districtFilter}
+            >
+              <option value="">Todos os distritos</option>
+              {districtOptions.map((district) => (
+                <option key={district} value={district}>{district}</option>
+              ))}
+            </select>
+            <ChevronRight className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-slate-500" size={16} />
+          </label>
+          <span className="rounded-full border border-white/[0.08] bg-white px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-300">
+            {emptyData ? 'Sem dados reais' : `${formatNumber(data.total)} registros reais`}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-[1.15fr_0.85fr] gap-4 max-xl:grid-cols-1">
