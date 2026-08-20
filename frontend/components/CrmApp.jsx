@@ -8,6 +8,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -189,6 +190,24 @@ function AppToaster({ theme = 'light' }) {
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString('pt-BR');
+}
+
+function HorizontalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value = 0 }) {
+  const formattedValue = formatNumber(value);
+  const estimatedLabelWidth = (formattedValue.length * 6.5) + 12;
+  const fitsInside = width >= estimatedLabelWidth + 8;
+
+  return (
+    <text
+      className={fitsInside ? 'chart-value-label chart-value-label-inside' : 'chart-value-label chart-value-label-outside'}
+      dominantBaseline="middle"
+      textAnchor={fitsInside ? 'end' : 'start'}
+      x={fitsInside ? x + width - 8 : x + width + 7}
+      y={y + (height / 2)}
+    >
+      {formattedValue}
+    </text>
+  );
 }
 
 function formatDatasetDate(value) {
@@ -2777,12 +2796,14 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
           <h3 className="mt-1 text-lg font-black text-slate-50">Base por situação</h3>
           <div className="mt-4 h-56">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={analytics.composition} layout="vertical" margin={{ left: 6, right: 8 }}>
+              <BarChart data={analytics.composition} layout="vertical" margin={{ left: 6, right: 58 }}>
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={98} />
                 <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
-                <Bar dataKey="value" fill="#38bdf8" radius={[0, 8, 8, 0]} />
+                <Bar dataKey="value" fill="#38bdf8" radius={[0, 8, 8, 0]}>
+                  <LabelList content={<HorizontalBarValueLabel />} dataKey="value" />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -2793,12 +2814,14 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
           <h3 className="mt-1 text-lg font-black text-slate-50">Classificação ML</h3>
           <div className="mt-4 h-56">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={analytics.priorities} layout="vertical" margin={{ left: 6, right: 8 }}>
+              <BarChart data={analytics.priorities} layout="vertical" margin={{ left: 6, right: 58 }}>
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={102} />
                 <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
-                <Bar dataKey="value" fill="#f97316" radius={[0, 8, 8, 0]} />
+                <Bar dataKey="value" fill="#f97316" radius={[0, 8, 8, 0]}>
+                  <LabelList content={<HorizontalBarValueLabel />} dataKey="value" />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -2809,12 +2832,14 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
           <h3 className="mt-1 text-lg font-black text-slate-50">Concentração operacional</h3>
           <div className="mt-4 h-56">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={analytics.districtMix} layout="vertical" margin={{ left: 8, right: 8 }}>
+              <BarChart data={analytics.districtMix} layout="vertical" margin={{ left: 8, right: 58 }}>
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={92} />
                 <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
-                <Bar dataKey="interessados" fill="#2563eb" radius={[0, 8, 8, 0]} />
+                <Bar dataKey="interessados" fill="#2563eb" radius={[0, 8, 8, 0]}>
+                  <LabelList content={<HorizontalBarValueLabel />} dataKey="interessados" />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -2853,12 +2878,14 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
           <h3 className="mt-1 text-lg font-black text-slate-50">Registrados e pendentes</h3>
           <div className="mt-4 h-56">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={analytics.whatsapp} layout="vertical" margin={{ left: 6, right: 8 }}>
+              <BarChart data={analytics.whatsapp} layout="vertical" margin={{ left: 6, right: 58 }}>
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={104} />
                 <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
-                <Bar dataKey="value" fill="#10b981" radius={[0, 8, 8, 0]} />
+                <Bar dataKey="value" fill="#10b981" radius={[0, 8, 8, 0]}>
+                  <LabelList content={<HorizontalBarValueLabel />} dataKey="value" />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -2899,12 +2926,14 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
           <h3 className="mt-1 text-lg font-black text-slate-50">Homens versus mulheres</h3>
           <div className="mt-4 h-56">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={analytics.genders} layout="vertical" margin={{ left: 6, right: 8 }}>
+              <BarChart data={analytics.genders} layout="vertical" margin={{ left: 6, right: 58 }}>
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={104} />
                 <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
-                <Bar dataKey="value" fill="#6366f1" radius={[0, 8, 8, 0]} />
+                <Bar dataKey="value" fill="#6366f1" radius={[0, 8, 8, 0]}>
+                  <LabelList content={<HorizontalBarValueLabel />} dataKey="value" />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -2915,12 +2944,14 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
           <h3 className="mt-1 text-lg font-black text-slate-50">Tipos de estudos bíblicos</h3>
           <div className="mt-4 h-56">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={analytics.materialTypes} layout="vertical" margin={{ left: 6, right: 8 }}>
+              <BarChart data={analytics.materialTypes} layout="vertical" margin={{ left: 6, right: 58 }}>
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} tickLine={false} type="category" width={98} />
                 <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
-                <Bar dataKey="value" fill="#f59e0b" radius={[0, 8, 8, 0]} />
+                <Bar dataKey="value" fill="#f59e0b" radius={[0, 8, 8, 0]}>
+                  <LabelList content={<HorizontalBarValueLabel />} dataKey="value" />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
