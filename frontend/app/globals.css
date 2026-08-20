@@ -226,6 +226,10 @@ html[data-crm-theme='light'] .theme-modal-summary .text-emerald-300 {
   color: rgb(4 120 87) !important;
 }
 
+html[data-crm-theme='light'] .theme-modal-summary .theme-modal-primary {
+  color: #ffffff !important;
+}
+
 @layer utilities {
   .church-map-marker {
     align-items: center;

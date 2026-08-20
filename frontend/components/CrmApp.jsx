@@ -4317,6 +4317,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const [leadPdfScope, setLeadPdfScope] = useState('filtered');
   const [leadPdfQuantity, setLeadPdfQuantity] = useState('');
   const [exportingLeadPdf, setExportingLeadPdf] = useState(false);
+  const [exportingAdvancedFiltersPdf, setExportingAdvancedFiltersPdf] = useState(false);
   const geocodeWasRunningRef = useRef(false);
   const leadsMapExportRef = useRef(null);
   const churchesForMap = useMemo(() => {
@@ -4635,10 +4636,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
     const exportToast = toast.loading('Preparando PDF dos leads…');
 
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf')
-      ]);
+      const { jsPDF } = await import('jspdf');
       const pdf = new jsPDF({ format: 'a4', orientation: 'portrait', unit: 'mm', compress: true });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -4711,37 +4709,9 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       const filterLines = pdf.splitTextToSize(filterSummary, contentWidth);
       pdf.text(filterLines, margin, 109);
 
-      const mapTitleY = Math.max(126, 109 + (filterLines.length * 4.2) + 8);
-      let mapBottom = mapTitleY;
-      if (leadsMapExportRef.current) {
-        try {
-          const mapCanvas = await html2canvas(leadsMapExportRef.current, {
-            backgroundColor: '#f8fafc',
-            logging: false,
-            scale: 1.25,
-            useCORS: true
-          });
-          const mapHeight = Math.min(pageHeight - mapTitleY - 28, 116, (mapCanvas.height * contentWidth) / mapCanvas.width);
-          pdf.setTextColor(15, 23, 42);
-          pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(12);
-          pdf.text('Mapa dos filtros atuais', margin, mapTitleY);
-          pdf.addImage(mapCanvas.toDataURL('image/jpeg', 0.9), 'JPEG', margin, mapTitleY + 6, contentWidth, mapHeight, undefined, 'FAST');
-          mapBottom = mapTitleY + 6 + mapHeight;
-        } catch (mapError) {
-          console.warn('Mapa não pôde ser capturado para o PDF.', mapError);
-          pdf.setFillColor(241, 245, 249);
-          pdf.setDrawColor(203, 213, 225);
-          pdf.roundedRect(margin, mapTitleY, contentWidth, 40, 3, 3, 'FD');
-          pdf.setTextColor(71, 85, 105);
-          pdf.text('O mapa não pôde ser capturado, mas todos os nomes e dados foram incluídos nas páginas seguintes.', margin + 7, mapTitleY + 21);
-          mapBottom = mapTitleY + 44;
-        }
-      }
-
       pdf.setTextColor(100, 116, 139);
       pdf.setFontSize(8);
-      pdf.text('A relação nominal completa começa na próxima página.', margin, Math.min(mapBottom + 9, pageHeight - 16));
+      pdf.text('A relação nominal completa começa na próxima página.', margin, Math.max(126, 109 + (filterLines.length * 4.2) + 8));
 
       const priorityTones = {
         Hot: [234, 88, 12],
@@ -4835,9 +4805,185 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       toast.success('PDF de leads exportado', { id: exportToast, description: `${formatNumber(rowsToExport.length)} nomes incluídos em ${totalPages} página(s).` });
     } catch (error) {
       console.error(error);
-      toast.error('Não foi possível gerar o PDF', { id: exportToast, description: 'Tente novamente após o mapa terminar de carregar.' });
+      toast.error('Não foi possível gerar o PDF', { id: exportToast, description: 'Revise os filtros e tente novamente.' });
     } finally {
       setExportingLeadPdf(false);
+    }
+  }
+
+  async function exportAdvancedFiltersPdf() {
+    if (exportingAdvancedFiltersPdf) return;
+    if (!filteredLeads.length) {
+      toast.info('Nenhum resultado para exportar', { description: 'Ajuste a filtragem avançada antes de gerar o PDF.' });
+      return;
+    }
+    if (!leadsMapExportRef.current) {
+      toast.info('Mapa ainda não disponível', { description: 'Aguarde o mapa aparecer na tela e tente novamente.' });
+      return;
+    }
+
+    setExportingAdvancedFiltersPdf(true);
+    const exportToast = toast.loading('Capturando o mapa e preparando a filtragem…');
+
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ]);
+      const mapCanvas = await html2canvas(leadsMapExportRef.current, {
+        allowTaint: false,
+        backgroundColor: '#f8fafc',
+        logging: false,
+        scale: 1.5,
+        useCORS: true
+      });
+      const pdf = new jsPDF({ format: 'a4', orientation: 'landscape', unit: 'mm', compress: true });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const contentWidth = pageWidth - (margin * 2);
+      const generatedAt = new Date().toLocaleString('pt-BR');
+      const optionLabel = (options, value) => options.find(([optionValue]) => optionValue === value)?.[1] || value;
+      const filterRows = [
+        ['Associação', associations.find((association) => association.id === filters.association)?.name || 'Associação Paulistana'],
+        ['Busca', filters.search || 'Sem busca textual'],
+        ['Distritos', filters.districts.length ? filters.districts.join(', ') : 'Todos os distritos'],
+        ['Bairros', filters.neighborhoods.length ? filters.neighborhoods.join(', ') : 'Todos os bairros'],
+        ['Materiais', filters.materials.length ? filters.materials.join(', ') : 'Todos os materiais'],
+        ['Prioridade ML', filters.priorities.length ? filters.priorities.map((priority) => crmPriorityLabels[priority] || priority).join(', ') : 'Todas as prioridades'],
+        ['Idade', filters.ageGroups.length ? filters.ageGroups.join(', ') : 'Todas as faixas etárias'],
+        ['Gênero', filters.genders.length ? filters.genders.map(leadGenderLabel).join(', ') : 'Todos os gêneros'],
+        ['WhatsApp', optionLabel(selectFilterOptions.whatsapp, filters.whatsapp)],
+        ['E-mail', optionLabel(selectFilterOptions.email, filters.email)],
+        ['Estudos', optionLabel(selectFilterOptions.study, filters.study)],
+        ['VIP', optionLabel(selectFilterOptions.vip, filters.vip)],
+        ['Religião', optionLabel(selectFilterOptions.religion, filters.religion)],
+        ['Tempo', optionLabel(selectFilterOptions.recency, filters.recency)]
+      ];
+      const summary = [
+        ['RESULTADOS', filteredLeads.length, [37, 99, 235]],
+        ['WHATSAPP', filteredLeads.filter((lead) => lead.t).length, [5, 150, 105]],
+        ['QUENTES', filteredLeads.filter((lead) => lead.p === 'Hot').length, [234, 88, 12]],
+        ['DISTRITOS', new Set(filteredLeads.map((lead) => lead.d).filter(Boolean)).size, [124, 58, 237]]
+      ];
+
+      const drawHeader = (eyebrow, title, subtitle, compact = false) => {
+        const height = compact ? 25 : 42;
+        pdf.setFillColor(8, 17, 31);
+        pdf.rect(0, 0, pageWidth, height, 'F');
+        pdf.setFillColor(37, 99, 235);
+        pdf.rect(0, 0, 5, height, 'F');
+        pdf.setTextColor(147, 197, 253);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(compact ? 8 : 9);
+        pdf.text(eyebrow, 14, compact ? 9 : 13);
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(compact ? 16 : 22);
+        pdf.text(title, 14, compact ? 18 : 27);
+        if (!compact) {
+          pdf.setTextColor(203, 213, 225);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(9);
+          pdf.text(subtitle, 14, 36);
+        }
+      };
+      const truncateText = (text, maxWidth) => {
+        const source = String(text || 'Não informado');
+        if (pdf.getTextWidth(source) <= maxWidth) return source;
+        let shortened = source;
+        while (shortened.length > 3 && pdf.getTextWidth(`${shortened}...`) > maxWidth) shortened = shortened.slice(0, -1);
+        return `${shortened}...`;
+      };
+
+      drawHeader(
+        'AMIGOS NT  /  FILTRAGEM AVANÇADA',
+        'Relatório da seleção atual',
+        `${formatNumber(filteredLeads.length)} leads encontrados em ${generatedAt}`
+      );
+
+      const summaryGap = 4;
+      const summaryWidth = (contentWidth - (summaryGap * 3)) / 4;
+      summary.forEach(([label, value, color], index) => {
+        const x = margin + (index * (summaryWidth + summaryGap));
+        pdf.setFillColor(248, 250, 252);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.roundedRect(x, 49, summaryWidth, 24, 3, 3, 'FD');
+        pdf.setFillColor(...color);
+        pdf.roundedRect(x + 4, 54, 3.5, 14, 1.7, 1.7, 'F');
+        pdf.setTextColor(71, 85, 105);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7);
+        pdf.text(label, x + 10, 58);
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFontSize(13);
+        pdf.text(formatNumber(value), x + 10, 67);
+      });
+
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.text('Informações da filtragem', margin, 82);
+      const filterGap = 5;
+      const filterCardWidth = (contentWidth - filterGap) / 2;
+      const filterCardHeight = 13.5;
+      filterRows.forEach(([label, value], index) => {
+        const column = index >= 7 ? 1 : 0;
+        const row = index % 7;
+        const x = margin + (column * (filterCardWidth + filterGap));
+        const y = 87 + (row * (filterCardHeight + 1.5));
+        pdf.setFillColor(row % 2 === 0 ? 248 : 241, row % 2 === 0 ? 250 : 245, row % 2 === 0 ? 252 : 249);
+        pdf.setDrawColor(226, 232, 240);
+        pdf.roundedRect(x, y, filterCardWidth, filterCardHeight, 2.2, 2.2, 'FD');
+        pdf.setTextColor(37, 99, 235);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(6.5);
+        pdf.text(label.toUpperCase(), x + 4, y + 4.4);
+        pdf.setTextColor(30, 41, 59);
+        pdf.setFontSize(8.2);
+        pdf.text(truncateText(value, filterCardWidth - 8), x + 4, y + 10);
+      });
+
+      pdf.addPage();
+      drawHeader('AMIGOS NT  /  MAPA DA FILTRAGEM', 'Mapa exibido na tela', '', true);
+      const mapY = 31;
+      const mapHeight = Math.min((mapCanvas.height * contentWidth) / mapCanvas.width, pageHeight - mapY - 18);
+      const mapWidth = (mapCanvas.width * mapHeight) / mapCanvas.height;
+      const mapX = margin + ((contentWidth - mapWidth) / 2);
+      pdf.setFillColor(241, 245, 249);
+      pdf.setDrawColor(203, 213, 225);
+      pdf.roundedRect(mapX - 1.5, mapY - 1.5, mapWidth + 3, mapHeight + 3, 2.5, 2.5, 'FD');
+      pdf.addImage(mapCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', mapX, mapY, mapWidth, mapHeight, undefined, 'FAST');
+      pdf.setTextColor(71, 85, 105);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.text('Captura do mapa no mesmo enquadramento apresentado na tela no momento da exportação.', margin, Math.min(mapY + mapHeight + 7, pageHeight - 10));
+
+      const totalPages = pdf.getNumberOfPages();
+      for (let page = 1; page <= totalPages; page += 1) {
+        pdf.setPage(page);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.line(margin, pageHeight - 7, pageWidth - margin, pageHeight - 7);
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7);
+        pdf.text('Amigos NT - relatório da filtragem avançada', margin, pageHeight - 3.2);
+        pdf.text(`Página ${page} de ${totalPages}`, pageWidth - margin, pageHeight - 3.2, { align: 'right' });
+      }
+
+      const dateSlug = new Date().toISOString().slice(0, 10);
+      pdf.save(`filtragem-avancada-${dateSlug}.pdf`);
+      toast.success('Filtragem avançada exportada', {
+        id: exportToast,
+        description: 'O PDF inclui as opções selecionadas e uma captura do mapa atual.'
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível exportar a filtragem', {
+        id: exportToast,
+        description: 'Aguarde o carregamento completo do mapa e tente novamente.'
+      });
+    } finally {
+      setExportingAdvancedFiltersPdf(false);
     }
   }
 
@@ -4991,6 +5137,18 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                 </select>
               </label>
             ))}
+            <div className="grid min-w-0 gap-2 rounded-2xl border border-blue-200 bg-blue-50/85 p-4 shadow-[0_14px_34px_rgba(37,99,235,0.10)] ring-1 ring-white/70">
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-blue-700">Relatório</span>
+              <button
+                className={`${primaryButtonClass} h-auto min-h-11 w-full py-3 text-center !text-white`}
+                disabled={exportingAdvancedFiltersPdf || !filteredLeads.length}
+                onClick={exportAdvancedFiltersPdf}
+                type="button"
+              >
+                <FileDown size={18} />
+                {exportingAdvancedFiltersPdf ? 'Gerando PDF…' : 'Exportar Filtragem Avançada'}
+              </button>
+            </div>
           </div>
         </div>
         </div>
@@ -5161,7 +5319,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                 <span className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-100">Exportação gerencial</span>
                 <h2 className="mt-2 text-2xl font-black text-white">Exportar leads em PDF</h2>
                 <p className="mt-2 max-w-xl text-sm font-semibold leading-relaxed text-slate-300">
-                  Escolha o grupo. O arquivo incluirá os filtros atuais, o mapa e a relação nominal.
+                  Escolha o grupo. O arquivo incluirá o resumo e a relação nominal, sem o mapa.
                 </p>
               </div>
               <button
@@ -5220,7 +5378,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button className={ghostButtonClass} disabled={exportingLeadPdf} onClick={() => setShowLeadPdfExport(false)} type="button">Cancelar</button>
-                  <button className={primaryButtonClass} disabled={exportingLeadPdf || !leadPdfFinalCount} onClick={exportLeadsPdf} type="button">
+                  <button className={`${primaryButtonClass} theme-modal-primary`} disabled={exportingLeadPdf || !leadPdfFinalCount} onClick={exportLeadsPdf} type="button">
                     <FileDown size={18} />
                     {exportingLeadPdf ? 'Gerando PDF…' : 'Gerar PDF'}
                   </button>
