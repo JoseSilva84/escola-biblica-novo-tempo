@@ -929,8 +929,17 @@ function InboxConversationModal({ item, question, answer, onClose }) {
   );
 }
 
-function LeadDetailOsmMap({ captureRef, lead }) {
+function LeadDetailOsmMap({ captureRef, churches = [], lead }) {
   const mapElementRef = useRef(null);
+  const visibleChurches = useMemo(() => {
+    if (!lead) return [];
+    const leadPoint = approximateLeadPoint(lead);
+    const districtSlug = slugifyDistrictName(lead.d);
+    const districtLeadPoints = districtSlug ? { [districtSlug]: [leadPoint] } : {};
+    return churches
+      .filter((church) => (church.districtSlug || slugifyDistrictName(church.districtName)) === districtSlug)
+      .map((church) => ({ church, point: churchMapPoint(church, districtLeadPoints) }));
+  }, [churches, lead]);
 
   useEffect(() => {
     if (!lead || !mapElementRef.current) return undefined;
@@ -973,6 +982,26 @@ function LeadDetailOsmMap({ captureRef, lead }) {
           ${escapeMapHtml(leadStreetAndNumber(lead))}<br>
           ${escapeMapHtml(leadNeighborhood(lead))} - ${escapeMapHtml(lead.d || '')}
         `);
+
+      for (const { church, point: churchPoint } of visibleChurches) {
+        const precisionLabel = churchPoint.precision === 'Endereco' ? 'Endereco exato' : 'Distrito aproximado';
+        const churchIcon = L.divIcon({
+          className: 'church-map-marker',
+          html: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v4"/><path d="M10 5h4"/><path d="M5 22V10l7-4 7 4v12"/><path d="M2 22h20"/><path d="M10 22v-5a2 2 0 0 1 4 0v5"/><path d="M9 13h6"/></svg>',
+          iconAnchor: [14, 14],
+          iconSize: [28, 28],
+          popupAnchor: [0, -14]
+        });
+        L.marker([churchPoint.lat, churchPoint.lng], { icon: churchIcon })
+          .addTo(map)
+          .bindPopup(`
+            <strong>${escapeMapHtml(church.name || 'Igreja Adventista')}</strong><br>
+            <strong style="color:#16a34a">Igreja Adventista</strong><br>
+            ${church.address ? `${escapeMapHtml(church.address)}<br>` : ''}
+            <small>${escapeMapHtml(precisionLabel)}</small><br>
+            <a href="${churchMapSearchUrl(church, 'osm')}" target="_blank" rel="noreferrer">Abrir igreja no OSM</a>
+          `);
+      }
       window.setTimeout(() => map?.invalidateSize(), 80);
     }
 
@@ -981,7 +1010,7 @@ function LeadDetailOsmMap({ captureRef, lead }) {
       active = false;
       if (map) map.remove();
     };
-  }, [lead]);
+  }, [lead, visibleChurches]);
 
   if (!lead) return null;
   const point = approximateLeadPoint(lead);
@@ -997,6 +1026,11 @@ function LeadDetailOsmMap({ captureRef, lead }) {
           <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: priorityStyle.color }} />
             {priorityStyle.label}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+            <Church size={14} />
+            Igrejas
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] text-emerald-700">{formatNumber(visibleChurches.length)}</span>
           </span>
           <a className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-800 transition hover:border-blue-300 hover:bg-blue-50" href={openStreetMapSearchUrl(lead)} rel="noreferrer" target="_blank">
             <MapPin size={15} />
@@ -1014,7 +1048,7 @@ function LeadDetailOsmMap({ captureRef, lead }) {
   );
 }
 
-function LeadDetailModal({ lead, onClose }) {
+function LeadDetailModal({ churches = [], lead, onClose }) {
   const [exportingDetailPdf, setExportingDetailPdf] = useState(false);
   const detailMapCaptureRef = useRef(null);
   if (!lead) return null;
@@ -1235,7 +1269,7 @@ function LeadDetailModal({ lead, onClose }) {
               <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-800">Resumo operacional</span>
               <p className="mt-2 text-sm leading-relaxed text-slate-800">{operationalSummary}</p>
             </div>
-            <LeadDetailOsmMap captureRef={detailMapCaptureRef} lead={lead} />
+            <LeadDetailOsmMap captureRef={detailMapCaptureRef} churches={churches} lead={lead} />
           </section>
         </div>
       </div>
@@ -5688,7 +5722,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         </div>
       ) : null}
 
-      <LeadDetailModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
+      <LeadDetailModal churches={churchesForMap} lead={selectedLead} onClose={() => setSelectedLead(null)} />
     </div>
   );
 }
