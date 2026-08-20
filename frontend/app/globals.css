@@ -64,6 +64,13 @@
   overflow: visible !important;
 }
 
+/* Keep an active chart above its grid siblings so an overflowing Recharts
+   tooltip is not painted underneath the card immediately beside it. */
+.chart-overflow:hover,
+.chart-overflow:focus-within {
+  z-index: 20;
+}
+
 @layer utilities {
   .church-map-marker {
     align-items: center;
