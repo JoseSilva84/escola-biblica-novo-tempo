@@ -3701,13 +3701,15 @@ function LeadsOpenStreetMap({ leads = [], churches = [] }) {
             ? 'Coordenada nao encontrada no OSM. Conferir ou corrigir endereco pelo Google Maps.'
             : 'Coordenada aproximada. Conferir precisao no Google Maps.';
           const priorityStyle = leadMapPriorityStyle(lead.p);
-          const marker = L.circleMarker([point.lat, point.lng], {
-            radius: lead.p === 'Hot' ? 8 : 7,
-            color: '#ffffff',
-            weight: 2,
-            fillColor: priorityStyle.color,
-            fillOpacity: 0.94
-          }).addTo(map);
+          const markerSize = lead.p === 'Hot' ? 20 : 18;
+          const leadIcon = L.divIcon({
+            className: 'lead-map-marker-shell',
+            html: `<span class="lead-map-marker" style="background-color:${priorityStyle.color}"></span>`,
+            iconSize: [markerSize, markerSize],
+            iconAnchor: [markerSize / 2, markerSize / 2],
+            popupAnchor: [0, -(markerSize / 2)]
+          });
+          const marker = L.marker([point.lat, point.lng], { icon: leadIcon }).addTo(map);
           marker.bindPopup(`
             <strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>
             <strong style="color:${priorityStyle.color}">${escapeMapHtml(priorityStyle.label)}</strong><br>
