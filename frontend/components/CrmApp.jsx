@@ -192,6 +192,15 @@ function formatNumber(value) {
   return Number(value || 0).toLocaleString('pt-BR');
 }
 
+function hexToRgb(hex) {
+  const normalized = String(hex || '').replace('#', '');
+  const value = Number.parseInt(normalized.length === 3
+    ? normalized.split('').map((character) => `${character}${character}`).join('')
+    : normalized, 16);
+  if (!Number.isFinite(value)) return [51, 65, 85];
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+}
+
 function HorizontalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value = 0 }) {
   const formattedValue = formatNumber(value);
   const estimatedLabelWidth = (formattedValue.length * 6.5) + 12;
@@ -920,7 +929,94 @@ function InboxConversationModal({ item, question, answer, onClose }) {
   );
 }
 
+function LeadDetailOsmMap({ captureRef, lead }) {
+  const mapElementRef = useRef(null);
+
+  useEffect(() => {
+    if (!lead || !mapElementRef.current) return undefined;
+    let active = true;
+    let map = null;
+
+    async function mountMap() {
+      const L = await import('leaflet');
+      if (!active || !mapElementRef.current) return;
+      const point = approximateLeadPoint(lead);
+      const priorityStyle = leadMapPriorityStyle(lead.p);
+      map = L.map(mapElementRef.current, {
+        center: [point.lat, point.lng],
+        scrollWheelZoom: true,
+        zoom: point.precision === 'Endereco' ? 16 : 14,
+        zoomControl: true
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(map);
+      const markerIcon = L.divIcon({
+        className: 'lead-detail-map-marker',
+        html: `
+          <svg aria-hidden="true" viewBox="0 0 40 48">
+            <path d="M20 2C10.1 2 2 10.1 2 20c0 13.4 18 26 18 26s18-12.6 18-26C38 10.1 29.9 2 20 2Z" fill="${priorityStyle.color}" stroke="#ffffff" stroke-width="3"/>
+            <circle cx="20" cy="20" r="7" fill="#ffffff"/>
+            <circle cx="20" cy="20" r="3.5" fill="${priorityStyle.color}"/>
+          </svg>
+        `,
+        iconAnchor: [20, 46],
+        iconSize: [40, 48],
+        popupAnchor: [0, -43]
+      });
+      L.marker([point.lat, point.lng], { icon: markerIcon })
+        .addTo(map)
+        .bindPopup(`
+          <strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>
+          <strong style="color:${priorityStyle.color}">${escapeMapHtml(priorityStyle.label)}</strong><br>
+          ${escapeMapHtml(leadStreetAndNumber(lead))}<br>
+          ${escapeMapHtml(leadNeighborhood(lead))} - ${escapeMapHtml(lead.d || '')}
+        `);
+      window.setTimeout(() => map?.invalidateSize(), 80);
+    }
+
+    mountMap().catch((error) => console.error('Não foi possível montar o mapa do lead.', error));
+    return () => {
+      active = false;
+      if (map) map.remove();
+    };
+  }, [lead]);
+
+  if (!lead) return null;
+  const point = approximateLeadPoint(lead);
+  const priorityStyle = leadMapPriorityStyle(lead.p);
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.08)]" ref={captureRef}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white p-4">
+        <div>
+          <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Localização do lead</span>
+          <p className="mt-1 text-sm font-bold text-slate-800">{leadStreetAndNumber(lead)} - {leadNeighborhood(lead)}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: priorityStyle.color }} />
+            {priorityStyle.label}
+          </span>
+          <a className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-800 transition hover:border-blue-300 hover:bg-blue-50" href={openStreetMapSearchUrl(lead)} rel="noreferrer" target="_blank">
+            <MapPin size={15} />
+            Abrir no OSM
+          </a>
+        </div>
+      </div>
+      <div className="relative h-72 bg-slate-100">
+        <div className="h-full w-full" ref={mapElementRef} />
+        <span className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-full border border-white/80 bg-white/90 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-slate-700 shadow-lg backdrop-blur">
+          {point.precision === 'Endereco' ? 'Posição por endereço' : 'Posição aproximada'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function LeadDetailModal({ lead, onClose }) {
+  const [exportingDetailPdf, setExportingDetailPdf] = useState(false);
+  const detailMapCaptureRef = useRef(null);
   if (!lead) return null;
 
   const fields = [
@@ -928,7 +1024,7 @@ function LeadDetailModal({ lead, onClose }) {
     ['WhatsApp', lead.tel || 'Nao informado'],
     ['E-mail', lead.em || 'Nao informado'],
     ['Distrito', lead.d],
-    ['Endereco', lead.end],
+    ['Endereco completo', `${leadStreetAndNumber(lead)} - Bairro: ${leadNeighborhood(lead)}`],
     ['Idade', lead.a || 'Nao informada'],
     ['Data de aniversario', lead.birthDate || 'Nao informada'],
     ['Genero', lead.g === 'M' ? 'Masculino' : lead.g === 'F' ? 'Feminino' : 'Nao informado'],
@@ -944,6 +1040,148 @@ function LeadDetailModal({ lead, onClose }) {
     ['Similaridade VIP', `${Math.round((lead.sim || 0) * 100)}%`],
     ['Faixa', lead.faixa || 'Nao informada']
   ];
+  const operationalSummary = `${lead.t ? 'Contato apto para WhatsApp.' : 'Contato sem WhatsApp valido.'} ${lead.v ? 'Marcado como VIP. ' : ''}${lead.e ? 'Possui estudo ativo para acompanhamento.' : 'Sem estudo ativo registrado.'}`;
+  const whatsappHistory = whatsappHistoryForLead(lead);
+
+  async function exportLeadDetailPdf() {
+    if (exportingDetailPdf) return;
+    setExportingDetailPdf(true);
+    const exportToast = toast.loading('Preparando PDF do lead…');
+
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ]);
+      const pdf = new jsPDF({ format: 'a4', orientation: 'portrait', unit: 'mm', compress: true });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const contentWidth = pageWidth - (margin * 2);
+      const columnGap = 4;
+      const columnWidth = (contentWidth - columnGap) / 2;
+      const priorityStyle = leadMapPriorityStyle(lead.p);
+      const generatedAt = new Date().toLocaleString('pt-BR');
+
+      const drawHeader = (compact = false) => {
+        const height = compact ? 23 : 48;
+        pdf.setFillColor(8, 17, 31);
+        pdf.rect(0, 0, pageWidth, height, 'F');
+        pdf.setFillColor(37, 99, 235);
+        pdf.rect(0, 0, 5, height, 'F');
+        pdf.setTextColor(147, 197, 253);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(8.5);
+        pdf.text('AMIGOS NT  /  DETALHES DO LEAD', 14, compact ? 9 : 13);
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(compact ? 15 : 23);
+        pdf.text(String(lead.n || 'Lead sem nome'), 14, compact ? 18 : 28);
+        if (!compact) {
+          pdf.setFillColor(...hexToRgb(priorityStyle.color));
+          pdf.roundedRect(14, 34, 34, 7, 3.5, 3.5, 'F');
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(8);
+          pdf.text(priorityStyle.label.toUpperCase(), 31, 38.8, { align: 'center' });
+          pdf.setTextColor(203, 213, 225);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(`Gerado em ${generatedAt}`, pageWidth - margin, 38.8, { align: 'right' });
+        }
+      };
+      const pdfFields = [
+        ...fields,
+        ['Último contato', whatsappHistory[0]?.detail || 'Sem histórico de contato'],
+        ['Resumo operacional', operationalSummary]
+      ];
+      const drawFieldCard = (label, value, x, y, height) => {
+        pdf.setFillColor(248, 250, 252);
+        pdf.setDrawColor(226, 232, 240);
+        pdf.roundedRect(x, y, columnWidth, height, 2.5, 2.5, 'FD');
+        pdf.setTextColor(37, 99, 235);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(6.5);
+        pdf.text(String(label).toUpperCase(), x + 4, y + 4.5);
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.2);
+        const lines = pdf.splitTextToSize(String(value ?? 'Não informado'), columnWidth - 8);
+        pdf.text(lines, x + 4, y + 9.7);
+      };
+
+      drawHeader();
+      let cursorY = 55;
+      for (let index = 0; index < pdfFields.length; index += 2) {
+        const pair = pdfFields.slice(index, index + 2);
+        const lineCounts = pair.map(([, value]) => pdf.splitTextToSize(String(value ?? 'Não informado'), columnWidth - 8).length);
+        const rowHeight = Math.max(15, 11 + (Math.max(...lineCounts) * 3.7));
+        if (cursorY + rowHeight > pageHeight - 16) {
+          pdf.addPage();
+          drawHeader(true);
+          cursorY = 30;
+        }
+        pair.forEach(([label, value], column) => {
+          drawFieldCard(label, value, margin + (column * (columnWidth + columnGap)), cursorY, rowHeight);
+        });
+        cursorY += rowHeight + 3;
+      }
+
+      pdf.addPage();
+      drawHeader(true);
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(13);
+      pdf.text('Localização no OpenStreetMap', margin, 33);
+      pdf.setTextColor(71, 85, 105);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.text(`${leadStreetAndNumber(lead)} - ${leadNeighborhood(lead)} - ${lead.d || 'Sem distrito'}`, margin, 40);
+
+      if (detailMapCaptureRef.current) {
+        try {
+          const mapCanvas = await html2canvas(detailMapCaptureRef.current, {
+            allowTaint: false,
+            backgroundColor: '#f8fafc',
+            logging: false,
+            scale: 1.5,
+            useCORS: true
+          });
+          const mapHeight = Math.min((mapCanvas.height * contentWidth) / mapCanvas.width, pageHeight - 60);
+          const mapWidth = (mapCanvas.width * mapHeight) / mapCanvas.height;
+          const mapX = margin + ((contentWidth - mapWidth) / 2);
+          pdf.setFillColor(241, 245, 249);
+          pdf.setDrawColor(203, 213, 225);
+          pdf.roundedRect(mapX - 1.5, 46.5, mapWidth + 3, mapHeight + 3, 2.5, 2.5, 'FD');
+          pdf.addImage(mapCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', mapX, 48, mapWidth, mapHeight, undefined, 'FAST');
+        } catch (mapError) {
+          console.warn('O mapa do lead não pôde ser capturado.', mapError);
+          pdf.setFillColor(241, 245, 249);
+          pdf.roundedRect(margin, 48, contentWidth, 34, 3, 3, 'F');
+          pdf.setTextColor(71, 85, 105);
+          pdf.text('O mapa não pôde ser capturado. Os demais dados do lead foram exportados normalmente.', margin + 7, 66);
+        }
+      }
+
+      const totalPages = pdf.getNumberOfPages();
+      for (let page = 1; page <= totalPages; page += 1) {
+        pdf.setPage(page);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.5);
+        pdf.text('Amigos NT - ficha individual do lead', margin, pageHeight - 5.5);
+        pdf.text(`Página ${page} de ${totalPages}`, pageWidth - margin, pageHeight - 5.5, { align: 'right' });
+      }
+
+      const safeName = String(lead.n || lead.id || 'lead').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+      pdf.save(`lead-${safeName}.pdf`);
+      toast.success('PDF do lead exportado', { id: exportToast, description: 'Dados completos e mapa incluídos no arquivo.' });
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível gerar o PDF do lead', { id: exportToast, description: 'Aguarde o mapa carregar e tente novamente.' });
+    } finally {
+      setExportingDetailPdf(false);
+    }
+  }
 
   return createPortal(
     <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
@@ -960,7 +1198,18 @@ function LeadDetailModal({ lead, onClose }) {
               {lead.e ? <span className="rounded-full border border-emerald-200/40 bg-emerald-600 px-3 py-1 text-xs font-black text-white">Estudo ativo</span> : null}
             </div>
           </div>
-          <button className="inline-flex h-11 items-center justify-center rounded-xl border border-white/20 bg-white px-4 text-sm font-black text-slate-950 shadow-[0_14px_35px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:bg-blue-50" onClick={onClose} type="button">Fechar</button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/12 px-4 text-sm font-black text-white shadow-[0_14px_35px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={exportingDetailPdf}
+              onClick={exportLeadDetailPdf}
+              type="button"
+            >
+              <FileDown size={17} />
+              {exportingDetailPdf ? 'Gerando PDF…' : 'Exportar PDF'}
+            </button>
+            <button className="inline-flex h-11 items-center justify-center rounded-xl border border-white/20 bg-white px-4 text-sm font-black text-slate-950 shadow-[0_14px_35px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:bg-blue-50" onClick={onClose} type="button">Fechar</button>
+          </div>
         </div>
         <div className="grid max-h-[72vh] gap-5 overflow-y-auto bg-slate-100 p-6 lg:grid-cols-[1fr_0.9fr]">
           <section className="grid gap-3">
@@ -976,7 +1225,7 @@ function LeadDetailModal({ lead, onClose }) {
           </section>
           <section className="grid content-start gap-3">
             <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">WhatsApp e acompanhamento</span>
-            {whatsappHistoryForLead(lead).map((item) => (
+            {whatsappHistory.map((item) => (
               <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.05)]" key={item.title}>
                 <strong className="block text-sm text-slate-950">{item.title}</strong>
                 <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-700">{item.detail}</p>
@@ -984,10 +1233,9 @@ function LeadDetailModal({ lead, onClose }) {
             ))}
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-[0_10px_28px_rgba(37,99,235,0.08)]">
               <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-800">Resumo operacional</span>
-              <p className="mt-2 text-sm leading-relaxed text-slate-800">
-                {lead.t ? 'Contato apto para WhatsApp.' : 'Contato sem WhatsApp valido.'} {lead.v ? 'Marcado como VIP. ' : ''}{lead.e ? 'Possui estudo ativo para acompanhamento.' : 'Sem estudo ativo registrado.'}
-              </p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-800">{operationalSummary}</p>
             </div>
+            <LeadDetailOsmMap captureRef={detailMapCaptureRef} lead={lead} />
           </section>
         </div>
       </div>

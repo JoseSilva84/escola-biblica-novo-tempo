@@ -231,6 +231,19 @@ html[data-crm-theme='light'] .theme-modal-summary .theme-modal-primary {
 }
 
 @layer utilities {
+  .lead-detail-map-marker {
+    background: transparent !important;
+    border: 0 !important;
+    filter: drop-shadow(0 5px 8px rgba(15, 23, 42, 0.38));
+  }
+
+  .lead-detail-map-marker svg {
+    display: block;
+    height: 48px;
+    overflow: visible;
+    width: 40px;
+  }
+
   .lead-map-marker-shell {
     background: transparent !important;
     border: 0 !important;
