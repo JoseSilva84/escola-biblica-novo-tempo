@@ -28,6 +28,7 @@ import {
   Database,
   Eye,
   EyeOff,
+  FileDown,
   FileSpreadsheet,
   Gauge,
   LayoutDashboard,
@@ -956,8 +957,7 @@ function LeadDetailModal({ lead, onClose }) {
   );
 }
 
-function AssociationLeadExplorer({ association, records }) {
-  const [district, setDistrict] = useState('all');
+function AssociationLeadExplorer({ association, records, district = '', onDistrictChange }) {
   const [search, setSearch] = useState('');
   const [selectedLead, setSelectedLead] = useState(null);
   const availableRecords = association?.id === 'paulistana' ? records : [];
@@ -969,7 +969,7 @@ function AssociationLeadExplorer({ association, records }) {
     const term = search.trim().toLowerCase();
     return availableRecords
       .filter((row) => {
-        if (district !== 'all' && row.d !== district) return false;
+        if (district && row.d !== district) return false;
         if (term) {
           const haystack = `${row.n || ''} ${row.tel || ''} ${row.em || ''} ${row.d || ''}`.toLowerCase();
           if (!haystack.includes(term)) return false;
@@ -1005,8 +1005,8 @@ function AssociationLeadExplorer({ association, records }) {
       <div className="mb-5 grid gap-3 lg:grid-cols-[260px_1fr]">
         <label className="grid gap-2 text-sm font-bold text-slate-800">
           Distrito
-          <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 shadow-[0_10px_28px_rgba(15,23,42,0.06)] outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setDistrict(event.target.value)} value={district}>
-            <option value="all">Todos os distritos</option>
+          <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 shadow-[0_10px_28px_rgba(15,23,42,0.06)] outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => onDistrictChange?.(event.target.value)} value={district}>
+            <option value="">Todos os distritos</option>
             {districts.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </label>
@@ -2011,11 +2011,15 @@ function AnalyticsRankingModal({ ranking, onClose }) {
   );
 }
 
-function LeadAnalyticsSection({ data: allData, records: allRecords = [], interestRecords: allInterestRecords = [], onlyPilot = false }) {
+function LeadAnalyticsSection({ data: allData, records: allRecords = [], interestRecords: allInterestRecords = [], onlyPilot = false, districtFilter: controlledDistrictFilter, onDistrictFilterChange }) {
   const [selectedRanking, setSelectedRanking] = useState(null);
   const [birthdayMonth, setBirthdayMonth] = useState('');
   const [birthdayDay, setBirthdayDay] = useState('');
-  const [districtFilter, setDistrictFilter] = useState('');
+  const [internalDistrictFilter, setInternalDistrictFilter] = useState('');
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const reportRef = useRef(null);
+  const districtFilter = controlledDistrictFilter ?? internalDistrictFilter;
+  const setDistrictFilter = onDistrictFilterChange || setInternalDistrictFilter;
   const districtOptions = useMemo(() => Array.from(new Set([
     ...allRecords.map((lead) => lead.d),
     ...allInterestRecords.map((lead) => lead.d || lead.distrito)
@@ -2337,6 +2341,185 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
     color: '#e2e8f0',
     zIndex: 9999
   };
+
+  async function exportOperationalPdf() {
+    if (!reportRef.current || exportingPdf) return;
+    setExportingPdf(true);
+    const exportToast = toast.loading('Preparando relatório em PDF…');
+
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ]);
+      const pdf = new jsPDF({ format: 'a4', orientation: 'portrait', unit: 'mm', compress: true });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const contentWidth = pageWidth - (margin * 2);
+      const contentTop = 24;
+      const contentBottom = pageHeight - 15;
+      const districtLabel = districtFilter || 'Todos os distritos';
+      const generatedAt = new Date().toLocaleString('pt-BR');
+      const isDarkExport = document.documentElement.dataset.crmTheme === 'dark';
+
+      pdf.setFillColor(8, 17, 31);
+      pdf.rect(0, 0, pageWidth, 76, 'F');
+      pdf.setFillColor(37, 99, 235);
+      pdf.rect(0, 0, 5, 76, 'F');
+      pdf.setTextColor(147, 197, 253);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.text('AMIGOS NT  /  INTELIGÊNCIA OPERACIONAL', 14, 18);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(25);
+      pdf.text('Leitura operacional da base', 14, 35);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(11);
+      pdf.setTextColor(203, 213, 225);
+      pdf.text(`Relatório consolidado - ${districtLabel}`, 14, 46);
+      pdf.text(`Gerado em ${generatedAt}`, 14, 54);
+      pdf.setFillColor(16, 185, 129);
+      pdf.roundedRect(14, 62, 44, 7, 3.5, 3.5, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.text('DADOS FILTRADOS E ATUALIZADOS', 18, 66.8);
+
+      const summary = [
+        ['REGISTROS', data?.total || 0, [37, 99, 235]],
+        ['WHATSAPP', data?.phone || 0, [5, 150, 105]],
+        ['QUENTES', data?.hot || 0, [234, 88, 12]],
+        ['ESTUDOS', data?.studies || 0, [124, 58, 237]]
+      ];
+      const cardGap = 4;
+      const cardWidth = (contentWidth - (cardGap * 3)) / 4;
+      summary.forEach(([label, value, color], index) => {
+        const x = margin + (index * (cardWidth + cardGap));
+        pdf.setFillColor(248, 250, 252);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.roundedRect(x, 88, cardWidth, 28, 3, 3, 'FD');
+        pdf.setFillColor(...color);
+        pdf.roundedRect(x + 4, 93, 4, 16, 2, 2, 'F');
+        pdf.setTextColor(71, 85, 105);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.text(label, x + 11, 98);
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFontSize(15);
+        pdf.text(formatNumber(value), x + 11, 108);
+      });
+
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(15);
+      pdf.text('Escopo do relatório', margin, 137);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(71, 85, 105);
+      const scopeText = districtFilter
+        ? `Os gráficos e indicadores deste documento consideram exclusivamente os leads vinculados ao distrito ${districtFilter}.`
+        : 'Os gráficos e indicadores deste documento consideram todos os distritos disponíveis na base.';
+      pdf.text(pdf.splitTextToSize(scopeText, contentWidth), margin, 147);
+
+      pdf.setFillColor(239, 246, 255);
+      pdf.setDrawColor(191, 219, 254);
+      pdf.roundedRect(margin, 164, contentWidth, 54, 4, 4, 'FD');
+      pdf.setTextColor(30, 64, 175);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.text('Conteúdo', margin + 7, 176);
+      pdf.setTextColor(51, 65, 85);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9.5);
+      [
+        'Funil de aquecimento e taxas por etapa',
+        'Composição, prioridade ML, concentração e recência',
+        'Contato, perfil demográfico, materiais e rankings',
+        'Aniversariantes e contatos recentes'
+      ].forEach((item, index) => pdf.text(`-  ${item}`, margin + 8, 188 + (index * 7)));
+
+      const drawDataPage = () => {
+        pdf.setFillColor(8, 17, 31);
+        pdf.rect(0, 0, pageWidth, 16, 'F');
+        pdf.setFillColor(37, 99, 235);
+        pdf.rect(0, 0, 4, 16, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(9);
+        pdf.text('AMIGOS NT  |  LEITURA OPERACIONAL', margin, 10.5);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(191, 219, 254);
+        pdf.text(districtLabel, pageWidth - margin, 10.5, { align: 'right' });
+      };
+
+      const addDataPage = () => {
+        pdf.addPage();
+        drawDataPage();
+        return contentTop;
+      };
+
+      let cursorY = addDataPage();
+      const sections = Array.from(reportRef.current.querySelectorAll('[data-pdf-section]'));
+      for (const section of sections) {
+        const canvas = await html2canvas(section, {
+          backgroundColor: isDarkExport ? '#08111f' : '#e8edf3',
+          logging: false,
+          scale: 1.5,
+          useCORS: true,
+          ignoreElements: (element) => element.hasAttribute('data-pdf-ignore')
+        });
+        const renderedHeight = (canvas.height * contentWidth) / canvas.width;
+        const availableFirstHeight = contentBottom - cursorY;
+
+        if (renderedHeight <= availableFirstHeight) {
+          pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, cursorY, contentWidth, renderedHeight, undefined, 'FAST');
+          cursorY += renderedHeight + 6;
+          continue;
+        }
+
+        if (cursorY > contentTop) cursorY = addDataPage();
+        let sourceY = 0;
+        while (sourceY < canvas.height) {
+          const availableHeightMm = contentBottom - cursorY;
+          const sourceHeight = Math.min(canvas.height - sourceY, Math.floor((availableHeightMm * canvas.width) / contentWidth));
+          const slice = document.createElement('canvas');
+          slice.width = canvas.width;
+          slice.height = sourceHeight;
+          const context = slice.getContext('2d');
+          context.drawImage(canvas, 0, sourceY, canvas.width, sourceHeight, 0, 0, canvas.width, sourceHeight);
+          const sliceHeightMm = (sourceHeight * contentWidth) / canvas.width;
+          pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', margin, cursorY, contentWidth, sliceHeightMm, undefined, 'FAST');
+          sourceY += sourceHeight;
+          cursorY += sliceHeightMm + 3;
+          if (sourceY < canvas.height) cursorY = addDataPage();
+        }
+        cursorY += 4;
+      }
+
+      const totalPages = pdf.getNumberOfPages();
+      for (let page = 1; page <= totalPages; page += 1) {
+        pdf.setPage(page);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.text('Amigos NT - relatório gerencial', margin, pageHeight - 5.5);
+        pdf.text(`Página ${page} de ${totalPages}`, pageWidth - margin, pageHeight - 5.5, { align: 'right' });
+      }
+
+      const safeDistrict = districtLabel.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+      pdf.save(`leitura-operacional-${safeDistrict}.pdf`);
+      toast.success('PDF exportado com sucesso', { id: exportToast, description: `${totalPages} página(s) com gráficos e indicadores de ${districtLabel}.` });
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível gerar o PDF', { id: exportToast, description: 'Tente novamente após os gráficos terminarem de carregar.' });
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   const emptyData = !records.length && !(data?.total || 0);
   const addressRanking = analytics.addressRankingAll.slice(0, 8);
   const materialRanking = analytics.materialRankingAll.slice(0, 8);
@@ -2498,7 +2681,7 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
   }
 
   return (
-    <section className="grid gap-4">
+    <section className="grid gap-4" ref={reportRef}>
       {!onlyPilot ? (
         <>
       <div className="flex items-end justify-between gap-4 max-md:flex-col max-md:items-start">
@@ -2525,10 +2708,20 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
           <span className="rounded-full border border-white/[0.08] bg-white px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-300">
             {emptyData ? 'Sem dados reais' : `${formatNumber(data.total)} registros reais`}
           </span>
+          <button
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 text-xs font-black uppercase tracking-wide text-white shadow-[0_14px_32px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-blue-600 disabled:cursor-wait disabled:opacity-65"
+            data-pdf-ignore
+            disabled={exportingPdf || emptyData}
+            onClick={exportOperationalPdf}
+            type="button"
+          >
+            <FileDown size={17} />
+            {exportingPdf ? 'Gerando PDF…' : 'Exportar PDF'}
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-[1.15fr_0.85fr] gap-4 max-xl:grid-cols-1">
+      <div className="grid grid-cols-[1.15fr_0.85fr] gap-4 max-xl:grid-cols-1" data-pdf-section="funil-e-cobertura">
         <article className={`${panelClass} chart-overflow p-6`}>
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
@@ -2578,7 +2771,7 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
         </article>
       </div>
 
-      <div className="grid grid-cols-5 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+      <div className="grid grid-cols-5 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1" data-pdf-section="composicao-e-recencia">
         <article className={`${panelClass} chart-overflow p-5 col-span-1 max-2xl:col-span-1`}>
           <span className={labelClass}>Composição</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Base por situação</h3>
@@ -2654,7 +2847,7 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
         </article>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+      <div className="grid grid-cols-4 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1" data-pdf-section="contato-e-perfil">
         <article className={`${panelClass} chart-overflow p-5`}>
           <span className={labelClass}>WhatsApp</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Registrados e pendentes</h3>
@@ -2809,7 +3002,7 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
 
       {!onlyPilot ? (
         <>
-      <div className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
+      <div className="grid grid-cols-2 gap-4 max-xl:grid-cols-1" data-pdf-section="rankings">
         <article className={`${panelClass} p-6`}>
           <div className="flex items-start justify-between gap-4 max-sm:flex-col">
             <div>
@@ -2879,7 +3072,7 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
         </article>
       </div>
 
-      <div className="grid grid-cols-[1.1fr_0.9fr] gap-4 max-xl:grid-cols-1">
+      <div className="grid grid-cols-[1.1fr_0.9fr] gap-4 max-xl:grid-cols-1" data-pdf-section="aniversarios-e-contatos">
         <article className={`${panelClass} p-6`}>
           <div className="flex items-start justify-between gap-4 max-sm:flex-col">
             <div>
@@ -3021,6 +3214,7 @@ function DeferredLeadAnalyticsSection(props) {
 
 function AssociationDashboard({ association, data, records = [], interestRecords = [], onDatasetUpdated, onOpenDetails, onOpenHistory, user }) {
   const automations = [];
+  const [operationalDistrict, setOperationalDistrict] = useState('');
 
   return (
     <div className="grid gap-6">
@@ -3083,7 +3277,13 @@ function AssociationDashboard({ association, data, records = [], interestRecords
 
       <DatasetUploadPanel association={association} onUpdated={onDatasetUpdated} user={user} />
 
-      <DeferredLeadAnalyticsSection data={data} records={records} interestRecords={interestRecords} />
+      <DeferredLeadAnalyticsSection
+        data={data}
+        districtFilter={operationalDistrict}
+        interestRecords={interestRecords}
+        onDistrictFilterChange={setOperationalDistrict}
+        records={records}
+      />
 
       <section className="grid grid-cols-[1.15fr_0.85fr] gap-4 max-xl:grid-cols-1">
         <article className={`${panelClass} p-6`}>
@@ -3161,7 +3361,12 @@ function AssociationDashboard({ association, data, records = [], interestRecords
         </div>
       </section>
 
-      <AssociationLeadExplorer association={association} records={records} />
+      <AssociationLeadExplorer
+        association={association}
+        district={operationalDistrict}
+        onDistrictChange={setOperationalDistrict}
+        records={records}
+      />
     </div>
   );
 }
