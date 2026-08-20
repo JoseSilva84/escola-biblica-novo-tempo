@@ -2013,6 +2013,8 @@ function AnalyticsRankingModal({ ranking, onClose }) {
 
 function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPilot = false }) {
   const [selectedRanking, setSelectedRanking] = useState(null);
+  const [birthdayMonth, setBirthdayMonth] = useState('');
+  const [birthdayDay, setBirthdayDay] = useState('');
   const analytics = useMemo(() => {
     const total = data?.total || records.length || 0;
     const priorityLabels = { Hot: 'Quentes', Warm: 'Potenciais', Cool: 'Frios' };
@@ -2112,6 +2114,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
     const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
     const birthdaysByMonth = monthNames.map((month, index) => ({
       month,
+      monthNumber: index + 1,
       leads: records
         .map((lead) => {
           const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(lead.birthDate || '').trim());
@@ -2310,6 +2313,16 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
   const addressRanking = analytics.addressRankingAll.slice(0, 8);
   const materialRanking = analytics.materialRankingAll.slice(0, 8);
   const recentContacts = analytics.recentContactsAll.slice(0, 10);
+  const selectedBirthdayMonth = analytics.birthdaysByMonth.find((month) => String(month.monthNumber) === birthdayMonth);
+  const birthdayDayOptions = selectedBirthdayMonth
+    ? Array.from({ length: new Date(2024, selectedBirthdayMonth.monthNumber, 0).getDate() }, (_, index) => index + 1)
+    : [];
+  const visibleBirthdayMonths = analytics.birthdaysByMonth
+    .filter((month) => !birthdayMonth || String(month.monthNumber) === birthdayMonth)
+    .map((month) => ({
+      ...month,
+      leads: birthdayDay ? month.leads.filter((lead) => String(lead.day) === birthdayDay) : month.leads
+    }));
   const rankingButtonClass = 'group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-slate-950/72 via-slate-900/46 to-white/[0.035] p-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.16)] transition duration-300 hover:-translate-y-1 hover:border-blue-300/45 hover:shadow-[0_24px_60px_rgba(37,99,235,0.18)] focus:outline-none focus:ring-4 focus:ring-blue-500/18';
   const rankingNumberClass = 'grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-sm font-black text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.24)] ring-1 ring-slate-900/5';
   const seeAllButtonClass = 'inline-flex h-10 items-center justify-center rounded-2xl bg-slate-950 px-4 text-xs font-black uppercase tracking-wide text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-500/15';
@@ -2331,9 +2344,13 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
   const openBirthdayRanking = () => openRanking({
     type: 'birthdays',
     kicker: 'Aniversariantes',
-    title: 'Todos os aniversariantes',
-    subtitle: 'Sequência completa por mês, com nome e data completa de aniversário.',
-    rows: analytics.birthdaysByMonth.flatMap((month) => month.leads.map((lead) => ({ ...lead, month })))
+    title: selectedBirthdayMonth
+      ? (birthdayDay ? `Aniversariantes de ${birthdayDay.padStart(2, '0')} de ${selectedBirthdayMonth.month}` : `Aniversariantes de ${selectedBirthdayMonth.month}`)
+      : 'Todos os aniversariantes',
+    subtitle: selectedBirthdayMonth
+      ? `${formatNumber(visibleBirthdayMonths[0]?.leads.length || 0)} aniversariantes encontrados no período selecionado.`
+      : 'Sequência completa por mês, com nome e data completa de aniversário.',
+    rows: visibleBirthdayMonths.flatMap((month) => month.leads.map((lead) => ({ ...lead, month: month.month })))
   });
   const openRecentContactRanking = () => openRanking({
     type: 'recentContacts',
@@ -2824,21 +2841,49 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
               <span className={labelClass}>Aniversariantes</span>
               <h3 className="mt-1 text-xl font-black text-slate-50">Leads por mês do ano</h3>
             </div>
-            <button className={seeAllButtonClass} onClick={openBirthdayRanking} type="button">Ver todos</button>
+            <div className="flex flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-start">
+              <select
+                aria-label="Filtrar aniversariantes por mês"
+                className="h-10 min-w-[10rem] rounded-2xl border border-white/10 bg-slate-950 px-3 text-xs font-black text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15"
+                onChange={(event) => {
+                  setBirthdayMonth(event.target.value);
+                  setBirthdayDay('');
+                }}
+                value={birthdayMonth}
+              >
+                <option value="">Todos os meses</option>
+                {analytics.birthdaysByMonth.map((month) => (
+                  <option key={month.month} value={month.monthNumber}>{month.month}</option>
+                ))}
+              </select>
+              <select
+                aria-label="Filtrar aniversariantes por dia"
+                className="h-10 min-w-[8.5rem] rounded-2xl border border-white/10 bg-slate-950 px-3 text-xs font-black text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!selectedBirthdayMonth}
+                onChange={(event) => setBirthdayDay(event.target.value)}
+                value={birthdayDay}
+              >
+                <option value="">{selectedBirthdayMonth ? 'Todos os dias' : 'Selecione o mês'}</option>
+                {birthdayDayOptions.map((day) => (
+                  <option key={day} value={day}>Dia {String(day).padStart(2, '0')}</option>
+                ))}
+              </select>
+              <button className={seeAllButtonClass} onClick={openBirthdayRanking} type="button">Ver todos</button>
+            </div>
           </div>
           <div className="mt-5 grid grid-cols-3 gap-3 max-2xl:grid-cols-2 max-md:grid-cols-1">
-            {analytics.birthdaysByMonth.map((month) => (
+            {visibleBirthdayMonths.map((month) => (
               <button
                 className={rankingButtonClass}
                 key={month.month}
                 onClick={() => openRanking({
                   kicker: 'Aniversariantes',
                   title: month.month,
-                  subtitle: `${formatNumber(month.leads.length)} aniversariantes registrados em ${month.month}.`,
+                  subtitle: `${formatNumber(month.leads.length)} aniversariantes registrados${birthdayDay ? ` no dia ${birthdayDay.padStart(2, '0')}` : ''} em ${month.month}.`,
                   rows: month.leads.map((lead) => ({
                     title: lead.name,
                     subtitle: lead.date,
-                    metric: `${String(lead.day).padStart(2, '0')}/${String(analytics.birthdaysByMonth.findIndex((item) => item.month === month.month) + 1).padStart(2, '0')}`
+                    metric: `${String(lead.day).padStart(2, '0')}/${String(month.monthNumber).padStart(2, '0')}`
                   }))
                 })}
                 type="button"
