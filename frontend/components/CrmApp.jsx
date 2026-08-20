@@ -5137,15 +5137,14 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                 </select>
               </label>
             ))}
-            <div className="grid min-w-0 gap-2 rounded-2xl border border-blue-200 bg-blue-50/85 p-4 shadow-[0_14px_34px_rgba(37,99,235,0.10)] ring-1 ring-white/70">
-              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-blue-700">Relatório</span>
+            <div className="flex min-w-0 items-end py-2">
               <button
-                className={`${primaryButtonClass} h-auto min-h-11 w-full py-3 text-center !text-white`}
+                className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[linear-gradient(135deg,#2563eb,#1e3a8a)] px-3 text-xs font-black text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={exportingAdvancedFiltersPdf || !filteredLeads.length}
                 onClick={exportAdvancedFiltersPdf}
                 type="button"
               >
-                <FileDown size={18} />
+                <FileDown size={16} />
                 {exportingAdvancedFiltersPdf ? 'Gerando PDF…' : 'Exportar Filtragem Avançada'}
               </button>
             </div>
