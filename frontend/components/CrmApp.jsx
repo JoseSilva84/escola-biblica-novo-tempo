@@ -1734,9 +1734,9 @@ function DatasetHistoryModal({ history = [], onClose }) {
   const safeHistory = Array.isArray(history) ? history : [];
 
   return (
-    <div className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/70 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/[0.10] bg-slate-950 text-slate-100 shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
-        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-6">
+    <div className="theme-modal-backdrop fixed inset-0 z-[120] grid place-items-center bg-slate-950/70 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <div className="theme-modal-surface max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/[0.10] bg-slate-950 text-slate-100 shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
+        <div className="theme-modal-header flex items-start justify-between gap-4 border-b border-white/[0.08] p-6">
           <div>
             <span className={labelClass}>Historico do dataset</span>
             <h2 className="mt-1 text-2xl font-black">Excels processados</h2>
@@ -1756,7 +1756,7 @@ function DatasetHistoryModal({ history = [], onClose }) {
                   + (alerts.nomes_repetidos_upload?.length || 0);
                 const date = formatDatasetDate(entry.atualizado_em);
                 return (
-                  <article className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5" key={`${entry.atualizado_em}-${index}`}>
+                  <article className="theme-modal-card rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5" key={`${entry.atualizado_em}-${index}`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <strong className="text-xl font-black">{formatNumber(consolidation.alunos_novos || 0)} novos leads</strong>
@@ -1773,7 +1773,7 @@ function DatasetHistoryModal({ history = [], onClose }) {
                         <span className={labelClass}>Arquivos</span>
                         <div className="mt-2 grid gap-2">
                           {(consolidation.arquivos || []).map((file) => (
-                            <div className="rounded-xl bg-slate-900/70 px-3 py-2 text-sm" key={file.arquivo}>
+                            <div className="theme-modal-card rounded-xl bg-slate-900/70 px-3 py-2 text-sm" key={file.arquivo}>
                               <strong>{file.arquivo}</strong>
                               <span className="block text-xs text-slate-400">
                                 {formatNumber(file.lidos)} lidos · {formatNumber(file.novos)} novos · {formatNumber(file.ja_existiam)} ja existiam · {formatNumber(file.duplicados_upload)} duplicados no upload
@@ -1803,7 +1803,7 @@ function DatasetHistoryModal({ history = [], onClose }) {
               })}
             </div>
           ) : (
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-8 text-center text-slate-400">
+            <div className="theme-modal-card rounded-2xl border border-white/[0.08] bg-white/[0.035] p-8 text-center text-slate-400">
               Nenhum upload de Excel registrado ainda.
             </div>
           )}
@@ -1851,9 +1851,9 @@ function AnalyticsRankingModal({ ranking, onClose }) {
   })) || expandedGroup?.details?.map((name) => ({ name, detail: null })) || [];
 
   return createPortal(
-    <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
-      <div className="max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-blue-600/24 via-slate-900 to-emerald-500/16 p-6">
+    <div className="theme-modal-backdrop fixed inset-0 z-[90] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
+      <div className="theme-modal-surface max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
+        <div className="theme-modal-header flex items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-blue-600/24 via-slate-900 to-emerald-500/16 p-6">
           <div>
             <span className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">{ranking.kicker}</span>
             <h2 className="mt-2 text-2xl font-black text-white">{ranking.title}</h2>
@@ -1869,7 +1869,7 @@ function AnalyticsRankingModal({ ranking, onClose }) {
           </button>
         </div>
         {showContactFilter ? (
-          <div className="border-b border-white/10 bg-slate-900/80 px-6 py-4">
+          <div className="theme-modal-filter border-b border-white/10 bg-slate-900/80 px-6 py-4">
             <div className="flex flex-wrap items-end gap-3">
               <label className="grid gap-1">
                 <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Pesquisar até</span>
@@ -1928,7 +1928,7 @@ function AnalyticsRankingModal({ ranking, onClose }) {
                   (row.materialName || row.materialPrincipal) && (row.materialName || row.materialPrincipal) !== 'N/I' ? `Material: ${row.materialName || row.materialPrincipal}` : 'Material não informado'
                 ] : []);
               return (
-                <button className="group relative overflow-hidden grid w-full grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-blue-500/[0.035] p-4 text-left shadow-[0_18px_40px_rgba(15,23,42,0.18)] transition duration-300 hover:-translate-y-1 hover:border-blue-300/45 hover:bg-white/[0.075] hover:shadow-[0_26px_62px_rgba(37,99,235,0.20)] focus:outline-none focus:ring-4 focus:ring-blue-500/15 max-md:grid-cols-1" key={`${ranking.title}-${title}-${index}`} onClick={() => {
+                <button className="theme-modal-card group relative overflow-hidden grid w-full grid-cols-[auto_1fr_auto] items-start gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-blue-500/[0.035] p-4 text-left shadow-[0_18px_40px_rgba(15,23,42,0.18)] transition duration-300 hover:-translate-y-1 hover:border-blue-300/45 hover:bg-white/[0.075] hover:shadow-[0_26px_62px_rgba(37,99,235,0.20)] focus:outline-none focus:ring-4 focus:ring-blue-500/15 max-md:grid-cols-1" key={`${ranking.title}-${title}-${index}`} onClick={() => {
                   if (row.leadRows?.length || details?.length) {
                     setExpandedGroup({ title, subtitle, metric, details, leadRows: row.leadRows || [] });
                   }
@@ -1938,21 +1938,21 @@ function AnalyticsRankingModal({ ranking, onClose }) {
                     #{index + 1}
                   </span>
                   <div className="min-w-0">
-                    <strong className="block break-words text-base font-black text-white transition duration-300 group-hover:text-blue-50">{title}</strong>
+                    <strong className="theme-modal-title block break-words text-base font-black text-white transition duration-300 group-hover:text-blue-50">{title}</strong>
                     {subtitle ? <span className="mt-1 block break-words text-sm font-semibold text-slate-400 transition duration-300 group-hover:text-slate-300">{subtitle}</span> : null}
                     {details?.length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {details.map((detail) => (
-                          <span className="rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300 transition duration-300 group-hover:border-blue-200/25 group-hover:bg-blue-950/45 group-hover:text-blue-100" key={detail}>{detail}</span>
+                          <span className="theme-modal-chip rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-300 transition duration-300 group-hover:border-blue-200/25 group-hover:bg-blue-950/45 group-hover:text-blue-100" key={detail}>{detail}</span>
                         ))}
                       </div>
                     ) : null}
                   </div>
-                  {metric ? <strong className="rounded-2xl bg-blue-600 px-4 py-2 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)] transition duration-300 group-hover:scale-105 group-hover:bg-blue-500 group-hover:shadow-[0_18px_38px_rgba(37,99,235,0.38)]">{metric}</strong> : null}
+                  {metric ? <strong className="theme-modal-accent rounded-2xl bg-blue-600 px-4 py-2 text-lg font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)] transition duration-300 group-hover:scale-105 group-hover:bg-blue-500 group-hover:shadow-[0_18px_38px_rgba(37,99,235,0.38)]">{metric}</strong> : null}
                 </button>
               );
             }) : (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-6 text-center text-sm font-semibold text-slate-400">
+              <div className="theme-modal-card rounded-2xl border border-white/10 bg-white/[0.045] p-6 text-center text-sm font-semibold text-slate-400">
                 Nenhum dado real encontrado para este ranking.
               </div>
             )}
@@ -1968,9 +1968,9 @@ function AnalyticsRankingModal({ ranking, onClose }) {
           </div>
         </div>
         {expandedGroup ? (
-          <div className="absolute inset-0 z-10 grid place-items-center bg-slate-950/78 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-[0_28px_80px_rgba(0,0,0,0.45)]">
-              <div className="flex items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-blue-600/22 via-slate-900 to-slate-950 p-5">
+          <div className="theme-modal-backdrop absolute inset-0 z-10 grid place-items-center bg-slate-950/78 p-4 backdrop-blur-sm">
+            <div className="theme-modal-surface w-full max-w-3xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-[0_28px_80px_rgba(0,0,0,0.45)]">
+              <div className="theme-modal-header flex items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-blue-600/22 via-slate-900 to-slate-950 p-5">
                 <div>
                   <span className="text-xs font-black uppercase tracking-[0.2em] text-blue-100">Leads vinculados</span>
                   <h3 className="mt-2 text-2xl font-black text-white">{expandedGroup.title}</h3>
@@ -1988,15 +1988,15 @@ function AnalyticsRankingModal({ ranking, onClose }) {
               <div className="max-h-[58vh] overflow-y-auto p-5">
                 <div className="grid gap-2">
                   {expandedNames.length ? expandedNames.map((item, index) => (
-                    <div className="grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-white/10 bg-white/[0.055] p-3 transition hover:border-blue-300/45 hover:bg-white/[0.08]" key={`${expandedGroup.title}-${item.name}-${index}`}>
+                    <div className="theme-modal-card grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-white/10 bg-white/[0.055] p-3 transition hover:border-blue-300/45 hover:bg-white/[0.08]" key={`${expandedGroup.title}-${item.name}-${index}`}>
                       <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-xs font-black text-slate-950">#{index + 1}</span>
                       <div className="min-w-0">
-                        <strong className="block break-words text-sm font-black text-white">{item.name}</strong>
+                        <strong className="theme-modal-title block break-words text-sm font-black text-white">{item.name}</strong>
                         {item.detail ? <span className="mt-1 block break-words text-xs font-semibold text-slate-400">{item.detail}</span> : null}
                       </div>
                     </div>
                   )) : (
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-5 text-center text-sm font-semibold text-slate-400">
+                    <div className="theme-modal-card rounded-2xl border border-white/10 bg-white/[0.045] p-5 text-center text-sm font-semibold text-slate-400">
                       Nenhum nome encontrado neste grupo.
                     </div>
                   )}
@@ -6926,6 +6926,13 @@ export default function CrmApp({ payload: initialPayload = null }) {
     { id: 'audit-export', action: 'Exportação controlada', user: 'Gestão Paulistana', detail: 'Relatório de distritos filtrados disponível', when: 'Hoje' },
     { id: 'audit-ml', action: 'Ranking ML carregado', user: 'Sistema', detail: 'Prioridade operacional aplicada ao dashboard', when: 'Hoje' }
   ]);
+
+  useEffect(() => {
+    document.documentElement.dataset.crmTheme = theme;
+    return () => {
+      delete document.documentElement.dataset.crmTheme;
+    };
+  }, [theme]);
   const baseRecords = useMemo(() => scopedRecordsForUser(payload?.records || [], user), [payload, user]);
   const visibleAssociations = useMemo(() => scopedAssociationsForUser(associations, user), [associations, user]);
   const selectedAssociation = visibleAssociations.find((association) => association.id === selectedAssociationId) || visibleAssociations[0];

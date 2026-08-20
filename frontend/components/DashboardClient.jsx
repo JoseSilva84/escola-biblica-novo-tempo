@@ -453,7 +453,7 @@ function ActionCard({ title, value, detail, tone, onClick, rule }) {
 
 function DetailStat({ label, value, color = 'text-slate-100', rule }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-slate-950/50 p-4">
+    <div className="theme-modal-card rounded-xl border border-white/[0.06] bg-slate-950/50 p-4">
       <span className={labelClass}>
         <LabelWithHint hint={rule}>{label}</LabelWithHint>
       </span>
@@ -475,9 +475,9 @@ function DistrictDrawer({ district, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50">
-      <button className="absolute inset-0 cursor-default bg-slate-950/70 backdrop-blur-sm" onClick={onClose} type="button" aria-label="Fechar detalhe" />
-      <aside className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-white/[0.08] bg-slate-950/96 p-6 shadow-[0_0_80px_rgba(0,0,0,0.55)]">
-        <div className="mb-6 flex items-start justify-between gap-4">
+      <button className="theme-modal-backdrop absolute inset-0 cursor-default bg-slate-950/70 backdrop-blur-sm" onClick={onClose} type="button" aria-label="Fechar detalhe" />
+      <aside className="theme-modal-surface absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-white/[0.08] bg-slate-950/96 p-6 shadow-[0_0_80px_rgba(0,0,0,0.55)]">
+        <div className="theme-modal-header mb-6 flex items-start justify-between gap-4">
           <div>
             <span className={labelClass}>Análise Detalhada</span>
             <h3 className="mt-2 text-2xl font-black text-slate-50">{district.nome}</h3>
@@ -495,7 +495,7 @@ function DistrictDrawer({ district, onClose }) {
           <DetailStat label="5+ anos sem contato" value={formatNumber(district.semContato5Anos)} color="text-red-300" />
         </div>
 
-        <div className="mt-6 rounded-2xl border border-white/[0.06] bg-slate-900/70 p-5">
+        <div className="theme-modal-card mt-6 rounded-2xl border border-white/[0.06] bg-slate-900/70 p-5">
           <div className="mb-4 flex items-center justify-between">
             <h4 className="font-black text-slate-100">Composição de Prioridade</h4>
             <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-400">ML</span>

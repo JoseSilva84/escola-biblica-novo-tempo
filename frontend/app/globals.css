@@ -71,6 +71,116 @@
   z-index: 20;
 }
 
+/* Theme-aware modal glass. Portaled dialogs live under <body>, so the theme
+   is mirrored on <html> and cannot rely on an .app-light ancestor. */
+html[data-crm-theme='light'] .theme-modal-backdrop {
+  background: rgba(71, 85, 105, 0.28) !important;
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+}
+
+html[data-crm-theme='light'] .theme-modal-surface {
+  border-color: rgba(255, 255, 255, 0.82) !important;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.98), transparent 35%),
+    linear-gradient(145deg, rgba(248, 250, 252, 0.96), rgba(203, 213, 225, 0.88)) !important;
+  color: rgb(15 23 42) !important;
+  box-shadow: 0 34px 110px rgba(15, 23, 42, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(30px) saturate(1.18);
+  -webkit-backdrop-filter: blur(30px) saturate(1.18);
+}
+
+html[data-crm-theme='light'] .theme-modal-header {
+  border-color: rgba(71, 85, 105, 0.12) !important;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.88), rgba(226, 232, 240, 0.74)),
+    radial-gradient(circle at 85% 0%, rgba(147, 197, 253, 0.28), transparent 38%) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-header :is(h1, h2, h3) {
+  color: rgb(15 23 42) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-header p,
+html[data-crm-theme='light'] .theme-modal-header > div > span {
+  color: rgb(71 85 105) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-header button {
+  border-color: rgba(71, 85, 105, 0.16) !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  color: rgb(51 65 85) !important;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-filter {
+  border-color: rgba(71, 85, 105, 0.12) !important;
+  background: rgba(226, 232, 240, 0.68) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-filter :is(input, select) {
+  border-color: rgba(71, 85, 105, 0.16) !important;
+  background: rgba(255, 255, 255, 0.84) !important;
+  color: rgb(15 23 42) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-filter span {
+  color: rgb(71 85 105) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-card {
+  border-color: rgba(71, 85, 105, 0.13) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(241, 245, 249, 0.66)) !important;
+  color: rgb(15 23 42) !important;
+  box-shadow: 0 14px 38px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-card:hover {
+  border-color: rgba(59, 130, 246, 0.30) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-title,
+html[data-crm-theme='light'] .theme-modal-card .text-slate-100,
+html[data-crm-theme='light'] .theme-modal-card .text-slate-50 {
+  color: rgb(15 23 42) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-surface .text-slate-300,
+html[data-crm-theme='light'] .theme-modal-surface .text-slate-400 {
+  color: rgb(71 85 105) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-surface .text-blue-100,
+html[data-crm-theme='light'] .theme-modal-surface .text-blue-200,
+html[data-crm-theme='light'] .theme-modal-surface .text-blue-300 {
+  color: rgb(29 78 216) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-surface .text-red-200 {
+  color: rgb(185 28 28) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-surface .text-emerald-300 {
+  color: rgb(4 120 87) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-card .bg-slate-950,
+html[data-crm-theme='light'] .theme-modal-card .bg-slate-900 {
+  background: rgba(203, 213, 225, 0.72) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-chip,
+html[data-crm-theme='light'] .theme-modal-chip:hover {
+  border-color: rgba(71, 85, 105, 0.14) !important;
+  background: rgba(226, 232, 240, 0.86) !important;
+  color: rgb(51 65 85) !important;
+}
+
+html[data-crm-theme='light'] .theme-modal-accent {
+  color: white !important;
+}
+
 @layer utilities {
   .church-map-marker {
     align-items: center;
