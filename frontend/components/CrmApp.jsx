@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Area,
@@ -2896,7 +2896,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
                 <div className="mt-3 grid gap-2">
                   {month.leads.slice(0, 5).map((lead) => (
                     <div className="rounded-xl bg-white/[0.045] px-3 py-2" key={`${month.month}-${lead.id}-${lead.date}`}>
-                      <span className="block truncate text-xs font-black text-slate-100">{lead.name}</span>
+                      <span className="block whitespace-normal break-words text-left text-xs font-black leading-snug text-slate-100">{lead.name}</span>
                       <span className="block text-[11px] font-semibold text-slate-500">{lead.date}</span>
                     </div>
                   ))}
@@ -2946,6 +2946,32 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
       <AnalyticsRankingModal ranking={selectedRanking} onClose={() => setSelectedRanking(null)} />
     </section>
   );
+}
+
+function DeferredLeadAnalyticsSection(props) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => setReady(true));
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, []);
+
+  if (!ready) {
+    return (
+      <section className={`${panelClass} flex min-h-28 items-center justify-center gap-3 p-6 text-sm font-black text-slate-500`} role="status" aria-live="polite">
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-blue-500" />
+        Preparando análises da associação…
+      </section>
+    );
+  }
+
+  return <LeadAnalyticsSection {...props} />;
 }
 
 function AssociationDashboard({ association, data, records = [], interestRecords = [], onDatasetUpdated, onOpenDetails, onOpenHistory, user }) {
@@ -3012,7 +3038,7 @@ function AssociationDashboard({ association, data, records = [], interestRecords
 
       <DatasetUploadPanel association={association} onUpdated={onDatasetUpdated} user={user} />
 
-      <LeadAnalyticsSection data={data} records={records} interestRecords={interestRecords} />
+      <DeferredLeadAnalyticsSection data={data} records={records} interestRecords={interestRecords} />
 
       <section className="grid grid-cols-[1.15fr_0.85fr] gap-4 max-xl:grid-cols-1">
         <article className={`${panelClass} p-6`}>
@@ -3979,6 +4005,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   });
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
+  const [visibleLeadLimit, setVisibleLeadLimit] = useState(80);
   const [geocodeInfo, setGeocodeInfo] = useState(null);
   const [geocodeLoading, setGeocodeLoading] = useState(false);
   const [geocodeDistrict, setGeocodeDistrict] = useState('');
@@ -4117,7 +4144,11 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       .sort((a, b) => (b.s || 0) - (a.s || 0));
   }, [filters, records]);
 
-  const visibleLeads = filteredLeads.slice(0, 300);
+  useEffect(() => {
+    setVisibleLeadLimit(80);
+  }, [filters]);
+
+  const visibleLeads = filteredLeads.slice(0, visibleLeadLimit);
   const selectedLeads = filteredLeads.filter((lead) => selectedLeadIds.has(lead.id));
   const mapLeads = selectedLeads.length ? selectedLeads : filteredLeads;
   const hotWithWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
@@ -4594,6 +4625,15 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
             </tbody>
           </table>
         </div>
+        {filteredLeads.length > visibleLeads.length ? (
+          <button
+            className="mx-auto mt-4 flex h-11 items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-blue-600"
+            onClick={() => setVisibleLeadLimit((current) => current + 80)}
+            type="button"
+          >
+            Carregar mais {formatNumber(Math.min(80, filteredLeads.length - visibleLeads.length))}
+          </button>
+        ) : null}
       </section>
 
       {showGeocodeMisses ? (
@@ -6867,6 +6907,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const initialAssociations = initialPayload ? buildInitialAssociations(initialPayload.records) : [];
   const [user, setUser] = useState(null);
   const [view, setView] = useState('login');
+  const deferredView = useDeferredValue(view);
   const [authReady, setAuthReady] = useState(true);
   const [restoringSession, setRestoringSession] = useState(false);
   const [theme, setTheme] = useState('light');
@@ -7152,7 +7193,10 @@ export default function CrmApp({ payload: initialPayload = null }) {
     records,
     users: adminUsers
   };
-  const effectiveView = canOpenView(user, view) ? view : defaultViewForUser(user);
+  const requestedView = canOpenView(user, view) ? view : defaultViewForUser(user);
+  const deferredContentView = deferredView === 'details' ? requestedView : deferredView;
+  const effectiveView = canOpenView(user, deferredContentView) ? deferredContentView : defaultViewForUser(user);
+  const viewTransitionPending = requestedView !== effectiveView;
 
   let content = null;
   if (effectiveView === 'admin') {
@@ -7283,8 +7327,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
 
   return (
     <AppShell
-      current={effectiveView === 'association' ? 'associations' : effectiveView}
-      canGoBack={effectiveView !== defaultViewForUser(user)}
+      current={requestedView === 'association' ? 'associations' : requestedView}
+      canGoBack={requestedView !== defaultViewForUser(user)}
       onBack={goBack}
       onLogout={logout}
       onNavigate={navigateView}
@@ -7293,13 +7337,19 @@ export default function CrmApp({ payload: initialPayload = null }) {
       selectedAssociationId={selectedAssociation?.id || ''}
       onSelectAssociation={(id) => {
         setSelectedAssociationId(id);
-        if (['admin', 'associations', 'association'].includes(effectiveView)) {
+        if (['admin', 'associations', 'association'].includes(requestedView)) {
           setView('associations');
         }
       }}
       theme={theme}
       user={user}
     >
+      {viewTransitionPending ? (
+        <div className="fixed left-1/2 top-3 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-full border border-blue-200/70 bg-white/95 px-4 py-2 text-xs font-black text-blue-800 shadow-[0_14px_34px_rgba(15,23,42,0.18)] backdrop-blur" role="status" aria-live="polite">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-blue-600" />
+          Abrindo página…
+        </div>
+      ) : null}
       {content}
     </AppShell>
   );
