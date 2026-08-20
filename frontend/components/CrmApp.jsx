@@ -210,6 +210,26 @@ function HorizontalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value = 
   );
 }
 
+function VerticalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value = 0 }) {
+  const formattedValue = formatNumber(value);
+  const fitsInside = height >= 42;
+  const labelX = x + (width / 2);
+  const labelY = fitsInside ? y + (height / 2) : y - 7;
+
+  return (
+    <text
+      className={fitsInside ? 'chart-value-label chart-value-label-inside' : 'chart-value-label chart-value-label-outside'}
+      dominantBaseline="middle"
+      textAnchor="middle"
+      transform={fitsInside ? `rotate(-90 ${labelX} ${labelY})` : undefined}
+      x={labelX}
+      y={labelY}
+    >
+      {formattedValue}
+    </text>
+  );
+}
+
 function formatDatasetDate(value) {
   if (!value) return 'sem data';
   const date = new Date(value);
@@ -2910,12 +2930,14 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
           <h3 className="mt-1 text-lg font-black text-slate-50">Faixas etárias</h3>
           <div className="mt-4 h-56">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={analytics.ageGroups}>
+              <BarChart data={analytics.ageGroups} margin={{ top: 24, right: 4, left: 0, bottom: 30 }}>
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" vertical={false} />
-                <XAxis dataKey="name" interval={0} stroke="#94a3b8" tick={{ fontSize: 10 }} tickLine={false} />
+                <XAxis dataKey="name" height={46} interval={0} stroke="#94a3b8" tick={{ fontSize: 9, angle: -35, textAnchor: 'end' }} tickLine={false} />
                 <YAxis stroke="#94a3b8" tickFormatter={formatNumber} tickLine={false} width={48} />
                 <Tooltip contentStyle={chartTooltip} formatter={(value) => formatNumber(value)} itemStyle={{ color: '#fff' }} />
-                <Bar dataKey="value" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="value" fill="#0ea5e9" radius={[8, 8, 0, 0]}>
+                  <LabelList content={<VerticalBarValueLabel />} dataKey="value" />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -4291,7 +4313,12 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const [geocodeLoading, setGeocodeLoading] = useState(false);
   const [geocodeDistrict, setGeocodeDistrict] = useState('');
   const [showGeocodeMisses, setShowGeocodeMisses] = useState(false);
+  const [showLeadPdfExport, setShowLeadPdfExport] = useState(false);
+  const [leadPdfScope, setLeadPdfScope] = useState('filtered');
+  const [leadPdfQuantity, setLeadPdfQuantity] = useState('');
+  const [exportingLeadPdf, setExportingLeadPdf] = useState(false);
   const geocodeWasRunningRef = useRef(false);
+  const leadsMapExportRef = useRef(null);
   const churchesForMap = useMemo(() => {
     const districtNamesBySlug = officialDistricts.reduce((map, district) => ({
       ...map,
@@ -4424,6 +4451,18 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       .filter((lead) => leadMatchesFilterGroup(lead, filters))
       .sort((a, b) => (b.s || 0) - (a.s || 0));
   }, [filters, records]);
+
+  const leadPdfScopeOptions = useMemo(() => ([
+    { value: 'filtered', label: 'Todos os resultados filtrados', count: filteredLeads.length },
+    { value: 'Hot', label: 'Leads quentes', count: filteredLeads.filter((lead) => lead.p === 'Hot').length },
+    { value: 'Warm', label: 'Leads potenciais', count: filteredLeads.filter((lead) => lead.p === 'Warm').length },
+    { value: 'Cool', label: 'Leads mornos', count: filteredLeads.filter((lead) => lead.p === 'Cool').length },
+    { value: 'Cold', label: 'Leads frios', count: filteredLeads.filter((lead) => lead.p === 'Cold').length }
+  ]), [filteredLeads]);
+  const selectedLeadPdfScope = leadPdfScopeOptions.find((option) => option.value === leadPdfScope) || leadPdfScopeOptions[0];
+  const leadPdfFinalCount = leadPdfScope === 'filtered' || !Number(leadPdfQuantity)
+    ? selectedLeadPdfScope.count
+    : Math.min(Math.max(Number(leadPdfQuantity), 1), selectedLeadPdfScope.count);
 
   useEffect(() => {
     setVisibleLeadLimit(80);
@@ -4577,35 +4616,229 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
     setSelectedLeadIds(new Set());
   }
 
-  function exportLeads() {
-    const rowsToExport = selectedLeads.length ? selectedLeads : filteredLeads;
-    const header = ['Nome', 'WhatsApp', 'Email', 'Distrito', 'Bairro', 'Material', 'Religiao', 'Idade', 'Genero', 'Prioridade ML', 'Score', 'VIP', 'Estudo ativo'];
-    const rows = rowsToExport.map((lead) => [
-      lead.n,
-      phoneDigits(lead.tel),
-      lead.em || '',
-      lead.d,
-      leadNeighborhood(lead),
-      leadMaterial(lead),
-      lead.r || 'Nao informado',
-      lead.a || '',
-      leadGenderLabel(lead.g || 'N'),
-      crmPriorityLabels[lead.p] || lead.p,
-      lead.s,
-      lead.v ? 'Sim' : 'Nao',
-      lead.e ? 'Sim' : 'Nao'
-    ]);
-    const csv = [header, ...rows].map((row) => row.map((cell) => {
-      const text = String(cell ?? '');
-      return /[",\n\r;]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-    }).join(';')).join('\n');
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = selectedLeads.length ? 'leads-selecionados.csv' : 'leads-filtrados.csv';
-    link.click();
-    URL.revokeObjectURL(url);
+  async function exportLeadsPdf() {
+    if (exportingLeadPdf) return;
+    const scopedLeads = leadPdfScope === 'filtered'
+      ? filteredLeads
+      : filteredLeads.filter((lead) => lead.p === leadPdfScope);
+    const requestedQuantity = Number(leadPdfQuantity);
+    const rowsToExport = leadPdfScope === 'filtered' || !requestedQuantity
+      ? scopedLeads
+      : scopedLeads.slice(0, Math.min(Math.max(requestedQuantity, 1), scopedLeads.length));
+
+    if (!rowsToExport.length) {
+      toast.info('Nenhum lead para exportar', { description: 'Escolha um grupo que possua resultados nos filtros atuais.' });
+      return;
+    }
+
+    setExportingLeadPdf(true);
+    const exportToast = toast.loading('Preparando PDF dos leads…');
+
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ]);
+      const pdf = new jsPDF({ format: 'a4', orientation: 'portrait', unit: 'mm', compress: true });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const contentWidth = pageWidth - (margin * 2);
+      const generatedAt = new Date().toLocaleString('pt-BR');
+      const scopeLabel = selectedLeadPdfScope.label;
+      const activeFilterParts = [
+        filters.districts.length ? `Distritos: ${filters.districts.join(', ')}` : null,
+        filters.neighborhoods.length ? `Bairros: ${filters.neighborhoods.join(', ')}` : null,
+        filters.materials.length ? `Materiais: ${filters.materials.join(', ')}` : null,
+        filters.ageGroups.length ? `Idades: ${filters.ageGroups.join(', ')}` : null,
+        filters.genders.length ? `Gêneros: ${filters.genders.map(leadGenderLabel).join(', ')}` : null,
+        filters.search ? `Busca: ${filters.search}` : null,
+        filters.whatsapp !== 'all' ? `WhatsApp: ${filters.whatsapp === 'with' ? 'com' : 'sem'}` : null,
+        filters.email !== 'all' ? `E-mail: ${filters.email === 'with' ? 'com' : 'sem'}` : null
+      ].filter(Boolean);
+
+      pdf.setFillColor(8, 17, 31);
+      pdf.rect(0, 0, pageWidth, 52, 'F');
+      pdf.setFillColor(37, 99, 235);
+      pdf.rect(0, 0, 5, 52, 'F');
+      pdf.setTextColor(147, 197, 253);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.text('AMIGOS NT  /  RELATÓRIO DE LEADS', 14, 15);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(23);
+      pdf.text(scopeLabel, 14, 30);
+      pdf.setTextColor(203, 213, 225);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.text(`${formatNumber(rowsToExport.length)} leads exportados em ${generatedAt}`, 14, 41);
+
+      const hotCount = rowsToExport.filter((lead) => lead.p === 'Hot').length;
+      const whatsappCount = rowsToExport.filter((lead) => lead.t).length;
+      const districtCount = new Set(rowsToExport.map((lead) => lead.d).filter(Boolean)).size;
+      const summary = [
+        ['EXPORTADOS', rowsToExport.length, [37, 99, 235]],
+        ['WHATSAPP', whatsappCount, [5, 150, 105]],
+        ['QUENTES', hotCount, [234, 88, 12]],
+        ['DISTRITOS', districtCount, [124, 58, 237]]
+      ];
+      const gap = 4;
+      const cardWidth = (contentWidth - (gap * 3)) / 4;
+      summary.forEach(([label, value, color], index) => {
+        const x = margin + (index * (cardWidth + gap));
+        pdf.setFillColor(248, 250, 252);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.roundedRect(x, 61, cardWidth, 25, 3, 3, 'FD');
+        pdf.setFillColor(...color);
+        pdf.roundedRect(x + 4, 66, 3.5, 14, 1.7, 1.7, 'F');
+        pdf.setTextColor(71, 85, 105);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7);
+        pdf.text(label, x + 10, 70);
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFontSize(13);
+        pdf.text(formatNumber(value), x + 10, 79);
+      });
+
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(12);
+      pdf.text('Filtros aplicados', margin, 101);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(71, 85, 105);
+      const filterSummary = activeFilterParts.length ? activeFilterParts.join('  |  ') : 'Nenhum filtro adicional - base completa.';
+      const filterLines = pdf.splitTextToSize(filterSummary, contentWidth);
+      pdf.text(filterLines, margin, 109);
+
+      const mapTitleY = Math.max(126, 109 + (filterLines.length * 4.2) + 8);
+      let mapBottom = mapTitleY;
+      if (leadsMapExportRef.current) {
+        try {
+          const mapCanvas = await html2canvas(leadsMapExportRef.current, {
+            backgroundColor: '#f8fafc',
+            logging: false,
+            scale: 1.25,
+            useCORS: true
+          });
+          const mapHeight = Math.min(pageHeight - mapTitleY - 28, 116, (mapCanvas.height * contentWidth) / mapCanvas.width);
+          pdf.setTextColor(15, 23, 42);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(12);
+          pdf.text('Mapa dos filtros atuais', margin, mapTitleY);
+          pdf.addImage(mapCanvas.toDataURL('image/jpeg', 0.9), 'JPEG', margin, mapTitleY + 6, contentWidth, mapHeight, undefined, 'FAST');
+          mapBottom = mapTitleY + 6 + mapHeight;
+        } catch (mapError) {
+          console.warn('Mapa não pôde ser capturado para o PDF.', mapError);
+          pdf.setFillColor(241, 245, 249);
+          pdf.setDrawColor(203, 213, 225);
+          pdf.roundedRect(margin, mapTitleY, contentWidth, 40, 3, 3, 'FD');
+          pdf.setTextColor(71, 85, 105);
+          pdf.text('O mapa não pôde ser capturado, mas todos os nomes e dados foram incluídos nas páginas seguintes.', margin + 7, mapTitleY + 21);
+          mapBottom = mapTitleY + 44;
+        }
+      }
+
+      pdf.setTextColor(100, 116, 139);
+      pdf.setFontSize(8);
+      pdf.text('A relação nominal completa começa na próxima página.', margin, Math.min(mapBottom + 9, pageHeight - 16));
+
+      const priorityTones = {
+        Hot: [234, 88, 12],
+        Warm: [245, 158, 11],
+        Cool: [37, 99, 235],
+        Cold: [71, 85, 105]
+      };
+      const truncateText = (text, maxWidth) => {
+        const source = String(text || 'Não informado');
+        if (pdf.getTextWidth(source) <= maxWidth) return source;
+        let shortened = source;
+        while (shortened.length > 3 && pdf.getTextWidth(`${shortened}...`) > maxWidth) shortened = shortened.slice(0, -1);
+        return `${shortened}...`;
+      };
+      const drawListHeader = () => {
+        pdf.setFillColor(8, 17, 31);
+        pdf.rect(0, 0, pageWidth, 18, 'F');
+        pdf.setFillColor(37, 99, 235);
+        pdf.rect(0, 0, 4, 18, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(9);
+        pdf.text('AMIGOS NT  |  RELAÇÃO NOMINAL', margin, 11.5);
+        pdf.setTextColor(191, 219, 254);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(scopeLabel, pageWidth - margin, 11.5, { align: 'right' });
+        pdf.setFillColor(226, 232, 240);
+        pdf.rect(margin, 24, contentWidth, 9, 'F');
+        pdf.setTextColor(51, 65, 85);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.text('#', margin + 2, 29.8);
+        pdf.text('NOME E CONTATO', margin + 12, 29.8);
+        pdf.text('PRIORIDADE', margin + 101, 29.8);
+        pdf.text('DISTRITO / BAIRRO', margin + 131, 29.8);
+      };
+
+      let listY = 36;
+      pdf.addPage();
+      drawListHeader();
+      rowsToExport.forEach((lead, index) => {
+        if (listY + 10 > pageHeight - 15) {
+          pdf.addPage();
+          drawListHeader();
+          listY = 36;
+        }
+        if (index % 2 === 0) {
+          pdf.setFillColor(248, 250, 252);
+          pdf.rect(margin, listY - 2.5, contentWidth, 10, 'F');
+        }
+        pdf.setTextColor(71, 85, 105);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.text(String(index + 1), margin + 2, listY + 2.3);
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFontSize(8.2);
+        pdf.text(truncateText(lead.n || 'Lead sem nome', 82), margin + 12, listY + 0.8);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFontSize(6.8);
+        pdf.text(truncateText(`${phoneDigits(lead.tel) || 'sem WhatsApp'} - ${lead.em || 'sem e-mail'}`, 82), margin + 12, listY + 5.1);
+        const tone = priorityTones[lead.p] || priorityTones.Cold;
+        pdf.setFillColor(...tone);
+        pdf.roundedRect(margin + 101, listY - 1.4, 25, 6.3, 2.5, 2.5, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(6.8);
+        pdf.text(crmPriorityLabels[lead.p] || 'Sem prioridade', margin + 113.5, listY + 2.7, { align: 'center' });
+        pdf.setTextColor(51, 65, 85);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.2);
+        pdf.text(truncateText(`${lead.d || 'Sem distrito'} / ${leadNeighborhood(lead)}`, 51), margin + 131, listY + 2.3);
+        listY += 10;
+      });
+
+      const totalPages = pdf.getNumberOfPages();
+      for (let page = 1; page <= totalPages; page += 1) {
+        pdf.setPage(page);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.5);
+        pdf.text('Amigos NT - exportação filtrada de leads', margin, pageHeight - 5.5);
+        pdf.text(`Página ${page} de ${totalPages}`, pageWidth - margin, pageHeight - 5.5, { align: 'right' });
+      }
+
+      const safeScope = scopeLabel.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+      pdf.save(`leads-${safeScope}.pdf`);
+      setShowLeadPdfExport(false);
+      toast.success('PDF de leads exportado', { id: exportToast, description: `${formatNumber(rowsToExport.length)} nomes incluídos em ${totalPages} página(s).` });
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível gerar o PDF', { id: exportToast, description: 'Tente novamente após o mapa terminar de carregar.' });
+    } finally {
+      setExportingLeadPdf(false);
+    }
   }
 
   return (
@@ -4762,7 +4995,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         </div>
         </div>
 
-        <div className="mt-5">
+        <div className="mt-5" ref={leadsMapExportRef}>
           <LeadsOpenStreetMap churches={churchesForMap} leads={mapLeads} />
         </div>
 
@@ -4842,7 +5075,10 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
               Selecionar visiveis
             </button>
             <button className={ghostButtonClass} onClick={clearSelection} type="button">Limpar selecao</button>
-            <button className={ghostButtonClass} onClick={exportLeads} type="button">Exportar leads</button>
+            <button className={ghostButtonClass} onClick={() => setShowLeadPdfExport(true)} type="button">
+              <FileDown size={18} />
+              Exportar leads em PDF
+            </button>
           </div>
         </div>
 
@@ -4916,6 +5152,85 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
           </button>
         ) : null}
       </section>
+
+      {showLeadPdfExport ? createPortal(
+        <div className="theme-modal-backdrop fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
+          <div className="theme-modal-surface max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.5)]">
+            <div className="theme-modal-header flex items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-blue-600/22 via-slate-900 to-emerald-500/12 p-6">
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-100">Exportação gerencial</span>
+                <h2 className="mt-2 text-2xl font-black text-white">Exportar leads em PDF</h2>
+                <p className="mt-2 max-w-xl text-sm font-semibold leading-relaxed text-slate-300">
+                  Escolha o grupo. O arquivo incluirá os filtros atuais, o mapa e a relação nominal.
+                </p>
+              </div>
+              <button
+                aria-label="Fechar exportação"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/8 text-white transition hover:bg-red-500/15"
+                disabled={exportingLeadPdf}
+                onClick={() => setShowLeadPdfExport(false)}
+                type="button"
+              >
+                <X size={19} />
+              </button>
+            </div>
+            <div className="max-h-[72vh] overflow-y-auto p-6">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {leadPdfScopeOptions.map((option) => {
+                  const active = leadPdfScope === option.value;
+                  return (
+                    <button
+                      className={`theme-modal-choice rounded-2xl border p-4 text-left transition ${active ? 'border-blue-400 bg-blue-500/15 shadow-[0_14px_34px_rgba(37,99,235,0.16)]' : 'border-white/10 bg-white/[0.04] hover:border-blue-300/40 hover:bg-white/[0.07]'} ${option.value === 'filtered' ? 'sm:col-span-2' : ''}`}
+                      data-active={active ? 'true' : 'false'}
+                      key={option.value}
+                      onClick={() => {
+                        setLeadPdfScope(option.value);
+                        setLeadPdfQuantity('');
+                      }}
+                      type="button"
+                    >
+                      <span className="block text-sm font-black text-white">{option.label}</span>
+                      <span className="mt-1 block text-xs font-semibold text-slate-400">{formatNumber(option.count)} disponíveis nos filtros atuais</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {leadPdfScope !== 'filtered' ? (
+                <div className="theme-modal-filter mt-5 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+                  <label className="grid gap-2 text-sm font-black text-slate-200">
+                    Quantidade opcional
+                    <input
+                      className="h-12 rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-black text-white outline-none transition placeholder:text-slate-500 focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15"
+                      max={selectedLeadPdfScope.count}
+                      min="1"
+                      onChange={(event) => setLeadPdfQuantity(event.target.value)}
+                      placeholder={`Vazio exporta todos os ${formatNumber(selectedLeadPdfScope.count)}`}
+                      type="number"
+                      value={leadPdfQuantity}
+                    />
+                  </label>
+                </div>
+              ) : null}
+
+              <div className="theme-modal-summary mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-300/25 bg-emerald-500/10 p-4">
+                <div>
+                  <span className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-300">Total no PDF</span>
+                  <strong className="mt-1 block text-3xl font-black text-white">{formatNumber(leadPdfFinalCount)}</strong>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button className={ghostButtonClass} disabled={exportingLeadPdf} onClick={() => setShowLeadPdfExport(false)} type="button">Cancelar</button>
+                  <button className={primaryButtonClass} disabled={exportingLeadPdf || !leadPdfFinalCount} onClick={exportLeadsPdf} type="button">
+                    <FileDown size={18} />
+                    {exportingLeadPdf ? 'Gerando PDF…' : 'Gerar PDF'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      ) : null}
 
       {showGeocodeMisses ? (
         <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
