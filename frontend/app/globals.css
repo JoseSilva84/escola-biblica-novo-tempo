@@ -59,6 +59,11 @@
   pointer-events: none;
 }
 
+/* ── Chart cards: allow tooltips to overflow card boundaries ── */
+.chart-overflow {
+  overflow: visible !important;
+}
+
 @layer utilities {
   .church-map-marker {
     align-items: center;
@@ -176,7 +181,7 @@
 
   .premium-panel {
     position: relative;
-    overflow: visible;
+    overflow: hidden;
   }
 
   .premium-panel::before {
@@ -189,8 +194,6 @@
       linear-gradient(135deg, rgba(255,255,255,0.70), transparent 22%),
       linear-gradient(315deg, rgba(148,163,184,0.18), transparent 30%);
     opacity: 0.82;
-    clip-path: inset(0 round inherit);
-    overflow: hidden;
   }
 
   .premium-panel::after {
@@ -204,7 +207,6 @@
     opacity: 0;
     transition: left 680ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms;
     z-index: 1;
-    clip-path: inset(-200% -200% -200% -200%);
   }
 
   .premium-panel > * {

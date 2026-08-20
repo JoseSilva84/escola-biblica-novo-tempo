@@ -2467,7 +2467,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
       </div>
 
       <div className="grid grid-cols-[1.15fr_0.85fr] gap-4 max-xl:grid-cols-1">
-        <article className={`${panelClass} p-6`}>
+        <article className={`${panelClass} chart-overflow p-6`}>
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <span className={labelClass}>Funil</span>
@@ -2494,7 +2494,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           </div>
         </article>
 
-        <article className={`${panelClass} p-6`}>
+        <article className={`${panelClass} chart-overflow p-6`}>
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <span className={labelClass}>Cobertura</span>
@@ -2517,7 +2517,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
       </div>
 
       <div className="grid grid-cols-5 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
-        <article className={`${panelClass} p-5 col-span-1 max-2xl:col-span-1`}>
+        <article className={`${panelClass} chart-overflow p-5 col-span-1 max-2xl:col-span-1`}>
           <span className={labelClass}>Composição</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Base por situação</h3>
           <div className="mt-4 h-56">
@@ -2533,7 +2533,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           </div>
         </article>
 
-        <article className={`${panelClass} p-5 col-span-1 max-2xl:col-span-1`}>
+        <article className={`${panelClass} chart-overflow p-5 col-span-1 max-2xl:col-span-1`}>
           <span className={labelClass}>Prioridade</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Classificação ML</h3>
           <div className="mt-4 h-56">
@@ -2549,7 +2549,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           </div>
         </article>
 
-        <article className={`${panelClass} p-5 col-span-1 max-2xl:col-span-2 max-lg:col-span-1`}>
+        <article className={`${panelClass} chart-overflow p-5 col-span-1 max-2xl:col-span-2 max-lg:col-span-1`}>
           <span className={labelClass}>Distritos</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Concentração operacional</h3>
           <div className="mt-4 h-56">
@@ -2565,7 +2565,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           </div>
         </article>
 
-        <article className={`${panelClass} p-5 col-span-2 max-2xl:col-span-2 max-lg:col-span-1`}>
+        <article className={`${panelClass} chart-overflow p-5 col-span-2 max-2xl:col-span-2 max-lg:col-span-1`}>
           <span className={labelClass}>Recência</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Tempo desde contato</h3>
           <div className="mt-4 h-64">
@@ -2593,7 +2593,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
       </div>
 
       <div className="grid grid-cols-4 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
-        <article className={`${panelClass} p-5`}>
+        <article className={`${panelClass} chart-overflow p-5`}>
           <span className={labelClass}>WhatsApp</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Registrados e pendentes</h3>
           <div className="mt-4 h-56">
@@ -2623,7 +2623,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           tone="emerald"
         />
 
-        <article className={`${panelClass} p-5`}>
+        <article className={`${panelClass} chart-overflow p-5`}>
           <span className={labelClass}>Idade</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Faixas etárias</h3>
           <div className="mt-4 h-56">
@@ -2639,7 +2639,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           </div>
         </article>
 
-        <article className={`${panelClass} p-5`}>
+        <article className={`${panelClass} chart-overflow p-5`}>
           <span className={labelClass}>Perfil</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Homens versus mulheres</h3>
           <div className="mt-4 h-56">
@@ -2655,7 +2655,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           </div>
         </article>
 
-        <article className={`${panelClass} p-5`}>
+        <article className={`${panelClass} chart-overflow p-5`}>
           <span className={labelClass}>Materiais</span>
           <h3 className="mt-1 text-lg font-black text-slate-50">Tipos de estudos bíblicos</h3>
           <div className="mt-4 h-56">
@@ -2687,7 +2687,7 @@ function LeadAnalyticsSection({ data, records = [], interestRecords = [], onlyPi
           </div>
 
           <div className="grid grid-cols-[1.1fr_0.9fr] gap-4 max-xl:grid-cols-1">
-            <article className={`${panelClass} p-6`}>
+            <article className={`${panelClass} chart-overflow p-6`}>
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <span className={labelClass}>Resultados</span>
