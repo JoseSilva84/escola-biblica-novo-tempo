@@ -2166,6 +2166,7 @@ function AnalyticsRankingModal({ ranking, onClose }) {
   const [contactFilterUnit, setContactFilterUnit] = useState('day');
   const [visibleLimit, setVisibleLimit] = useState(80);
   const [expandedGroup, setExpandedGroup] = useState(null);
+  const [expandedVisibleLimit, setExpandedVisibleLimit] = useState(100);
 
   useEffect(() => {
     setContactFilter('');
@@ -2177,6 +2178,10 @@ function AnalyticsRankingModal({ ranking, onClose }) {
   useEffect(() => {
     setVisibleLimit(80);
   }, [contactFilter, contactFilterUnit]);
+
+  useEffect(() => {
+    setExpandedVisibleLimit(100);
+  }, [expandedGroup]);
 
   const filteredRows = useMemo(() => {
     const rows = ranking?.rows || [];
@@ -2193,10 +2198,15 @@ function AnalyticsRankingModal({ ranking, onClose }) {
   const showContactFilter = ranking.type === 'recentContacts';
   const visibleRows = filteredRows.slice(0, visibleLimit);
   const hasMoreRows = filteredRows.length > visibleRows.length;
+  const studyChartMax = ranking.type === 'studyChart'
+    ? Math.max(...filteredRows.map((row) => Number(row.value) || 0), 1)
+    : 1;
   const expandedNames = expandedGroup?.leadRows?.map((lead) => ({
     name: lead.n || lead.name || 'Lead sem nome',
     detail: `${lead.bairro || lead.d || 'Local não informado'} · ${lead.tel || 'sem telefone'} · ${lead.em || 'sem e-mail'}`
   })) || expandedGroup?.details?.map((name) => ({ name, detail: null })) || [];
+  const visibleExpandedNames = expandedNames.slice(0, expandedVisibleLimit);
+  const hasMoreExpandedNames = expandedNames.length > visibleExpandedNames.length;
 
   return createPortal(
     <div className="theme-modal-backdrop fixed inset-0 z-[90] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
@@ -2251,37 +2261,33 @@ function AnalyticsRankingModal({ ranking, onClose }) {
         <div className="max-h-[calc(88vh-150px)] overflow-y-auto p-6">
           {ranking.type === 'studyChart' ? (
             filteredRows.length ? (
-              <div style={{ height: `${Math.max(420, filteredRows.length * 42)}px` }}>
-                <ResponsiveContainer height="100%" width="100%">
-                  <BarChart data={filteredRows} layout="vertical" margin={{ left: 12, right: 78, top: 4, bottom: 4 }}>
-                    <CartesianGrid stroke="rgba(226,232,240,0.10)" horizontal={false} />
-                    <XAxis hide type="number" />
-                    <YAxis dataKey="name" interval={0} tick={<StudyNameAxisTick />} tickLine={false} type="category" width={285} />
-                    <Tooltip
-                      contentStyle={chartTooltip}
-                      formatter={(value) => [`${formatNumber(value)} leads`, 'Quantidade']}
-                      itemStyle={{ color: '#fff' }}
-                    />
-                    <Bar
-                      dataKey="value"
-                      fill="#f59e0b"
-                      onClick={(data) => {
-                        if (data?.payload) {
-                          setExpandedGroup({
-                            title: data.payload.name,
-                            subtitle: `${formatNumber(data.payload.value)} leads vinculados`,
-                            metric: `${formatNumber(data.payload.value)} leads`,
-                            leadRows: data.payload.rows || []
-                          });
-                        }
-                      }}
-                      radius={[0, 8, 8, 0]}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <LabelList content={<HorizontalBarValueLabel />} dataKey="value" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="grid gap-3">
+                {filteredRows.map((row, index) => (
+                  <button
+                    className="theme-modal-card group rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-amber-300/55 hover:bg-white/[0.075] focus:outline-none focus:ring-4 focus:ring-amber-500/15"
+                    key={`${row.name}-${index}`}
+                    onClick={() => setExpandedGroup({
+                      title: row.name,
+                      subtitle: `${formatNumber(row.value)} leads vinculados`,
+                      metric: `${formatNumber(row.value)} leads`,
+                      leadRows: row.rows || []
+                    })}
+                    type="button"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <strong className="theme-modal-title min-w-0 break-words text-sm font-black text-white">{row.name}</strong>
+                      <span className="shrink-0 rounded-xl bg-amber-500 px-3 py-1 text-xs font-black text-slate-950 shadow-[0_10px_24px_rgba(245,158,11,0.22)]">
+                        {formatNumber(row.value)} leads
+                      </span>
+                    </div>
+                    <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-800/80 ring-1 ring-white/5">
+                      <div
+                        className="h-full min-w-1 rounded-full bg-gradient-to-r from-amber-500 via-orange-400 to-amber-300 transition-all duration-500 group-hover:brightness-110"
+                        style={{ width: `${Math.max((Number(row.value) / studyChartMax) * 100, 0.5)}%` }}
+                      />
+                    </div>
+                  </button>
+                ))}
               </div>
             ) : (
               <div className="theme-modal-card rounded-2xl border border-white/10 bg-white/[0.045] p-6 text-center text-sm font-semibold text-slate-400">
@@ -2376,7 +2382,7 @@ function AnalyticsRankingModal({ ranking, onClose }) {
               </div>
               <div className="max-h-[58vh] overflow-y-auto p-5">
                 <div className="grid gap-2">
-                  {expandedNames.length ? expandedNames.map((item, index) => (
+                  {expandedNames.length ? visibleExpandedNames.map((item, index) => (
                     <div className="theme-modal-card grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-white/10 bg-white/[0.055] p-3 transition hover:border-blue-300/45 hover:bg-white/[0.08]" key={`${expandedGroup.title}-${item.name}-${index}`}>
                       <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-xs font-black text-slate-950">#{index + 1}</span>
                       <div className="min-w-0">
@@ -2389,6 +2395,15 @@ function AnalyticsRankingModal({ ranking, onClose }) {
                       Nenhum nome encontrado neste grupo.
                     </div>
                   )}
+                  {hasMoreExpandedNames ? (
+                    <button
+                      className="mx-auto mt-2 inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 shadow-[0_16px_34px_rgba(255,255,255,0.14)] transition hover:-translate-y-0.5 hover:bg-blue-50"
+                      onClick={() => setExpandedVisibleLimit((current) => current + 100)}
+                      type="button"
+                    >
+                      Carregar mais {formatNumber(Math.min(100, expandedNames.length - visibleExpandedNames.length))} nomes
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
