@@ -5917,6 +5917,7 @@ function AdminGeneralView({
   const [selectedInboxId, setSelectedInboxId] = useState(null);
   const [conversationModalOpen, setConversationModalOpen] = useState(false);
   const [selectedAdminLead, setSelectedAdminLead] = useState(null);
+  const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [leadFilters, setLeadFilters] = useState({
     association: 'paulistana',
     distrito: 'all',
@@ -6221,16 +6222,39 @@ function AdminGeneralView({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = String(form.get('name') || '').trim();
-    if (!name) return;
+    const proposal = String(form.get('proposal') || '').trim();
+    const objective = String(form.get('objective') || '').trim();
+    const audience = String(form.get('audience') || '').trim();
+    const startDate = String(form.get('startDate') || '');
+    const endDate = String(form.get('endDate') || '');
+    if (!name || !proposal || !objective || !audience) return;
+    if (startDate && endDate && endDate < startDate) {
+      toast.error('Período inválido', { description: 'A data final deve ser igual ou posterior à data inicial.' });
+      return;
+    }
     onAddCampaign({
       id: `campaign-${Date.now()}`,
       name,
       association: String(form.get('association') || associations[0]?.name || 'Todas as associacoes'),
       status: String(form.get('status') || 'Planejada'),
       owner: String(form.get('owner') || 'Admin geral'),
-      goal: Number(form.get('goal') || 0)
+      goal: Number(form.get('goal') || 0),
+      proposal,
+      objective,
+      audience,
+      context: String(form.get('context') || '').trim(),
+      message: String(form.get('message') || '').trim(),
+      callToAction: String(form.get('callToAction') || '').trim(),
+      channels: form.getAll('channels').map(String),
+      startDate,
+      endDate,
+      budget: Number(form.get('budget') || 0),
+      kpis: String(form.get('kpis') || '').trim(),
+      risks: String(form.get('risks') || '').trim(),
+      stakeholders: String(form.get('stakeholders') || '').trim()
     });
     event.currentTarget.reset();
+    setCampaignModalOpen(false);
     toast.success('Campanha adicionada', {
       description: `${name} ficou pronta para acompanhamento administrativo.`
     });
@@ -6483,40 +6507,38 @@ function AdminGeneralView({
 
       {section === 'campaigns' ? (
         <div className="grid gap-4">
-        <section className="grid grid-cols-[1fr_24rem] gap-4 max-xl:grid-cols-1">
+        <section>
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Campanhas gerais</span>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <span className={labelClass}>Campanhas gerais</span>
+                <h2 className="mt-1 text-2xl font-black text-slate-50">Projetos de campanha</h2>
+                <p className="mt-2 text-sm font-semibold text-slate-400">Planejamento, responsáveis, metas e proposta de cada iniciativa.</p>
+              </div>
+              <button className={primaryButtonClass} onClick={() => setCampaignModalOpen(true)} type="button">
+                <Plus size={18} />
+                Nova campanha
+              </button>
+            </div>
             <div className="mt-5 grid gap-3">
-              {campaigns.map((campaign, index) => (
+              {campaigns.length ? campaigns.map((campaign, index) => (
                 <div className={`interactive-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/30 bg-gradient-to-br ${campaignColors[index % campaignColors.length]} p-5 text-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]`} key={campaign.id}>
                   <div>
                     <strong className="text-xl font-semibold text-white">{campaign.name}</strong>
                     <span className="mt-2 block text-sm text-white/80">{campaign.association} · {campaign.owner} · meta {formatNumber(campaign.goal)}</span>
+                    {campaign.objective ? <span className="mt-2 block text-sm font-semibold text-white/90">Objetivo: {campaign.objective}</span> : null}
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${campaign.status === 'Ativa' ? 'bg-emerald-400 text-emerald-950' : 'bg-white/22 text-white'}`}>{campaign.status}</span>
                 </div>
-              ))}
+              )) : (
+                <div className="rounded-2xl border border-dashed border-white/15 bg-slate-950/35 p-8 text-center">
+                  <Radio className="mx-auto text-blue-300" size={30} />
+                  <strong className="mt-3 block text-lg font-black text-slate-50">Nenhuma campanha cadastrada</strong>
+                  <p className="mt-2 text-sm font-semibold text-slate-400">Crie o primeiro briefing para iniciar o planejamento.</p>
+                </div>
+              )}
             </div>
           </article>
-          <form className={`${panelClass} grid content-start gap-3 p-5`} onSubmit={submitCampaign}>
-            <span className={labelClass}>Nova campanha</span>
-            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="name" placeholder="Nome da campanha" />
-            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="association">
-              {associations.map((association) => <option key={association.id}>{association.name}</option>)}
-            </select>
-            <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="status">
-              <option>Planejada</option>
-              <option>Ativa</option>
-              <option>Pausada</option>
-              <option>Finalizada</option>
-            </select>
-            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" name="owner" placeholder="Responsável" />
-            <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" min="0" name="goal" placeholder="Meta de acompanhamentos" type="number" />
-            <button className={primaryButtonClass} type="submit">
-              <Plus size={18} />
-              Criar campanha
-            </button>
-          </form>
         </section>
           <CampaignAutomationPanel />
         </div>
@@ -7060,6 +7082,151 @@ function AdminGeneralView({
             </div>
           </article>
         </section>
+      ) : null}
+      {campaignModalOpen ? createPortal(
+        <div className="theme-modal-backdrop fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="campaign-modal-title">
+          <div className="theme-modal-surface max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.52)]">
+            <form className="flex max-h-[92vh] flex-col" onSubmit={submitCampaign}>
+              <div className="theme-modal-header flex shrink-0 items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-blue-600/24 via-slate-900 to-violet-500/16 p-6">
+                <div>
+                  <span className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-100">Briefing estratégico</span>
+                  <h2 className="mt-2 text-3xl font-black text-white" id="campaign-modal-title">Compor nova campanha</h2>
+                  <p className="mt-2 max-w-3xl text-sm font-semibold leading-relaxed text-slate-300">
+                    Responda às perguntas essenciais para transformar a ideia em uma campanha clara, mensurável e executável.
+                  </p>
+                </div>
+                <button
+                  aria-label="Fechar criação de campanha"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/8 text-white transition hover:border-red-200/60 hover:bg-red-500/18"
+                  onClick={() => setCampaignModalOpen(false)}
+                  type="button"
+                >
+                  <X size={19} />
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                <div className="grid gap-6">
+                  <section className="theme-modal-card rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-300">1. Identidade e responsabilidade</span>
+                    <h3 className="mt-1 text-xl font-black text-white">Quem lidera e como a campanha será identificada?</h3>
+                    <div className="mt-5 grid grid-cols-2 gap-4 max-md:grid-cols-1">
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Nome da campanha <span className="text-xs font-semibold text-slate-400">Como o projeto será reconhecido? *</span>
+                        <input className="h-12 rounded-xl border border-white/10 bg-slate-950/75 px-4 text-sm font-bold text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="name" placeholder="Ex.: Jornada Evidências 2026" required />
+                      </label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Associação <span className="text-xs font-semibold text-slate-400">Qual território responde pela execução? *</span>
+                        <select className="h-12 rounded-xl border border-white/10 bg-slate-950/75 px-4 text-sm font-bold text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="association" required>
+                          {associations.map((association) => <option key={association.id}>{association.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Responsável principal <span className="text-xs font-semibold text-slate-400">Quem toma decisões e presta contas? *</span>
+                        <input className="h-12 rounded-xl border border-white/10 bg-slate-950/75 px-4 text-sm font-bold text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="owner" placeholder="Nome do responsável" required />
+                      </label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Situação inicial <span className="text-xs font-semibold text-slate-400">Em qual estágio o projeto começa?</span>
+                        <select className="h-12 rounded-xl border border-white/10 bg-slate-950/75 px-4 text-sm font-bold text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="status">
+                          <option>Planejada</option>
+                          <option>Ativa</option>
+                          <option>Pausada</option>
+                          <option>Finalizada</option>
+                        </select>
+                      </label>
+                    </div>
+                  </section>
+
+                  <section className="theme-modal-card rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-300">2. Estratégia</span>
+                    <h3 className="mt-1 text-xl font-black text-white">Por que esta campanha deve existir?</h3>
+                    <div className="mt-5 grid grid-cols-2 gap-4 max-md:grid-cols-1">
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Problema ou oportunidade <span className="text-xs font-semibold text-slate-400">Qual situação precisa ser transformada?</span>
+                        <textarea className="min-h-28 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="context" placeholder="Descreva o contexto, a necessidade e as evidências disponíveis." />
+                      </label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Proposta da campanha <span className="text-xs font-semibold text-slate-400">Qual solução ou valor será oferecido? *</span>
+                        <textarea className="min-h-28 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="proposal" placeholder="Explique a proposta central e o benefício para o público." required />
+                      </label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Objetivo principal <span className="text-xs font-semibold text-slate-400">Que resultado concreto deve ser alcançado? *</span>
+                        <textarea className="min-h-28 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="objective" placeholder="Use um objetivo específico, mensurável e com prazo." required />
+                      </label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Público prioritário <span className="text-xs font-semibold text-slate-400">Quem deve ser alcançado e quais são suas características? *</span>
+                        <textarea className="min-h-28 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="audience" placeholder="Perfil, localização, necessidades, interesses e estágio de relacionamento." required />
+                      </label>
+                    </div>
+                  </section>
+
+                  <section className="theme-modal-card rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-300">3. Mensagem e mobilização</span>
+                    <h3 className="mt-1 text-xl font-black text-white">O que será comunicado e qual ação esperamos?</h3>
+                    <div className="mt-5 grid grid-cols-2 gap-4 max-md:grid-cols-1">
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Mensagem central <span className="text-xs font-semibold text-slate-400">Qual ideia o público precisa compreender?</span>
+                        <textarea className="min-h-24 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="message" placeholder="Mensagem principal, tom e promessa que devem permanecer consistentes." />
+                      </label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Chamada para ação <span className="text-xs font-semibold text-slate-400">O que a pessoa deve fazer depois de receber a mensagem?</span>
+                        <textarea className="min-h-24 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="callToAction" placeholder="Ex.: iniciar estudo, responder ao WhatsApp, participar de encontro ou solicitar visita." />
+                      </label>
+                    </div>
+                    <fieldset className="mt-4">
+                      <legend className="text-sm font-black text-slate-200">Canais previstos <span className="text-xs font-semibold text-slate-400">Onde a campanha será executada?</span></legend>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {['WhatsApp', 'E-mail', 'Telefone', 'Redes sociais', 'Evento presencial', 'Visita', 'Material impresso'].map((channel) => (
+                          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-slate-950/65 px-3 py-2 text-xs font-black text-slate-200 transition hover:border-blue-300/45" key={channel}>
+                            <input className="h-4 w-4 accent-blue-600" name="channels" type="checkbox" value={channel} />
+                            {channel}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  </section>
+
+                  <section className="theme-modal-card rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-300">4. Execução e mensuração</span>
+                    <h3 className="mt-1 text-xl font-black text-white">Quando, com quais recursos e como o sucesso será medido?</h3>
+                    <div className="mt-5 grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-md:grid-cols-1">
+                      <label className="grid gap-2 text-sm font-black text-slate-200">Data inicial <input className="h-12 rounded-xl border border-white/10 bg-slate-950/75 px-4 text-sm font-bold text-white outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="startDate" type="date" /></label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">Data final <input className="h-12 rounded-xl border border-white/10 bg-slate-950/75 px-4 text-sm font-bold text-white outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="endDate" type="date" /></label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">Meta de acompanhamentos <input className="h-12 rounded-xl border border-white/10 bg-slate-950/75 px-4 text-sm font-bold text-white outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" min="0" name="goal" placeholder="Ex.: 500" type="number" /></label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">Orçamento previsto (R$) <input className="h-12 rounded-xl border border-white/10 bg-slate-950/75 px-4 text-sm font-bold text-white outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" min="0" name="budget" placeholder="0,00" step="0.01" type="number" /></label>
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-4 max-lg:grid-cols-1">
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Indicadores de sucesso <span className="text-xs font-semibold text-slate-400">Quais métricas indicarão progresso e resultado?</span>
+                        <textarea className="min-h-24 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="kpis" placeholder="Alcance, respostas, inscrições, estudos iniciados, visitas e conversão." />
+                      </label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Equipe e parceiros <span className="text-xs font-semibold text-slate-400">Quem precisa participar ou aprovar?</span>
+                        <textarea className="min-h-24 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="stakeholders" placeholder="Coordenação, comunicação, voluntários, igrejas e parceiros." />
+                      </label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Riscos e restrições <span className="text-xs font-semibold text-slate-400">O que pode comprometer a execução?</span>
+                        <textarea className="min-h-24 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15" name="risks" placeholder="Prazos, orçamento, capacidade da equipe, permissões e dependências." />
+                      </label>
+                    </div>
+                  </section>
+                </div>
+              </div>
+
+              <div className="theme-modal-header flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-slate-900/95 px-6 py-4">
+                <span className="text-xs font-semibold text-slate-400">Os campos marcados com * são essenciais para criar a campanha.</span>
+                <div className="flex flex-wrap gap-2">
+                  <button className={ghostButtonClass} onClick={() => setCampaignModalOpen(false)} type="button">Cancelar</button>
+                  <button className={`${primaryButtonClass} theme-modal-primary`} type="submit">
+                    <Plus size={18} />
+                    Criar campanha
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       ) : null}
       <InboxConversationModal
         answer={selectedAnswer}
