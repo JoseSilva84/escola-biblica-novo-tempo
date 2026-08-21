@@ -7085,7 +7085,7 @@ function AdminGeneralView({
       ) : null}
       {campaignModalOpen ? createPortal(
         <div className="theme-modal-backdrop fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="campaign-modal-title">
-          <div className="theme-modal-surface max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.52)]">
+          <div className="campaign-briefing-modal theme-modal-surface max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.52)]">
             <form className="flex max-h-[92vh] flex-col" onSubmit={submitCampaign}>
               <div className="theme-modal-header flex shrink-0 items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-blue-600/24 via-slate-900 to-violet-500/16 p-6">
                 <div>
@@ -7177,7 +7177,7 @@ function AdminGeneralView({
                       <legend className="text-sm font-black text-slate-200">Canais previstos <span className="text-xs font-semibold text-slate-400">Onde a campanha será executada?</span></legend>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {['WhatsApp', 'E-mail', 'Telefone', 'Redes sociais', 'Evento presencial', 'Visita', 'Material impresso'].map((channel) => (
-                          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-slate-950/65 px-3 py-2 text-xs font-black text-slate-200 transition hover:border-blue-300/45" key={channel}>
+                          <label className="campaign-channel-option inline-flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-slate-950/65 px-3 py-2 text-xs font-black text-slate-200 transition hover:border-blue-300/45" key={channel}>
                             <input className="h-4 w-4 accent-blue-600" name="channels" type="checkbox" value={channel} />
                             {channel}
                           </label>
@@ -7217,7 +7217,7 @@ function AdminGeneralView({
                 <span className="text-xs font-semibold text-slate-400">Os campos marcados com * são essenciais para criar a campanha.</span>
                 <div className="flex flex-wrap gap-2">
                   <button className={ghostButtonClass} onClick={() => setCampaignModalOpen(false)} type="button">Cancelar</button>
-                  <button className={`${primaryButtonClass} theme-modal-primary`} type="submit">
+                  <button className={`${primaryButtonClass} campaign-submit theme-modal-primary`} type="submit">
                     <Plus size={18} />
                     Criar campanha
                   </button>

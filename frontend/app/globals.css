@@ -230,6 +230,67 @@ html[data-crm-theme='light'] .theme-modal-summary .theme-modal-primary {
   color: #ffffff !important;
 }
 
+/* Campaign briefing has a dense form inside light modal cards. Keep every
+   question, label and control at an accessible contrast in the light theme. */
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card h3,
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card label,
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card legend,
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card .text-white,
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card .text-slate-200 {
+  color: rgb(15 23 42) !important;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card label > span,
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card legend > span {
+  color: rgb(71 85 105) !important;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card .text-blue-300 {
+  color: rgb(29 78 216) !important;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card .text-emerald-300 {
+  color: rgb(4 120 87) !important;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card .text-amber-300 {
+  color: rgb(180 83 9) !important;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card .text-violet-300 {
+  color: rgb(109 40 217) !important;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card :is(input:not([type='checkbox']), select, textarea) {
+  border-color: rgb(203 213 225) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: rgb(15 23 42) !important;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.06) !important;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card :is(input, textarea)::placeholder {
+  color: rgb(100 116 139) !important;
+  opacity: 1;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .campaign-channel-option {
+  border-color: rgb(203 213 225) !important;
+  background: rgba(248, 250, 252, 0.96) !important;
+  color: rgb(30 41 59) !important;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .campaign-channel-option:hover {
+  border-color: rgb(96 165 250) !important;
+  background: rgb(239 246 255) !important;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .campaign-submit {
+  border-color: transparent !important;
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 52%, #0f172a 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 18px 46px rgba(37, 99, 235, 0.28) !important;
+}
+
 @layer utilities {
   .lead-detail-map-marker {
     background: transparent !important;
