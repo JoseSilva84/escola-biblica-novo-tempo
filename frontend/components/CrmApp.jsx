@@ -2525,6 +2525,14 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
       else acc.naoInformado += 1;
       return acc;
     }, { masculino: 0, feminino: 0, naoInformado: 0 });
+    const religionMap = records.reduce((map, lead) => {
+      const name = lead.r && lead.r !== 'N/I' ? lead.r : 'Não informado';
+      const current = map.get(name) || { name, value: 0, rows: [] };
+      current.value += 1;
+      current.rows.push(lead);
+      map.set(name, current);
+      return map;
+    }, new Map());
     const materialTypeCounts = records.reduce((acc, lead) => {
       const name = lead.tm && lead.tm !== 'N/I' ? lead.tm : 'Não informado';
       acc[name] = (acc[name] || 0) + 1;
@@ -2645,6 +2653,9 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
         { name: 'Mulheres', value: genderCounts.feminino },
         { name: 'Não informado', value: genderCounts.naoInformado }
       ],
+      religions: Array.from(religionMap.values())
+        .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
+        .slice(0, 5),
       materialTypes: Object.entries(materialTypeCounts)
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value),
@@ -3396,6 +3407,32 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
           </div>
         )}
       </article>
+
+        <article className={`${panelClass} chart-overflow p-5`}>
+          <span className={labelClass}>Perfil religioso</span>
+          <h3 className="mt-1 text-lg font-black text-slate-50">Principais religiões</h3>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.religions} layout="vertical" margin={{ left: 4, right: 54, top: 4, bottom: 4 }}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
+                <XAxis hide type="number" />
+                <YAxis dataKey="name" interval={0} stroke="#94a3b8" tick={{ fontSize: 10 }} tickLine={false} type="category" width={116} />
+                <Tooltip contentStyle={chartTooltip} formatter={(value) => [`${formatNumber(value)} leads`, 'Quantidade']} itemStyle={{ color: '#fff' }} />
+                <Bar
+                  dataKey="value"
+                  fill="#8b5cf6"
+                  onClick={(data) => {
+                    if (data?.payload) openLeadGroup('Perfil religioso', data.payload);
+                  }}
+                  radius={[0, 8, 8, 0]}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <LabelList content={<HorizontalBarValueLabel />} dataKey="value" />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
       </div>
       </>
       ) : null}
@@ -3683,8 +3720,55 @@ function DeferredLeadAnalyticsSection(props) {
   return <LeadAnalyticsSection {...props} />;
 }
 
+function CampaignAutomationPanel({ automations = [] }) {
+  return (
+    <section className={`${panelClass} p-6`}>
+      <div className="mb-5 flex items-center justify-between gap-4 max-md:flex-col max-md:items-start">
+        <div>
+          <span className={labelClass}>WhatsApp CRM</span>
+          <h2 className="mt-1 text-xl font-black text-slate-50">Automações de aquecimento</h2>
+          <p className="mt-2 text-sm font-semibold text-slate-400">Sequências, gatilhos e regras vinculados às campanhas.</p>
+        </div>
+        <button
+          className={ghostButtonClass}
+          onClick={() => toast.info('Configuração do funil', {
+            description: 'A próxima etapa conectará gatilhos, templates e regras de resposta por campanha.'
+          })}
+          type="button"
+        >
+          <LayoutDashboard size={17} />
+          Configurar funil
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-3 max-lg:grid-cols-1">
+        {automations.length ? automations.map((automation) => (
+          <div className={`interactive-card rounded-2xl border ${automation.color} p-5`} key={automation.name}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <strong className="text-slate-100">{automation.name}</strong>
+              <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${automation.status === 'Ativa' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>{automation.status}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className={labelClass}>Enviadas</span>
+                <strong className="mt-1 block text-2xl font-black text-slate-50">{formatNumber(automation.sent)}</strong>
+              </div>
+              <div>
+                <span className={labelClass}>Resposta</span>
+                <strong className="mt-1 block text-2xl font-black text-slate-50">{automation.response}</strong>
+              </div>
+            </div>
+          </div>
+        )) : (
+          <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400 max-lg:col-span-1 lg:col-span-3">
+            Nenhuma automação real cadastrada ainda.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function AssociationDashboard({ association, data, records = [], interestRecords = [], onDatasetUpdated, onOpenDetails, onOpenHistory, user }) {
-  const automations = [];
   const [operationalDistrict, setOperationalDistrict] = useState('');
 
   return (
@@ -3693,24 +3777,14 @@ function AssociationDashboard({ association, data, records = [], interestRecords
         <div className="grid grid-cols-[1.1fr_0.9fr] gap-6 max-xl:grid-cols-1">
           <div>
             <span className={labelClass}>Visão executiva</span>
-            <h1 className="mt-2 max-w-3xl text-4xl font-black tracking-normal text-slate-50 max-md:text-3xl">Central de aquecimento dos interessados</h1>
+            <h1 className="mt-2 max-w-3xl text-4xl font-black tracking-normal text-slate-50 max-md:text-3xl">Visão operacional dos interessados</h1>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
-              {association.name} concentra campanhas, automações de WhatsApp, prioridades por distrito e acompanhamento de visitas em um fluxo único.
+              {association.name} reúne indicadores da base, prioridades por distrito, perfil dos interessados e acompanhamento dos estudos.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button className={primaryButtonClass} onClick={onOpenDetails} type="button">
                 Análise dos Potenciais
                 <ArrowRight size={18} />
-              </button>
-              <button
-                className={ghostButtonClass}
-                onClick={() => toast.success('Sequência preparada', {
-                  description: 'A criação de fluxos WhatsApp será ligada aos templates aprovados da campanha.'
-                })}
-                type="button"
-              >
-                <Send size={18} />
-                Nova sequência WhatsApp
               </button>
               <button className={ghostButtonClass} onClick={onOpenHistory} type="button">
                 <ClipboardList size={18} />
@@ -3787,49 +3861,6 @@ function AssociationDashboard({ association, data, records = [], interestRecords
             </ResponsiveContainer>
           </div>
         </article>
-      </section>
-
-      <section className={`${panelClass} p-6`}>
-        <div className="mb-5 flex items-center justify-between gap-4 max-md:flex-col max-md:items-start">
-          <div>
-            <span className={labelClass}>WhatsApp CRM</span>
-            <h2 className="mt-1 text-xl font-black text-slate-50">Automações de aquecimento</h2>
-          </div>
-          <button
-            className={ghostButtonClass}
-            onClick={() => toast.info('Configuração do funil', {
-              description: 'A próxima etapa conectará gatilhos, templates e regras de resposta por campanha.'
-            })}
-            type="button"
-          >
-            <LayoutDashboard size={17} />
-            Configurar funil
-          </button>
-        </div>
-        <div className="grid grid-cols-3 gap-3 max-lg:grid-cols-1">
-          {automations.length ? automations.map((automation) => (
-            <div className={`interactive-card rounded-2xl border ${automation.color} p-5`} key={automation.name}>
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <strong className="text-slate-100">{automation.name}</strong>
-                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${automation.status === 'Ativa' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>{automation.status}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <span className={labelClass}>Enviadas</span>
-                  <strong className="mt-1 block text-2xl font-black text-slate-50">{formatNumber(automation.sent)}</strong>
-                </div>
-                <div>
-                  <span className={labelClass}>Resposta</span>
-                  <strong className="mt-1 block text-2xl font-black text-slate-50">{automation.response}</strong>
-                </div>
-              </div>
-            </div>
-          )) : (
-            <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400 max-lg:col-span-1 lg:col-span-3">
-              Nenhuma automacao real cadastrada ainda.
-            </div>
-          )}
-        </div>
       </section>
 
       <AssociationLeadExplorer
@@ -6451,6 +6482,7 @@ function AdminGeneralView({
       ) : null}
 
       {section === 'campaigns' ? (
+        <div className="grid gap-4">
         <section className="grid grid-cols-[1fr_24rem] gap-4 max-xl:grid-cols-1">
           <article className={`${panelClass} p-6`}>
             <span className={labelClass}>Campanhas gerais</span>
@@ -6486,6 +6518,8 @@ function AdminGeneralView({
             </button>
           </form>
         </section>
+          <CampaignAutomationPanel />
+        </div>
       ) : null}
 
       {section === 'distribution' ? (
