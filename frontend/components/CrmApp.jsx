@@ -6533,8 +6533,8 @@ function AdminGeneralView({
               )) : (
                 <div className="rounded-2xl border border-dashed border-white/15 bg-slate-950/35 p-8 text-center">
                   <Radio className="mx-auto text-blue-300" size={30} />
-                  <strong className="mt-3 block text-lg font-black text-slate-50">Nenhuma campanha cadastrada</strong>
-                  <p className="mt-2 text-sm font-semibold text-slate-400">Crie o primeiro briefing para iniciar o planejamento.</p>
+                  <strong className="mt-3 block text-lg font-white text-slate-50">Nenhuma campanha cadastrada</strong>
+                  <p className="mt-2 text-sm font-semibold text-slate-600">Crie o primeiro briefing para iniciar o planejamento.</p>
                 </div>
               )}
             </div>
