@@ -239,25 +239,25 @@ function VerticalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value = 0 
   );
 }
 
-function StudyNameAxisTick({ x = 0, y = 0, payload = {} }) {
+function StudyNameAxisTick({ maxChars = 34, maxLines = 2, x = 0, y = 0, payload = {} }) {
   const name = String(payload.value || 'Não informado');
   const words = name.split(/\s+/).filter(Boolean);
   const lines = [];
 
   words.forEach((word) => {
     const currentLine = lines[lines.length - 1] || '';
-    if (!currentLine || `${currentLine} ${word}`.length <= 34) {
+    if (!currentLine || `${currentLine} ${word}`.length <= maxChars) {
       lines[lines.length ? lines.length - 1 : 0] = currentLine ? `${currentLine} ${word}` : word;
-    } else if (lines.length < 2) {
+    } else if (lines.length < maxLines) {
       lines.push(word);
-    } else if (!lines[1].endsWith('…')) {
-      lines[1] = `${lines[1].slice(0, 30).trimEnd()}…`;
+    } else if (!lines[maxLines - 1].endsWith('…')) {
+      lines[maxLines - 1] = `${lines[maxLines - 1].slice(0, Math.max(maxChars - 4, 8)).trimEnd()}…`;
     }
   });
 
   return (
     <text className="fill-slate-500 text-[11px] font-semibold" textAnchor="end" x={x - 10} y={y}>
-      {lines.slice(0, 2).map((line, index) => (
+      {lines.slice(0, maxLines).map((line, index) => (
         <tspan dy={index === 0 ? (lines.length > 1 ? '-0.35em' : '0.35em') : '1.15em'} key={`${line}-${index}`} x={x - 10}>
           {line}
         </tspan>
@@ -2249,6 +2249,46 @@ function AnalyticsRankingModal({ ranking, onClose }) {
           </div>
         ) : null}
         <div className="max-h-[calc(88vh-150px)] overflow-y-auto p-6">
+          {ranking.type === 'studyChart' ? (
+            filteredRows.length ? (
+              <div style={{ height: `${Math.max(420, filteredRows.length * 42)}px` }}>
+                <ResponsiveContainer height="100%" width="100%">
+                  <BarChart data={filteredRows} layout="vertical" margin={{ left: 12, right: 78, top: 4, bottom: 4 }}>
+                    <CartesianGrid stroke="rgba(226,232,240,0.10)" horizontal={false} />
+                    <XAxis hide type="number" />
+                    <YAxis dataKey="name" interval={0} tick={<StudyNameAxisTick />} tickLine={false} type="category" width={285} />
+                    <Tooltip
+                      contentStyle={chartTooltip}
+                      formatter={(value) => [`${formatNumber(value)} leads`, 'Quantidade']}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                    <Bar
+                      dataKey="value"
+                      fill="#f59e0b"
+                      onClick={(data) => {
+                        if (data?.payload) {
+                          setExpandedGroup({
+                            title: data.payload.name,
+                            subtitle: `${formatNumber(data.payload.value)} leads vinculados`,
+                            metric: `${formatNumber(data.payload.value)} leads`,
+                            leadRows: data.payload.rows || []
+                          });
+                        }
+                      }}
+                      radius={[0, 8, 8, 0]}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <LabelList content={<HorizontalBarValueLabel />} dataKey="value" />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="theme-modal-card rounded-2xl border border-white/10 bg-white/[0.045] p-6 text-center text-sm font-semibold text-slate-400">
+                Nenhum estudo identificado na base atual.
+              </div>
+            )
+          ) : (
           <div className="grid gap-3">
             {filteredRows.length ? visibleRows.map((row, index) => {
               const title = row.title || row.address || row.name || row.n || 'Lead sem nome';
@@ -2314,6 +2354,7 @@ function AnalyticsRankingModal({ ranking, onClose }) {
               </button>
             ) : null}
           </div>
+          )}
         </div>
         {expandedGroup ? (
           <div className="theme-modal-backdrop absolute inset-0 z-10 grid place-items-center bg-slate-950/78 p-4 backdrop-blur-sm">
@@ -2476,10 +2517,11 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
     }, {});
     const materialNameMap = records.reduce((map, lead) => {
       const name = lead.materialName && lead.materialName !== 'N/I' ? lead.materialName : 'Não informado';
-      const current = map.get(name) || { name, leads: 0, recebidos: 0, names: [] };
+      const current = map.get(name) || { name, leads: 0, recebidos: 0, names: [], rows: [] };
       current.leads += 1;
       current.recebidos += Number(lead.m) || 0;
       if (lead.n && current.names.length < 8) current.names.push(lead.n);
+      current.rows.push(lead);
       map.set(name, current);
       return map;
     }, new Map());
@@ -2591,11 +2633,10 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
       materialTypes: Object.entries(materialTypeCounts)
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value),
-      studyLeadRanking: Array.from(materialNameMap.values())
+      studyLeadRankingAll: Array.from(materialNameMap.values())
         .filter((item) => item.name !== 'Não informado')
         .sort((a, b) => b.leads - a.leads || a.name.localeCompare(b.name))
-        .slice(0, 12)
-        .map((item) => ({ name: item.name, value: item.leads })),
+        .map((item) => ({ name: item.name, value: item.leads, rows: item.rows })),
       composition: [
         { name: 'Com WhatsApp', value: data?.phone || 0 },
         { name: 'Sem WhatsApp', value: Math.max(total - (data?.phone || 0), 0) },
@@ -2904,6 +2945,13 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
     title: 'Todos os materiais recebidos',
     subtitle: 'Sequência completa dos materiais, ordenada pela quantidade recebida.',
     rows: analytics.materialRankingAll
+  });
+  const openStudyRanking = () => openRanking({
+    type: 'studyChart',
+    kicker: 'Ranking de estudos',
+    title: 'Todos os estudos por número de leads',
+    subtitle: 'Clique em uma barra para visualizar os nomes dos leads vinculados ao estudo.',
+    rows: analytics.studyLeadRankingAll
   });
   const openBirthdayRanking = () => openRanking({
     type: 'birthdays',
@@ -3292,43 +3340,48 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
             </ResponsiveContainer>
           </div>
         </article>
-      </div>
 
-      <article className={`${panelClass} chart-overflow p-6`} data-pdf-section="estudos-por-leads">
-        <div className="flex items-start justify-between gap-4 max-sm:flex-col">
+        <article className={`${panelClass} chart-overflow p-5`} data-pdf-section="estudos-por-leads">
+          <div className="flex items-start justify-between gap-3">
           <div>
             <span className={labelClass}>Ranking de estudos</span>
-            <h3 className="mt-1 text-xl font-black text-slate-50">Estudos com mais leads</h3>
-            <p className="mt-2 text-sm font-semibold text-slate-400">Quantidade de leads vinculados a cada estudo principal.</p>
+              <h3 className="mt-1 text-lg font-black text-slate-50">Estudos com mais leads</h3>
           </div>
-          <span className="rounded-full border border-amber-200/45 bg-amber-400/15 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-amber-200">
-            Top {analytics.studyLeadRanking.length}
-          </span>
+            <button className={`${seeAllButtonClass} shrink-0 px-3`} data-pdf-ignore onClick={openStudyRanking} type="button">Ver todos</button>
         </div>
-        {analytics.studyLeadRanking.length ? (
-          <div className="mt-5 h-[30rem]">
+          {analytics.studyLeadRankingAll.length ? (
+            <div className="mt-4 h-56">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={analytics.studyLeadRanking} layout="vertical" margin={{ left: 10, right: 72, top: 4, bottom: 4 }}>
+                <BarChart data={analytics.studyLeadRankingAll.slice(0, 4)} layout="vertical" margin={{ left: 4, right: 54, top: 4, bottom: 4 }}>
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
                 <XAxis hide type="number" />
-                <YAxis dataKey="name" interval={0} tick={<StudyNameAxisTick />} tickLine={false} type="category" width={270} />
+                  <YAxis dataKey="name" interval={0} tick={<StudyNameAxisTick maxChars={17} />} tickLine={false} type="category" width={126} />
                 <Tooltip
                   contentStyle={chartTooltip}
                   formatter={(value) => [`${formatNumber(value)} leads`, 'Quantidade']}
                   itemStyle={{ color: '#fff' }}
                 />
-                <Bar dataKey="value" fill="#f59e0b" radius={[0, 8, 8, 0]}>
+                  <Bar
+                    dataKey="value"
+                    fill="#f59e0b"
+                    onClick={(data) => {
+                      if (data?.payload) openLeadGroup('Ranking de estudos', data.payload);
+                    }}
+                    radius={[0, 8, 8, 0]}
+                    style={{ cursor: 'pointer' }}
+                  >
                   <LabelList content={<HorizontalBarValueLabel />} dataKey="value" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="mt-5 rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400">
+            <div className="mt-4 rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400">
             Nenhum estudo identificado na base atual.
           </div>
         )}
       </article>
+      </div>
       </>
       ) : null}
 
