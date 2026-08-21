@@ -239,6 +239,33 @@ function VerticalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value = 0 
   );
 }
 
+function StudyNameAxisTick({ x = 0, y = 0, payload = {} }) {
+  const name = String(payload.value || 'Não informado');
+  const words = name.split(/\s+/).filter(Boolean);
+  const lines = [];
+
+  words.forEach((word) => {
+    const currentLine = lines[lines.length - 1] || '';
+    if (!currentLine || `${currentLine} ${word}`.length <= 34) {
+      lines[lines.length ? lines.length - 1 : 0] = currentLine ? `${currentLine} ${word}` : word;
+    } else if (lines.length < 2) {
+      lines.push(word);
+    } else if (!lines[1].endsWith('…')) {
+      lines[1] = `${lines[1].slice(0, 30).trimEnd()}…`;
+    }
+  });
+
+  return (
+    <text className="fill-slate-500 text-[11px] font-semibold" textAnchor="end" x={x - 10} y={y}>
+      {lines.slice(0, 2).map((line, index) => (
+        <tspan dy={index === 0 ? (lines.length > 1 ? '-0.35em' : '0.35em') : '1.15em'} key={`${line}-${index}`} x={x - 10}>
+          {line}
+        </tspan>
+      ))}
+    </text>
+  );
+}
+
 function formatDatasetDate(value) {
   if (!value) return 'sem data';
   const date = new Date(value);
@@ -2564,6 +2591,11 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
       materialTypes: Object.entries(materialTypeCounts)
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value),
+      studyLeadRanking: Array.from(materialNameMap.values())
+        .filter((item) => item.name !== 'Não informado')
+        .sort((a, b) => b.leads - a.leads || a.name.localeCompare(b.name))
+        .slice(0, 12)
+        .map((item) => ({ name: item.name, value: item.leads })),
       composition: [
         { name: 'Com WhatsApp', value: data?.phone || 0 },
         { name: 'Sem WhatsApp', value: Math.max(total - (data?.phone || 0), 0) },
@@ -3261,7 +3293,43 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
           </div>
         </article>
       </div>
-        </>
+
+      <article className={`${panelClass} chart-overflow p-6`} data-pdf-section="estudos-por-leads">
+        <div className="flex items-start justify-between gap-4 max-sm:flex-col">
+          <div>
+            <span className={labelClass}>Ranking de estudos</span>
+            <h3 className="mt-1 text-xl font-black text-slate-50">Estudos com mais leads</h3>
+            <p className="mt-2 text-sm font-semibold text-slate-400">Quantidade de leads vinculados a cada estudo principal.</p>
+          </div>
+          <span className="rounded-full border border-amber-200/45 bg-amber-400/15 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-amber-200">
+            Top {analytics.studyLeadRanking.length}
+          </span>
+        </div>
+        {analytics.studyLeadRanking.length ? (
+          <div className="mt-5 h-[30rem]">
+            <ResponsiveContainer height="100%" width="100%">
+              <BarChart data={analytics.studyLeadRanking} layout="vertical" margin={{ left: 10, right: 72, top: 4, bottom: 4 }}>
+                <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
+                <XAxis hide type="number" />
+                <YAxis dataKey="name" interval={0} tick={<StudyNameAxisTick />} tickLine={false} type="category" width={270} />
+                <Tooltip
+                  contentStyle={chartTooltip}
+                  formatter={(value) => [`${formatNumber(value)} leads`, 'Quantidade']}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Bar dataKey="value" fill="#f59e0b" radius={[0, 8, 8, 0]}>
+                  <LabelList content={<HorizontalBarValueLabel />} dataKey="value" />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="mt-5 rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm font-semibold text-slate-400">
+            Nenhum estudo identificado na base atual.
+          </div>
+        )}
+      </article>
+      </>
       ) : null}
 
       {analytics.pilot.total ? (
