@@ -4094,7 +4094,7 @@ function churchMapPoint(church, districtLeadPoints = {}) {
   };
 }
 
-function LeadsOpenStreetMap({ leads = [], churches = [] }) {
+function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -4184,8 +4184,19 @@ function LeadsOpenStreetMap({ leads = [], churches = [] }) {
             <small>${escapeMapHtml(precisionLabel)}</small><br>
             ${needsGoogleCheck ? `<small style="display:block;color:#b45309;font-weight:700;max-width:260px">${escapeMapHtml(precisionWarning)}</small>` : ''}
             <a href="${openStreetMapSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no OSM</a><br>
-            <a href="${googleMapsSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no Google Maps (precisao)</a>
+            <a href="${googleMapsSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no Google Maps (precisao)</a><br>
+            <button type="button" data-lead-details style="width:100%;margin-top:10px;padding:9px 12px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(37,99,235,.25)">
+              Detalhes do Lead
+            </button>
           `);
+          marker.on('popupopen', (event) => {
+            const detailsButton = event.popup.getElement()?.querySelector('[data-lead-details]');
+            if (!detailsButton) return;
+            detailsButton.onclick = () => {
+              onLeadDetails?.(lead);
+              map.closePopup();
+            };
+          });
           markersRef.current.push(marker);
           bounds.extend([point.lat, point.lng]);
         }
@@ -4228,7 +4239,7 @@ function LeadsOpenStreetMap({ leads = [], churches = [] }) {
 
     renderMap();
     return () => { active = false; };
-  }, [churchPoints, mappableLeads]);
+  }, [churchPoints, mappableLeads, onLeadDetails]);
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)]">
@@ -5623,7 +5634,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         </div>
 
         <div className="mt-5" ref={leadsMapExportRef}>
-          <LeadsOpenStreetMap churches={churchesForMap} leads={mapLeads} />
+          <LeadsOpenStreetMap churches={churchesForMap} leads={mapLeads} onLeadDetails={setSelectedLead} />
         </div>
 
         {canRunGeocode ? (
