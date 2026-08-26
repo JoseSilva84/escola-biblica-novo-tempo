@@ -22,7 +22,9 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Church,
   ClipboardList,
   Crown,
@@ -7392,6 +7394,7 @@ function WhatsAppLeadPickerModal({
   onToggleSelect,
   onToggleNewContact,
 }) {
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(true);
   const selectedPhones = new Set(selectedLeads.map((lead) => phoneDigits(lead.phone).slice(-10)));
   return createPortal(
     <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-lead-picker-title">
@@ -7403,6 +7406,11 @@ function WhatsAppLeadPickerModal({
             <p className="mt-2 text-sm font-semibold text-blue-100">{newContactMode ? 'Informe o nome, número, distrito e tipo do contato.' : 'Clique nos contatos para montar uma lista ou use Conversar para abrir apenas um chat.'}</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {!newContactMode ? (
+              <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-200/50 bg-[#00a884] px-4 text-sm font-black text-white shadow-lg shadow-emerald-950/20 transition duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:bg-[#06cf9c] focus:outline-none focus:ring-4 focus:ring-emerald-200/30" onClick={onOpenBroadcast} type="button">
+                <Send size={18} /> Lista de transmissão {selectedLeads.length ? `(${selectedLeads.length})` : ''}
+              </button>
+            ) : null}
             <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-black text-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:border-white/50 hover:bg-white/20 hover:shadow-[0_14px_34px_rgba(96,165,250,0.35)] focus:outline-none focus:ring-4 focus:ring-white/20" onClick={onToggleNewContact} type="button">
               <Plus size={18} /> {newContactMode ? 'Voltar à busca' : 'Novo contato'}
             </button>
@@ -7432,7 +7440,7 @@ function WhatsAppLeadPickerModal({
             </button>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {advancedFiltersOpen ? <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {[
               ['districts', 'Distrito', 'Todos os distritos'],
               ['neighborhoods', 'Bairro', 'Todos os bairros'],
@@ -7465,8 +7473,8 @@ function WhatsAppLeadPickerModal({
                 </select>
               </label>
             ))}
-          </div>
-          {filters.birthday === 'date' ? (
+          </div> : null}
+          {advancedFiltersOpen && filters.birthday === 'date' ? (
             <div className="grid gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:grid-cols-3">
               <label className="grid gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-800">
                 Dia
@@ -7491,7 +7499,15 @@ function WhatsAppLeadPickerModal({
               </label>
             </div>
           ) : null}
-          <p className="text-[11px] font-semibold text-slate-500">Todos é o padrão. Ao escolher uma opção, os contatos são atualizados automaticamente.</p>
+          {advancedFiltersOpen ? <p className="text-[11px] font-semibold text-slate-500">Todos é o padrão. Ao escolher uma opção, os contatos são atualizados automaticamente.</p> : null}
+          <button
+            aria-expanded={advancedFiltersOpen}
+            className="mx-auto inline-flex h-8 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 text-[11px] font-black text-slate-600 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+            onClick={() => setAdvancedFiltersOpen((current) => !current)}
+            type="button"
+          >
+            {advancedFiltersOpen ? <><ChevronUp size={16} /> Recolher filtros</> : <><ChevronDown size={16} /> Abrir filtros avançados</>}
+          </button>
         </form>
         )}
 
