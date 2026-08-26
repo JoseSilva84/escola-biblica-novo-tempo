@@ -7797,11 +7797,16 @@ function ConversationsView({ records = [] }) {
 
   useEffect(() => {
     if (!conversationExpanded) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const closeOnEscape = (event) => {
       if (event.key === 'Escape') setConversationExpanded(false);
     };
     window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
   }, [conversationExpanded]);
 
   useEffect(() => {
@@ -7949,14 +7954,14 @@ function ConversationsView({ records = [] }) {
         </aside>
 
         {conversationExpanded ? <button aria-label="Fechar conversa ampliada" className="fixed inset-0 z-[2147483644] cursor-default bg-slate-950/75 backdrop-blur-sm" onClick={() => setConversationExpanded(false)} type="button" /> : null}
-        <article className={`${panelClass} flex min-h-0 flex-col overflow-hidden ${conversationExpanded ? 'fixed inset-4 z-[2147483645] !h-auto rounded-3xl' : 'h-full max-2xl:h-[42rem]'}`}>
-          <div className="border-b border-white/[0.07] p-5">
+        <article className={`${panelClass} flex min-h-0 flex-col overflow-hidden transition-[width,height,top,left] duration-300 ${conversationExpanded ? '!fixed left-[2vw] top-[3vh] z-[2147483645] !h-[94vh] !w-[96vw] max-w-none rounded-[2rem] border border-white/40 shadow-[0_42px_140px_rgba(0,0,0,0.62)]' : 'h-full max-2xl:h-[42rem]'}`}>
+          <div className={`border-b border-white/[0.07] p-5 ${conversationExpanded ? 'bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(219,234,254,0.94),rgba(241,245,249,0.98))] px-7 py-5' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-4">
                 <ContactAvatar name={activeLeadName} phone={activePhone} size="lg" />
                 <span className="min-w-0">
                   <span className={labelClass}>Atendimento</span>
-                <h2 className="mt-1 text-2xl font-black text-slate-50">{activeLeadName || activePhone || 'Selecione um lead'}</h2>
+                <h2 className={`mt-1 font-black text-slate-50 ${conversationExpanded ? 'text-3xl max-md:text-xl' : 'text-2xl'}`}>{activeLeadName || activePhone || 'Selecione um lead'}</h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">{activeLeadDistrict || 'Distrito não vinculado'}{activePhone ? ` · ${activePhone}` : ''}</p>
                 </span>
               </div>
@@ -7977,8 +7982,8 @@ function ConversationsView({ records = [] }) {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto bg-slate-950/20 p-5">
-            <div className="grid gap-3">
+          <div className={`flex-1 overflow-auto bg-slate-950/20 ${conversationExpanded ? 'conversation-tools-scroll bg-[radial-gradient(circle_at_top,rgba(219,234,254,0.72),rgba(203,213,225,0.82))] p-7 max-md:p-4' : 'p-5'}`}>
+            <div className={`mx-auto grid gap-3 ${conversationExpanded ? 'w-full max-w-6xl' : ''}`}>
               {messages.length ? messages.map((message) => {
                 const outgoing = message.direction === 'OUTBOUND';
                 const deliveredByReply = outgoing && (
@@ -7987,7 +7992,7 @@ function ConversationsView({ records = [] }) {
                 );
                 return (
                   <div className={`flex ${outgoing ? 'justify-end' : 'justify-start'}`} key={message.id}>
-                    <div className={`max-w-[78%] rounded-2xl border px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${outgoing ? 'border-blue-300 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-800'}`}>
+                    <div className={`${conversationExpanded ? 'max-w-[64%] max-md:max-w-[88%]' : 'max-w-[78%]'} rounded-2xl border px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${outgoing ? 'border-blue-300 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-800'}`}>
                       <span className={`block text-[11px] font-black uppercase tracking-[0.14em] ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
                         {outgoing ? 'Mensagem de saída' : 'Pergunta recebida'}
                       </span>
@@ -8008,7 +8013,7 @@ function ConversationsView({ records = [] }) {
             </div>
           </div>
 
-          <form className="grid gap-3 border-t border-white/[0.07] p-4" onSubmit={submitMessage}>
+          <form className={`grid gap-3 border-t border-white/[0.07] p-4 ${conversationExpanded ? 'bg-white/95 px-7 py-5 shadow-[0_-16px_50px_rgba(15,23,42,0.10)] max-md:px-4' : ''}`} onSubmit={submitMessage}>
             <textarea
               className="min-h-20 resize-none rounded-2xl border border-white/[0.08] bg-slate-950/70 px-4 py-3 text-sm font-semibold leading-relaxed text-slate-100 outline-none placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10"
               onKeyDown={(event) => {
@@ -8046,27 +8051,29 @@ function ConversationsView({ records = [] }) {
           </form>
         </article>
 
-        <aside className={`${panelClass} grid h-full min-h-0 auto-rows-max content-start gap-4 overflow-x-hidden overflow-y-auto p-5 max-2xl:col-span-2 max-2xl:h-auto max-lg:col-span-1`}>
-          <div>
+        <aside className={`${panelClass} flex h-full min-h-0 flex-col overflow-hidden p-5 max-2xl:col-span-2 max-2xl:h-[42rem] max-lg:col-span-1`}>
+          <div className="shrink-0">
             <span className={labelClass}>Ferramentas</span>
             <h2 className="mt-1 text-xl font-black text-slate-50">Proximas acoes</h2>
           </div>
-          {quickActions.map(([title, detail]) => (
-            <button
-              className="interactive-card min-h-[7rem] rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
-              key={title}
-              onClick={() => toast.info(title, { description: detail })}
-              type="button"
-            >
-              <strong className="block text-sm font-black text-slate-950">{title}</strong>
-              <span className="mt-1 block text-xs font-semibold leading-relaxed text-slate-600">{detail}</span>
-            </button>
-          ))}
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-            <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Poderiamos implementar mais</span>
-            <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">
-              etiquetas por assunto, status de atendimento, responsavel, resposta sugerida por IA, resumo automatico, opt-out e tarefas de visita ligadas a conversa.
-            </p>
+          <div className="conversation-tools-scroll mt-4 grid min-h-0 flex-1 auto-rows-max content-start gap-4 overflow-x-hidden overflow-y-scroll pr-3">
+            {quickActions.map(([title, detail]) => (
+              <button
+                className="interactive-card min-h-[7rem] rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
+                key={title}
+                onClick={() => toast.info(title, { description: detail })}
+                type="button"
+              >
+                <strong className="block text-sm font-black text-slate-950">{title}</strong>
+                <span className="mt-1 block text-xs font-semibold leading-relaxed text-slate-600">{detail}</span>
+              </button>
+            ))}
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Poderiamos implementar mais</span>
+              <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">
+                etiquetas por assunto, status de atendimento, responsavel, resposta sugerida por IA, resumo automatico, opt-out e tarefas de visita ligadas a conversa.
+              </p>
+            </div>
           </div>
         </aside>
       </section>

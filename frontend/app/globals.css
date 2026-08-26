@@ -4,6 +4,31 @@
 @tailwind components;
 @tailwind utilities;
 
+.conversation-tools-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: rgba(37, 99, 235, 0.72) rgba(148, 163, 184, 0.16);
+  scrollbar-gutter: stable;
+}
+
+.conversation-tools-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.conversation-tools-scroll::-webkit-scrollbar-track {
+  background: rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+}
+
+.conversation-tools-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #3b82f6, #1e3a8a);
+  border: 2px solid rgba(241, 245, 249, 0.9);
+  border-radius: 999px;
+}
+
+.conversation-tools-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #2563eb, #172554);
+}
+
 @layer base {
   * {
     box-sizing: border-box;
