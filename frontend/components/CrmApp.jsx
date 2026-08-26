@@ -7473,6 +7473,7 @@ function ConversationsView({ records = [] }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [phoneSearch, setPhoneSearch] = useState('');
+  const [conversationListSearch, setConversationListSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [conversationExpanded, setConversationExpanded] = useState(false);
@@ -7786,6 +7787,30 @@ function ConversationsView({ records = [] }) {
     ['IA', 'Preparar sugestao de resposta antes do envio.'],
     ['Pausa', 'Registrar pedido para nao receber novas mensagens.']
   ];
+  const visibleConversations = useMemo(() => {
+    const term = conversationListSearch.trim().toLocaleLowerCase('pt-BR');
+    if (!term) return conversations;
+    const termDigits = phoneDigits(term);
+    return conversations.filter((conversation) => {
+      const suffix = String(conversation.phone || '').slice(-10);
+      const matchedRecord = records.find((lead) => suffix && phoneDigits(lead.tel).includes(suffix));
+      const matchedDirectoryLead = leadDirectory.find((lead) => suffix && phoneDigits(lead.phone).endsWith(suffix));
+      const lastBody = conversation.messages?.[conversation.messages.length - 1]?.body || '';
+      const haystack = [
+        conversation.phone,
+        conversation.leadName,
+        conversation.district,
+        conversation.lead?.name,
+        conversation.lead?.district,
+        matchedRecord?.n,
+        matchedRecord?.d,
+        matchedDirectoryLead?.name,
+        matchedDirectoryLead?.district,
+        lastBody
+      ].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
+      return haystack.includes(term) || Boolean(termDigits && phoneDigits(conversation.phone).includes(termDigits));
+    });
+  }, [conversationListSearch, conversations, leadDirectory, records]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -7907,10 +7932,25 @@ function ConversationsView({ records = [] }) {
             <span className={labelClass}>Leads</span>
             <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations()} type="button">Atualizar</button>
           </div>
+          <label className="relative mt-3 block shrink-0">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            <input
+              aria-label="Buscar na lista de leads"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white/90 pl-9 pr-9 text-xs font-bold text-slate-800 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+              onChange={(event) => setConversationListSearch(event.target.value)}
+              placeholder="Buscar nome, número ou distrito"
+              value={conversationListSearch}
+            />
+            {conversationListSearch ? (
+              <button aria-label="Limpar busca" className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-950" onClick={() => setConversationListSearch('')} type="button">
+                <X size={15} />
+              </button>
+            ) : null}
+          </label>
           <div className="mt-4 grid min-h-0 flex-1 auto-rows-max content-start gap-2 overflow-x-hidden overflow-y-auto pr-1">
             {loading ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-700">Carregando conversas...</div>
-            ) : conversations.length ? conversations.map((conversation) => {
+            ) : visibleConversations.length ? visibleConversations.map((conversation) => {
               const conversationMessages = conversation.messages || [];
               const currentLast = conversationMessages[conversationMessages.length - 1];
               const suffix = String(conversation.phone || '').slice(-10);
@@ -7947,7 +7987,9 @@ function ConversationsView({ records = [] }) {
               );
             }) : (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700">
-                Nenhuma conversa salva. Use “Buscar e selecionar lead” para iniciar um atendimento.
+                {conversationListSearch
+                  ? 'Nenhuma conversa encontrada nesta lista. Você também pode usar “Buscar e selecionar lead”.'
+                  : 'Nenhuma conversa salva. Use “Buscar e selecionar lead” para iniciar um atendimento.'}
               </div>
             )}
           </div>
