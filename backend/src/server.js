@@ -887,7 +887,8 @@ function zproConfig() {
   const channelId = String(process.env.ZPRO_CHANNEL_ID || '').trim();
   const apiId = String(process.env.ZPRO_API_ID || process.env.ZPRO_CHANNEL_ID || '').trim();
   const sendPath = String(process.env.ZPRO_SEND_TEXT_PATH || '/v2/api/external/{apiId}').trim();
-  return { baseUrl, token, channelId, apiId, sendPath };
+  const sendMediaPath = String(process.env.ZPRO_SEND_MEDIA_PATH || '/v2/api/external/{apiId}/base64').trim();
+  return { baseUrl, token, channelId, apiId, sendPath, sendMediaPath };
 }
 
 function tokenDiagnostic(token) {
@@ -1065,6 +1066,82 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
   };
 }
 
+async function sendZproMediaMessage({ phone, message = '', fileName, mimeType, base64Data, leadId = null }) {
+  const config = zproConfig();
+  if (!config.baseUrl || !config.token || !config.apiId) {
+    const error = new Error('Configuração Zpro incompleta para envio de mídia.');
+    error.status = 500;
+    throw error;
+  }
+
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) {
+    const error = new Error('Telefone inválido. Use DDI + DDD + número, ou DDD + número brasileiro.');
+    error.status = 400;
+    throw error;
+  }
+
+  const cleanMimeType = String(mimeType || '').toLowerCase();
+  if (!cleanMimeType.startsWith('image/') && !cleanMimeType.startsWith('video/')) {
+    const error = new Error('Envie somente imagem ou vídeo.');
+    error.status = 400;
+    throw error;
+  }
+
+  const cleanBase64 = String(base64Data || '').replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+  const mediaBytes = Buffer.byteLength(cleanBase64, 'base64');
+  if (!cleanBase64 || !mediaBytes || mediaBytes > 10 * 1024 * 1024) {
+    const error = new Error('O anexo deve ter no máximo 10 MB.');
+    error.status = 400;
+    throw error;
+  }
+
+  const safeFileName = path.basename(String(fileName || (cleanMimeType.startsWith('video/') ? 'video' : 'imagem')))
+    .replace(/[^\w .()\-À-ÿ]/g, '_');
+  const cleanMessage = String(message || '').trim();
+  const externalKey = `leadsnt-media-${leadId || normalizedPhone}-${Date.now()}`;
+  const pathValue = applyPathParams(config.sendMediaPath, {
+    apiId: config.apiId,
+    channelId: config.channelId || config.apiId,
+    sessionId: config.channelId || config.apiId
+  });
+  const url = pathValue.startsWith('http') ? pathValue : `${config.baseUrl}${pathValue.startsWith('/') ? '' : '/'}${pathValue}`;
+  const providerResponse = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      body: cleanMessage,
+      number: normalizedPhone,
+      base64Data: cleanBase64,
+      mimeType: cleanMimeType,
+      fileName: safeFileName,
+      externalKey,
+      isClosed: false
+    })
+  });
+  const data = await parseProviderResponse(providerResponse);
+  if (!providerResponse.ok) {
+    const error = new Error(data?.message || data?.error || `Zpro respondeu com status ${providerResponse.status}`);
+    error.status = 502;
+    error.providerStatus = providerResponse.status;
+    error.deliveryStatus = providerFailureStatus(providerResponse.status, data);
+    error.providerResponse = data;
+    throw error;
+  }
+
+  return {
+    ok: true,
+    provider: 'zpro-baileys',
+    deliveryStatus: providerResponseDeliveryStatus(data),
+    phone: normalizedPhone,
+    providerResponse: data,
+    media: { fileName: safeFileName, mimeType: cleanMimeType }
+  };
+}
+
 app.use(cors({
   origin(origin, callback) {
     if (process.env.NODE_ENV !== 'production') {
@@ -1144,8 +1221,8 @@ app.post(
   }
 );
 
-app.use(express.json({ limit: '2mb', type: ['application/json', 'application/*+json'] }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.json({ limit: '16mb', type: ['application/json', 'application/*+json'] }));
+app.use(express.urlencoded({ extended: true, limit: '16mb' }));
 app.use(express.text({ limit: '2mb', type: ['text/*', 'application/xml'] }));
 
 app.get('/api/health', async (_request, response) => {
@@ -1539,6 +1616,65 @@ app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
       conversationId: failed?.conversation?.id || null,
       messageId: failed?.message?.id || null
     });
+  }
+});
+
+app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
+  const mediaLabel = String(request.body?.mimeType || '').startsWith('video/') ? 'Vídeo' : 'Imagem';
+  const savedBody = String(request.body?.message || '').trim() || `[${mediaLabel}] ${request.body?.fileName || 'anexo'}`;
+  try {
+    const sentAt = new Date();
+    const result = await sendZproMediaMessage({
+      phone: request.body?.phone,
+      message: request.body?.message,
+      fileName: request.body?.fileName,
+      mimeType: request.body?.mimeType,
+      base64Data: request.body?.base64Data,
+      leadId: request.body?.leadId
+    });
+    const saved = await recordWhatsAppMessage({
+      phone: result.phone,
+      body: savedBody,
+      direction: 'OUTBOUND',
+      senderType: request.body?.senderType || 'USER',
+      senderName: request.user?.email || request.user?.sub || 'Sistema',
+      leadId: request.body?.leadId,
+      leadName: request.body?.name || null,
+      district: request.body?.district || null,
+      provider: result.provider,
+      providerStatus: result.deliveryStatus,
+      providerResponse: result.providerResponse,
+      providerMessageId: providerMessageId(result.providerResponse),
+      occurredAt: sentAt,
+      metadata: { media: result.media }
+    });
+    response.json({
+      ...result,
+      conversationId: saved?.conversation?.id || null,
+      messageId: saved?.message?.id || null,
+      sentAt: sentAt.toISOString()
+    });
+  } catch (error) {
+    console.error('[zpro:send-media:error]', error.message, error.providerResponse || '');
+    await recordWhatsAppMessage({
+      phone: request.body?.phone,
+      body: savedBody,
+      direction: 'OUTBOUND',
+      senderType: request.body?.senderType || 'USER',
+      senderName: request.user?.email || request.user?.sub || 'Sistema',
+      leadId: request.body?.leadId,
+      leadName: request.body?.name || null,
+      district: request.body?.district || null,
+      provider: 'zpro-baileys',
+      providerStatus: error.deliveryStatus || 'FAILED',
+      providerResponse: error.providerResponse || null,
+      occurredAt: new Date(),
+      metadata: {
+        failure: true,
+        media: { fileName: request.body?.fileName || null, mimeType: request.body?.mimeType || null }
+      }
+    }).catch(() => null);
+    response.status(error.status || 500).json({ ok: false, message: error.message });
   }
 });
 

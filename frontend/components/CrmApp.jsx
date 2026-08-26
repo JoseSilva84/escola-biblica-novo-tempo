@@ -39,6 +39,7 @@ import {
   Menu,
   MessageCircle,
   Moon,
+  Paperclip,
   PanelLeftClose,
   PanelLeftOpen,
   PieChart,
@@ -119,6 +120,15 @@ function dashboardLeadToWhatsAppLead(lead) {
     hasActiveStudy: Boolean(lead?.e),
     source: 'dashboard'
   };
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '');
+    reader.onerror = () => reject(new Error('Não foi possível ler o anexo.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function apiFetch(path, options = {}) {
@@ -7299,14 +7309,13 @@ function WhatsAppLeadPickerModal({
   newContact,
   newContactMode = false,
   newContactSaving = false,
-  onClearArrayFilter,
+  onArrayFilterChange,
   onClose,
   onFilterChange,
   onNewContactChange,
   onNewContactSubmit,
   onSearch,
   onSelect,
-  onToggleArrayFilter,
   onToggleNewContact,
 }) {
   return createPortal(
@@ -7360,56 +7369,57 @@ function WhatsAppLeadPickerModal({
             </div>
           </form>
         ) : (
-        <form className="grid max-h-[54vh] gap-4 overflow-y-auto border-b border-slate-200 bg-white p-5" onSubmit={onSearch}>
+        <form className="grid gap-3 border-b border-slate-200 bg-white p-4" onSubmit={onSearch}>
           <div className="grid gap-3 md:grid-cols-[1fr_auto]">
             <label className="grid gap-1.5">
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Buscar contato</span>
+              <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">Buscar contato</span>
               <input
                 autoFocus
-                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
                 onChange={(event) => onFilterChange('search', event.target.value)}
                 placeholder="Nome, e-mail, distrito ou WhatsApp"
                 value={filters.search}
               />
             </label>
-            <button className={`${primaryButtonClass} mt-auto h-12`} type="submit">
+            <button className={`${primaryButtonClass} mt-auto h-10`} type="submit">
               <Search size={18} /> Buscar
             </button>
           </div>
 
-          <details className="group rounded-2xl border border-slate-200 bg-slate-50/80 p-4" open>
-            <summary className="cursor-pointer list-none text-xs font-black uppercase tracking-[0.16em] text-blue-700">
-              Filtragem avançada
-            </summary>
-            <div className="mt-4 grid gap-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <AdvancedFilterGroup compact title="Distritos" options={filterOptions.districts} selected={filters.districts} onToggle={(value) => onToggleArrayFilter('districts', value)} onClear={() => onClearArrayFilter('districts')} />
-                <AdvancedFilterGroup compact title="Bairros" options={filterOptions.neighborhoods} selected={filters.neighborhoods} onToggle={(value) => onToggleArrayFilter('neighborhoods', value)} onClear={() => onClearArrayFilter('neighborhoods')} />
-                <AdvancedFilterGroup compact title="Materiais" options={filterOptions.materials} selected={filters.materials} onToggle={(value) => onToggleArrayFilter('materials', value)} onClear={() => onClearArrayFilter('materials')} />
-                <AdvancedFilterGroup compact title="Prioridade" options={filterOptions.priorities} selected={filters.priorities} onToggle={(value) => onToggleArrayFilter('priorities', value)} onClear={() => onClearArrayFilter('priorities')} />
-                <AdvancedFilterGroup compact title="Idade" options={filterOptions.ageGroups} selected={filters.ageGroups} onToggle={(value) => onToggleArrayFilter('ageGroups', value)} onClear={() => onClearArrayFilter('ageGroups')} />
-                <AdvancedFilterGroup compact title="Gênero" options={filterOptions.genders} selected={filters.genders} onToggle={(value) => onToggleArrayFilter('genders', value)} onClear={() => onClearArrayFilter('genders')} />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {[
-                  ['whatsapp', 'WhatsApp'],
-                  ['email', 'E-mail'],
-                  ['study', 'Estudos'],
-                  ['vip', 'VIP'],
-                  ['religion', 'Religião'],
-                  ['recency', 'Tempo']
-                ].map(([key, label]) => (
-                  <label className="grid min-w-0 gap-2 rounded-xl border border-slate-200 bg-white p-3 text-[11px] font-black uppercase tracking-wide text-slate-600 shadow-sm" key={key}>
-                    {label}
-                    <select className="h-10 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold normal-case text-slate-800 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => onFilterChange(key, event.target.value)} value={filters[key]}>
-                      {filterOptions[key].map(([value, optionLabel]) => <option key={value} value={value}>{optionLabel}</option>)}
-                    </select>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </details>
-          <p className="text-xs font-semibold text-slate-500">A lista abaixo é atualizada automaticamente enquanto você digita ou seleciona os filtros.</p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ['districts', 'Distrito', 'Todos os distritos'],
+              ['neighborhoods', 'Bairro', 'Todos os bairros'],
+              ['materials', 'Material', 'Todos os materiais'],
+              ['priorities', 'Prioridade', 'Todas as prioridades'],
+              ['ageGroups', 'Idade', 'Todas as idades'],
+              ['genders', 'Gênero', 'Todos os gêneros']
+            ].map(([key, label, defaultLabel]) => (
+              <label className="grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500" key={key}>
+                {label}
+                <select className="h-9 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-bold normal-case text-slate-800 outline-none transition hover:border-blue-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => onArrayFilterChange(key, event.target.value)} value={filters[key][0] || ''}>
+                  <option value="">{defaultLabel}</option>
+                  {filterOptions[key].map((option) => <option key={option.value} value={option.value}>{option.label} ({formatNumber(option.count)})</option>)}
+                </select>
+              </label>
+            ))}
+            {[
+              ['whatsapp', 'WhatsApp'],
+              ['email', 'E-mail'],
+              ['study', 'Estudos'],
+              ['vip', 'VIP'],
+              ['religion', 'Religião'],
+              ['recency', 'Tempo']
+            ].map(([key, label]) => (
+              <label className="grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500" key={key}>
+                {label}
+                <select className="h-9 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-bold normal-case text-slate-800 outline-none transition hover:border-blue-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => onFilterChange(key, event.target.value)} value={filters[key]}>
+                  {filterOptions[key].map(([value, optionLabel]) => <option key={value} value={value}>{optionLabel}</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
+          <p className="text-[11px] font-semibold text-slate-500">Todos é o padrão. Ao escolher uma opção, os contatos são atualizados automaticamente.</p>
         </form>
         )}
 
@@ -7477,7 +7487,9 @@ function ConversationsView({ records = [] }) {
   const [newContactSaving, setNewContactSaving] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', phone: '', district: '', priority: '' });
   const [messageText, setMessageText] = useState('Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?');
+  const [messageAttachment, setMessageAttachment] = useState(null);
   const chatEndRef = useRef(null);
+  const attachmentInputRef = useRef(null);
   const activePhoneRef = useRef('');
   const lastSeenMessageIdRef = useRef(null);
 
@@ -7526,17 +7538,8 @@ function ConversationsView({ records = [] }) {
     setContactFilters((current) => ({ ...current, [key]: value }));
   }
 
-  function toggleContactArrayFilter(key, value) {
-    setContactFilters((current) => ({
-      ...current,
-      [key]: current[key].includes(value)
-        ? current[key].filter((item) => item !== value)
-        : [...current[key], value]
-    }));
-  }
-
-  function clearContactArrayFilter(key) {
-    setContactFilters((current) => ({ ...current, [key]: [] }));
+  function replaceContactArrayFilter(key, value) {
+    setContactFilters((current) => ({ ...current, [key]: value ? [value] : [] }));
   }
 
   async function selectRecipientLead(lead) {
@@ -7788,19 +7791,25 @@ function ConversationsView({ records = [] }) {
     event.preventDefault();
     const phone = activePhone;
     const message = messageText.trim();
-    if (!phone || !message) {
-      toast.error('Informe telefone e mensagem');
+    if (!phone || (!message && !messageAttachment)) {
+      toast.error('Informe o destinatário e digite um texto ou anexe uma mídia');
       return;
     }
 
     setSending(true);
     try {
-      const response = await apiFetch('/api/whatsapp/send', {
+      const mediaPayload = messageAttachment ? {
+        base64Data: await fileToBase64(messageAttachment),
+        fileName: messageAttachment.name,
+        mimeType: messageAttachment.type
+      } : null;
+      const response = await apiFetch(messageAttachment ? '/api/whatsapp/send-media' : '/api/whatsapp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone,
           message,
+          ...(mediaPayload || {}),
           leadId: activeLead?.id || activeLead?.externalId || selectedConversation?.externalLeadId || null,
           name: activeLeadName,
           district: activeLeadDistrict
@@ -7809,6 +7818,8 @@ function ConversationsView({ records = [] }) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
       setMessageText('');
+      setMessageAttachment(null);
+      if (attachmentInputRef.current) attachmentInputRef.current.value = '';
       await loadConversations(phone, { selectSearched: true });
       setSelectedId(payload.conversationId || selectedId);
       toast.success('Mensagem aceita pelo provedor', {
@@ -7819,6 +7830,22 @@ function ConversationsView({ records = [] }) {
     } finally {
       setSending(false);
     }
+  }
+
+  function selectMessageAttachment(event) {
+    const file = event.target.files?.[0] || null;
+    if (!file) return;
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      toast.error('Arquivo não permitido', { description: 'Selecione uma imagem ou um vídeo.' });
+      event.target.value = '';
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Anexo muito grande', { description: 'O tamanho máximo é 10 MB.' });
+      event.target.value = '';
+      return;
+    }
+    setMessageAttachment(file);
   }
 
   return (
@@ -7839,8 +7866,8 @@ function ConversationsView({ records = [] }) {
         </div>
       </section>
 
-      <section className="grid grid-cols-[22rem_1fr_18rem] gap-4 max-2xl:grid-cols-[20rem_1fr] max-lg:grid-cols-1">
-        <aside className={`${panelClass} flex min-h-[42rem] flex-col overflow-hidden p-4`}>
+      <section className="grid h-[42rem] min-h-0 grid-cols-[22rem_1fr_18rem] gap-4 max-2xl:h-auto max-2xl:grid-cols-[20rem_1fr] max-lg:grid-cols-1">
+        <aside className={`${panelClass} flex h-full min-h-0 flex-col overflow-hidden p-4 max-2xl:h-[42rem]`}>
           <div className="flex items-center justify-between gap-3">
             <span className={labelClass}>Leads</span>
             <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations()} type="button">Atualizar</button>
@@ -7885,7 +7912,7 @@ function ConversationsView({ records = [] }) {
           </div>
         </aside>
 
-        <article className={`${panelClass} flex min-h-[42rem] flex-col overflow-hidden`}>
+        <article className={`${panelClass} flex h-full min-h-0 flex-col overflow-hidden max-2xl:h-[42rem]`}>
           <div className="border-b border-white/[0.07] p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-4">
@@ -7933,24 +7960,45 @@ function ConversationsView({ records = [] }) {
             </div>
           </div>
 
-          <form className="grid gap-3 border-t border-white/[0.07] p-5" onSubmit={submitMessage}>
+          <form className="grid gap-3 border-t border-white/[0.07] p-4" onSubmit={submitMessage}>
             <textarea
-              className="min-h-28 rounded-2xl border border-white/[0.08] bg-slate-950/70 px-4 py-3 text-sm font-semibold leading-relaxed text-slate-100 outline-none placeholder:text-slate-600"
+              className="min-h-20 resize-none rounded-2xl border border-white/[0.08] bg-slate-950/70 px-4 py-3 text-sm font-semibold leading-relaxed text-slate-100 outline-none placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  if (!sending && activePhone && (messageText.trim() || messageAttachment)) event.currentTarget.form?.requestSubmit();
+                }
+              }}
               onChange={(event) => setMessageText(event.target.value)}
-              placeholder="Digite sua resposta"
+              placeholder="Digite o texto"
               value={messageText}
             />
+            {messageAttachment ? (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-400/25 bg-blue-500/10 px-3 py-2 text-xs font-bold text-blue-100">
+                <span className="min-w-0 truncate">{messageAttachment.type.startsWith('video/') ? 'Vídeo' : 'Imagem'}: {messageAttachment.name}</span>
+                <button aria-label="Remover anexo" className="rounded-lg p-1 transition hover:bg-white/10 hover:text-white" onClick={() => {
+                  setMessageAttachment(null);
+                  if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+                }} type="button"><X size={16} /></button>
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-slate-500">Ao enviar, a mensagem fica vinculada ao lead selecionado no banco de dados.</span>
-              <button className={primaryButtonClass} disabled={sending || !activePhone} type="submit">
+              <div className="flex items-center gap-2">
+                <input accept="image/*,video/*" className="hidden" onChange={selectMessageAttachment} ref={attachmentInputRef} type="file" />
+                <button className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-black text-slate-300 transition hover:-translate-y-0.5 hover:border-blue-400/40 hover:bg-blue-500/10 hover:text-white" onClick={() => attachmentInputRef.current?.click()} type="button">
+                  <Paperclip size={17} /> Anexar imagem ou vídeo
+                </button>
+                <span className="text-[11px] font-semibold text-slate-500 max-md:hidden">Enter envia · Shift+Enter quebra a linha</span>
+              </div>
+              <button className={primaryButtonClass} disabled={sending || !activePhone || (!messageText.trim() && !messageAttachment)} type="submit">
                 <Send size={18} />
-                {sending ? 'Enviando...' : 'Enviar resposta'}
+                {sending ? 'Enviando...' : 'Enviar'}
               </button>
             </div>
           </form>
         </article>
 
-        <aside className={`${panelClass} grid content-start gap-4 p-5 max-2xl:col-span-2 max-lg:col-span-1`}>
+        <aside className={`${panelClass} grid h-full min-h-0 content-start gap-4 overflow-y-auto p-5 max-2xl:col-span-2 max-2xl:h-auto max-lg:col-span-1`}>
           <div>
             <span className={labelClass}>Ferramentas</span>
             <h2 className="mt-1 text-xl font-black text-slate-50">Proximas acoes</h2>
@@ -8004,14 +8052,13 @@ function ConversationsView({ records = [] }) {
           newContact={newContact}
           newContactMode={newContactMode}
           newContactSaving={newContactSaving}
-          onClearArrayFilter={clearContactArrayFilter}
+          onArrayFilterChange={replaceContactArrayFilter}
           onClose={() => setLeadPickerOpen(false)}
           onFilterChange={setContactFilter}
           onNewContactChange={updateNewContact}
           onNewContactSubmit={submitNewContact}
           onSearch={submitLeadSearch}
           onSelect={selectRecipientLead}
-          onToggleArrayFilter={toggleContactArrayFilter}
           onToggleNewContact={() => setNewContactMode((current) => !current)}
         />
       ) : null}
