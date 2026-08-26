@@ -7759,11 +7759,98 @@ function WhatsAppBroadcastModal({
   );
 }
 
+function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
+  const metricDefinitions = [
+    { key: 'sent', label: 'Enviados', icon: Send, color: '#00a884', track: '#d9fdd3' },
+    { key: 'delivered', label: 'Receberam', icon: CheckCheck, color: '#0284c7', track: '#e0f2fe' },
+    { key: 'responded', label: 'Responderam', icon: MessageCircle, color: '#7c3aed', track: '#ede9fe' }
+  ];
+
+  return (
+    <section className={`${panelClass} overflow-hidden p-6`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <span className={labelClass}>Desempenho das transmissões</span>
+          <h2 className="mt-2 text-2xl font-black text-slate-50">Painel de mensagens enviadas aos leads</h2>
+          <p className="mt-2 max-w-3xl text-sm font-semibold leading-relaxed text-slate-400">
+            Cada envio é medido separadamente. A seleção de destinatários continua temporária e não é salva como lista reutilizável.
+          </p>
+        </div>
+        <button className={`${ghostButtonClass} h-10 px-4`} onClick={onRefresh} type="button">Atualizar painel</button>
+      </div>
+
+      {loading ? (
+        <div className="mt-5 rounded-2xl border border-[#00a884]/20 bg-white p-5 text-sm font-bold text-[#54656f]">
+          Carregando os indicadores das transmissões...
+        </div>
+      ) : transmissions.length ? (
+        <div className="mt-5 grid grid-cols-2 gap-4 max-xl:grid-cols-1">
+          {transmissions.slice(0, 8).map((transmission) => {
+            const target = Math.max(Number(transmission.targeted) || 0, Number(transmission.sent) || 0, 1);
+            const formattedDate = transmission.createdAt
+              ? new Date(transmission.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+              : 'Data não informada';
+            return (
+              <article className="overflow-hidden rounded-2xl border border-[#d1d7db] bg-white shadow-[0_16px_42px_rgba(11,20,26,0.10)]" key={transmission.id}>
+                <div className="border-b border-[#e9edef] bg-[linear-gradient(135deg,#f7fffb,#edfdf7)] px-5 py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <strong className="block truncate text-base font-black text-[#111b21]">{transmission.name}</strong>
+                      <span className="mt-1 block text-xs font-bold text-[#667781]">{formattedDate}</span>
+                    </div>
+                    <span className="rounded-full bg-[#075e54] px-3 py-1 text-xs font-black text-white">
+                      {formatNumber(transmission.targeted || transmission.sent || 0)} destinatários
+                    </span>
+                  </div>
+                  <p className="mt-3 line-clamp-2 text-sm font-semibold leading-relaxed text-[#3b4a54]">{transmission.message}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-3 p-4 max-sm:grid-cols-1">
+                  {metricDefinitions.map((metric) => {
+                    const Icon = metric.icon;
+                    const value = Number(transmission[metric.key]) || 0;
+                    const percentage = Math.min(100, Math.round((value / target) * 100));
+                    return (
+                      <div className="rounded-xl border border-[#e9edef] p-3" key={metric.key}>
+                        <div className="flex items-center gap-2">
+                          <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ backgroundColor: metric.track, color: metric.color }}>
+                            <Icon size={16} />
+                          </span>
+                          <span className="text-[11px] font-black uppercase tracking-wide text-[#667781]">{metric.label}</span>
+                        </div>
+                        <strong className="mt-3 block text-2xl font-black text-[#111b21]">{formatNumber(value)}</strong>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: metric.track }}>
+                          <span className="block h-full rounded-full transition-all" style={{ backgroundColor: metric.color, width: `${percentage}%` }} />
+                        </div>
+                        <span className="mt-1.5 block text-[11px] font-bold text-[#667781]">{percentage}% dos destinatários</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {transmission.failed ? (
+                  <div className="border-t border-red-100 bg-red-50 px-5 py-2 text-xs font-bold text-red-700">
+                    {formatNumber(transmission.failed)} envio(s) com falha
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mt-5 rounded-2xl border border-dashed border-[#00a884]/40 bg-[#d9fdd3] p-6 text-center">
+          <strong className="text-sm font-black text-[#006c5b]">Nenhuma transmissão registrada ainda.</strong>
+          <p className="mt-1 text-xs font-semibold text-[#3b4a54]">Depois do primeiro envio coletivo, os indicadores aparecerão aqui.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ConversationsView({ records = [] }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [phoneSearch, setPhoneSearch] = useState('');
   const [conversationListSearch, setConversationListSearch] = useState('');
+  const [hiddenConversationIds, setHiddenConversationIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [conversationExpanded, setConversationExpanded] = useState(false);
@@ -7796,6 +7883,8 @@ function ConversationsView({ records = [] }) {
   const [broadcastListName, setBroadcastListName] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastAnalytics, setBroadcastAnalytics] = useState([]);
+  const [broadcastAnalyticsLoading, setBroadcastAnalyticsLoading] = useState(true);
   const [selectedRecipientLead, setSelectedRecipientLead] = useState(null);
   const [newContactMode, setNewContactMode] = useState(false);
   const [newContactSaving, setNewContactSaving] = useState(false);
@@ -7806,6 +7895,30 @@ function ConversationsView({ records = [] }) {
   const attachmentInputRef = useRef(null);
   const activePhoneRef = useRef('');
   const lastSeenMessageIdRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('whatsapp-hidden-conversations') || '[]');
+      if (Array.isArray(saved)) setHiddenConversationIds(saved.filter(Boolean));
+    } catch {
+      setHiddenConversationIds([]);
+    }
+  }, []);
+
+  function hideConversationFromHistory(conversation) {
+    setHiddenConversationIds((current) => {
+      const next = Array.from(new Set([...current, conversation.id]));
+      window.localStorage.setItem('whatsapp-hidden-conversations', JSON.stringify(next));
+      return next;
+    });
+    if (selectedId === conversation.id || phoneDigits(phoneSearch).endsWith(phoneDigits(conversation.phone).slice(-10))) {
+      setSelectedId(null);
+      setPhoneSearch('');
+    }
+    toast.success('Conversa removida desta tela', {
+      description: 'O histórico continua salvo no banco de dados.'
+    });
+  }
 
   async function loadLeadDirectory() {
     const fallbackDistricts = Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b));
@@ -7920,12 +8033,20 @@ function ConversationsView({ records = [] }) {
         phone: phoneDigits(lead.phone)
       }));
       const totals = { sent: 0, failed: 0 };
+      const broadcastId = globalThis.crypto?.randomUUID?.()
+        || `broadcast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       for (let index = 0; index < recipients.length; index += 50) {
         const chunk = recipients.slice(index, index + 50);
         const response = await apiFetch('/api/whatsapp/send-batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ recipients: chunk, message: broadcastMessage.trim(), listName: broadcastListName.trim() || null })
+          body: JSON.stringify({
+            recipients: chunk,
+            message: broadcastMessage.trim(),
+            listName: broadcastListName.trim() || null,
+            broadcastId,
+            recipientTotal: recipients.length
+          })
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.message || 'Não foi possível enviar a transmissão.');
@@ -7941,6 +8062,7 @@ function ConversationsView({ records = [] }) {
       setBroadcastListName('');
       setBroadcastMessage('');
       await loadConversations('', { silent: true });
+      await loadBroadcastAnalytics({ silent: true });
     } catch (error) {
       toast.error('Falha na transmissão', { description: error.message });
     } finally {
@@ -8040,8 +8162,35 @@ function ConversationsView({ records = [] }) {
     }
   }
 
+  async function loadBroadcastAnalytics(options = {}) {
+    const { silent = false } = options;
+    if (!silent) setBroadcastAnalyticsLoading(true);
+    try {
+      const response = await apiFetch(`/api/whatsapp/broadcast-analytics?_=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Não foi possível carregar os indicadores.');
+      setBroadcastAnalytics(Array.isArray(payload.transmissions) ? payload.transmissions : []);
+    } catch (error) {
+      if (!silent) {
+        setBroadcastAnalytics([]);
+        toast.error('Falha ao carregar o painel de transmissões', { description: error.message });
+      }
+    } finally {
+      if (!silent) setBroadcastAnalyticsLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadConversations();
+    loadBroadcastAnalytics();
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => loadBroadcastAnalytics({ silent: true }), 15000);
+    return () => window.clearInterval(interval);
   }, []);
 
   const contactFilterRecords = useMemo(() => {
@@ -8182,11 +8331,14 @@ function ConversationsView({ records = [] }) {
     [records]
   );
   const searchedPhone = phoneDigits(phoneSearch);
-  const selectedById = conversations.find((conversation) => conversation.id === selectedId) || null;
+  const displayedConversations = useMemo(() => conversations.filter(
+    (conversation) => !hiddenConversationIds.includes(conversation.id)
+  ), [conversations, hiddenConversationIds]);
+  const selectedById = displayedConversations.find((conversation) => conversation.id === selectedId) || null;
   const searchedConversation = searchedPhone
-    ? conversations.find((conversation) => phoneDigits(conversation.phone).endsWith(searchedPhone.slice(-10)))
+    ? displayedConversations.find((conversation) => phoneDigits(conversation.phone).endsWith(searchedPhone.slice(-10)))
     : null;
-  const selectedConversation = searchedPhone ? searchedConversation : selectedById || conversations[0] || null;
+  const selectedConversation = searchedPhone ? searchedConversation : selectedById || displayedConversations[0] || null;
   const activePhone = searchedPhone || selectedConversation?.phone || '';
   const messages = selectedConversation?.messages || [];
   const lastMessage = messages[messages.length - 1];
@@ -8215,9 +8367,9 @@ function ConversationsView({ records = [] }) {
   ];
   const visibleConversations = useMemo(() => {
     const term = conversationListSearch.trim().toLocaleLowerCase('pt-BR');
-    if (!term) return conversations;
+    if (!term) return displayedConversations;
     const termDigits = phoneDigits(term);
-    return conversations.filter((conversation) => {
+    return displayedConversations.filter((conversation) => {
       const suffix = String(conversation.phone || '').slice(-10);
       const matchedRecord = records.find((lead) => suffix && phoneDigits(lead.tel).includes(suffix));
       const matchedDirectoryLead = leadDirectory.find((lead) => suffix && phoneDigits(lead.phone).endsWith(suffix));
@@ -8236,7 +8388,7 @@ function ConversationsView({ records = [] }) {
       ].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
       return haystack.includes(term) || Boolean(termDigits && phoneDigits(conversation.phone).includes(termDigits));
     });
-  }, [conversationListSearch, conversations, leadDirectory, records]);
+  }, [conversationListSearch, displayedConversations, leadDirectory, records]);
   const newConversationCandidate = useMemo(() => {
     const typedPhone = phoneDigits(conversationListSearch);
     if (visibleConversations.length || typedPhone.length < 10 || typedPhone.length > 13) return null;
@@ -8416,23 +8568,36 @@ function ConversationsView({ records = [] }) {
               const displayDistrict = displayLead?.district || displayLead?.d || conversation.district || 'Distrito não vinculado';
               const displayPriority = displayLead?.priority || displayLead?.p || conversation.leadPriority || null;
               return (
-                <button
-                  className={`interactive-card whatsapp-contact-card flex items-center gap-3 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'whatsapp-contact-active border-[#25d366] ring-4 ring-[#25d366]/10' : 'border-[#e9edef]'}`}
+                <div
+                  className={`interactive-card whatsapp-contact-card relative overflow-hidden rounded-2xl border text-left transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'whatsapp-contact-active border-[#25d366] ring-4 ring-[#25d366]/10' : 'border-[#e9edef]'}`}
                   key={conversation.id}
-                  onClick={() => {
-                    setSelectedId(conversation.id);
-                    setPhoneSearch(conversation.phone);
-                  }}
-                  type="button"
                 >
-                  <ContactAvatar name={displayName} phone={conversation.phone} variant="whatsapp" />
-                  <span className="min-w-0 flex-1">
-                  <strong className="block truncate text-sm font-black text-slate-950">{displayName}</strong>
-                  <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{displayDistrict} · {whatsappPriorityLabels[displayPriority] || displayPriority || 'Sem tipo'}</span>
-                  <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">{conversation.phone}</span>
-                  <span className="mt-2 block truncate text-xs font-bold text-slate-500">{currentLast?.body || 'Sem mensagens registradas'}</span>
-                  </span>
-                </button>
+                  <button
+                    className="flex w-full items-center gap-3 p-4 pr-11 text-left"
+                    onClick={() => {
+                      setSelectedId(conversation.id);
+                      setPhoneSearch(conversation.phone);
+                    }}
+                    type="button"
+                  >
+                    <ContactAvatar name={displayName} phone={conversation.phone} variant="whatsapp" />
+                    <span className="min-w-0 flex-1">
+                      <strong className="block truncate text-sm font-black text-slate-950">{displayName}</strong>
+                      <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{displayDistrict} · {whatsappPriorityLabels[displayPriority] || displayPriority || 'Sem tipo'}</span>
+                      <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">{conversation.phone}</span>
+                      <span className="mt-2 block truncate text-xs font-bold text-slate-500">{currentLast?.body || 'Sem mensagens registradas'}</span>
+                    </span>
+                  </button>
+                  <button
+                    aria-label={`Remover ${displayName} desta tela`}
+                    className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full border border-[#d1d7db] bg-white/95 text-[#667781] shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-4 focus:ring-red-500/10"
+                    onClick={() => hideConversationFromHistory(conversation)}
+                    title="Remover conversa desta tela"
+                    type="button"
+                  >
+                    <X size={15} strokeWidth={2.5} />
+                  </button>
+                </div>
               );
             }) : newConversationCandidate ? (
               <button
@@ -8592,6 +8757,12 @@ function ConversationsView({ records = [] }) {
           </div>
         </aside>
       </section>
+
+      <BroadcastAnalyticsPanel
+        loading={broadcastAnalyticsLoading}
+        transmissions={broadcastAnalytics}
+        onRefresh={() => loadBroadcastAnalytics()}
+      />
 
       <section className={`${panelClass} p-6`}>
         <span className={labelClass}>Base de contatos</span>

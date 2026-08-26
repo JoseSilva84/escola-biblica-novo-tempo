@@ -1682,6 +1682,8 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
   const recipients = Array.isArray(request.body?.recipients) ? request.body.recipients.slice(0, 50) : [];
   const message = request.body?.message;
   const listName = String(request.body?.listName || '').trim().slice(0, 120) || null;
+  const broadcastId = String(request.body?.broadcastId || '').trim().slice(0, 120) || randomUUID();
+  const recipientTotal = Math.max(Number(request.body?.recipientTotal) || recipients.length, recipients.length);
   if (!recipients.length) {
     response.status(400).json({ ok: false, message: 'Informe ao menos um destinatario.' });
     return;
@@ -1709,7 +1711,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         providerStatus: result.deliveryStatus,
         providerResponse: result.providerResponse,
         providerMessageId: providerMessageId(result.providerResponse),
-        metadata: { templateId: request.body?.templateId || null, batch: true, listName, attempts: result.attempts || [] }
+        metadata: { templateId: request.body?.templateId || null, batch: true, broadcastId, listName, recipientTotal, attempts: result.attempts || [] }
       });
       results.push({
         ok: true,
@@ -1735,7 +1737,9 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         metadata: {
           failure: true,
           batch: true,
+          broadcastId,
           listName,
+          recipientTotal,
           providerHttpStatus: error.providerStatus || null,
           attempts: error.providerAttempts || []
         }
@@ -1759,6 +1763,137 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
     failed: results.filter((item) => !item.ok).length,
     results
   });
+});
+
+app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, response) => {
+  response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.json({ transmissions: [] });
+    return;
+  }
+
+  try {
+    const outboundMessages = await prisma.whatsAppMessage.findMany({
+      where: { direction: 'OUTBOUND' },
+      orderBy: { createdAt: 'desc' },
+      take: 20000,
+      select: {
+        id: true,
+        conversationId: true,
+        body: true,
+        providerStatus: true,
+        metadata: true,
+        createdAt: true,
+        sentAt: true
+      }
+    });
+    const transmissionIdFor = (messageItem) => {
+      const metadata = messageItem.metadata && typeof messageItem.metadata === 'object'
+        ? messageItem.metadata
+        : {};
+      if (!metadata.batch) return null;
+      const legacyDay = messageItem.createdAt.toISOString().slice(0, 10);
+      return String(metadata.broadcastId || `legacy:${metadata.listName || 'sem-nome'}:${messageItem.body}:${legacyDay}`);
+    };
+    const batchMessages = outboundMessages
+      .filter((messageItem) => messageItem.metadata?.batch)
+      .reverse();
+    const transmissions = new Map();
+
+    for (const messageItem of batchMessages) {
+      const metadata = messageItem.metadata && typeof messageItem.metadata === 'object'
+        ? messageItem.metadata
+        : {};
+      const transmissionId = transmissionIdFor(messageItem);
+      if (!transmissions.has(transmissionId)) {
+        transmissions.set(transmissionId, {
+          id: transmissionId,
+          name: metadata.listName || 'Transmissão sem nome',
+          message: messageItem.body,
+          createdAt: messageItem.sentAt || messageItem.createdAt,
+          recipientTarget: Number(metadata.recipientTotal) || 0,
+          recipients: new Set(),
+          sent: new Set(),
+          delivered: new Set(),
+          failed: new Set(),
+          responded: new Set()
+        });
+      }
+
+      const transmission = transmissions.get(transmissionId);
+      const status = String(messageItem.providerStatus || 'ACCEPTED').toUpperCase();
+      const conversationId = messageItem.conversationId;
+      transmission.recipientTarget = Math.max(transmission.recipientTarget, Number(metadata.recipientTotal) || 0);
+      transmission.recipients.add(conversationId);
+      if (status.startsWith('FAILED')) {
+        transmission.failed.add(conversationId);
+      } else {
+        transmission.sent.add(conversationId);
+      }
+      if (['DELIVERED', 'READ', 'PLAYED', 'DELIVERED_BY_REPLY'].includes(status)) {
+        transmission.delivered.add(conversationId);
+      }
+    }
+
+    const recentTransmissions = Array.from(transmissions.values())
+      .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
+      .slice(0, 12);
+    const recentIds = new Set(recentTransmissions.map((item) => item.id));
+    const conversationIds = Array.from(new Set(recentTransmissions.flatMap((item) => Array.from(item.recipients))));
+    const conversationIdSet = new Set(conversationIds);
+
+    if (recentTransmissions.length && conversationIds.length) {
+      const earliestCreatedAt = recentTransmissions.reduce((earliest, item) => (
+        new Date(item.createdAt) < earliest ? new Date(item.createdAt) : earliest
+      ), new Date(recentTransmissions[0].createdAt));
+      const inboundMessages = await prisma.whatsAppMessage.findMany({
+        where: {
+          direction: 'INBOUND',
+          conversationId: { in: conversationIds },
+          createdAt: { gte: earliestCreatedAt }
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { conversationId: true, createdAt: true }
+      });
+      const outboundTimeline = new Map();
+      for (const outbound of outboundMessages) {
+        if (!conversationIdSet.has(outbound.conversationId) || new Date(outbound.createdAt) < earliestCreatedAt) continue;
+        if (!outboundTimeline.has(outbound.conversationId)) outboundTimeline.set(outbound.conversationId, []);
+        outboundTimeline.get(outbound.conversationId).push({
+          createdAt: outbound.createdAt,
+          transmissionId: transmissionIdFor(outbound)
+        });
+      }
+      for (const entries of outboundTimeline.values()) {
+        entries.sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
+      }
+      for (const inbound of inboundMessages) {
+        const timeline = outboundTimeline.get(inbound.conversationId) || [];
+        const preceding = [...timeline].reverse().find((item) => new Date(item.createdAt) <= new Date(inbound.createdAt));
+        if (!preceding || !recentIds.has(preceding.transmissionId)) continue;
+        transmissions.get(preceding.transmissionId)?.responded.add(inbound.conversationId);
+        transmissions.get(preceding.transmissionId)?.delivered.add(inbound.conversationId);
+      }
+    }
+
+    response.json({
+      transmissions: recentTransmissions.map((transmission) => ({
+        id: transmission.id,
+        name: transmission.name,
+        message: transmission.message,
+        createdAt: transmission.createdAt,
+        targeted: Math.max(transmission.recipientTarget, transmission.recipients.size),
+        sent: transmission.sent.size,
+        delivered: transmission.delivered.size,
+        responded: transmission.responded.size,
+        failed: transmission.failed.size
+      }))
+    });
+  } catch (error) {
+    console.error('[whatsapp:broadcast-analytics:error]', error.message);
+    response.status(500).json({ message: 'Não foi possível carregar os indicadores das transmissões.' });
+  }
 });
 
 app.get('/api/webhooks/zpro/whatsapp', (request, response) => {
