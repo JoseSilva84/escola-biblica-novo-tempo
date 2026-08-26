@@ -36,8 +36,10 @@ import {
   Lock,
   LogOut,
   MapPin,
+  Maximize2,
   Menu,
   MessageCircle,
+  Minimize2,
   Moon,
   Paperclip,
   PanelLeftClose,
@@ -120,6 +122,17 @@ function dashboardLeadToWhatsAppLead(lead) {
     hasActiveStudy: Boolean(lead?.e),
     source: 'dashboard'
   };
+}
+
+function meaningfulContactName(phone, ...values) {
+  const normalizedPhone = phoneDigits(phone);
+  const name = values.find((value) => {
+    const text = String(value || '').trim();
+    if (!text) return false;
+    const digits = phoneDigits(text);
+    return !digits || !normalizedPhone || !digits.endsWith(normalizedPhone.slice(-10));
+  });
+  return String(name || normalizedPhone || phone || '').trim();
 }
 
 function fileToBase64(file) {
@@ -7462,6 +7475,7 @@ function ConversationsView({ records = [] }) {
   const [phoneSearch, setPhoneSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [conversationExpanded, setConversationExpanded] = useState(false);
   const [leadPickerOpen, setLeadPickerOpen] = useState(false);
   const [leadDirectory, setLeadDirectory] = useState([]);
   const [leadDistricts, setLeadDistricts] = useState([]);
@@ -7757,7 +7771,14 @@ function ConversationsView({ records = [] }) {
   const activeLead = selectedLeadMatches
     ? selectedRecipientLead
     : selectedConversation?.lead || directoryLead || recordLead || null;
-  const activeLeadName = activeLead?.name || activeLead?.n || selectedConversation?.leadName || null;
+  const activeLeadName = meaningfulContactName(
+    activePhone,
+    activeLead?.name,
+    activeLead?.n,
+    selectedConversation?.leadName,
+    recordLead?.n,
+    directoryLead?.name
+  ) || null;
   const activeLeadDistrict = activeLead?.district || activeLead?.d || selectedConversation?.district || null;
   const quickActions = [
     ['Resumo', 'Gerar resumo da conversa para o coordenador.'],
@@ -7773,6 +7794,15 @@ function ConversationsView({ records = [] }) {
   useEffect(() => {
     activePhoneRef.current = activePhone;
   }, [activePhone]);
+
+  useEffect(() => {
+    if (!conversationExpanded) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setConversationExpanded(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [conversationExpanded]);
 
   useEffect(() => {
     if (lastMessage?.id) {
@@ -7872,7 +7902,7 @@ function ConversationsView({ records = [] }) {
             <span className={labelClass}>Leads</span>
             <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations()} type="button">Atualizar</button>
           </div>
-          <div className="mt-4 grid min-h-0 flex-1 content-start gap-2 overflow-auto pr-1">
+          <div className="mt-4 grid min-h-0 flex-1 auto-rows-max content-start gap-2 overflow-x-hidden overflow-y-auto pr-1">
             {loading ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-700">Carregando conversas...</div>
             ) : conversations.length ? conversations.map((conversation) => {
@@ -7882,7 +7912,13 @@ function ConversationsView({ records = [] }) {
               const matchedRecord = records.find((lead) => suffix && phoneDigits(lead.tel).includes(suffix));
               const matchedDirectoryLead = leadDirectory.find((lead) => suffix && phoneDigits(lead.phone).endsWith(suffix));
               const displayLead = conversation.lead || matchedDirectoryLead || matchedRecord || null;
-              const displayName = displayLead?.name || displayLead?.n || conversation.leadName || conversation.phone;
+              const displayName = meaningfulContactName(
+                conversation.phone,
+                conversation.lead?.name,
+                matchedDirectoryLead?.name,
+                matchedRecord?.n,
+                conversation.leadName
+              );
               const displayDistrict = displayLead?.district || displayLead?.d || conversation.district || 'Distrito não vinculado';
               const displayPriority = displayLead?.priority || displayLead?.p || conversation.leadPriority || null;
               return (
@@ -7896,7 +7932,7 @@ function ConversationsView({ records = [] }) {
                   type="button"
                 >
                   <ContactAvatar name={displayName} phone={conversation.phone} />
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
                   <strong className="block truncate text-sm font-black text-slate-950">{displayName}</strong>
                   <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{displayDistrict} · {whatsappPriorityLabels[displayPriority] || displayPriority || 'Sem tipo'}</span>
                   <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">{conversation.phone}</span>
@@ -7912,7 +7948,8 @@ function ConversationsView({ records = [] }) {
           </div>
         </aside>
 
-        <article className={`${panelClass} flex h-full min-h-0 flex-col overflow-hidden max-2xl:h-[42rem]`}>
+        {conversationExpanded ? <button aria-label="Fechar conversa ampliada" className="fixed inset-0 z-[2147483644] cursor-default bg-slate-950/75 backdrop-blur-sm" onClick={() => setConversationExpanded(false)} type="button" /> : null}
+        <article className={`${panelClass} flex min-h-0 flex-col overflow-hidden ${conversationExpanded ? 'fixed inset-4 z-[2147483645] !h-auto rounded-3xl' : 'h-full max-2xl:h-[42rem]'}`}>
           <div className="border-b border-white/[0.07] p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-4">
@@ -7923,9 +7960,20 @@ function ConversationsView({ records = [] }) {
                 <p className="mt-1 text-sm font-semibold text-slate-500">{activeLeadDistrict || 'Distrito não vinculado'}{activePhone ? ` · ${activePhone}` : ''}</p>
                 </span>
               </div>
-              <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
-                {lastMessage?.direction === 'INBOUND' ? 'Responder' : 'Em acompanhamento'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
+                  {lastMessage?.direction === 'INBOUND' ? 'Responder' : 'Em acompanhamento'}
+                </span>
+                <button
+                  aria-label={conversationExpanded ? 'Reduzir conversa' : 'Ampliar conversa'}
+                  className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/15"
+                  onClick={() => setConversationExpanded((current) => !current)}
+                  title={conversationExpanded ? 'Reduzir conversa' : 'Ampliar conversa'}
+                  type="button"
+                >
+                  {conversationExpanded ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -7998,14 +8046,14 @@ function ConversationsView({ records = [] }) {
           </form>
         </article>
 
-        <aside className={`${panelClass} grid h-full min-h-0 content-start gap-4 overflow-y-auto p-5 max-2xl:col-span-2 max-2xl:h-auto max-lg:col-span-1`}>
+        <aside className={`${panelClass} grid h-full min-h-0 auto-rows-max content-start gap-4 overflow-x-hidden overflow-y-auto p-5 max-2xl:col-span-2 max-2xl:h-auto max-lg:col-span-1`}>
           <div>
             <span className={labelClass}>Ferramentas</span>
             <h2 className="mt-1 text-xl font-black text-slate-50">Proximas acoes</h2>
           </div>
           {quickActions.map(([title, detail]) => (
             <button
-              className="interactive-card rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
+              className="interactive-card min-h-[7rem] rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
               key={title}
               onClick={() => toast.info(title, { description: detail })}
               type="button"
