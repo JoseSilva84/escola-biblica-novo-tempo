@@ -8569,7 +8569,7 @@ function ConversationsView({ records = [] }) {
               const displayPriority = displayLead?.priority || displayLead?.p || conversation.leadPriority || null;
               return (
                 <div
-                  className={`interactive-card whatsapp-contact-card relative overflow-hidden rounded-2xl border text-left transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'whatsapp-contact-active border-[#25d366] ring-4 ring-[#25d366]/10' : 'border-[#e9edef]'}`}
+                  className={`whatsapp-contact-card relative isolate overflow-hidden rounded-2xl border text-left transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'whatsapp-contact-active border-[#25d366] ring-4 ring-[#25d366]/10' : 'border-[#e9edef]'}`}
                   key={conversation.id}
                 >
                   <button
@@ -8590,7 +8590,7 @@ function ConversationsView({ records = [] }) {
                   </button>
                   <button
                     aria-label={`Remover ${displayName} desta tela`}
-                    className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full border border-[#d1d7db] bg-white/95 text-[#667781] shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-4 focus:ring-red-500/10"
+                    className="absolute right-3 top-3 z-30 grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 border-white bg-red-500 text-white opacity-100 shadow-[0_7px_18px_rgba(220,38,38,0.38)] transition hover:scale-110 hover:bg-red-600 focus:outline-none focus:ring-4 focus:ring-red-500/25"
                     onClick={() => hideConversationFromHistory(conversation)}
                     title="Remover conversa desta tela"
                     type="button"
