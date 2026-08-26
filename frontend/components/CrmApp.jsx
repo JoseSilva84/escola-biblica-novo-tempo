@@ -7398,11 +7398,11 @@ function RecencyMultiSelect({ onChange, options = [], selected = [] }) {
     .reduce((sum, [, label]) => sum + Number(String(label).match(/\(([\d.]+)\)$/)?.[1]?.replace(/\./g, '') || 0), 0);
 
   return (
-    <label className="relative grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500">
-      Tempo
+    <div className="grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500 lg:col-span-4">
+      <span>Tempo</span>
       <button
         aria-expanded={open}
-        className="flex h-9 min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 text-left text-xs font-bold normal-case text-slate-800 outline-none transition hover:border-blue-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+        className="flex h-9 min-w-0 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 text-left text-xs font-bold normal-case text-slate-800 outline-none transition hover:border-blue-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 lg:max-w-sm"
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
@@ -7410,7 +7410,7 @@ function RecencyMultiSelect({ onChange, options = [], selected = [] }) {
         <ChevronDown className={`shrink-0 transition ${open ? 'rotate-180' : ''}`} size={15} />
       </button>
       {open ? (
-        <div className="absolute right-0 top-full z-[80] mt-1 w-[min(24rem,80vw)] rounded-xl border border-slate-200 bg-white p-2 shadow-[0_20px_55px_rgba(15,23,42,0.24)]">
+        <div className="mt-1 w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-2 shadow-[0_16px_38px_rgba(15,23,42,0.16)]">
           <div className="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 px-2 pb-2">
             <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">Selecione um ou vários períodos</span>
             {selected.length ? <button className="text-[10px] font-black uppercase text-blue-700 hover:text-red-600" onClick={() => onChange([])} type="button">Limpar</button> : null}
@@ -7433,7 +7433,7 @@ function RecencyMultiSelect({ onChange, options = [], selected = [] }) {
           </div>
         </div>
       ) : null}
-    </label>
+    </div>
   );
 }
 
