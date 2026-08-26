@@ -796,6 +796,55 @@ function normalizePhone(value) {
   return digits;
 }
 
+function normalizedPhonesFromValue(value) {
+  const direct = normalizePhone(value);
+  if (direct) return [direct];
+
+  return Array.from(new Set(String(value || '')
+    .split(/(?=\+)|[;,/|]+/)
+    .map((item) => normalizePhone(item))
+    .filter(Boolean)));
+}
+
+function storedPhoneMatches(value, phone) {
+  const target = normalizePhone(phone);
+  if (!target) return false;
+  const suffix = target.slice(-10);
+  return normalizedPhonesFromValue(value).some((candidate) => (
+    candidate === target || candidate.endsWith(suffix)
+  ));
+}
+
+const whatsappLeadSelect = {
+  id: true,
+  externalId: true,
+  name: true,
+  phone: true,
+  priority: true,
+  score: true,
+  isVip: true,
+  hasActiveStudy: true,
+  district: { select: { name: true } },
+  association: { select: { name: true, slug: true } }
+};
+
+function serializeWhatsAppLead(lead) {
+  const phone = normalizedPhonesFromValue(lead?.phone)[0] || '';
+  return {
+    id: lead?.id || null,
+    externalId: lead?.externalId || null,
+    name: lead?.name || null,
+    phone,
+    storedPhone: lead?.phone || null,
+    district: lead?.district?.name || null,
+    priority: lead?.priority || null,
+    score: lead?.score == null ? null : Number(lead.score),
+    isVip: Boolean(lead?.isVip),
+    hasActiveStudy: Boolean(lead?.hasActiveStudy),
+    association: lead?.association || null
+  };
+}
+
 function applyPathParams(pathValue, params) {
   return String(pathValue || '').replace(/\{(\w+)\}/g, (_match, key) => encodeURIComponent(params[key] || ''));
 }
@@ -1207,6 +1256,57 @@ app.get('/api/whatsapp/provider', requireAuth, (_request, response) => {
   });
 });
 
+app.get('/api/whatsapp/leads', requireAuth, async (request, response) => {
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.json({ leads: [], districts: [] });
+    return;
+  }
+
+  const search = String(request.query?.search || '').trim();
+  const district = String(request.query?.district || '').trim();
+  const requestedPriority = String(request.query?.priority || '').trim().toUpperCase();
+  const priority = ['HOT', 'WARM', 'COOL', 'COLD'].includes(requestedPriority) ? requestedPriority : '';
+  const requestedAssociation = normalizeAssociationSlug(request.query?.association);
+  const associationSlug = isAdminGeralUser(request.user)
+    ? requestedAssociation || 'paulistana'
+    : userAssociationSlug(request.user);
+  const limit = Math.min(Math.max(Number(request.query?.limit) || 80, 1), 200);
+
+  const where = {
+    phone: { not: null },
+    association: { is: { slug: associationSlug } },
+    ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
+    ...(district ? { district: { is: { name: district } } } : {}),
+    ...(priority ? { priority } : {})
+  };
+
+  try {
+    const [leads, districts] = await Promise.all([
+      prisma.lead.findMany({
+        where,
+        select: whatsappLeadSelect,
+        orderBy: [{ name: 'asc' }],
+        take: limit
+      }),
+      prisma.district.findMany({
+        where: { association: { is: { slug: associationSlug } } },
+        select: { name: true },
+        orderBy: { name: 'asc' }
+      })
+    ]);
+
+    response.json({
+      leads: leads.map(serializeWhatsAppLead).filter((lead) => lead.phone),
+      districts: districts.map((item) => item.name),
+      limit,
+      association: associationSlug
+    });
+  } catch (error) {
+    console.error('[whatsapp:leads:error]', error.message);
+    response.status(500).json({ leads: [], districts: [], message: 'Nao foi possivel buscar os leads do banco.' });
+  }
+});
+
 app.get('/api/whatsapp/conversations', requireAuth, async (request, response) => {
   response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   response.set('Pragma', 'no-cache');
@@ -1230,6 +1330,7 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
     orderBy: { updatedAt: 'desc' },
     take: limit,
     include: {
+      lead: { select: whatsappLeadSelect },
       messages: {
         orderBy: { createdAt: 'asc' },
         take: 200
@@ -1237,7 +1338,38 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
     }
   });
 
-  response.json({ conversations });
+  const unresolved = conversations.filter((conversation) => !conversation.lead);
+  const suffixes = Array.from(new Set(unresolved
+    .map((conversation) => normalizePhone(conversation.phone)?.slice(-10))
+    .filter(Boolean)));
+  const candidates = suffixes.length
+    ? await prisma.lead.findMany({
+      where: {
+        phone: { not: null },
+        OR: suffixes.map((suffix) => ({ phone: { contains: suffix } }))
+      },
+      select: whatsappLeadSelect
+    })
+    : [];
+
+  const enrichedConversations = conversations.map((conversation) => {
+    const lead = conversation.lead
+      || candidates.find((candidate) => storedPhoneMatches(candidate.phone, conversation.phone))
+      || null;
+    const serializedLead = lead ? serializeWhatsAppLead(lead) : null;
+    const { lead: _lead, ...conversationData } = conversation;
+    return {
+      ...conversationData,
+      lead: serializedLead,
+      leadId: conversation.leadId || serializedLead?.id || null,
+      externalLeadId: conversation.externalLeadId || serializedLead?.externalId || null,
+      leadName: serializedLead?.name || conversation.leadName || null,
+      district: serializedLead?.district || conversation.district || null,
+      leadPriority: serializedLead?.priority || null
+    };
+  });
+
+  response.json({ conversations: enrichedConversations });
 });
 
 app.post('/api/whatsapp/send', requireAuth, async (request, response) => {

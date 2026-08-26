@@ -88,6 +88,21 @@ const crmPriorityLabels = {
   Cool: 'Morno',
   Cold: 'Frio'
 };
+const whatsappPriorityLabels = {
+  HOT: 'Quente',
+  WARM: 'Potencial',
+  COOL: 'Morno',
+  COLD: 'Frio',
+  Hot: 'Quente',
+  Warm: 'Potencial',
+  Cool: 'Morno',
+  Cold: 'Frio'
+};
+
+function whatsappPriorityBadgeKey(value) {
+  const text = String(value || '').toLowerCase();
+  return text ? `${text[0].toUpperCase()}${text.slice(1)}` : 'Cool';
+}
 
 function apiFetch(path, options = {}) {
   const token = typeof window !== 'undefined' ? window.localStorage.getItem('sevenflow_token') : '';
@@ -7258,16 +7273,156 @@ function AdminGeneralView({
   );
 }
 
+function WhatsAppLeadPickerModal({
+  districts = [],
+  district,
+  leads = [],
+  loading = false,
+  nameSearch,
+  onClose,
+  onDistrictChange,
+  onNameSearchChange,
+  onPriorityChange,
+  onSearch,
+  onSelect,
+  priority
+}) {
+  return createPortal(
+    <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-lead-picker-title">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/12 bg-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.56)]">
+        <div className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_52%,#0f172a_100%)] p-6 text-white">
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">Destinatário do WhatsApp</span>
+            <h2 className="mt-2 text-3xl font-black tracking-normal" id="whatsapp-lead-picker-title">Selecionar lead</h2>
+            <p className="mt-2 text-sm font-semibold text-blue-100">Busque no banco por nome, distrito ou tipo de lead.</p>
+          </div>
+          <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/20 bg-white px-4 text-sm font-black text-slate-950" onClick={onClose} type="button">
+            <X size={18} /> Fechar
+          </button>
+        </div>
+
+        <form className="grid gap-3 border-b border-slate-200 bg-white p-5 md:grid-cols-[1fr_15rem_13rem_auto]" onSubmit={onSearch}>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Nome</span>
+            <input
+              autoFocus
+              className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+              onChange={(event) => onNameSearchChange(event.target.value)}
+              placeholder="Digite o nome do lead"
+              value={nameSearch}
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Distrito</span>
+            <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => onDistrictChange(event.target.value)} value={district}>
+              <option value="">Todos os distritos</option>
+              {districts.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Tipo de lead</span>
+            <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => onPriorityChange(event.target.value)} value={priority}>
+              <option value="">Todos os tipos</option>
+              {Object.entries(whatsappPriorityLabels).slice(0, 4).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <button className={`${primaryButtonClass} mt-auto h-12`} type="submit">
+            <Search size={18} /> Buscar
+          </button>
+        </form>
+
+        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-100 p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Leads encontrados</span>
+            <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">{leads.length}</span>
+          </div>
+          {loading ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-bold text-slate-600">Buscando leads no banco...</div>
+          ) : leads.length ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {leads.map((lead) => (
+                <button className="interactive-card flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-400" key={lead.id} onClick={() => onSelect(lead)} type="button">
+                  <ContactAvatar name={lead.name} phone={lead.phone} />
+                  <span className="min-w-0 flex-1">
+                    <strong className="block truncate text-base font-black text-slate-950">{lead.name}</strong>
+                    <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{lead.district || 'Distrito não vinculado'} · {lead.phone}</span>
+                    <span className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${priorityBadgeClasses(whatsappPriorityBadgeKey(lead.priority))}`}>
+                      {whatsappPriorityLabels[lead.priority] || lead.priority || 'Sem tipo'}
+                    </span>
+                  </span>
+                  <ChevronRight className="text-blue-600" size={20} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-600">Nenhum lead com WhatsApp foi encontrado para esses filtros.</div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function ConversationsView({ records = [] }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [phoneSearch, setPhoneSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [leadPickerOpen, setLeadPickerOpen] = useState(false);
+  const [leadDirectory, setLeadDirectory] = useState([]);
+  const [leadDistricts, setLeadDistricts] = useState([]);
+  const [leadDirectoryLoading, setLeadDirectoryLoading] = useState(false);
+  const [leadNameSearch, setLeadNameSearch] = useState('');
+  const [leadDistrictFilter, setLeadDistrictFilter] = useState('');
+  const [leadPriorityFilter, setLeadPriorityFilter] = useState('');
+  const [selectedRecipientLead, setSelectedRecipientLead] = useState(null);
   const [messageText, setMessageText] = useState('Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?');
   const chatEndRef = useRef(null);
   const activePhoneRef = useRef('');
   const lastSeenMessageIdRef = useRef(null);
+
+  async function loadLeadDirectory(filters = {}) {
+    const search = filters.search ?? leadNameSearch;
+    const district = filters.district ?? leadDistrictFilter;
+    const priority = filters.priority ?? leadPriorityFilter;
+    setLeadDirectoryLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: '100' });
+      if (search.trim()) params.set('search', search.trim());
+      if (district) params.set('district', district);
+      if (priority) params.set('priority', priority);
+      const response = await apiFetch(`/api/whatsapp/leads?${params.toString()}`, { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Não foi possível buscar os leads.');
+      setLeadDirectory(payload.leads || []);
+      setLeadDistricts(payload.districts || []);
+    } catch (error) {
+      setLeadDirectory([]);
+      toast.error('Falha ao buscar leads', { description: error.message });
+    } finally {
+      setLeadDirectoryLoading(false);
+    }
+  }
+
+  function openLeadPicker() {
+    setLeadPickerOpen(true);
+    loadLeadDirectory();
+  }
+
+  async function submitLeadSearch(event) {
+    event.preventDefault();
+    await loadLeadDirectory();
+  }
+
+  async function selectRecipientLead(lead) {
+    setSelectedRecipientLead(lead);
+    setPhoneSearch(lead.phone);
+    setSelectedId(null);
+    setLeadPickerOpen(false);
+    await loadConversations(lead.phone, { selectSearched: true });
+  }
 
   async function loadConversations(phone = '', options = {}) {
     const { silent = false, notify = false, selectSearched = false } = options;
@@ -7360,7 +7515,16 @@ function ConversationsView({ records = [] }) {
   const activePhone = searchedPhone || selectedConversation?.phone || '';
   const messages = selectedConversation?.messages || [];
   const lastMessage = messages[messages.length - 1];
-  const activeLead = records.find((lead) => phoneDigits(lead.tel).endsWith(String(activePhone).slice(-10)));
+  const activePhoneSuffix = String(activePhone).slice(-10);
+  const recordLead = records.find((lead) => activePhoneSuffix && phoneDigits(lead.tel).includes(activePhoneSuffix));
+  const directoryLead = leadDirectory.find((lead) => activePhoneSuffix && phoneDigits(lead.phone).endsWith(activePhoneSuffix));
+  const selectedLeadMatches = selectedRecipientLead && activePhoneSuffix
+    && phoneDigits(selectedRecipientLead.phone).endsWith(activePhoneSuffix);
+  const activeLead = selectedLeadMatches
+    ? selectedRecipientLead
+    : selectedConversation?.lead || directoryLead || recordLead || null;
+  const activeLeadName = activeLead?.name || activeLead?.n || selectedConversation?.leadName || null;
+  const activeLeadDistrict = activeLead?.district || activeLead?.d || selectedConversation?.district || null;
   const quickActions = [
     ['Resumo', 'Gerar resumo da conversa para o coordenador.'],
     ['Visita', 'Marcar como candidato para visita ou estudo presencial.'],
@@ -7389,11 +7553,6 @@ function ConversationsView({ records = [] }) {
     return () => window.clearInterval(interval);
   }, [phoneSearch, selectedId]);
 
-  async function submitSearch(event) {
-    event.preventDefault();
-    await loadConversations(phoneSearch, { selectSearched: true });
-  }
-
   async function submitMessage(event) {
     event.preventDefault();
     const phone = activePhone;
@@ -7411,9 +7570,9 @@ function ConversationsView({ records = [] }) {
         body: JSON.stringify({
           phone,
           message,
-          leadId: activeLead?.id || selectedConversation?.externalLeadId || null,
-          name: activeLead?.n || selectedConversation?.leadName || null,
-          district: activeLead?.d || selectedConversation?.district || null
+          leadId: activeLead?.id || activeLead?.externalId || selectedConversation?.externalLeadId || null,
+          name: activeLeadName,
+          district: activeLeadDistrict
         })
       });
       const payload = await response.json();
@@ -7439,27 +7598,20 @@ function ConversationsView({ records = [] }) {
             <span className={labelClass}>WhatsApp</span>
             <h1 className="silver-title mt-2 text-5xl font-extrabold leading-tight tracking-normal max-md:text-4xl">Conversas</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
-              Atendimento por numero com historico salvo no banco, leitura das respostas e ferramentas de acompanhamento para transformar mensagem em cuidado real.
+              Atendimento por lead com histórico salvo no banco, leitura das respostas e ferramentas de acompanhamento para transformar mensagem em cuidado real.
             </p>
           </div>
-          <form className="flex min-w-[20rem] gap-2 max-sm:min-w-0 max-sm:w-full" onSubmit={submitSearch}>
-            <input
-              className="h-11 min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none placeholder:text-slate-600"
-              onChange={(event) => setPhoneSearch(event.target.value)}
-              placeholder="Buscar ou digitar numero"
-              value={phoneSearch}
-            />
-            <button className={primaryButtonClass} type="submit">
-              <Search size={18} />
-            </button>
-          </form>
+          <button className={`${primaryButtonClass} min-w-[16rem]`} onClick={openLeadPicker} type="button">
+            <Search size={18} />
+            Buscar e selecionar lead
+          </button>
         </div>
       </section>
 
       <section className="grid grid-cols-[22rem_1fr_18rem] gap-4 max-2xl:grid-cols-[20rem_1fr] max-lg:grid-cols-1">
         <aside className={`${panelClass} flex min-h-[42rem] flex-col overflow-hidden p-4`}>
           <div className="flex items-center justify-between gap-3">
-            <span className={labelClass}>Numeros</span>
+            <span className={labelClass}>Leads</span>
             <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations()} type="button">Atualizar</button>
           </div>
           <div className="mt-4 grid min-h-0 flex-1 content-start gap-2 overflow-auto pr-1">
@@ -7468,6 +7620,13 @@ function ConversationsView({ records = [] }) {
             ) : conversations.length ? conversations.map((conversation) => {
               const conversationMessages = conversation.messages || [];
               const currentLast = conversationMessages[conversationMessages.length - 1];
+              const suffix = String(conversation.phone || '').slice(-10);
+              const matchedRecord = records.find((lead) => suffix && phoneDigits(lead.tel).includes(suffix));
+              const matchedDirectoryLead = leadDirectory.find((lead) => suffix && phoneDigits(lead.phone).endsWith(suffix));
+              const displayLead = conversation.lead || matchedDirectoryLead || matchedRecord || null;
+              const displayName = displayLead?.name || displayLead?.n || conversation.leadName || conversation.phone;
+              const displayDistrict = displayLead?.district || displayLead?.d || conversation.district || 'Distrito não vinculado';
+              const displayPriority = displayLead?.priority || displayLead?.p || conversation.leadPriority || null;
               return (
                 <button
                   className={`interactive-card flex items-center gap-3 rounded-2xl border bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'border-blue-400 ring-4 ring-blue-500/10' : 'border-slate-200'}`}
@@ -7478,17 +7637,18 @@ function ConversationsView({ records = [] }) {
                   }}
                   type="button"
                 >
-                  <ContactAvatar name={conversation.leadName} phone={conversation.phone} />
+                  <ContactAvatar name={displayName} phone={conversation.phone} />
                   <span className="min-w-0">
-                  <strong className="block truncate text-sm font-black text-slate-950">{conversation.leadName || conversation.phone}</strong>
-                  <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{conversation.phone} · {conversation.district || 'Distrito nao vinculado'}</span>
+                  <strong className="block truncate text-sm font-black text-slate-950">{displayName}</strong>
+                  <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{displayDistrict} · {whatsappPriorityLabels[displayPriority] || displayPriority || 'Sem tipo'}</span>
+                  <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">{conversation.phone}</span>
                   <span className="mt-2 block truncate text-xs font-bold text-slate-500">{currentLast?.body || 'Sem mensagens registradas'}</span>
                   </span>
                 </button>
               );
             }) : (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700">
-                Nenhuma conversa salva para esse filtro. Digite um numero e envie a primeira mensagem.
+                Nenhuma conversa salva. Use “Buscar e selecionar lead” para iniciar um atendimento.
               </div>
             )}
           </div>
@@ -7498,11 +7658,11 @@ function ConversationsView({ records = [] }) {
           <div className="border-b border-white/[0.07] p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-4">
-                <ContactAvatar name={activeLead?.n || selectedConversation?.leadName} phone={activePhone} size="lg" />
+                <ContactAvatar name={activeLeadName} phone={activePhone} size="lg" />
                 <span className="min-w-0">
                   <span className={labelClass}>Atendimento</span>
-                <h2 className="mt-1 text-2xl font-black text-slate-50">{activeLead?.n || selectedConversation?.leadName || activePhone || 'Novo numero'}</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">{activePhone || 'Digite um numero para iniciar'}{activeLead?.d ? ` · ${activeLead.d}` : ''}</p>
+                <h2 className="mt-1 text-2xl font-black text-slate-50">{activeLeadName || activePhone || 'Selecione um lead'}</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">{activeLeadDistrict || 'Distrito não vinculado'}{activePhone ? ` · ${activePhone}` : ''}</p>
                 </span>
               </div>
               <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
@@ -7550,7 +7710,7 @@ function ConversationsView({ records = [] }) {
               value={messageText}
             />
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-slate-500">Ao enviar, a mensagem fica ligada ao numero no banco de dados.</span>
+              <span className="text-xs font-semibold text-slate-500">Ao enviar, a mensagem fica vinculada ao lead selecionado no banco de dados.</span>
               <button className={primaryButtonClass} disabled={sending || !activePhone} type="submit">
                 <Send size={18} />
                 {sending ? 'Enviando...' : 'Enviar resposta'}
@@ -7603,6 +7763,22 @@ function ConversationsView({ records = [] }) {
           ))}
         </div>
       </section>
+      {leadPickerOpen ? (
+        <WhatsAppLeadPickerModal
+          district={leadDistrictFilter}
+          districts={leadDistricts}
+          leads={leadDirectory}
+          loading={leadDirectoryLoading}
+          nameSearch={leadNameSearch}
+          onClose={() => setLeadPickerOpen(false)}
+          onDistrictChange={setLeadDistrictFilter}
+          onNameSearchChange={setLeadNameSearch}
+          onPriorityChange={setLeadPriorityFilter}
+          onSearch={submitLeadSearch}
+          onSelect={selectRecipientLead}
+          priority={leadPriorityFilter}
+        />
+      ) : null}
     </div>
   );
 }
