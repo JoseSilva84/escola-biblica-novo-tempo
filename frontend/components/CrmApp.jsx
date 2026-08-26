@@ -7576,7 +7576,7 @@ function WhatsAppLeadPickerModal({
                 <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{selectedLeads.length} selecionados</span>
               </div>
               <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-                {selectedLeads.length ? `${selectedLeads.slice(0, 4).map((lead) => lead.name).join(', ')}${selectedLeads.length > 4 ? ` e mais ${selectedLeads.length - 4}` : ''}` : 'Selecione até 50 contatos.'}
+                {selectedLeads.length ? `${selectedLeads.slice(0, 4).map((lead) => lead.name).join(', ')}${selectedLeads.length > 4 ? ` e mais ${selectedLeads.length - 4}` : ''}` : 'Os resultados dos filtros serão selecionados automaticamente.'}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -7656,15 +7656,16 @@ function WhatsAppBroadcastModal({
           <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-black uppercase tracking-wide text-slate-600">Destinatários</span>
-              <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{recipients.length}/50</span>
+              <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{formatNumber(recipients.length)}</span>
             </div>
             <div className="mt-3 flex max-h-36 flex-wrap gap-2 overflow-y-auto pr-1">
-              {recipients.map((lead) => (
+              {recipients.slice(0, 100).map((lead) => (
                 <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-[#d9fdd3] py-1 pl-3 pr-1 text-xs font-bold text-slate-800" key={`${lead.id}-${lead.phone}`}>
                   {lead.name}
                   <button aria-label={`Remover ${lead.name}`} className="grid h-6 w-6 place-items-center rounded-full text-[#008069] transition hover:bg-white" onClick={() => onRemove(lead)} type="button"><X size={13} /></button>
                 </span>
               ))}
+              {recipients.length > 100 ? <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">+ {formatNumber(recipients.length - 100)} demais contatos</span> : null}
             </div>
           </div>
           <label className="mt-4 grid gap-1.5">
@@ -7816,10 +7817,6 @@ function ConversationsView({ records = [] }) {
     setBroadcastSelectedLeads((current) => {
       const exists = current.some((item) => phoneDigits(item.phone).slice(-10) === key);
       if (exists) return current.filter((item) => phoneDigits(item.phone).slice(-10) !== key);
-      if (current.length >= 50) {
-        toast.error('Limite de 50 contatos por transmissão.');
-        return current;
-      }
       return [...current, lead];
     });
   }
@@ -7828,9 +7825,8 @@ function ConversationsView({ records = [] }) {
     setBroadcastSelectedLeads((current) => {
       const merged = new Map(current.map((lead) => [phoneDigits(lead.phone).slice(-10), lead]));
       leads.forEach((lead) => {
-        if (merged.size < 50) merged.set(phoneDigits(lead.phone).slice(-10), lead);
+        merged.set(phoneDigits(lead.phone).slice(-10), lead);
       });
-      if (current.length + leads.length > 50) toast.info('Foram selecionados os primeiros 50 contatos.');
       return Array.from(merged.values());
     });
   }
@@ -7848,15 +7844,21 @@ function ConversationsView({ records = [] }) {
         priority: lead.priority || null,
         phone: phoneDigits(lead.phone)
       }));
-      const response = await apiFetch('/api/whatsapp/send-batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipients, message: broadcastMessage.trim(), listName: broadcastListName.trim() || null })
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || 'Não foi possível enviar a transmissão.');
+      const totals = { sent: 0, failed: 0 };
+      for (let index = 0; index < recipients.length; index += 50) {
+        const chunk = recipients.slice(index, index + 50);
+        const response = await apiFetch('/api/whatsapp/send-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipients: chunk, message: broadcastMessage.trim(), listName: broadcastListName.trim() || null })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.message || 'Não foi possível enviar a transmissão.');
+        totals.sent += payload.sent || 0;
+        totals.failed += payload.failed || 0;
+      }
       toast.success('Transmissão concluída', {
-        description: `${payload.sent || 0} enviadas${payload.failed ? ` e ${payload.failed} com falha` : ''}.`
+        description: `${totals.sent} enviadas${totals.failed ? ` e ${totals.failed} com falha` : ''}.`
       });
       setBroadcastModalOpen(false);
       setLeadPickerOpen(false);
@@ -8076,9 +8078,21 @@ function ConversationsView({ records = [] }) {
     .filter((lead) => leadMatchesBirthdayFilter(lead, deferredContactFilters))
     .sort((a, b) => (b.s || 0) - (a.s || 0)), [contactFilterRecords, deferredContactFilters]);
 
-  const filteredContactLeads = useMemo(() => filteredContactLeadRecords
-    .map((lead) => lead._directoryLead || dashboardLeadToWhatsAppLead(lead))
-    .slice(0, 100), [filteredContactLeadRecords]);
+  const allFilteredContactLeads = useMemo(() => filteredContactLeadRecords
+    .map((lead) => lead._directoryLead || dashboardLeadToWhatsAppLead(lead)), [filteredContactLeadRecords]);
+
+  const filteredContactLeads = useMemo(() => allFilteredContactLeads.slice(0, 100), [allFilteredContactLeads]);
+  const hasActiveCombinedContactFilter = useMemo(() => (
+    ['districts', 'neighborhoods', 'materials', 'ageGroups', 'genders', 'priorities']
+      .some((key) => deferredContactFilters[key]?.length)
+    || ['whatsapp', 'email', 'study', 'vip', 'religion', 'recency', 'birthday']
+      .some((key) => deferredContactFilters[key] && deferredContactFilters[key] !== 'all')
+  ), [deferredContactFilters]);
+
+  useEffect(() => {
+    if (!leadPickerOpen || newContactMode || !hasActiveCombinedContactFilter) return;
+    setBroadcastSelectedLeads(allFilteredContactLeads);
+  }, [allFilteredContactLeads, hasActiveCombinedContactFilter, leadPickerOpen, newContactMode]);
 
   const leadOptions = useMemo(
     () => records
