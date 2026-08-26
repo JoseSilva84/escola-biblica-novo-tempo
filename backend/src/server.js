@@ -1681,6 +1681,7 @@ app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
 app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
   const recipients = Array.isArray(request.body?.recipients) ? request.body.recipients.slice(0, 50) : [];
   const message = request.body?.message;
+  const listName = String(request.body?.listName || '').trim().slice(0, 120) || null;
   if (!recipients.length) {
     response.status(400).json({ ok: false, message: 'Informe ao menos um destinatario.' });
     return;
@@ -1708,7 +1709,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         providerStatus: result.deliveryStatus,
         providerResponse: result.providerResponse,
         providerMessageId: providerMessageId(result.providerResponse),
-        metadata: { templateId: request.body?.templateId || null, batch: true, attempts: result.attempts || [] }
+        metadata: { templateId: request.body?.templateId || null, batch: true, listName, attempts: result.attempts || [] }
       });
       results.push({
         ok: true,
@@ -1734,6 +1735,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         metadata: {
           failure: true,
           batch: true,
+          listName,
           providerHttpStatus: error.providerStatus || null,
           attempts: error.providerAttempts || []
         }

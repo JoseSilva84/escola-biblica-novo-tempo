@@ -31,7 +31,7 @@
 
 .conversation-expanded-panel {
   left: 50% !important;
-  width: min(84vw, 1380px) !important;
+  width: min(63vw, 1040px) !important;
   transform: translateX(-50%);
 }
 

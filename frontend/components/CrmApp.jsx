@@ -101,6 +101,13 @@ const whatsappPriorityLabels = {
   Cool: 'Morno',
   Cold: 'Frio'
 };
+const birthdayMonthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+function birthdayParts(value) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value || '').trim());
+  if (!match) return null;
+  return { day: match[1], month: match[2], year: match[3] };
+}
 
 function whatsappPriorityBadgeKey(value) {
   const text = String(value || '').toLowerCase();
@@ -120,6 +127,7 @@ function dashboardLeadToWhatsAppLead(lead) {
     score: lead?.s ?? null,
     isVip: Boolean(lead?.v),
     hasActiveStudy: Boolean(lead?.e),
+    birthDate: lead?.birthDate || null,
     source: 'dashboard'
   };
 }
@@ -7316,6 +7324,52 @@ function AdminGeneralView({
   );
 }
 
+function WhatsAppNewContactForm({ districts = [], initialContact, onSubmit, saving = false }) {
+  const [draft, setDraft] = useState(() => ({
+    name: initialContact?.name || '',
+    phone: initialContact?.phone || '',
+    district: initialContact?.district || '',
+    priority: initialContact?.priority || ''
+  }));
+  const updateDraft = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
+
+  return (
+    <form className="grid gap-3 border-b border-slate-200 bg-white p-5 md:grid-cols-2" onSubmit={(event) => {
+      event.preventDefault();
+      onSubmit(draft);
+    }}>
+      <label className="grid gap-1.5">
+        <span className="text-xs font-black uppercase tracking-wide text-slate-500">Nome opcional</span>
+        <input className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => updateDraft('name', event.target.value)} placeholder="Nome do novo contato" value={draft.name} />
+      </label>
+      <label className="grid gap-1.5">
+        <span className="text-xs font-black uppercase tracking-wide text-slate-500">WhatsApp *</span>
+        <input autoFocus className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => updateDraft('phone', event.target.value)} placeholder="Ex.: 11999999999" required value={draft.phone} />
+      </label>
+      <label className="grid gap-1.5">
+        <span className="text-xs font-black uppercase tracking-wide text-slate-500">Vincular a um distrito</span>
+        <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => updateDraft('district', event.target.value)} value={draft.district}>
+          <option value="">Sem distrito vinculado</option>
+          {districts.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
+        <span className="text-xs font-semibold text-slate-500">Você pode deixar o contato sem distrito e vinculá-lo posteriormente.</span>
+      </label>
+      <label className="grid gap-1.5">
+        <span className="text-xs font-black uppercase tracking-wide text-slate-500">Tipo de lead</span>
+        <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => updateDraft('priority', event.target.value)} value={draft.priority}>
+          <option value="">Sem tipo</option>
+          {Object.entries(whatsappPriorityLabels).slice(0, 4).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </label>
+      <div className="flex justify-end md:col-span-2">
+        <button className={`${primaryButtonClass} min-w-[13rem]`} disabled={saving} type="submit">
+          <Plus size={18} /> {saving ? 'Salvando...' : 'Salvar contato'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function WhatsAppLeadPickerModal({
   districts = [],
   filterOptions,
@@ -7325,23 +7379,28 @@ function WhatsAppLeadPickerModal({
   newContact,
   newContactMode = false,
   newContactSaving = false,
+  selectedLeads = [],
   onArrayFilterChange,
+  onClearSelected,
   onClose,
   onFilterChange,
-  onNewContactChange,
   onNewContactSubmit,
+  onOpenBroadcast,
   onSearch,
+  onSelectAll,
   onSelect,
+  onToggleSelect,
   onToggleNewContact,
 }) {
+  const selectedPhones = new Set(selectedLeads.map((lead) => phoneDigits(lead.phone).slice(-10)));
   return createPortal(
     <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-lead-picker-title">
       <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/12 bg-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.56)]">
         <div className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_52%,#0f172a_100%)] p-6 text-white">
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">Destinatário do WhatsApp</span>
-            <h2 className="mt-2 text-3xl font-black tracking-normal" id="whatsapp-lead-picker-title">{newContactMode ? 'Adicionar contato' : 'Selecionar lead'}</h2>
-            <p className="mt-2 text-sm font-semibold text-blue-100">{newContactMode ? 'Informe o nome, número, distrito e tipo do contato.' : 'Use a filtragem avançada e veja os contatos aparecerem automaticamente.'}</p>
+            <h2 className="mt-2 text-3xl font-black tracking-normal" id="whatsapp-lead-picker-title">{newContactMode ? 'Adicionar contato' : 'Selecionar contatos'}</h2>
+            <p className="mt-2 text-sm font-semibold text-blue-100">{newContactMode ? 'Informe o nome, número, distrito e tipo do contato.' : 'Clique nos contatos para montar uma lista ou use Conversar para abrir apenas um chat.'}</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-black text-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:border-white/50 hover:bg-white/20 hover:shadow-[0_14px_34px_rgba(96,165,250,0.35)] focus:outline-none focus:ring-4 focus:ring-white/20" onClick={onToggleNewContact} type="button">
@@ -7354,36 +7413,7 @@ function WhatsAppLeadPickerModal({
         </div>
 
         {newContactMode ? (
-          <form className="grid gap-3 border-b border-slate-200 bg-white p-5 md:grid-cols-2" onSubmit={onNewContactSubmit}>
-            <label className="grid gap-1.5">
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Nome opcional</span>
-              <input className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => onNewContactChange('name', event.target.value)} placeholder="Nome do novo contato" value={newContact.name} />
-            </label>
-            <label className="grid gap-1.5">
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">WhatsApp *</span>
-              <input autoFocus className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => onNewContactChange('phone', event.target.value)} placeholder="Ex.: 11999999999" required value={newContact.phone} />
-            </label>
-            <label className="grid gap-1.5">
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Vincular a um distrito</span>
-              <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => onNewContactChange('district', event.target.value)} value={newContact.district}>
-                <option value="">Sem distrito vinculado</option>
-                {districts.map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-              <span className="text-xs font-semibold text-slate-500">Você pode deixar o contato sem distrito e vinculá-lo posteriormente.</span>
-            </label>
-            <label className="grid gap-1.5">
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Tipo de lead</span>
-              <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => onNewContactChange('priority', event.target.value)} value={newContact.priority}>
-                <option value="">Sem tipo</option>
-                {Object.entries(whatsappPriorityLabels).slice(0, 4).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </label>
-            <div className="flex justify-end md:col-span-2">
-              <button className={`${primaryButtonClass} min-w-[13rem]`} disabled={newContactSaving} type="submit">
-                <Plus size={18} /> {newContactSaving ? 'Salvando...' : 'Salvar contato'}
-              </button>
-            </div>
-          </form>
+          <WhatsAppNewContactForm districts={districts} initialContact={newContact} onSubmit={onNewContactSubmit} saving={newContactSaving} />
         ) : (
         <form className="grid gap-3 border-b border-slate-200 bg-white p-4" onSubmit={onSearch}>
           <div className="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -7425,7 +7455,8 @@ function WhatsAppLeadPickerModal({
               ['study', 'Estudos'],
               ['vip', 'VIP'],
               ['religion', 'Religião'],
-              ['recency', 'Tempo']
+              ['recency', 'Tempo'],
+              ['birthday', 'Aniversariantes']
             ].map(([key, label]) => (
               <label className="grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500" key={key}>
                 {label}
@@ -7435,38 +7466,145 @@ function WhatsAppLeadPickerModal({
               </label>
             ))}
           </div>
+          {filters.birthday === 'date' ? (
+            <div className="grid gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:grid-cols-3">
+              <label className="grid gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-800">
+                Dia
+                <select className="h-9 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-bold normal-case text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onFilterChange('birthdayDay', event.target.value)} value={filters.birthdayDay}>
+                  <option value="">Todos os dias</option>
+                  {Array.from({ length: 31 }, (_, index) => String(index + 1).padStart(2, '0')).map((day) => <option key={day} value={day}>{day}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-800">
+                Mês
+                <select className="h-9 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-bold normal-case text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onFilterChange('birthdayMonth', event.target.value)} value={filters.birthdayMonth}>
+                  <option value="">Todos os meses</option>
+                  {birthdayMonthNames.map((month, index) => <option key={month} value={String(index + 1).padStart(2, '0')}>{month}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-800">
+                Ano
+                <select className="h-9 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-bold normal-case text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onFilterChange('birthdayYear', event.target.value)} value={filters.birthdayYear}>
+                  <option value="">Todos os anos</option>
+                  {filterOptions.birthdayYears.map((year) => <option key={year} value={year}>{year}</option>)}
+                </select>
+              </label>
+            </div>
+          ) : null}
           <p className="text-[11px] font-semibold text-slate-500">Todos é o padrão. Ao escolher uma opção, os contatos são atualizados automaticamente.</p>
         </form>
         )}
 
         {!newContactMode ? <div className="min-h-0 flex-1 overflow-y-auto bg-slate-100 p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-white p-3 shadow-sm">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">Lista de transmissão</span>
+                <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{selectedLeads.length} selecionados</span>
+              </div>
+              <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                {selectedLeads.length ? `${selectedLeads.slice(0, 4).map((lead) => lead.name).join(', ')}${selectedLeads.length > 4 ? ` e mais ${selectedLeads.length - 4}` : ''}` : 'Selecione até 50 contatos.'}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 transition hover:border-emerald-400 hover:text-emerald-700" disabled={!leads.length} onClick={() => onSelectAll(leads)} type="button">Selecionar resultados</button>
+              {selectedLeads.length ? <button className="h-9 rounded-lg px-3 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-950" onClick={onClearSelected} type="button">Limpar</button> : null}
+              <button className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#00a884] px-4 text-xs font-black text-white shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={!selectedLeads.length} onClick={onOpenBroadcast} type="button"><Send size={15} /> Criar transmissão</button>
+            </div>
+          </div>
           <div className="mb-3 flex items-center justify-between gap-3">
-            <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Leads encontrados</span>
+            <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Contatos encontrados</span>
             <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">{leads.length}</span>
           </div>
           {loading ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-bold text-slate-600">Buscando leads no banco...</div>
           ) : leads.length ? (
             <div className="grid gap-3 md:grid-cols-2">
-              {leads.map((lead) => (
-                <button className="interactive-card flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-400" key={lead.id} onClick={() => onSelect(lead)} type="button">
-                  <ContactAvatar name={lead.name} phone={lead.phone} />
-                  <span className="min-w-0 flex-1">
-                    <strong className="block truncate text-base font-black text-slate-950">{lead.name}</strong>
-                    <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{lead.district || 'Distrito não vinculado'} · {lead.phone}</span>
-                    <span className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${priorityBadgeClasses(whatsappPriorityBadgeKey(lead.priority))}`}>
-                      {whatsappPriorityLabels[lead.priority] || lead.priority || 'Sem tipo'}
-                    </span>
-                  </span>
-                  <ChevronRight className="text-blue-600" size={20} />
-                </button>
-              ))}
+              {leads.map((lead) => {
+                const selected = selectedPhones.has(phoneDigits(lead.phone).slice(-10));
+                return (
+                  <div className={`interactive-card flex items-center gap-2 rounded-2xl border p-2 shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition ${selected ? 'border-[#00a884] bg-[#d9fdd3] ring-2 ring-[#00a884]/20' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-emerald-400'}`} key={`${lead.id}-${lead.phone}`}>
+                    <button className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 text-left" onClick={() => onToggleSelect(lead)} type="button">
+                      <ContactAvatar name={lead.name} phone={lead.phone} />
+                      <span className="min-w-0 flex-1">
+                        <strong className="block truncate text-base font-black text-slate-950">{lead.name}</strong>
+                        <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{lead.district || 'Distrito não vinculado'} · {lead.phone}</span>
+                        <span className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${priorityBadgeClasses(whatsappPriorityBadgeKey(lead.priority))}`}>
+                            {whatsappPriorityLabels[lead.priority] || lead.priority || 'Sem tipo'}
+                          </span>
+                          {lead.birthDate && lead.birthDate !== 'N/I' ? <span className="text-[11px] font-bold text-emerald-800">Aniversário: {lead.birthDate}</span> : null}
+                        </span>
+                      </span>
+                      <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border ${selected ? 'border-[#008069] bg-[#008069] text-white' : 'border-slate-300 bg-white text-slate-400'}`}>{selected ? <Check size={16} /> : <Plus size={16} />}</span>
+                    </button>
+                    <button className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-black text-[#008069] transition hover:border-[#00a884] hover:bg-emerald-50" onClick={() => onSelect(lead)} type="button">Conversar <ChevronRight size={15} /></button>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-600">Nenhum lead com WhatsApp foi encontrado para esses filtros.</div>
           )}
         </div> : <div className="min-h-[8rem] flex-1 bg-slate-100 p-6 text-center text-sm font-semibold text-slate-600">O contato será salvo na Associação Paulistana e ficará disponível para iniciar a conversa.</div>}
       </div>
+    </div>,
+    document.body
+  );
+}
+
+function WhatsAppBroadcastModal({
+  listName,
+  message,
+  onClose,
+  onListNameChange,
+  onMessageChange,
+  onRemove,
+  onSubmit,
+  recipients = [],
+  sending = false
+}) {
+  return createPortal(
+    <div className="fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-broadcast-title">
+      <form className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#f0f2f5] shadow-[0_34px_110px_rgba(0,0,0,0.6)]" onSubmit={onSubmit}>
+        <div className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,#075e54,#008069,#00a884)] p-6 text-white">
+          <div>
+            <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">WhatsApp</span>
+            <h2 className="mt-2 text-2xl font-black" id="whatsapp-broadcast-title">Lista de transmissão</h2>
+            <p className="mt-1 text-sm font-semibold text-emerald-50">A mesma mensagem será enviada individualmente para {recipients.length} contatos.</p>
+          </div>
+          <button aria-label="Fechar" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 transition hover:bg-white/25" onClick={onClose} type="button"><X size={20} /></button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <label className="grid gap-1.5">
+            <span className="text-xs font-black uppercase tracking-wide text-slate-600">Nome da lista (opcional)</span>
+            <input className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onListNameChange(event.target.value)} placeholder="Ex.: Aniversariantes de agosto" value={listName} />
+          </label>
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-600">Destinatários</span>
+              <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{recipients.length}/50</span>
+            </div>
+            <div className="mt-3 flex max-h-36 flex-wrap gap-2 overflow-y-auto pr-1">
+              {recipients.map((lead) => (
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-[#d9fdd3] py-1 pl-3 pr-1 text-xs font-bold text-slate-800" key={`${lead.id}-${lead.phone}`}>
+                  {lead.name}
+                  <button aria-label={`Remover ${lead.name}`} className="grid h-6 w-6 place-items-center rounded-full text-[#008069] transition hover:bg-white" onClick={() => onRemove(lead)} type="button"><X size={13} /></button>
+                </span>
+              ))}
+            </div>
+          </div>
+          <label className="mt-4 grid gap-1.5">
+            <span className="text-xs font-black uppercase tracking-wide text-slate-600">Mensagem *</span>
+            <textarea autoFocus className="min-h-36 resize-y rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onMessageChange(event.target.value)} placeholder="Digite a mensagem que todos receberão" required value={message} />
+          </label>
+          <p className="mt-2 text-xs font-semibold text-slate-500">Cada destinatário receberá uma conversa separada; os contatos não verão os demais participantes.</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white p-4">
+          <button className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50" onClick={onClose} type="button">Cancelar</button>
+          <button className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !recipients.length || !message.trim()} type="submit"><Send size={18} /> {sending ? 'Enviando...' : `Enviar para ${recipients.length}`}</button>
+        </div>
+      </form>
     </div>,
     document.body
   );
@@ -7498,8 +7636,17 @@ function ConversationsView({ records = [] }) {
     vip: 'all',
     religion: 'all',
     recency: 'all',
+    birthday: 'all',
+    birthdayDay: '',
+    birthdayMonth: '',
+    birthdayYear: '',
     search: ''
   });
+  const [broadcastSelectedLeads, setBroadcastSelectedLeads] = useState([]);
+  const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
+  const [broadcastListName, setBroadcastListName] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastSending, setBroadcastSending] = useState(false);
   const [selectedRecipientLead, setSelectedRecipientLead] = useState(null);
   const [newContactMode, setNewContactMode] = useState(false);
   const [newContactSaving, setNewContactSaving] = useState(false);
@@ -7572,7 +7719,11 @@ function ConversationsView({ records = [] }) {
   }
 
   function setContactFilter(key, value) {
-    setContactFilters((current) => ({ ...current, [key]: value }));
+    setContactFilters((current) => (
+      key === 'birthday' && value !== 'date'
+        ? { ...current, birthday: value, birthdayDay: '', birthdayMonth: '', birthdayYear: '' }
+        : { ...current, [key]: value }
+    ));
   }
 
   function replaceContactArrayFilter(key, value) {
@@ -7587,18 +7738,73 @@ function ConversationsView({ records = [] }) {
     await loadConversations(lead.phone, { selectSearched: true });
   }
 
-  function updateNewContact(field, value) {
-    setNewContact((current) => ({ ...current, [field]: value }));
+  function toggleBroadcastLead(lead) {
+    const key = phoneDigits(lead.phone).slice(-10);
+    setBroadcastSelectedLeads((current) => {
+      const exists = current.some((item) => phoneDigits(item.phone).slice(-10) === key);
+      if (exists) return current.filter((item) => phoneDigits(item.phone).slice(-10) !== key);
+      if (current.length >= 50) {
+        toast.error('Limite de 50 contatos por transmissão.');
+        return current;
+      }
+      return [...current, lead];
+    });
   }
 
-  async function submitNewContact(event) {
+  function selectAllBroadcastLeads(leads) {
+    setBroadcastSelectedLeads((current) => {
+      const merged = new Map(current.map((lead) => [phoneDigits(lead.phone).slice(-10), lead]));
+      leads.forEach((lead) => {
+        if (merged.size < 50) merged.set(phoneDigits(lead.phone).slice(-10), lead);
+      });
+      if (current.length + leads.length > 50) toast.info('Foram selecionados os primeiros 50 contatos.');
+      return Array.from(merged.values());
+    });
+  }
+
+  async function submitBroadcast(event) {
     event.preventDefault();
+    if (!broadcastSelectedLeads.length || !broadcastMessage.trim()) return;
+    setBroadcastSending(true);
+    try {
+      const recipients = broadcastSelectedLeads.map((lead) => ({
+        id: lead.id,
+        leadId: lead.id,
+        name: lead.name,
+        district: lead.district || null,
+        priority: lead.priority || null,
+        phone: phoneDigits(lead.phone)
+      }));
+      const response = await apiFetch('/api/whatsapp/send-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipients, message: broadcastMessage.trim(), listName: broadcastListName.trim() || null })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Não foi possível enviar a transmissão.');
+      toast.success('Transmissão concluída', {
+        description: `${payload.sent || 0} enviadas${payload.failed ? ` e ${payload.failed} com falha` : ''}.`
+      });
+      setBroadcastModalOpen(false);
+      setLeadPickerOpen(false);
+      setBroadcastSelectedLeads([]);
+      setBroadcastListName('');
+      setBroadcastMessage('');
+      await loadConversations('', { silent: true });
+    } catch (error) {
+      toast.error('Falha na transmissão', { description: error.message });
+    } finally {
+      setBroadcastSending(false);
+    }
+  }
+
+  async function submitNewContact(contactDraft) {
     setNewContactSaving(true);
     try {
       const response = await apiFetch('/api/whatsapp/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newContact)
+        body: JSON.stringify(contactDraft)
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Não foi possível salvar o contato.');
@@ -7703,6 +7909,7 @@ function ConversationsView({ records = [] }) {
         em: null,
         e: Boolean(lead.hasActiveStudy),
         v: Boolean(lead.isVip),
+        birthDate: lead.birthDate || null,
         _directoryLead: lead
       });
     });
@@ -7760,12 +7967,31 @@ function ConversationsView({ records = [] }) {
           range.value,
           toggleLabel(range.label, contactFilterRecords.filter((lead) => leadContactTimeRange(lead) === range.value).length)
         ])
-      ]
+      ],
+      birthday: [
+        ['all', toggleLabel('Todos', contactFilterRecords.length)],
+        ['with', toggleLabel('Com aniversário', contactFilterRecords.filter((lead) => birthdayParts(lead.birthDate)).length)],
+        ['date', 'Escolher uma data']
+      ],
+      birthdayYears: Array.from(new Set(contactFilterRecords
+        .map((lead) => birthdayParts(lead.birthDate)?.year)
+        .filter(Boolean)))
+        .sort((a, b) => Number(b) - Number(a))
     };
   }, [contactFilterRecords]);
 
   const filteredContactLeads = useMemo(() => contactFilterRecords
     .filter((lead) => leadMatchesFilterGroup(lead, contactFilters))
+    .filter((lead) => {
+      if (contactFilters.birthday === 'all') return true;
+      const birthday = birthdayParts(lead.birthDate);
+      if (!birthday) return false;
+      if (contactFilters.birthday === 'with') return true;
+      if (contactFilters.birthdayDay && birthday.day !== contactFilters.birthdayDay) return false;
+      if (contactFilters.birthdayMonth && birthday.month !== contactFilters.birthdayMonth) return false;
+      if (contactFilters.birthdayYear && birthday.year !== contactFilters.birthdayYear) return false;
+      return true;
+    })
     .sort((a, b) => (b.s || 0) - (a.s || 0))
     .map((lead) => lead._directoryLead || dashboardLeadToWhatsAppLead(lead))
     .slice(0, 100), [contactFilterRecords, contactFilters]);
@@ -8218,14 +8444,31 @@ function ConversationsView({ records = [] }) {
           newContact={newContact}
           newContactMode={newContactMode}
           newContactSaving={newContactSaving}
+          selectedLeads={broadcastSelectedLeads}
           onArrayFilterChange={replaceContactArrayFilter}
+          onClearSelected={() => setBroadcastSelectedLeads([])}
           onClose={() => setLeadPickerOpen(false)}
           onFilterChange={setContactFilter}
-          onNewContactChange={updateNewContact}
           onNewContactSubmit={submitNewContact}
+          onOpenBroadcast={() => setBroadcastModalOpen(true)}
           onSearch={submitLeadSearch}
+          onSelectAll={selectAllBroadcastLeads}
           onSelect={selectRecipientLead}
+          onToggleSelect={toggleBroadcastLead}
           onToggleNewContact={() => setNewContactMode((current) => !current)}
+        />
+      ) : null}
+      {broadcastModalOpen ? (
+        <WhatsAppBroadcastModal
+          listName={broadcastListName}
+          message={broadcastMessage}
+          onClose={() => setBroadcastModalOpen(false)}
+          onListNameChange={setBroadcastListName}
+          onMessageChange={setBroadcastMessage}
+          onRemove={toggleBroadcastLead}
+          onSubmit={submitBroadcast}
+          recipients={broadcastSelectedLeads}
+          sending={broadcastSending}
         />
       ) : null}
     </div>
