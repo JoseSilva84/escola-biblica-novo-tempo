@@ -7340,8 +7340,8 @@ function WhatsAppLeadPickerModal({
         <div className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_52%,#0f172a_100%)] p-6 text-white">
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">Destinatário do WhatsApp</span>
-            <h2 className="mt-2 text-3xl font-black tracking-normal" id="whatsapp-lead-picker-title">Selecionar lead</h2>
-            <p className="mt-2 text-sm font-semibold text-blue-100">Use a filtragem avançada e veja os contatos aparecerem automaticamente.</p>
+            <h2 className="mt-2 text-3xl font-black tracking-normal" id="whatsapp-lead-picker-title">{newContactMode ? 'Adicionar contato' : 'Selecionar lead'}</h2>
+            <p className="mt-2 text-sm font-semibold text-blue-100">{newContactMode ? 'Informe o nome, número, distrito e tipo do contato.' : 'Use a filtragem avançada e veja os contatos aparecerem automaticamente.'}</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-black text-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:border-white/50 hover:bg-white/20 hover:shadow-[0_14px_34px_rgba(96,165,250,0.35)] focus:outline-none focus:ring-4 focus:ring-white/20" onClick={onToggleNewContact} type="button">
@@ -7544,6 +7544,25 @@ function ConversationsView({ records = [] }) {
   function openLeadPicker() {
     setLeadPickerOpen(true);
     setNewContactMode(false);
+    loadLeadDirectory();
+  }
+
+  function openActiveContactModal() {
+    if (!activePhone) {
+      toast.error('Selecione um número para adicionar o contato.');
+      return;
+    }
+    const currentName = String(activeLeadName || '').trim();
+    const priority = String(activeLead?.priority || activeLead?.p || '').toUpperCase();
+    setNewContact({
+      name: phoneDigits(currentName) === phoneDigits(activePhone) ? '' : currentName,
+      phone: phoneDigits(activePhone),
+      district: activeLeadDistrict && activeLeadDistrict !== 'Distrito não vinculado' ? activeLeadDistrict : '',
+      priority: ['HOT', 'WARM', 'COOL', 'COLD'].includes(priority) ? priority : ''
+    });
+    setNewContactMode(true);
+    setLeadPickerOpen(true);
+    setConversationExpanded(false);
     loadLeadDirectory();
   }
 
@@ -7952,8 +7971,8 @@ function ConversationsView({ records = [] }) {
         </div>
       </section>
 
-      <section className="grid h-[42rem] min-h-0 grid-cols-[22rem_1fr_18rem] gap-4 max-2xl:h-auto max-2xl:grid-cols-[20rem_1fr] max-lg:grid-cols-1">
-        <aside className={`${panelClass} whatsapp-sidebar flex h-full min-h-0 flex-col overflow-hidden p-4 max-2xl:h-[42rem]`}>
+      <section className="grid h-[46rem] min-h-0 grid-cols-[22rem_1fr_18rem] gap-4 max-2xl:h-auto max-2xl:grid-cols-[20rem_1fr] max-lg:grid-cols-1">
+        <aside className={`${panelClass} whatsapp-sidebar flex h-full min-h-0 flex-col overflow-hidden p-4 max-2xl:h-[46rem]`}>
           <div className="flex items-center justify-between gap-3">
             <span className={labelClass}>Leads</span>
             <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations()} type="button">Atualizar</button>
@@ -8039,7 +8058,7 @@ function ConversationsView({ records = [] }) {
         </aside>
 
         {conversationExpanded ? <button aria-label="Fechar conversa ampliada" className="fixed inset-0 z-[2147483644] cursor-default bg-slate-950/75 backdrop-blur-sm" onClick={() => setConversationExpanded(false)} type="button" /> : null}
-        <article className={`${panelClass} whatsapp-chat flex min-h-0 flex-col overflow-hidden transition-[width,height,top,left] duration-300 ${conversationExpanded ? 'conversation-expanded-panel !fixed top-[3vh] z-[2147483645] !h-[94vh] max-w-none rounded-[2rem] border border-white/40 shadow-[0_42px_140px_rgba(0,0,0,0.62)]' : 'h-full max-2xl:h-[42rem]'}`}>
+        <article className={`${panelClass} whatsapp-chat flex min-h-0 flex-col overflow-hidden transition-[width,height,top,left] duration-300 ${conversationExpanded ? 'conversation-expanded-panel !fixed top-[3vh] z-[2147483645] !h-[94vh] max-w-none rounded-[2rem] border border-white/40 shadow-[0_42px_140px_rgba(0,0,0,0.62)]' : 'h-full max-2xl:h-[46rem]'}`}>
           <div className={`whatsapp-chat-header border-b border-[#d1d7db] p-5 ${conversationExpanded ? 'px-7 py-5' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-4">
@@ -8047,7 +8066,14 @@ function ConversationsView({ records = [] }) {
                 <span className="min-w-0">
                   <span className={labelClass}>Atendimento</span>
                 <h2 className={`mt-1 font-black text-slate-50 ${conversationExpanded ? 'text-3xl max-md:text-xl' : 'text-2xl'}`}>{activeLeadName || activePhone || 'Selecione um lead'}</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">{activeLeadDistrict || 'Distrito não vinculado'}{activePhone ? ` · ${activePhone}` : ''}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-slate-500">{activeLeadDistrict || 'Distrito não vinculado'}{activePhone ? ` · ${activePhone}` : ''}</p>
+                  {activePhone ? (
+                    <button className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#00a884]/30 bg-[#d9fdd3] px-2.5 text-[11px] font-black text-[#006c5b] transition hover:-translate-y-0.5 hover:border-[#00a884] hover:bg-[#c7f7bd]" onClick={openActiveContactModal} type="button">
+                      <BadgePlus size={15} /> Adicionar contato
+                    </button>
+                  ) : null}
+                </div>
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -8136,7 +8162,7 @@ function ConversationsView({ records = [] }) {
           </form>
         </article>
 
-        <aside className={`${panelClass} whatsapp-tools flex h-full min-h-0 flex-col overflow-hidden p-5 max-2xl:col-span-2 max-2xl:h-[42rem] max-lg:col-span-1`}>
+        <aside className={`${panelClass} whatsapp-tools flex h-full min-h-0 flex-col overflow-hidden p-5 max-2xl:col-span-2 max-2xl:h-[46rem] max-lg:col-span-1`}>
           <div className="shrink-0">
             <span className={labelClass}>Ferramentas</span>
             <h2 className="mt-1 text-xl font-black text-slate-50">Proximas acoes</h2>

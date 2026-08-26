@@ -1462,7 +1462,7 @@ app.post('/api/whatsapp/leads', requireAuth, async (request, response) => {
           phone,
           ...(name ? { name } : {}),
           priority,
-          ...(district ? { districtId: district.id } : {})
+          districtId: district?.id || null
         },
         select: whatsappLeadSelect
       })
