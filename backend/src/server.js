@@ -660,6 +660,30 @@ function normalizeProviderStatus(value) {
   return raw.toUpperCase();
 }
 
+function recognizedDeliveryStatus(value) {
+  const normalized = normalizeProviderStatus(value);
+  return ['ACCEPTED', 'SERVER_ACK', 'DELIVERED', 'READ', 'FAILED', 'FAILED_463'].includes(normalized)
+    ? normalized
+    : null;
+}
+
+function providerResponseDeliveryStatus(data = {}) {
+  const nested = data?.data || {};
+  const status = firstValue(
+    data?.ack,
+    data?.messageStatus,
+    data?.deliveryStatus,
+    data?.receiptStatus,
+    data?.key?.status,
+    nested?.ack,
+    nested?.messageStatus,
+    nested?.deliveryStatus,
+    nested?.receiptStatus,
+    nested?.key?.status
+  );
+  return recognizedDeliveryStatus(status) || 'ACCEPTED';
+}
+
 function providerFailureStatus(status, data) {
   const diagnostic = `${status || ''} ${JSON.stringify(data || {})}`;
   return diagnostic.includes('463') ? 'FAILED_463' : 'FAILED';
@@ -1031,7 +1055,7 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
   return {
     ok: true,
     provider: 'zpro-baileys',
-    deliveryStatus: 'ACCEPTED',
+    deliveryStatus: providerResponseDeliveryStatus(data),
     channelId: config.channelId || null,
     apiId: config.apiId,
     phone: normalizedPhone,
@@ -1391,7 +1415,7 @@ app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
       leadName: request.body?.name || null,
       district: request.body?.district || null,
       provider: result.provider,
-      providerStatus: 'ACCEPTED',
+      providerStatus: result.deliveryStatus,
       providerResponse: result.providerResponse,
       providerMessageId: providerMessageId(result.providerResponse),
       occurredAt: sentAt,
@@ -1465,7 +1489,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         leadName: recipient.name || null,
         district: recipient.district || null,
         provider: result.provider,
-        providerStatus: 'ACCEPTED',
+        providerStatus: result.deliveryStatus,
         providerResponse: result.providerResponse,
         providerMessageId: providerMessageId(result.providerResponse),
         metadata: { templateId: request.body?.templateId || null, batch: true, attempts: result.attempts || [] }
@@ -1474,7 +1498,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         ok: true,
         phone: result.phone,
         leadId: recipient.leadId || recipient.id || null,
-        deliveryStatus: 'ACCEPTED',
+        deliveryStatus: result.deliveryStatus,
         conversationId: saved?.conversation?.id || null,
         messageId: saved?.message?.id || null
       });
@@ -1535,10 +1559,10 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
 
   const payload = coerceWebhookPayload(request.body);
   const event = readZproMessage(payload);
-  const normalizedStatus = normalizeProviderStatus(event.status);
+  const normalizedStatus = recognizedDeliveryStatus(event.status);
   console.log('[zpro:webhook]', JSON.stringify(webhookDiagnostics(request, payload, event)));
 
-  if (!event.text && normalizedStatus) {
+  if (normalizedStatus) {
     let updated = { count: 0 };
     if (event.messageId) {
       updated = await prisma.whatsAppMessage.updateMany({
@@ -1589,13 +1613,44 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
         updated = { count: 1 };
       }
     }
-    response.json({
-      ok: true,
-      received: true,
-      statusUpdated: updated.count,
-      providerMessageId: event.messageId
-    });
-    return;
+    if (!event.text || (event.fromMe && updated.count)) {
+      response.json({
+        ok: true,
+        received: true,
+        statusUpdated: updated.count,
+        providerMessageId: event.messageId
+      });
+      return;
+    }
+  }
+
+  if (event.fromMe && event.text && event.messageId && !normalizedStatus) {
+    const echoed = await prisma.whatsAppMessage.findFirst({
+      where: { providerMessageId: event.messageId, direction: 'OUTBOUND' },
+      select: { id: true }
+    }).catch(() => null);
+    if (echoed?.id) {
+      await prisma.whatsAppMessage.update({
+        where: { id: echoed.id },
+        data: {
+          providerStatus: 'SERVER_ACK',
+          metadata: {
+            status: 'SERVER_ACK',
+            rawStatus: event.status,
+            channelId: event.channelId,
+            event: event.event,
+            raw: payload
+          }
+        }
+      });
+      response.json({
+        ok: true,
+        received: true,
+        statusUpdated: 1,
+        providerMessageId: event.messageId
+      });
+      return;
+    }
   }
 
   const saved = await recordWhatsAppMessage({

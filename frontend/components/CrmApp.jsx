@@ -377,7 +377,7 @@ function deliveryState(message = {}, deliveredByReply = false) {
   if (raw.includes('server_ack') || raw.includes('sent') || raw.includes('ack:1') || raw.includes('ack 1') || raw.trim() === '1') {
     return { label: 'Recebida pelo servidor do WhatsApp', Icon: Check, className: 'text-blue-100' };
   }
-  return { label: 'Aceita pelo provedor; entrega não confirmada', Icon: Check, className: 'text-slate-300' };
+  return { label: 'Enviada pelo provedor', Icon: Check, className: 'text-white' };
 }
 
 function DeliveryReceipt({ message, deliveredByReply = false }) {
