@@ -388,10 +388,13 @@ function contactInitials(name, phone) {
   return digits ? digits.slice(-2) : 'NT';
 }
 
-function ContactAvatar({ name, phone, size = 'md' }) {
+function ContactAvatar({ name, phone, size = 'md', variant = 'default' }) {
   const sizeClass = size === 'lg' ? 'h-16 w-16 text-lg' : 'h-12 w-12 text-sm';
+  const colorClass = variant === 'whatsapp'
+    ? 'border-white/80 bg-[linear-gradient(135deg,#25d366_0%,#00a884_52%,#075e54_100%)] shadow-[0_14px_34px_rgba(0,168,132,0.22)] ring-emerald-200/80'
+    : 'border-white/70 bg-[linear-gradient(135deg,#e0f2fe_0%,#2563eb_48%,#0f172a_100%)] shadow-[0_14px_34px_rgba(37,99,235,0.20)] ring-blue-200/70';
   return (
-    <span className={`${sizeClass} grid shrink-0 place-items-center rounded-2xl border border-white/70 bg-[linear-gradient(135deg,#e0f2fe_0%,#2563eb_48%,#0f172a_100%)] font-black text-white shadow-[0_14px_34px_rgba(37,99,235,0.20)] ring-1 ring-blue-200/70`}>
+    <span className={`${sizeClass} ${colorClass} grid shrink-0 place-items-center rounded-2xl border font-black text-white ring-1`}>
       {contactInitials(name, phone)}
     </span>
   );
@@ -7932,7 +7935,7 @@ function ConversationsView({ records = [] }) {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="whatsapp-conversations grid gap-6">
       <section className={`${panelClass} overflow-hidden p-6`}>
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
@@ -7942,7 +7945,7 @@ function ConversationsView({ records = [] }) {
               Atendimento por lead com histórico salvo no banco, leitura das respostas e ferramentas de acompanhamento para transformar mensagem em cuidado real.
             </p>
           </div>
-          <button className={`${primaryButtonClass} min-w-[16rem]`} onClick={openLeadPicker} type="button">
+          <button className="inline-flex h-12 min-w-[16rem] items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#25d366,#00a884,#075e54)] px-5 text-sm font-black text-white shadow-[0_18px_46px_rgba(0,168,132,0.28)] transition hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_24px_64px_rgba(0,168,132,0.34)]" onClick={openLeadPicker} type="button">
             <Search size={18} />
             Buscar e selecionar lead
           </button>
@@ -7950,7 +7953,7 @@ function ConversationsView({ records = [] }) {
       </section>
 
       <section className="grid h-[42rem] min-h-0 grid-cols-[22rem_1fr_18rem] gap-4 max-2xl:h-auto max-2xl:grid-cols-[20rem_1fr] max-lg:grid-cols-1">
-        <aside className={`${panelClass} flex h-full min-h-0 flex-col overflow-hidden p-4 max-2xl:h-[42rem]`}>
+        <aside className={`${panelClass} whatsapp-sidebar flex h-full min-h-0 flex-col overflow-hidden p-4 max-2xl:h-[42rem]`}>
           <div className="flex items-center justify-between gap-3">
             <span className={labelClass}>Leads</span>
             <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations()} type="button">Atualizar</button>
@@ -7959,7 +7962,7 @@ function ConversationsView({ records = [] }) {
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
             <input
               aria-label="Buscar na lista de leads"
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white/90 pl-9 pr-9 text-xs font-bold text-slate-800 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+              className="h-10 w-full rounded-xl border border-[#d1d7db] bg-white pl-9 pr-9 text-xs font-bold text-[#111b21] shadow-inner outline-none transition placeholder:text-[#667781] focus:border-[#00a884] focus:ring-4 focus:ring-[#00a884]/10"
               onChange={(event) => setConversationListSearch(event.target.value)}
               placeholder="Buscar nome, número ou distrito"
               value={conversationListSearch}
@@ -7970,7 +7973,7 @@ function ConversationsView({ records = [] }) {
               </button>
             ) : null}
           </label>
-          <div className="mt-4 grid min-h-0 flex-1 auto-rows-max content-start gap-2 overflow-x-hidden overflow-y-auto pr-1">
+          <div className="whatsapp-sidebar-scroll mt-4 grid min-h-0 flex-1 auto-rows-max content-start gap-2 overflow-x-hidden overflow-y-auto pr-1">
             {loading ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-700">Carregando conversas...</div>
             ) : visibleConversations.length ? visibleConversations.map((conversation) => {
@@ -7991,7 +7994,7 @@ function ConversationsView({ records = [] }) {
               const displayPriority = displayLead?.priority || displayLead?.p || conversation.leadPriority || null;
               return (
                 <button
-                  className={`interactive-card flex items-center gap-3 rounded-2xl border bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'border-blue-400 ring-4 ring-blue-500/10' : 'border-slate-200'}`}
+                  className={`interactive-card whatsapp-contact-card flex items-center gap-3 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'whatsapp-contact-active border-[#25d366] ring-4 ring-[#25d366]/10' : 'border-[#e9edef]'}`}
                   key={conversation.id}
                   onClick={() => {
                     setSelectedId(conversation.id);
@@ -7999,7 +8002,7 @@ function ConversationsView({ records = [] }) {
                   }}
                   type="button"
                 >
-                  <ContactAvatar name={displayName} phone={conversation.phone} />
+                  <ContactAvatar name={displayName} phone={conversation.phone} variant="whatsapp" />
                   <span className="min-w-0 flex-1">
                   <strong className="block truncate text-sm font-black text-slate-950">{displayName}</strong>
                   <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{displayDistrict} · {whatsappPriorityLabels[displayPriority] || displayPriority || 'Sem tipo'}</span>
@@ -8015,11 +8018,11 @@ function ConversationsView({ records = [] }) {
                 type="button"
               >
                 <span className="flex items-center gap-3">
-                  <ContactAvatar name={newConversationCandidate.name} phone={newConversationCandidate.phone} />
+                  <ContactAvatar name={newConversationCandidate.name} phone={newConversationCandidate.phone} variant="whatsapp" />
                   <span className="min-w-0 flex-1">
                     <strong className="block truncate text-sm font-black text-slate-950">{newConversationCandidate.name}</strong>
                     <span className="mt-1 block text-xs font-semibold text-slate-600">{newConversationCandidate.phone}</span>
-                    <span className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white transition group-hover:bg-blue-700">
+                    <span className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#00a884] px-3 py-1.5 text-xs font-black text-white transition group-hover:bg-[#008f72]">
                       <MessageCircle size={15} /> Conversar
                     </span>
                   </span>
@@ -8036,11 +8039,11 @@ function ConversationsView({ records = [] }) {
         </aside>
 
         {conversationExpanded ? <button aria-label="Fechar conversa ampliada" className="fixed inset-0 z-[2147483644] cursor-default bg-slate-950/75 backdrop-blur-sm" onClick={() => setConversationExpanded(false)} type="button" /> : null}
-        <article className={`${panelClass} flex min-h-0 flex-col overflow-hidden transition-[width,height,top,left] duration-300 ${conversationExpanded ? 'conversation-expanded-panel !fixed top-[3vh] z-[2147483645] !h-[94vh] max-w-none rounded-[2rem] border border-white/40 shadow-[0_42px_140px_rgba(0,0,0,0.62)]' : 'h-full max-2xl:h-[42rem]'}`}>
-          <div className={`border-b border-white/[0.07] p-5 ${conversationExpanded ? 'bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(219,234,254,0.94),rgba(241,245,249,0.98))] px-7 py-5' : ''}`}>
+        <article className={`${panelClass} whatsapp-chat flex min-h-0 flex-col overflow-hidden transition-[width,height,top,left] duration-300 ${conversationExpanded ? 'conversation-expanded-panel !fixed top-[3vh] z-[2147483645] !h-[94vh] max-w-none rounded-[2rem] border border-white/40 shadow-[0_42px_140px_rgba(0,0,0,0.62)]' : 'h-full max-2xl:h-[42rem]'}`}>
+          <div className={`whatsapp-chat-header border-b border-[#d1d7db] p-5 ${conversationExpanded ? 'px-7 py-5' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-4">
-                <ContactAvatar name={activeLeadName} phone={activePhone} size="lg" />
+                <ContactAvatar name={activeLeadName} phone={activePhone} size="lg" variant="whatsapp" />
                 <span className="min-w-0">
                   <span className={labelClass}>Atendimento</span>
                 <h2 className={`mt-1 font-black text-slate-50 ${conversationExpanded ? 'text-3xl max-md:text-xl' : 'text-2xl'}`}>{activeLeadName || activePhone || 'Selecione um lead'}</h2>
@@ -8048,12 +8051,12 @@ function ConversationsView({ records = [] }) {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
+                <span className="rounded-full bg-[#00a884] px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
                   {lastMessage?.direction === 'INBOUND' ? 'Responder' : 'Em acompanhamento'}
                 </span>
                 <button
                   aria-label={conversationExpanded ? 'Reduzir conversa' : 'Ampliar conversa'}
-                  className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/15"
+                  className="grid h-10 w-10 place-items-center rounded-xl border border-[#d1d7db] bg-white text-[#54656f] shadow-sm transition hover:-translate-y-0.5 hover:border-[#00a884] hover:bg-[#d9fdd3] hover:text-[#006c5b] focus:outline-none focus:ring-4 focus:ring-[#00a884]/15"
                   onClick={() => setConversationExpanded((current) => !current)}
                   title={conversationExpanded ? 'Reduzir conversa' : 'Ampliar conversa'}
                   type="button"
@@ -8064,7 +8067,7 @@ function ConversationsView({ records = [] }) {
             </div>
           </div>
 
-          <div className={`flex-1 overflow-auto bg-slate-950/20 ${conversationExpanded ? 'conversation-tools-scroll bg-[radial-gradient(circle_at_top,rgba(219,234,254,0.72),rgba(203,213,225,0.82))] p-7 max-md:p-4' : 'p-5'}`}>
+          <div className={`whatsapp-chat-history flex-1 overflow-auto ${conversationExpanded ? 'conversation-tools-scroll p-7 max-md:p-4' : 'p-5'}`}>
             <div className={`mx-auto grid gap-3 ${conversationExpanded ? 'w-full max-w-6xl' : ''}`}>
               {messages.length ? messages.map((message) => {
                 const outgoing = message.direction === 'OUTBOUND';
@@ -8074,12 +8077,12 @@ function ConversationsView({ records = [] }) {
                 );
                 return (
                   <div className={`flex ${outgoing ? 'justify-end' : 'justify-start'}`} key={message.id}>
-                    <div className={`${conversationExpanded ? 'max-w-[64%] max-md:max-w-[88%]' : 'max-w-[78%]'} rounded-2xl border px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${outgoing ? 'border-blue-300 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-800'}`}>
-                      <span className={`block text-[11px] font-black uppercase tracking-[0.14em] ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
+                    <div className={`${conversationExpanded ? 'max-w-[64%] max-md:max-w-[88%]' : 'max-w-[78%]'} rounded-2xl border px-4 py-3 shadow-[0_8px_24px_rgba(11,20,26,0.10)] ${outgoing ? 'border-[#c8e7bf] bg-[#d9fdd3] text-[#111b21]' : 'border-[#e9edef] bg-white text-[#111b21]'}`}>
+                      <span className={`block text-[11px] font-black uppercase tracking-[0.14em] ${outgoing ? 'text-[#008069]' : 'text-[#667781]'}`}>
                         {outgoing ? 'Mensagem de saída' : 'Pergunta recebida'}
                       </span>
                       <p className="mt-1 text-sm font-semibold leading-relaxed">{message.body}</p>
-                      <span className={`mt-2 flex items-center justify-end gap-1.5 text-[11px] font-bold ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
+                      <span className="mt-2 flex items-center justify-end gap-1.5 text-[11px] font-bold text-[#667781]">
                         <span>{message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : 'Sem data'}</span>
                         {outgoing ? <DeliveryReceipt deliveredByReply={deliveredByReply} message={message} /> : null}
                       </span>
@@ -8095,9 +8098,9 @@ function ConversationsView({ records = [] }) {
             </div>
           </div>
 
-          <form className={`grid gap-3 border-t border-white/[0.07] p-4 ${conversationExpanded ? 'bg-white/95 px-7 py-5 shadow-[0_-16px_50px_rgba(15,23,42,0.10)] max-md:px-4' : ''}`} onSubmit={submitMessage}>
+          <form className={`whatsapp-composer grid gap-3 border-t border-[#d1d7db] bg-[#f0f2f5] p-4 ${conversationExpanded ? 'px-7 py-5 shadow-[0_-16px_50px_rgba(11,20,26,0.10)] max-md:px-4' : ''}`} onSubmit={submitMessage}>
             <textarea
-              className="min-h-20 resize-none rounded-2xl border border-white/[0.08] bg-slate-950/70 px-4 py-3 text-sm font-semibold leading-relaxed text-slate-100 outline-none placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10"
+              className="min-h-20 resize-none rounded-2xl border border-[#d1d7db] bg-white px-4 py-3 text-sm font-semibold leading-relaxed text-[#111b21] outline-none placeholder:text-[#667781] focus:border-[#00a884] focus:ring-4 focus:ring-[#00a884]/10"
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();
@@ -8109,7 +8112,7 @@ function ConversationsView({ records = [] }) {
               value={messageText}
             />
             {messageAttachment ? (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-400/25 bg-blue-500/10 px-3 py-2 text-xs font-bold text-blue-100">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-[#00a884]/25 bg-[#d9fdd3] px-3 py-2 text-xs font-bold text-[#006c5b]">
                 <span className="min-w-0 truncate">{messageAttachment.type.startsWith('video/') ? 'Vídeo' : 'Imagem'}: {messageAttachment.name}</span>
                 <button aria-label="Remover anexo" className="rounded-lg p-1 transition hover:bg-white/10 hover:text-white" onClick={() => {
                   setMessageAttachment(null);
@@ -8120,12 +8123,12 @@ function ConversationsView({ records = [] }) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <input accept="image/*,video/*" className="hidden" onChange={selectMessageAttachment} ref={attachmentInputRef} type="file" />
-                <button className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-black text-slate-300 transition hover:-translate-y-0.5 hover:border-blue-400/40 hover:bg-blue-500/10 hover:text-white" onClick={() => attachmentInputRef.current?.click()} type="button">
+                <button className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#d1d7db] bg-white px-3 text-xs font-black text-[#54656f] transition hover:-translate-y-0.5 hover:border-[#00a884] hover:bg-[#d9fdd3] hover:text-[#006c5b]" onClick={() => attachmentInputRef.current?.click()} type="button">
                   <Paperclip size={17} /> Anexar imagem ou vídeo
                 </button>
                 <span className="text-[11px] font-semibold text-slate-500 max-md:hidden">Enter envia · Shift+Enter quebra a linha</span>
               </div>
-              <button className={primaryButtonClass} disabled={sending || !activePhone || (!messageText.trim() && !messageAttachment)} type="submit">
+              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#25d366,#00a884,#075e54)] px-5 text-sm font-black text-white shadow-[0_14px_34px_rgba(0,168,132,0.26)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60" disabled={sending || !activePhone || (!messageText.trim() && !messageAttachment)} type="submit">
                 <Send size={18} />
                 {sending ? 'Enviando...' : 'Enviar'}
               </button>
