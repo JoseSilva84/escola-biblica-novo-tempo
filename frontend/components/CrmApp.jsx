@@ -3970,22 +3970,24 @@ function leadAgeGroup(lead) {
 }
 
 const contactTimeRanges = [
-  { value: 'month:1', label: 'Ate 1 mes', min: 0, max: 30 },
+  { value: 'month:1', label: '1º mês · 0 a 30 dias', min: 0, max: 30 },
   ...Array.from({ length: 10 }, (_, index) => {
     const month = index + 2;
+    const min = ((month - 1) * 30) + 1;
+    const max = month * 30;
     return {
       value: `month:${month}`,
-      label: `${month} meses`,
-      min: ((month - 1) * 30) + 1,
-      max: month * 30
+      label: `${month}º mês · ${min} a ${max} dias`,
+      min,
+      max
     };
   }),
-  { value: 'year:1', label: '1 ano', min: (11 * 30) + 1, max: 365 },
+  { value: 'year:1', label: '12º mês · 331 a 365 dias', min: (11 * 30) + 1, max: 365 },
   ...Array.from({ length: 9 }, (_, index) => {
     const year = index + 2;
     return {
       value: `year:${year}`,
-      label: `${year} anos`,
+      label: `${year}º ano · entre ${year - 1} e ${year} anos`,
       min: ((year - 1) * 365) + 1,
       max: year * 365
     };
@@ -7498,6 +7500,32 @@ function WhatsAppLeadPickerModal({
             </div>
           ) : null}
 
+          {advancedFiltersOpen && filters.birthday === 'date' ? (
+            <div className="grid gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:grid-cols-3">
+              <label className="grid gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-800">
+                Dia
+                <select className="h-9 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-bold normal-case text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onFilterChange('birthdayDay', event.target.value)} value={filters.birthdayDay}>
+                  <option value="">Todos os dias</option>
+                  {Array.from({ length: 31 }, (_, index) => String(index + 1).padStart(2, '0')).map((day) => <option key={day} value={day}>{day}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-800">
+                Mês
+                <select className="h-9 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-bold normal-case text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onFilterChange('birthdayMonth', event.target.value)} value={filters.birthdayMonth}>
+                  <option value="">Todos os meses</option>
+                  {birthdayMonthNames.map((month, index) => <option key={month} value={String(index + 1).padStart(2, '0')}>{month}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-800">
+                Ano
+                <select className="h-9 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-bold normal-case text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onFilterChange('birthdayYear', event.target.value)} value={filters.birthdayYear}>
+                  <option value="">Todos os anos</option>
+                  {filterOptions.birthdayYears.map((year) => <option key={year} value={year}>{year}</option>)}
+                </select>
+              </label>
+            </div>
+          ) : null}
+
           {advancedFiltersOpen ? <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {[
               ['districts', 'Distrito', 'Todos os distritos'],
@@ -7532,31 +7560,6 @@ function WhatsAppLeadPickerModal({
               </label>
             ))}
           </div> : null}
-          {advancedFiltersOpen && filters.birthday === 'date' ? (
-            <div className="grid gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:grid-cols-3">
-              <label className="grid gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-800">
-                Dia
-                <select className="h-9 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-bold normal-case text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onFilterChange('birthdayDay', event.target.value)} value={filters.birthdayDay}>
-                  <option value="">Todos os dias</option>
-                  {Array.from({ length: 31 }, (_, index) => String(index + 1).padStart(2, '0')).map((day) => <option key={day} value={day}>{day}</option>)}
-                </select>
-              </label>
-              <label className="grid gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-800">
-                Mês
-                <select className="h-9 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-bold normal-case text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onFilterChange('birthdayMonth', event.target.value)} value={filters.birthdayMonth}>
-                  <option value="">Todos os meses</option>
-                  {birthdayMonthNames.map((month, index) => <option key={month} value={String(index + 1).padStart(2, '0')}>{month}</option>)}
-                </select>
-              </label>
-              <label className="grid gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-800">
-                Ano
-                <select className="h-9 rounded-lg border border-emerald-200 bg-white px-2 text-xs font-bold normal-case text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onFilterChange('birthdayYear', event.target.value)} value={filters.birthdayYear}>
-                  <option value="">Todos os anos</option>
-                  {filterOptions.birthdayYears.map((year) => <option key={year} value={year}>{year}</option>)}
-                </select>
-              </label>
-            </div>
-          ) : null}
           {advancedFiltersOpen ? <p className="text-[11px] font-semibold text-slate-500">Todos é o padrão. Ao escolher uma opção, os contatos são atualizados automaticamente.</p> : null}
           <button
             aria-expanded={advancedFiltersOpen}
