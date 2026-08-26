@@ -104,6 +104,23 @@ function whatsappPriorityBadgeKey(value) {
   return text ? `${text[0].toUpperCase()}${text.slice(1)}` : 'Cool';
 }
 
+function dashboardLeadToWhatsAppLead(lead) {
+  const phone = phoneDigits(lead?.tel);
+  const priority = String(lead?.p || 'Cool').toUpperCase();
+  return {
+    id: lead?.id,
+    externalId: Number(lead?.id) || null,
+    name: lead?.n || `Contato ${phone.slice(-4)}`,
+    phone,
+    district: lead?.d || null,
+    priority,
+    score: lead?.s ?? null,
+    isVip: Boolean(lead?.v),
+    hasActiveStudy: Boolean(lead?.e),
+    source: 'dashboard'
+  };
+}
+
 function apiFetch(path, options = {}) {
   const token = typeof window !== 'undefined' ? window.localStorage.getItem('sevenflow_token') : '';
   return fetch(`${API_BASE}${path}`, {
@@ -7279,12 +7296,18 @@ function WhatsAppLeadPickerModal({
   leads = [],
   loading = false,
   nameSearch,
+  newContact,
+  newContactMode = false,
+  newContactSaving = false,
   onClose,
   onDistrictChange,
   onNameSearchChange,
+  onNewContactChange,
+  onNewContactSubmit,
   onPriorityChange,
   onSearch,
   onSelect,
+  onToggleNewContact,
   priority
 }) {
   return createPortal(
@@ -7296,11 +7319,47 @@ function WhatsAppLeadPickerModal({
             <h2 className="mt-2 text-3xl font-black tracking-normal" id="whatsapp-lead-picker-title">Selecionar lead</h2>
             <p className="mt-2 text-sm font-semibold text-blue-100">Busque no banco por nome, distrito ou tipo de lead.</p>
           </div>
-          <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/20 bg-white px-4 text-sm font-black text-slate-950" onClick={onClose} type="button">
-            <X size={18} /> Fechar
-          </button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-black text-white transition hover:bg-white/20" onClick={onToggleNewContact} type="button">
+              <Plus size={18} /> {newContactMode ? 'Voltar à busca' : 'Novo contato'}
+            </button>
+            <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/20 bg-white px-4 text-sm font-black text-slate-950" onClick={onClose} type="button">
+              <X size={18} /> Fechar
+            </button>
+          </div>
         </div>
 
+        {newContactMode ? (
+          <form className="grid gap-3 border-b border-slate-200 bg-white p-5 md:grid-cols-2" onSubmit={onNewContactSubmit}>
+            <label className="grid gap-1.5">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Nome opcional</span>
+              <input className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => onNewContactChange('name', event.target.value)} placeholder="Nome do novo contato" value={newContact.name} />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">WhatsApp *</span>
+              <input autoFocus className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => onNewContactChange('phone', event.target.value)} placeholder="Ex.: 11999999999" required value={newContact.phone} />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Vincular a um distrito</span>
+              <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => onNewContactChange('district', event.target.value)} value={newContact.district}>
+                <option value="">Sem distrito vinculado</option>
+                {districts.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+              <span className="text-xs font-semibold text-slate-500">Você pode deixar o contato sem distrito e vinculá-lo posteriormente.</span>
+            </label>
+            <label className="grid gap-1.5">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Tipo de lead</span>
+              <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => onNewContactChange('priority', event.target.value)} value={newContact.priority}>
+                {Object.entries(whatsappPriorityLabels).slice(0, 4).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <div className="flex justify-end md:col-span-2">
+              <button className={`${primaryButtonClass} min-w-[13rem]`} disabled={newContactSaving} type="submit">
+                <Plus size={18} /> {newContactSaving ? 'Salvando...' : 'Salvar contato'}
+              </button>
+            </div>
+          </form>
+        ) : (
         <form className="grid gap-3 border-b border-slate-200 bg-white p-5 md:grid-cols-[1fr_15rem_13rem_auto]" onSubmit={onSearch}>
           <label className="grid gap-1.5">
             <span className="text-xs font-black uppercase tracking-wide text-slate-500">Nome</span>
@@ -7330,8 +7389,9 @@ function WhatsAppLeadPickerModal({
             <Search size={18} /> Buscar
           </button>
         </form>
+        )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-100 p-5">
+        {!newContactMode ? <div className="min-h-0 flex-1 overflow-y-auto bg-slate-100 p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Leads encontrados</span>
             <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">{leads.length}</span>
@@ -7357,7 +7417,7 @@ function WhatsAppLeadPickerModal({
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-600">Nenhum lead com WhatsApp foi encontrado para esses filtros.</div>
           )}
-        </div>
+        </div> : <div className="min-h-[8rem] flex-1 bg-slate-100 p-6 text-center text-sm font-semibold text-slate-600">O contato será salvo na Associação Paulistana e ficará disponível para iniciar a conversa.</div>}
       </div>
     </div>,
     document.body
@@ -7378,6 +7438,9 @@ function ConversationsView({ records = [] }) {
   const [leadDistrictFilter, setLeadDistrictFilter] = useState('');
   const [leadPriorityFilter, setLeadPriorityFilter] = useState('');
   const [selectedRecipientLead, setSelectedRecipientLead] = useState(null);
+  const [newContactMode, setNewContactMode] = useState(false);
+  const [newContactSaving, setNewContactSaving] = useState(false);
+  const [newContact, setNewContact] = useState({ name: '', phone: '', district: '', priority: 'COOL' });
   const [messageText, setMessageText] = useState('Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?');
   const chatEndRef = useRef(null);
   const activePhoneRef = useRef('');
@@ -7387,6 +7450,15 @@ function ConversationsView({ records = [] }) {
     const search = filters.search ?? leadNameSearch;
     const district = filters.district ?? leadDistrictFilter;
     const priority = filters.priority ?? leadPriorityFilter;
+    const fallbackDistricts = Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    const normalizedSearch = search.trim().toLocaleLowerCase('pt-BR');
+    const fallbackLeads = records
+      .filter((lead) => lead.t && phoneDigits(lead.tel))
+      .filter((lead) => !normalizedSearch || String(lead.n || '').toLocaleLowerCase('pt-BR').includes(normalizedSearch))
+      .filter((lead) => !district || lead.d === district)
+      .filter((lead) => !priority || String(lead.p || '').toUpperCase() === priority)
+      .map(dashboardLeadToWhatsAppLead)
+      .slice(0, 100);
     setLeadDirectoryLoading(true);
     try {
       const params = new URLSearchParams({ limit: '100' });
@@ -7396,11 +7468,17 @@ function ConversationsView({ records = [] }) {
       const response = await apiFetch(`/api/whatsapp/leads?${params.toString()}`, { cache: 'no-store' });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Não foi possível buscar os leads.');
-      setLeadDirectory(payload.leads || []);
-      setLeadDistricts(payload.districts || []);
+      const mergedLeads = new Map();
+      [...fallbackLeads, ...(payload.leads || [])].forEach((lead) => {
+        const key = phoneDigits(lead.phone).slice(-10) || lead.id;
+        mergedLeads.set(key, lead);
+      });
+      setLeadDirectory(Array.from(mergedLeads.values()).slice(0, 100));
+      setLeadDistricts(Array.from(new Set([...fallbackDistricts, ...(payload.districts || [])])).sort((a, b) => a.localeCompare(b)));
     } catch (error) {
-      setLeadDirectory([]);
-      toast.error('Falha ao buscar leads', { description: error.message });
+      setLeadDirectory(fallbackLeads);
+      setLeadDistricts(fallbackDistricts);
+      if (!fallbackLeads.length) toast.error('Falha ao buscar leads', { description: error.message });
     } finally {
       setLeadDirectoryLoading(false);
     }
@@ -7408,6 +7486,7 @@ function ConversationsView({ records = [] }) {
 
   function openLeadPicker() {
     setLeadPickerOpen(true);
+    setNewContactMode(false);
     loadLeadDirectory();
   }
 
@@ -7422,6 +7501,32 @@ function ConversationsView({ records = [] }) {
     setSelectedId(null);
     setLeadPickerOpen(false);
     await loadConversations(lead.phone, { selectSearched: true });
+  }
+
+  function updateNewContact(field, value) {
+    setNewContact((current) => ({ ...current, [field]: value }));
+  }
+
+  async function submitNewContact(event) {
+    event.preventDefault();
+    setNewContactSaving(true);
+    try {
+      const response = await apiFetch('/api/whatsapp/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newContact)
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Não foi possível salvar o contato.');
+      setLeadDirectory((current) => [payload.lead, ...current.filter((lead) => lead.id !== payload.lead.id)]);
+      setNewContact({ name: '', phone: '', district: '', priority: 'COOL' });
+      toast.success(payload.created ? 'Novo contato salvo' : 'Contato atualizado', { description: payload.lead.name });
+      await selectRecipientLead(payload.lead);
+    } catch (error) {
+      toast.error('Falha ao salvar contato', { description: error.message });
+    } finally {
+      setNewContactSaving(false);
+    }
   }
 
   async function loadConversations(phone = '', options = {}) {
@@ -7770,12 +7875,18 @@ function ConversationsView({ records = [] }) {
           leads={leadDirectory}
           loading={leadDirectoryLoading}
           nameSearch={leadNameSearch}
+          newContact={newContact}
+          newContactMode={newContactMode}
+          newContactSaving={newContactSaving}
           onClose={() => setLeadPickerOpen(false)}
           onDistrictChange={setLeadDistrictFilter}
           onNameSearchChange={setLeadNameSearch}
+          onNewContactChange={updateNewContact}
+          onNewContactSubmit={submitNewContact}
           onPriorityChange={setLeadPriorityFilter}
           onSearch={submitLeadSearch}
           onSelect={selectRecipientLead}
+          onToggleNewContact={() => setNewContactMode((current) => !current)}
           priority={leadPriorityFilter}
         />
       ) : null}

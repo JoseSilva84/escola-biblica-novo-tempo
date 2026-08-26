@@ -1331,6 +1331,86 @@ app.get('/api/whatsapp/leads', requireAuth, async (request, response) => {
   }
 });
 
+app.post('/api/whatsapp/leads', requireAuth, async (request, response) => {
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.status(403).json({ message: 'Usuario sem permissao para cadastrar contatos.' });
+    return;
+  }
+
+  const phone = normalizePhone(request.body?.phone);
+  if (!phone) {
+    response.status(400).json({ message: 'WhatsApp invalido. Informe DDI + DDD + numero, ou DDD + numero brasileiro.' });
+    return;
+  }
+
+  const requestedAssociation = normalizeAssociationSlug(request.body?.association);
+  const associationSlug = isAdminGeralUser(request.user)
+    ? requestedAssociation || 'paulistana'
+    : userAssociationSlug(request.user);
+  const name = String(request.body?.name || '').trim();
+  const districtName = String(request.body?.district || '').trim();
+  const requestedPriority = String(request.body?.priority || 'COOL').trim().toUpperCase();
+  const priority = ['HOT', 'WARM', 'COOL', 'COLD'].includes(requestedPriority) ? requestedPriority : 'COOL';
+
+  try {
+    const association = await prisma.association.findUnique({
+      where: { slug: associationSlug },
+      select: { id: true }
+    });
+    if (!association) {
+      response.status(400).json({ message: 'Associacao nao encontrada para cadastrar o contato.' });
+      return;
+    }
+
+    const district = districtName
+      ? await prisma.district.upsert({
+        where: { associationId_name: { associationId: association.id, name: districtName } },
+        create: { associationId: association.id, name: districtName },
+        update: {},
+        select: { id: true }
+      })
+      : null;
+    const existing = await prisma.lead.findFirst({
+      where: {
+        associationId: association.id,
+        phone: { contains: phone.slice(-10) }
+      },
+      select: { id: true }
+    });
+
+    const lead = existing
+      ? await prisma.lead.update({
+        where: { id: existing.id },
+        data: {
+          phone,
+          ...(name ? { name } : {}),
+          priority,
+          ...(district ? { districtId: district.id } : {})
+        },
+        select: whatsappLeadSelect
+      })
+      : await prisma.lead.create({
+        data: {
+          associationId: association.id,
+          name: name || `Novo contato ${phone.slice(-4)}`,
+          phone,
+          priority,
+          ...(district ? { districtId: district.id } : {})
+        },
+        select: whatsappLeadSelect
+      });
+
+    response.status(existing ? 200 : 201).json({
+      ok: true,
+      created: !existing,
+      lead: serializeWhatsAppLead(lead)
+    });
+  } catch (error) {
+    console.error('[whatsapp:lead:create:error]', error.message);
+    response.status(500).json({ message: 'Nao foi possivel salvar o novo contato.' });
+  }
+});
+
 app.get('/api/whatsapp/conversations', requireAuth, async (request, response) => {
   response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   response.set('Pragma', 'no-cache');
