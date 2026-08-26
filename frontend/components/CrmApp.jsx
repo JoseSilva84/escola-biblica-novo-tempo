@@ -420,7 +420,7 @@ function deliveryState(message = {}, deliveredByReply = false) {
   if (raw.includes('server_ack') || raw.includes('sent') || raw.includes('ack:1') || raw.includes('ack 1') || raw.trim() === '1') {
     return { label: 'Recebida pelo servidor do WhatsApp', Icon: Check, className: 'text-blue-100' };
   }
-  return { label: 'Enviada pelo provedor', Icon: Check, className: 'text-white' };
+  return { label: 'Enviada pelo provedor', Icon: Check, className: 'text-[#54656f]' };
 }
 
 function DeliveryReceipt({ message, deliveredByReply = false }) {
@@ -8136,15 +8136,15 @@ function ConversationsView({ records = [] }) {
           </form>
         </article>
 
-        <aside className={`${panelClass} flex h-full min-h-0 flex-col overflow-hidden p-5 max-2xl:col-span-2 max-2xl:h-[42rem] max-lg:col-span-1`}>
+        <aside className={`${panelClass} whatsapp-tools flex h-full min-h-0 flex-col overflow-hidden p-5 max-2xl:col-span-2 max-2xl:h-[42rem] max-lg:col-span-1`}>
           <div className="shrink-0">
             <span className={labelClass}>Ferramentas</span>
             <h2 className="mt-1 text-xl font-black text-slate-50">Proximas acoes</h2>
           </div>
-          <div className="conversation-tools-scroll mt-4 grid min-h-0 flex-1 auto-rows-max content-start gap-4 overflow-x-hidden overflow-y-scroll pr-3">
+          <div className="conversation-tools-scroll whatsapp-tools-scroll mt-4 grid min-h-0 flex-1 auto-rows-max content-start gap-4 overflow-x-hidden overflow-y-scroll pr-3">
             {quickActions.map(([title, detail]) => (
               <button
-                className="interactive-card min-h-[7rem] rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300"
+                className="interactive-card whatsapp-tool-card min-h-[7rem] rounded-2xl border border-[#e9edef] bg-white p-4 text-left shadow-[0_10px_28px_rgba(11,20,26,0.07)] transition hover:-translate-y-0.5"
                 key={title}
                 onClick={() => toast.info(title, { description: detail })}
                 type="button"
@@ -8153,8 +8153,8 @@ function ConversationsView({ records = [] }) {
                 <span className="mt-1 block text-xs font-semibold leading-relaxed text-slate-600">{detail}</span>
               </button>
             ))}
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Poderiamos implementar mais</span>
+            <div className="rounded-2xl border border-[#25d366]/40 bg-[#d9fdd3] p-4">
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-[#008069]">Poderiamos implementar mais</span>
               <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">
                 etiquetas por assunto, status de atendimento, responsavel, resposta sugerida por IA, resumo automatico, opt-out e tarefas de visita ligadas a conversa.
               </p>
