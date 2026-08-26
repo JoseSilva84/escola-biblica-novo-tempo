@@ -4773,7 +4773,12 @@ function leadMatchesFilterGroup(lead, filters, ignoredGroups = []) {
   if (!ignored.has('religion') && filters.religion === 'adventist' && !isAdventistReligion(lead.r)) return false;
   if (!ignored.has('religion') && filters.religion === 'non-adventist' && isAdventistReligion(lead.r)) return false;
   if (!ignored.has('religion') && filters.religion.startsWith('religion:') && leadReligionValue(lead) !== filters.religion.slice('religion:'.length)) return false;
-  if (!ignored.has('recency') && filters.recency !== 'all' && leadContactTimeRange(lead) !== filters.recency) return false;
+  if (!ignored.has('recency')) {
+    const selectedRecencies = Array.isArray(filters.recency)
+      ? filters.recency
+      : filters.recency && filters.recency !== 'all' ? [filters.recency] : [];
+    if (selectedRecencies.length && !selectedRecencies.includes(leadContactTimeRange(lead))) return false;
+  }
   if (!ignored.has('search') && term) {
     const haystack = `${lead.n || ''} ${lead.tel || ''} ${lead.em || ''} ${lead.d || ''} ${leadNeighborhood(lead)} ${leadMaterial(lead)} ${lead.r || ''} ${lead.id || ''}`.toLowerCase();
     if (!haystack.includes(term)) return false;
@@ -7385,6 +7390,53 @@ function WhatsAppNewContactForm({ districts = [], initialContact, onSubmit, savi
   );
 }
 
+function RecencyMultiSelect({ onChange, options = [], selected = [] }) {
+  const [open, setOpen] = useState(false);
+  const choices = options.filter(([value]) => value !== 'all');
+  const selectedTotal = choices
+    .filter(([value]) => selected.includes(value))
+    .reduce((sum, [, label]) => sum + Number(String(label).match(/\(([\d.]+)\)$/)?.[1]?.replace(/\./g, '') || 0), 0);
+
+  return (
+    <label className="relative grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500">
+      Tempo
+      <button
+        aria-expanded={open}
+        className="flex h-9 min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 text-left text-xs font-bold normal-case text-slate-800 outline-none transition hover:border-blue-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span className="truncate">{selected.length ? `${selected.length} faixas · ${formatNumber(selectedTotal)} contatos` : options[0]?.[1] || 'Todos'}</span>
+        <ChevronDown className={`shrink-0 transition ${open ? 'rotate-180' : ''}`} size={15} />
+      </button>
+      {open ? (
+        <div className="absolute right-0 top-full z-[80] mt-1 w-[min(24rem,80vw)] rounded-xl border border-slate-200 bg-white p-2 shadow-[0_20px_55px_rgba(15,23,42,0.24)]">
+          <div className="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 px-2 pb-2">
+            <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">Selecione um ou vários períodos</span>
+            {selected.length ? <button className="text-[10px] font-black uppercase text-blue-700 hover:text-red-600" onClick={() => onChange([])} type="button">Limpar</button> : null}
+          </div>
+          <div className="conversation-tools-scroll grid max-h-64 gap-1 overflow-y-auto pr-1">
+            {choices.map(([value, label]) => {
+              const checked = selected.includes(value);
+              return (
+                <button
+                  className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-bold normal-case transition ${checked ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-50'}`}
+                  key={value}
+                  onClick={() => onChange(checked ? selected.filter((item) => item !== value) : [...selected, value])}
+                  type="button"
+                >
+                  <span className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${checked ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'}`}>{checked ? <Check size={13} /> : null}</span>
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </label>
+  );
+}
+
 function WhatsAppLeadPickerModal({
   districts = [],
   filterOptions,
@@ -7425,7 +7477,6 @@ function WhatsAppLeadPickerModal({
     study: 'Estudos',
     vip: 'VIP',
     religion: 'Religião',
-    recency: 'Tempo',
     birthday: 'Aniversariantes'
   };
   const selectedFilterChips = [
@@ -7437,7 +7488,14 @@ function WhatsAppLeadPickerModal({
       const optionLabel = filterOptions[key]?.find(([value]) => value === filters[key])?.[1]
         ?.replace(/\s\([\d.]+\)$/, '') || filters[key];
       return [{ key, label, value: optionLabel, array: false }];
-    })
+    }),
+    ...(filters.recency || []).map((value) => ({
+      key: `recency:${value}`,
+      label: 'Tempo',
+      value: filterOptions.recency?.find(([optionValue]) => optionValue === value)?.[1]?.replace(/\s\([\d.]+\)$/, '') || value,
+      multiple: true,
+      rawValue: value
+    }))
   ];
   return createPortal(
     <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-lead-picker-title">
@@ -7490,7 +7548,11 @@ function WhatsAppLeadPickerModal({
                 <button
                   className="inline-flex h-8 items-center gap-1.5 rounded-full border border-blue-200 bg-white px-3 text-[11px] font-black text-slate-700 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
                   key={chip.key}
-                  onClick={() => (chip.array ? onArrayFilterChange(chip.key, '') : onFilterChange(chip.key, 'all'))}
+                  onClick={() => (
+                    chip.multiple
+                      ? onFilterChange('recency', filters.recency.filter((value) => value !== chip.rawValue))
+                      : chip.array ? onArrayFilterChange(chip.key, '') : onFilterChange(chip.key, 'all')
+                  )}
                   title="Clique para remover este filtro"
                   type="button"
                 >
@@ -7549,7 +7611,6 @@ function WhatsAppLeadPickerModal({
               ['study', 'Estudos'],
               ['vip', 'VIP'],
               ['religion', 'Religião'],
-              ['recency', 'Tempo'],
               ['birthday', 'Aniversariantes']
             ].map(([key, label]) => (
               <label className="grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500" key={key}>
@@ -7559,6 +7620,11 @@ function WhatsAppLeadPickerModal({
                 </select>
               </label>
             ))}
+            <RecencyMultiSelect
+              onChange={(values) => onFilterChange('recency', values)}
+              options={filterOptions.recency}
+              selected={filters.recency}
+            />
           </div> : null}
           {advancedFiltersOpen ? <p className="text-[11px] font-semibold text-slate-500">Todos é o padrão. Ao escolher uma opção, os contatos são atualizados automaticamente.</p> : null}
           <button
@@ -7718,7 +7784,7 @@ function ConversationsView({ records = [] }) {
     study: 'all',
     vip: 'all',
     religion: 'all',
-    recency: 'all',
+    recency: [],
     birthday: 'all',
     birthdayDay: '',
     birthdayMonth: '',
@@ -8097,9 +8163,9 @@ function ConversationsView({ records = [] }) {
 
   const filteredContactLeads = useMemo(() => allFilteredContactLeads.slice(0, 100), [allFilteredContactLeads]);
   const hasActiveCombinedContactFilter = useMemo(() => (
-    ['districts', 'neighborhoods', 'materials', 'ageGroups', 'genders', 'priorities']
+    ['districts', 'neighborhoods', 'materials', 'ageGroups', 'genders', 'priorities', 'recency']
       .some((key) => deferredContactFilters[key]?.length)
-    || ['whatsapp', 'email', 'study', 'vip', 'religion', 'recency', 'birthday']
+    || ['whatsapp', 'email', 'study', 'vip', 'religion', 'birthday']
       .some((key) => deferredContactFilters[key] && deferredContactFilters[key] !== 'all')
   ), [deferredContactFilters]);
 
