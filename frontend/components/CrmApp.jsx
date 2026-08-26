@@ -4779,6 +4779,17 @@ function leadMatchesFilterGroup(lead, filters, ignoredGroups = []) {
   return true;
 }
 
+function leadMatchesBirthdayFilter(lead, filters, ignored = false) {
+  if (ignored || filters.birthday === 'all') return true;
+  const birthday = birthdayParts(lead.birthDate);
+  if (!birthday) return false;
+  if (filters.birthday === 'with') return true;
+  if (filters.birthdayDay && birthday.day !== filters.birthdayDay) return false;
+  if (filters.birthdayMonth && birthday.month !== filters.birthdayMonth) return false;
+  if (filters.birthdayYear && birthday.year !== filters.birthdayYear) return false;
+  return true;
+}
+
 function isAdventistReligion(value) {
   return slugifyDistrictName(value).includes('adventista');
 }
@@ -7381,6 +7392,7 @@ function WhatsAppLeadPickerModal({
   newContact,
   newContactMode = false,
   newContactSaving = false,
+  resultCount = leads.length,
   selectedLeads = [],
   onArrayFilterChange,
   onClearSelected,
@@ -7396,6 +7408,34 @@ function WhatsAppLeadPickerModal({
 }) {
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(true);
   const selectedPhones = new Set(selectedLeads.map((lead) => phoneDigits(lead.phone).slice(-10)));
+  const arrayFilterLabels = {
+    districts: 'Distrito',
+    neighborhoods: 'Bairro',
+    materials: 'Material',
+    priorities: 'Prioridade',
+    ageGroups: 'Idade',
+    genders: 'Gênero'
+  };
+  const scalarFilterLabels = {
+    whatsapp: 'WhatsApp',
+    email: 'E-mail',
+    study: 'Estudos',
+    vip: 'VIP',
+    religion: 'Religião',
+    recency: 'Tempo',
+    birthday: 'Aniversariantes'
+  };
+  const selectedFilterChips = [
+    ...Object.entries(arrayFilterLabels).flatMap(([key, label]) => (
+      filters[key]?.length ? [{ key, label, value: filters[key][0], array: true }] : []
+    )),
+    ...Object.entries(scalarFilterLabels).flatMap(([key, label]) => {
+      if (!filters[key] || filters[key] === 'all') return [];
+      const optionLabel = filterOptions[key]?.find(([value]) => value === filters[key])?.[1]
+        ?.replace(/\s\([\d.]+\)$/, '') || filters[key];
+      return [{ key, label, value: optionLabel, array: false }];
+    })
+  ];
   return createPortal(
     <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-lead-picker-title">
       <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/12 bg-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.56)]">
@@ -7439,6 +7479,23 @@ function WhatsAppLeadPickerModal({
               <Search size={18} /> Buscar
             </button>
           </div>
+
+          {selectedFilterChips.length ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-2.5">
+              <span className="mr-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">Filtros combinados</span>
+              {selectedFilterChips.map((chip) => (
+                <button
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-blue-200 bg-white px-3 text-[11px] font-black text-slate-700 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                  key={chip.key}
+                  onClick={() => (chip.array ? onArrayFilterChange(chip.key, '') : onFilterChange(chip.key, 'all'))}
+                  title="Clique para remover este filtro"
+                  type="button"
+                >
+                  <span className="text-blue-700">{chip.label}:</span> {chip.value} <X size={13} />
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {advancedFiltersOpen ? <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {[
@@ -7530,7 +7587,7 @@ function WhatsAppLeadPickerModal({
           </div>
           <div className="mb-3 flex items-center justify-between gap-3">
             <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Contatos encontrados</span>
-            <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">{leads.length}</span>
+            <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">{formatNumber(resultCount)}</span>
           </div>
           {loading ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-bold text-slate-600">Buscando leads no banco...</div>
@@ -7936,81 +7993,92 @@ function ConversationsView({ records = [] }) {
     return Array.from(byPhone.values());
   }, [leadDirectory, records]);
 
+  const deferredContactFilters = useDeferredValue(contactFilters);
   const contactFilterOptions = useMemo(() => {
-    const optionWithCount = (values, getValue, getLabel = (value) => value) => values.map((value) => ({
+    const recordsFor = (group) => contactFilterRecords.filter((lead) => (
+      leadMatchesFilterGroup(lead, deferredContactFilters, [group])
+      && leadMatchesBirthdayFilter(lead, deferredContactFilters, group === 'birthday')
+    ));
+    const optionWithCount = (rows, values, getValue, getLabel = (value) => value) => values.map((value) => ({
       value,
       label: getLabel(value),
-      count: contactFilterRecords.filter((lead) => getValue(lead) === value).length
+      count: rows.filter((lead) => getValue(lead) === value).length
     })).filter((option) => option.count > 0);
     const toggleLabel = (label, count) => `${label} (${formatNumber(count)})`;
+    const districtRows = recordsFor('districts');
+    const neighborhoodRows = recordsFor('neighborhoods');
+    const materialRows = recordsFor('materials');
+    const ageRows = recordsFor('ageGroups');
+    const genderRows = recordsFor('genders');
+    const priorityRows = recordsFor('priorities');
+    const whatsappRows = recordsFor('whatsapp');
+    const emailRows = recordsFor('email');
+    const studyRows = recordsFor('study');
+    const vipRows = recordsFor('vip');
+    const religionRows = recordsFor('religion');
+    const recencyRows = recordsFor('recency');
+    const birthdayRows = recordsFor('birthday');
     return {
-      districts: topOptions(contactFilterRecords, (lead) => lead.d),
-      neighborhoods: topOptions(contactFilterRecords, leadNeighborhood),
-      materials: topOptions(contactFilterRecords, leadMaterial),
-      ageGroups: optionWithCount(['Ate 17', '18 a 29', '30 a 44', '45 a 59', '60+', 'Sem idade'], leadAgeGroup),
-      genders: optionWithCount(['F', 'M', 'N'], (lead) => lead.g || 'N', leadGenderLabel),
-      priorities: optionWithCount(['Hot', 'Warm', 'Cool', 'Cold'], (lead) => lead.p, (value) => crmPriorityLabels[value]),
+      districts: topOptions(districtRows, (lead) => lead.d),
+      neighborhoods: topOptions(neighborhoodRows, leadNeighborhood),
+      materials: topOptions(materialRows, leadMaterial),
+      ageGroups: optionWithCount(ageRows, ['Ate 17', '18 a 29', '30 a 44', '45 a 59', '60+', 'Sem idade'], leadAgeGroup),
+      genders: optionWithCount(genderRows, ['F', 'M', 'N'], (lead) => lead.g || 'N', leadGenderLabel),
+      priorities: optionWithCount(priorityRows, ['Hot', 'Warm', 'Cool', 'Cold'], (lead) => lead.p, (value) => crmPriorityLabels[value]),
       whatsapp: [
-        ['all', toggleLabel('Todos', contactFilterRecords.length)],
-        ['with', toggleLabel('Com WhatsApp', contactFilterRecords.filter((lead) => lead.t).length)],
-        ['without', 'Sem WhatsApp (0)']
+        ['all', toggleLabel('Todos', whatsappRows.length)],
+        ['with', toggleLabel('Com WhatsApp', whatsappRows.filter((lead) => lead.t).length)],
+        ['without', toggleLabel('Sem WhatsApp', whatsappRows.filter((lead) => !lead.t).length)]
       ],
       email: [
-        ['all', toggleLabel('Todos', contactFilterRecords.length)],
-        ['with', toggleLabel('Com e-mail', contactFilterRecords.filter((lead) => lead.em).length)],
-        ['without', toggleLabel('Sem e-mail', contactFilterRecords.filter((lead) => !lead.em).length)]
+        ['all', toggleLabel('Todos', emailRows.length)],
+        ['with', toggleLabel('Com e-mail', emailRows.filter((lead) => lead.em).length)],
+        ['without', toggleLabel('Sem e-mail', emailRows.filter((lead) => !lead.em).length)]
       ],
       study: [
-        ['all', toggleLabel('Todos', contactFilterRecords.length)],
-        ['with', toggleLabel('Com estudo', contactFilterRecords.filter((lead) => lead.e).length)],
-        ['without', toggleLabel('Sem estudo', contactFilterRecords.filter((lead) => !lead.e).length)]
+        ['all', toggleLabel('Todos', studyRows.length)],
+        ['with', toggleLabel('Com estudo', studyRows.filter((lead) => lead.e).length)],
+        ['without', toggleLabel('Sem estudo', studyRows.filter((lead) => !lead.e).length)]
       ],
       vip: [
-        ['all', toggleLabel('Todos', contactFilterRecords.length)],
-        ['with', toggleLabel('VIP', contactFilterRecords.filter((lead) => lead.v).length)],
-        ['without', toggleLabel('Não VIP', contactFilterRecords.filter((lead) => !lead.v).length)]
+        ['all', toggleLabel('Todos', vipRows.length)],
+        ['with', toggleLabel('VIP', vipRows.filter((lead) => lead.v).length)],
+        ['without', toggleLabel('Não VIP', vipRows.filter((lead) => !lead.v).length)]
       ],
       religion: [
-        ['all', toggleLabel('Todos', contactFilterRecords.length)],
-        ['adventist', toggleLabel('Adventista', contactFilterRecords.filter((lead) => isAdventistReligion(lead.r)).length)],
-        ['non-adventist', toggleLabel('Não Adventista', contactFilterRecords.filter((lead) => !isAdventistReligion(lead.r)).length)],
-        ...topOptions(contactFilterRecords.filter((lead) => !isAdventistReligion(lead.r)), leadReligionValue, 20)
+        ['all', toggleLabel('Todos', religionRows.length)],
+        ['adventist', toggleLabel('Adventista', religionRows.filter((lead) => isAdventistReligion(lead.r)).length)],
+        ['non-adventist', toggleLabel('Não Adventista', religionRows.filter((lead) => !isAdventistReligion(lead.r)).length)],
+        ...topOptions(religionRows.filter((lead) => !isAdventistReligion(lead.r)), leadReligionValue, 20)
           .map((option) => [`religion:${option.value}`, toggleLabel(option.label, option.count)])
       ],
       recency: [
-        ['all', toggleLabel('Todos', contactFilterRecords.length)],
+        ['all', toggleLabel('Todos', recencyRows.length)],
         ...contactTimeRanges.map((range) => [
           range.value,
-          toggleLabel(range.label, contactFilterRecords.filter((lead) => leadContactTimeRange(lead) === range.value).length)
+          toggleLabel(range.label, recencyRows.filter((lead) => leadContactTimeRange(lead) === range.value).length)
         ])
       ],
       birthday: [
-        ['all', toggleLabel('Todos', contactFilterRecords.length)],
-        ['with', toggleLabel('Com aniversário', contactFilterRecords.filter((lead) => birthdayParts(lead.birthDate)).length)],
+        ['all', toggleLabel('Todos', birthdayRows.length)],
+        ['with', toggleLabel('Com aniversário', birthdayRows.filter((lead) => birthdayParts(lead.birthDate)).length)],
         ['date', 'Escolher uma data']
       ],
-      birthdayYears: Array.from(new Set(contactFilterRecords
+      birthdayYears: Array.from(new Set(birthdayRows
         .map((lead) => birthdayParts(lead.birthDate)?.year)
         .filter(Boolean)))
         .sort((a, b) => Number(b) - Number(a))
     };
-  }, [contactFilterRecords]);
+  }, [contactFilterRecords, deferredContactFilters]);
 
-  const filteredContactLeads = useMemo(() => contactFilterRecords
-    .filter((lead) => leadMatchesFilterGroup(lead, contactFilters))
-    .filter((lead) => {
-      if (contactFilters.birthday === 'all') return true;
-      const birthday = birthdayParts(lead.birthDate);
-      if (!birthday) return false;
-      if (contactFilters.birthday === 'with') return true;
-      if (contactFilters.birthdayDay && birthday.day !== contactFilters.birthdayDay) return false;
-      if (contactFilters.birthdayMonth && birthday.month !== contactFilters.birthdayMonth) return false;
-      if (contactFilters.birthdayYear && birthday.year !== contactFilters.birthdayYear) return false;
-      return true;
-    })
-    .sort((a, b) => (b.s || 0) - (a.s || 0))
+  const filteredContactLeadRecords = useMemo(() => contactFilterRecords
+    .filter((lead) => leadMatchesFilterGroup(lead, deferredContactFilters))
+    .filter((lead) => leadMatchesBirthdayFilter(lead, deferredContactFilters))
+    .sort((a, b) => (b.s || 0) - (a.s || 0)), [contactFilterRecords, deferredContactFilters]);
+
+  const filteredContactLeads = useMemo(() => filteredContactLeadRecords
     .map((lead) => lead._directoryLead || dashboardLeadToWhatsAppLead(lead))
-    .slice(0, 100), [contactFilterRecords, contactFilters]);
+    .slice(0, 100), [filteredContactLeadRecords]);
 
   const leadOptions = useMemo(
     () => records
@@ -8460,6 +8528,7 @@ function ConversationsView({ records = [] }) {
           newContact={newContact}
           newContactMode={newContactMode}
           newContactSaving={newContactSaving}
+          resultCount={filteredContactLeadRecords.length}
           selectedLeads={broadcastSelectedLeads}
           onArrayFilterChange={replaceContactArrayFilter}
           onClearSelected={() => setBroadcastSelectedLeads([])}
