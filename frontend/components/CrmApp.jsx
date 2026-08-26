@@ -7811,6 +7811,29 @@ function ConversationsView({ records = [] }) {
       return haystack.includes(term) || Boolean(termDigits && phoneDigits(conversation.phone).includes(termDigits));
     });
   }, [conversationListSearch, conversations, leadDirectory, records]);
+  const newConversationCandidate = useMemo(() => {
+    const typedPhone = phoneDigits(conversationListSearch);
+    if (visibleConversations.length || typedPhone.length < 10 || typedPhone.length > 13) return null;
+    const suffix = typedPhone.slice(-10);
+    const matchedRecord = records.find((lead) => phoneDigits(lead.tel).endsWith(suffix));
+    const matchedDirectoryLead = leadDirectory.find((lead) => phoneDigits(lead.phone).endsWith(suffix));
+    return {
+      id: matchedDirectoryLead?.id || matchedRecord?.id || `new-${typedPhone}`,
+      externalId: matchedDirectoryLead?.externalId || matchedRecord?.id || null,
+      name: meaningfulContactName(typedPhone, matchedDirectoryLead?.name, matchedRecord?.n) || `Contato ${typedPhone.slice(-4)}`,
+      phone: matchedDirectoryLead?.phone || phoneDigits(matchedRecord?.tel) || typedPhone,
+      district: matchedDirectoryLead?.district || matchedRecord?.d || null,
+      priority: matchedDirectoryLead?.priority || matchedRecord?.p || null
+    };
+  }, [conversationListSearch, leadDirectory, records, visibleConversations.length]);
+
+  async function startNewConversation(lead) {
+    setSelectedRecipientLead(lead);
+    setPhoneSearch(lead.phone);
+    setSelectedId(null);
+    setConversationListSearch('');
+    await loadConversations(lead.phone, { selectSearched: true });
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -7985,7 +8008,24 @@ function ConversationsView({ records = [] }) {
                   </span>
                 </button>
               );
-            }) : (
+            }) : newConversationCandidate ? (
+              <button
+                className="group rounded-2xl border border-blue-200 bg-[linear-gradient(135deg,#eff6ff,#ffffff)] p-4 text-left shadow-[0_14px_34px_rgba(37,99,235,0.12)] transition hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-[0_18px_42px_rgba(37,99,235,0.18)]"
+                onClick={() => startNewConversation(newConversationCandidate)}
+                type="button"
+              >
+                <span className="flex items-center gap-3">
+                  <ContactAvatar name={newConversationCandidate.name} phone={newConversationCandidate.phone} />
+                  <span className="min-w-0 flex-1">
+                    <strong className="block truncate text-sm font-black text-slate-950">{newConversationCandidate.name}</strong>
+                    <span className="mt-1 block text-xs font-semibold text-slate-600">{newConversationCandidate.phone}</span>
+                    <span className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white transition group-hover:bg-blue-700">
+                      <MessageCircle size={15} /> Conversar
+                    </span>
+                  </span>
+                </span>
+              </button>
+            ) : (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700">
                 {conversationListSearch
                   ? 'Nenhuma conversa encontrada nesta lista. Você também pode usar “Buscar e selecionar lead”.'
