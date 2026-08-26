@@ -7393,6 +7393,7 @@ function WhatsAppLeadPickerModal({
   newContactMode = false,
   newContactSaving = false,
   resultCount = leads.length,
+  sourceLeadCount = resultCount,
   selectedLeads = [],
   onArrayFilterChange,
   onClearSelected,
@@ -7586,7 +7587,12 @@ function WhatsAppLeadPickerModal({
             </div>
           </div>
           <div className="mb-3 flex items-center justify-between gap-3">
-            <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Contatos encontrados</span>
+            <span>
+              <span className="block text-xs font-black uppercase tracking-[0.16em] text-slate-500">Contatos encontrados</span>
+              <span className="mt-1 block text-xs font-bold text-slate-600">
+                {formatNumber(resultCount)} contatos com WhatsApp único, de {formatNumber(sourceLeadCount)} leads
+              </span>
+            </span>
             <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">{formatNumber(resultCount)}</span>
           </div>
           {loading ? (
@@ -8078,6 +8084,11 @@ function ConversationsView({ records = [] }) {
     .filter((lead) => leadMatchesBirthdayFilter(lead, deferredContactFilters))
     .sort((a, b) => (b.s || 0) - (a.s || 0)), [contactFilterRecords, deferredContactFilters]);
 
+  const filteredSourceLeadCount = useMemo(() => records
+    .filter((lead) => leadMatchesFilterGroup(lead, deferredContactFilters, ['whatsapp']))
+    .filter((lead) => leadMatchesBirthdayFilter(lead, deferredContactFilters))
+    .length, [deferredContactFilters, records]);
+
   const allFilteredContactLeads = useMemo(() => filteredContactLeadRecords
     .map((lead) => lead._directoryLead || dashboardLeadToWhatsAppLead(lead)), [filteredContactLeadRecords]);
 
@@ -8543,6 +8554,7 @@ function ConversationsView({ records = [] }) {
           newContactMode={newContactMode}
           newContactSaving={newContactSaving}
           resultCount={filteredContactLeadRecords.length}
+          sourceLeadCount={filteredSourceLeadCount}
           selectedLeads={broadcastSelectedLeads}
           onArrayFilterChange={replaceContactArrayFilter}
           onClearSelected={() => setBroadcastSelectedLeads([])}
