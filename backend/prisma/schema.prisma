@@ -116,7 +116,7 @@ model Lead {
   gender         String?
   age            Int?
   address        String?
-  priority       LeadPriority      @default(COOL)
+  priority       LeadPriority?
   score          Decimal?          @db.Decimal(5, 2)
   isVip          Boolean           @default(false)
   hasActiveStudy Boolean           @default(false)

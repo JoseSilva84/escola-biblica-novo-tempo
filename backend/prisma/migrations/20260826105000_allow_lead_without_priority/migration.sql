@@ -1,0 +1,3 @@
+ALTER TABLE "Lead"
+  ALTER COLUMN "priority" DROP DEFAULT,
+  ALTER COLUMN "priority" DROP NOT NULL;

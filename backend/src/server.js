@@ -1349,8 +1349,8 @@ app.post('/api/whatsapp/leads', requireAuth, async (request, response) => {
     : userAssociationSlug(request.user);
   const name = String(request.body?.name || '').trim();
   const districtName = String(request.body?.district || '').trim();
-  const requestedPriority = String(request.body?.priority || 'COOL').trim().toUpperCase();
-  const priority = ['HOT', 'WARM', 'COOL', 'COLD'].includes(requestedPriority) ? requestedPriority : 'COOL';
+  const requestedPriority = String(request.body?.priority || '').trim().toUpperCase();
+  const priority = ['HOT', 'WARM', 'COOL', 'COLD'].includes(requestedPriority) ? requestedPriority : null;
 
   try {
     const association = await prisma.association.findUnique({

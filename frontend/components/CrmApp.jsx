@@ -106,7 +106,7 @@ function whatsappPriorityBadgeKey(value) {
 
 function dashboardLeadToWhatsAppLead(lead) {
   const phone = phoneDigits(lead?.tel);
-  const priority = String(lead?.p || 'Cool').toUpperCase();
+  const priority = lead?.p ? String(lead.p).toUpperCase() : null;
   return {
     id: lead?.id,
     externalId: Number(lead?.id) || null,
@@ -7292,23 +7292,22 @@ function AdminGeneralView({
 
 function WhatsAppLeadPickerModal({
   districts = [],
-  district,
+  filterOptions,
+  filters,
   leads = [],
   loading = false,
-  nameSearch,
   newContact,
   newContactMode = false,
   newContactSaving = false,
+  onClearArrayFilter,
   onClose,
-  onDistrictChange,
-  onNameSearchChange,
+  onFilterChange,
   onNewContactChange,
   onNewContactSubmit,
-  onPriorityChange,
   onSearch,
   onSelect,
+  onToggleArrayFilter,
   onToggleNewContact,
-  priority
 }) {
   return createPortal(
     <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-lead-picker-title">
@@ -7317,13 +7316,13 @@ function WhatsAppLeadPickerModal({
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">Destinatário do WhatsApp</span>
             <h2 className="mt-2 text-3xl font-black tracking-normal" id="whatsapp-lead-picker-title">Selecionar lead</h2>
-            <p className="mt-2 text-sm font-semibold text-blue-100">Busque no banco por nome, distrito ou tipo de lead.</p>
+            <p className="mt-2 text-sm font-semibold text-blue-100">Use a filtragem avançada e veja os contatos aparecerem automaticamente.</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-black text-white transition hover:bg-white/20" onClick={onToggleNewContact} type="button">
+            <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-black text-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:border-white/50 hover:bg-white/20 hover:shadow-[0_14px_34px_rgba(96,165,250,0.35)] focus:outline-none focus:ring-4 focus:ring-white/20" onClick={onToggleNewContact} type="button">
               <Plus size={18} /> {newContactMode ? 'Voltar à busca' : 'Novo contato'}
             </button>
-            <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/20 bg-white px-4 text-sm font-black text-slate-950" onClick={onClose} type="button">
+            <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/20 bg-white px-4 text-sm font-black text-slate-950 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:bg-blue-50 hover:text-blue-800 hover:shadow-[0_14px_34px_rgba(255,255,255,0.28)] focus:outline-none focus:ring-4 focus:ring-white/30" onClick={onClose} type="button">
               <X size={18} /> Fechar
             </button>
           </div>
@@ -7350,6 +7349,7 @@ function WhatsAppLeadPickerModal({
             <label className="grid gap-1.5">
               <span className="text-xs font-black uppercase tracking-wide text-slate-500">Tipo de lead</span>
               <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => onNewContactChange('priority', event.target.value)} value={newContact.priority}>
+                <option value="">Sem tipo</option>
                 {Object.entries(whatsappPriorityLabels).slice(0, 4).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </label>
@@ -7360,34 +7360,56 @@ function WhatsAppLeadPickerModal({
             </div>
           </form>
         ) : (
-        <form className="grid gap-3 border-b border-slate-200 bg-white p-5 md:grid-cols-[1fr_15rem_13rem_auto]" onSubmit={onSearch}>
-          <label className="grid gap-1.5">
-            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Nome</span>
-            <input
-              autoFocus
-              className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
-              onChange={(event) => onNameSearchChange(event.target.value)}
-              placeholder="Digite o nome do lead"
-              value={nameSearch}
-            />
-          </label>
-          <label className="grid gap-1.5">
-            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Distrito</span>
-            <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => onDistrictChange(event.target.value)} value={district}>
-              <option value="">Todos os distritos</option>
-              {districts.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </label>
-          <label className="grid gap-1.5">
-            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Tipo de lead</span>
-            <select className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none" onChange={(event) => onPriorityChange(event.target.value)} value={priority}>
-              <option value="">Todos os tipos</option>
-              {Object.entries(whatsappPriorityLabels).slice(0, 4).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-          <button className={`${primaryButtonClass} mt-auto h-12`} type="submit">
-            <Search size={18} /> Buscar
-          </button>
+        <form className="grid max-h-[54vh] gap-4 overflow-y-auto border-b border-slate-200 bg-white p-5" onSubmit={onSearch}>
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <label className="grid gap-1.5">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500">Buscar contato</span>
+              <input
+                autoFocus
+                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+                onChange={(event) => onFilterChange('search', event.target.value)}
+                placeholder="Nome, e-mail, distrito ou WhatsApp"
+                value={filters.search}
+              />
+            </label>
+            <button className={`${primaryButtonClass} mt-auto h-12`} type="submit">
+              <Search size={18} /> Buscar
+            </button>
+          </div>
+
+          <details className="group rounded-2xl border border-slate-200 bg-slate-50/80 p-4" open>
+            <summary className="cursor-pointer list-none text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+              Filtragem avançada
+            </summary>
+            <div className="mt-4 grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <AdvancedFilterGroup compact title="Distritos" options={filterOptions.districts} selected={filters.districts} onToggle={(value) => onToggleArrayFilter('districts', value)} onClear={() => onClearArrayFilter('districts')} />
+                <AdvancedFilterGroup compact title="Bairros" options={filterOptions.neighborhoods} selected={filters.neighborhoods} onToggle={(value) => onToggleArrayFilter('neighborhoods', value)} onClear={() => onClearArrayFilter('neighborhoods')} />
+                <AdvancedFilterGroup compact title="Materiais" options={filterOptions.materials} selected={filters.materials} onToggle={(value) => onToggleArrayFilter('materials', value)} onClear={() => onClearArrayFilter('materials')} />
+                <AdvancedFilterGroup compact title="Prioridade" options={filterOptions.priorities} selected={filters.priorities} onToggle={(value) => onToggleArrayFilter('priorities', value)} onClear={() => onClearArrayFilter('priorities')} />
+                <AdvancedFilterGroup compact title="Idade" options={filterOptions.ageGroups} selected={filters.ageGroups} onToggle={(value) => onToggleArrayFilter('ageGroups', value)} onClear={() => onClearArrayFilter('ageGroups')} />
+                <AdvancedFilterGroup compact title="Gênero" options={filterOptions.genders} selected={filters.genders} onToggle={(value) => onToggleArrayFilter('genders', value)} onClear={() => onClearArrayFilter('genders')} />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {[
+                  ['whatsapp', 'WhatsApp'],
+                  ['email', 'E-mail'],
+                  ['study', 'Estudos'],
+                  ['vip', 'VIP'],
+                  ['religion', 'Religião'],
+                  ['recency', 'Tempo']
+                ].map(([key, label]) => (
+                  <label className="grid min-w-0 gap-2 rounded-xl border border-slate-200 bg-white p-3 text-[11px] font-black uppercase tracking-wide text-slate-600 shadow-sm" key={key}>
+                    {label}
+                    <select className="h-10 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold normal-case text-slate-800 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => onFilterChange(key, event.target.value)} value={filters[key]}>
+                      {filterOptions[key].map(([value, optionLabel]) => <option key={value} value={value}>{optionLabel}</option>)}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </details>
+          <p className="text-xs font-semibold text-slate-500">A lista abaixo é atualizada automaticamente enquanto você digita ou seleciona os filtros.</p>
         </form>
         )}
 
@@ -7434,37 +7456,42 @@ function ConversationsView({ records = [] }) {
   const [leadDirectory, setLeadDirectory] = useState([]);
   const [leadDistricts, setLeadDistricts] = useState([]);
   const [leadDirectoryLoading, setLeadDirectoryLoading] = useState(false);
-  const [leadNameSearch, setLeadNameSearch] = useState('');
-  const [leadDistrictFilter, setLeadDistrictFilter] = useState('');
-  const [leadPriorityFilter, setLeadPriorityFilter] = useState('');
+  const [contactFilters, setContactFilters] = useState({
+    association: 'paulistana',
+    districts: [],
+    neighborhoods: [],
+    materials: [],
+    ageGroups: [],
+    genders: [],
+    priorities: [],
+    whatsapp: 'all',
+    email: 'all',
+    study: 'all',
+    vip: 'all',
+    religion: 'all',
+    recency: 'all',
+    search: ''
+  });
   const [selectedRecipientLead, setSelectedRecipientLead] = useState(null);
   const [newContactMode, setNewContactMode] = useState(false);
   const [newContactSaving, setNewContactSaving] = useState(false);
-  const [newContact, setNewContact] = useState({ name: '', phone: '', district: '', priority: 'COOL' });
+  const [newContact, setNewContact] = useState({ name: '', phone: '', district: '', priority: '' });
   const [messageText, setMessageText] = useState('Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?');
   const chatEndRef = useRef(null);
   const activePhoneRef = useRef('');
   const lastSeenMessageIdRef = useRef(null);
 
-  async function loadLeadDirectory(filters = {}) {
-    const search = filters.search ?? leadNameSearch;
-    const district = filters.district ?? leadDistrictFilter;
-    const priority = filters.priority ?? leadPriorityFilter;
+  async function loadLeadDirectory() {
     const fallbackDistricts = Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-    const normalizedSearch = search.trim().toLocaleLowerCase('pt-BR');
     const fallbackLeads = records
       .filter((lead) => lead.t && phoneDigits(lead.tel))
-      .filter((lead) => !normalizedSearch || String(lead.n || '').toLocaleLowerCase('pt-BR').includes(normalizedSearch))
-      .filter((lead) => !district || lead.d === district)
-      .filter((lead) => !priority || String(lead.p || '').toUpperCase() === priority)
       .map(dashboardLeadToWhatsAppLead)
-      .slice(0, 100);
+      .slice(0, 250);
+    setLeadDirectory(fallbackLeads);
+    setLeadDistricts(fallbackDistricts);
     setLeadDirectoryLoading(true);
     try {
-      const params = new URLSearchParams({ limit: '100' });
-      if (search.trim()) params.set('search', search.trim());
-      if (district) params.set('district', district);
-      if (priority) params.set('priority', priority);
+      const params = new URLSearchParams({ limit: '250' });
       const response = await apiFetch(`/api/whatsapp/leads?${params.toString()}`, { cache: 'no-store' });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Não foi possível buscar os leads.');
@@ -7473,7 +7500,7 @@ function ConversationsView({ records = [] }) {
         const key = phoneDigits(lead.phone).slice(-10) || lead.id;
         mergedLeads.set(key, lead);
       });
-      setLeadDirectory(Array.from(mergedLeads.values()).slice(0, 100));
+      setLeadDirectory(Array.from(mergedLeads.values()).slice(0, 250));
       setLeadDistricts(Array.from(new Set([...fallbackDistricts, ...(payload.districts || [])])).sort((a, b) => a.localeCompare(b)));
     } catch (error) {
       setLeadDirectory(fallbackLeads);
@@ -7493,6 +7520,23 @@ function ConversationsView({ records = [] }) {
   async function submitLeadSearch(event) {
     event.preventDefault();
     await loadLeadDirectory();
+  }
+
+  function setContactFilter(key, value) {
+    setContactFilters((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleContactArrayFilter(key, value) {
+    setContactFilters((current) => ({
+      ...current,
+      [key]: current[key].includes(value)
+        ? current[key].filter((item) => item !== value)
+        : [...current[key], value]
+    }));
+  }
+
+  function clearContactArrayFilter(key) {
+    setContactFilters((current) => ({ ...current, [key]: [] }));
   }
 
   async function selectRecipientLead(lead) {
@@ -7519,7 +7563,7 @@ function ConversationsView({ records = [] }) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Não foi possível salvar o contato.');
       setLeadDirectory((current) => [payload.lead, ...current.filter((lead) => lead.id !== payload.lead.id)]);
-      setNewContact({ name: '', phone: '', district: '', priority: 'COOL' });
+      setNewContact({ name: '', phone: '', district: '', priority: '' });
       toast.success(payload.created ? 'Novo contato salvo' : 'Contato atualizado', { description: payload.lead.name });
       await selectRecipientLead(payload.lead);
     } catch (error) {
@@ -7603,6 +7647,88 @@ function ConversationsView({ records = [] }) {
   useEffect(() => {
     loadConversations();
   }, []);
+
+  const contactFilterRecords = useMemo(() => {
+    const byPhone = new Map();
+    leadDirectory.forEach((lead) => {
+      const phone = phoneDigits(lead.phone);
+      if (!phone) return;
+      byPhone.set(phone.slice(-10), {
+        id: `directory-${lead.id}`,
+        n: lead.name,
+        tel: phone,
+        t: true,
+        d: lead.district || null,
+        p: lead.priority ? whatsappPriorityBadgeKey(lead.priority) : null,
+        em: null,
+        e: Boolean(lead.hasActiveStudy),
+        v: Boolean(lead.isVip),
+        _directoryLead: lead
+      });
+    });
+    records.forEach((lead) => {
+      const phone = phoneDigits(lead.tel);
+      if (lead.t && phone) byPhone.set(phone.slice(-10), lead);
+    });
+    return Array.from(byPhone.values());
+  }, [leadDirectory, records]);
+
+  const contactFilterOptions = useMemo(() => {
+    const optionWithCount = (values, getValue, getLabel = (value) => value) => values.map((value) => ({
+      value,
+      label: getLabel(value),
+      count: contactFilterRecords.filter((lead) => getValue(lead) === value).length
+    })).filter((option) => option.count > 0);
+    const toggleLabel = (label, count) => `${label} (${formatNumber(count)})`;
+    return {
+      districts: topOptions(contactFilterRecords, (lead) => lead.d),
+      neighborhoods: topOptions(contactFilterRecords, leadNeighborhood),
+      materials: topOptions(contactFilterRecords, leadMaterial),
+      ageGroups: optionWithCount(['Ate 17', '18 a 29', '30 a 44', '45 a 59', '60+', 'Sem idade'], leadAgeGroup),
+      genders: optionWithCount(['F', 'M', 'N'], (lead) => lead.g || 'N', leadGenderLabel),
+      priorities: optionWithCount(['Hot', 'Warm', 'Cool', 'Cold'], (lead) => lead.p, (value) => crmPriorityLabels[value]),
+      whatsapp: [
+        ['all', toggleLabel('Todos', contactFilterRecords.length)],
+        ['with', toggleLabel('Com WhatsApp', contactFilterRecords.filter((lead) => lead.t).length)],
+        ['without', 'Sem WhatsApp (0)']
+      ],
+      email: [
+        ['all', toggleLabel('Todos', contactFilterRecords.length)],
+        ['with', toggleLabel('Com e-mail', contactFilterRecords.filter((lead) => lead.em).length)],
+        ['without', toggleLabel('Sem e-mail', contactFilterRecords.filter((lead) => !lead.em).length)]
+      ],
+      study: [
+        ['all', toggleLabel('Todos', contactFilterRecords.length)],
+        ['with', toggleLabel('Com estudo', contactFilterRecords.filter((lead) => lead.e).length)],
+        ['without', toggleLabel('Sem estudo', contactFilterRecords.filter((lead) => !lead.e).length)]
+      ],
+      vip: [
+        ['all', toggleLabel('Todos', contactFilterRecords.length)],
+        ['with', toggleLabel('VIP', contactFilterRecords.filter((lead) => lead.v).length)],
+        ['without', toggleLabel('Não VIP', contactFilterRecords.filter((lead) => !lead.v).length)]
+      ],
+      religion: [
+        ['all', toggleLabel('Todos', contactFilterRecords.length)],
+        ['adventist', toggleLabel('Adventista', contactFilterRecords.filter((lead) => isAdventistReligion(lead.r)).length)],
+        ['non-adventist', toggleLabel('Não Adventista', contactFilterRecords.filter((lead) => !isAdventistReligion(lead.r)).length)],
+        ...topOptions(contactFilterRecords.filter((lead) => !isAdventistReligion(lead.r)), leadReligionValue, 20)
+          .map((option) => [`religion:${option.value}`, toggleLabel(option.label, option.count)])
+      ],
+      recency: [
+        ['all', toggleLabel('Todos', contactFilterRecords.length)],
+        ...contactTimeRanges.map((range) => [
+          range.value,
+          toggleLabel(range.label, contactFilterRecords.filter((lead) => leadContactTimeRange(lead) === range.value).length)
+        ])
+      ]
+    };
+  }, [contactFilterRecords]);
+
+  const filteredContactLeads = useMemo(() => contactFilterRecords
+    .filter((lead) => leadMatchesFilterGroup(lead, contactFilters))
+    .sort((a, b) => (b.s || 0) - (a.s || 0))
+    .map((lead) => lead._directoryLead || dashboardLeadToWhatsAppLead(lead))
+    .slice(0, 100), [contactFilterRecords, contactFilters]);
 
   const leadOptions = useMemo(
     () => records
@@ -7870,24 +7996,23 @@ function ConversationsView({ records = [] }) {
       </section>
       {leadPickerOpen ? (
         <WhatsAppLeadPickerModal
-          district={leadDistrictFilter}
           districts={leadDistricts}
-          leads={leadDirectory}
-          loading={leadDirectoryLoading}
-          nameSearch={leadNameSearch}
+          filterOptions={contactFilterOptions}
+          filters={contactFilters}
+          leads={filteredContactLeads}
+          loading={leadDirectoryLoading && !filteredContactLeads.length}
           newContact={newContact}
           newContactMode={newContactMode}
           newContactSaving={newContactSaving}
+          onClearArrayFilter={clearContactArrayFilter}
           onClose={() => setLeadPickerOpen(false)}
-          onDistrictChange={setLeadDistrictFilter}
-          onNameSearchChange={setLeadNameSearch}
+          onFilterChange={setContactFilter}
           onNewContactChange={updateNewContact}
           onNewContactSubmit={submitNewContact}
-          onPriorityChange={setLeadPriorityFilter}
           onSearch={submitLeadSearch}
           onSelect={selectRecipientLead}
+          onToggleArrayFilter={toggleContactArrayFilter}
           onToggleNewContact={() => setNewContactMode((current) => !current)}
-          priority={leadPriorityFilter}
         />
       ) : null}
     </div>
