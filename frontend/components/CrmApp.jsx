@@ -7524,7 +7524,7 @@ function WhatsAppLeadPickerModal({
         {newContactMode ? (
           <WhatsAppNewContactForm districts={districts} initialContact={newContact} onSubmit={onNewContactSubmit} saving={newContactSaving} />
         ) : (
-        <form className="grid gap-3 border-b border-slate-200 bg-white p-4" onSubmit={onSearch}>
+        <form className="conversation-tools-scroll grid max-h-[55vh] shrink-0 gap-3 overflow-y-auto overscroll-contain border-b border-slate-200 bg-white p-4 pr-3" onSubmit={onSearch}>
           <div className="grid gap-3 md:grid-cols-[1fr_auto]">
             <label className="grid gap-1.5">
               <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">Buscar contato</span>
@@ -7629,7 +7629,7 @@ function WhatsAppLeadPickerModal({
           {advancedFiltersOpen ? <p className="text-[11px] font-semibold text-slate-500">Todos é o padrão. Ao escolher uma opção, os contatos são atualizados automaticamente.</p> : null}
           <button
             aria-expanded={advancedFiltersOpen}
-            className="mx-auto inline-flex h-8 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 text-[11px] font-black text-slate-600 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+            className="sticky bottom-0 z-20 mx-auto inline-flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-600 shadow-[0_8px_24px_rgba(15,23,42,0.16)] transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
             onClick={() => setAdvancedFiltersOpen((current) => !current)}
             type="button"
           >
