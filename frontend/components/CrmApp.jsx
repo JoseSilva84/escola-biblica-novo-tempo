@@ -347,13 +347,22 @@ function deliveryState(message = {}, deliveredByReply = false) {
     return { label: 'Entregue', Icon: CheckCheck, className: 'text-blue-100' };
   }
   const raw = `${message.providerStatus || ''} ${message.metadata?.status || ''} ${message.metadata?.ack || ''}`.toLowerCase();
+  if (raw.includes('failed_463')) {
+    return { label: 'Falhou: primeiro contato recusado (463)', Icon: X, className: 'text-rose-300' };
+  }
+  if (raw.includes('failed') || raw.includes('error') || raw.includes('rejected') || raw.includes('undeliverable')) {
+    return { label: 'Falha no envio', Icon: X, className: 'text-rose-300' };
+  }
   if (raw.includes('read') || raw.includes('played') || raw.includes('ack:3') || raw.includes('ack 3') || raw.trim() === '3') {
     return { label: 'Lida', Icon: CheckCheck, className: 'text-sky-200' };
   }
   if (raw.includes('delivered') || raw.includes('delivery') || raw.includes('delivered_by_reply') || raw.includes('ack:2') || raw.includes('ack 2') || raw.trim() === '2' || message.metadata?.deliveredByReply) {
     return { label: 'Entregue', Icon: CheckCheck, className: 'text-blue-100' };
   }
-  return { label: 'Enviada, aguardando entrega', Icon: Check, className: 'text-blue-100' };
+  if (raw.includes('server_ack') || raw.includes('sent') || raw.includes('ack:1') || raw.includes('ack 1') || raw.trim() === '1') {
+    return { label: 'Recebida pelo servidor do WhatsApp', Icon: Check, className: 'text-blue-100' };
+  }
+  return { label: 'Aceita pelo provedor; entrega não confirmada', Icon: Check, className: 'text-slate-300' };
 }
 
 function DeliveryReceipt({ message, deliveredByReply = false }) {
@@ -362,7 +371,7 @@ function DeliveryReceipt({ message, deliveredByReply = false }) {
   return (
     <span className={`inline-flex items-center gap-1 ${state.className}`} title={state.label}>
       <Icon size={15} strokeWidth={2.8} />
-      <span className="sr-only">{state.label}</span>
+      <span>{state.label}</span>
     </span>
   );
 }
@@ -6293,8 +6302,8 @@ function AdminGeneralView({
       }
       setLastSend(payload);
       await refreshWhatsappConversations();
-      toast.success('Mensagem enviada', {
-        description: `Disparo feito para ${payload.phone} via ${payload.transport || 'Z-PRO'}.`
+      toast.success('Mensagem aceita pelo provedor', {
+        description: `Solicitação aceita para ${payload.phone}; aguardando confirmação de entrega.`
       });
     } catch (error) {
       toast.error('Falha no disparo', {
@@ -7412,8 +7421,8 @@ function ConversationsView({ records = [] }) {
       setMessageText('');
       await loadConversations(phone, { selectSearched: true });
       setSelectedId(payload.conversationId || selectedId);
-      toast.success('Mensagem salva na conversa', {
-        description: `Historico atualizado para ${payload.phone || phone}.`
+      toast.success('Mensagem aceita pelo provedor', {
+        description: `Histórico atualizado para ${payload.phone || phone}; aguardando confirmação de entrega.`
       });
     } catch (error) {
       toast.error('Falha ao enviar', { description: error.message });
@@ -7506,15 +7515,15 @@ function ConversationsView({ records = [] }) {
             <div className="grid gap-3">
               {messages.length ? messages.map((message) => {
                 const outgoing = message.direction === 'OUTBOUND';
-                const deliveredByReply = outgoing && messages.some((nextMessage) => (
-                  nextMessage.direction === 'INBOUND'
-                  && new Date(nextMessage.createdAt || 0) > new Date(message.createdAt || 0)
-                ));
+                const deliveredByReply = outgoing && (
+                  message.providerStatus === 'DELIVERED_BY_REPLY'
+                  || message.metadata?.deliveredByReply
+                );
                 return (
                   <div className={`flex ${outgoing ? 'justify-end' : 'justify-start'}`} key={message.id}>
                     <div className={`max-w-[78%] rounded-2xl border px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${outgoing ? 'border-blue-300 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-800'}`}>
                       <span className={`block text-[11px] font-black uppercase tracking-[0.14em] ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>
-                        {outgoing ? 'Mensagem enviada' : 'Pergunta recebida'}
+                        {outgoing ? 'Mensagem de saída' : 'Pergunta recebida'}
                       </span>
                       <p className="mt-1 text-sm font-semibold leading-relaxed">{message.body}</p>
                       <span className={`mt-2 flex items-center justify-end gap-1.5 text-[11px] font-bold ${outgoing ? 'text-blue-100' : 'text-slate-500'}`}>

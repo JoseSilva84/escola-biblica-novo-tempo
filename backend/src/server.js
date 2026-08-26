@@ -553,7 +553,14 @@ function readZproMessage(payload = {}) {
   return {
     event: payload.event || payload.type || payload.action || 'zpro.webhook',
     channelId: payload.channelId || payload.sessionId || data.channelId || data.sessionId || data.whatsappId || ticket.channelId || ticket.whatsappId || null,
-    messageId: data.id || data.messageId || key.id || data.message?.key?.id || null,
+    messageId: data.id
+      || data.messageId
+      || data.Info?.ID
+      || data.info?.id
+      || data.data?.Info?.ID
+      || key.id
+      || data.message?.key?.id
+      || null,
     fromMe,
     phone,
     name: contact.name || contact.pushName || data.pushName || data.senderName || null,
@@ -626,9 +633,36 @@ function providerMessageId(data) {
   return data?.id
     || data?.messageId
     || data?.key?.id
+    || data?.Info?.ID
+    || data?.info?.id
     || data?.data?.id
     || data?.data?.messageId
+    || data?.data?.Info?.ID
+    || data?.data?.info?.id
     || null;
+}
+
+function normalizeProviderStatus(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+
+  const raw = String(value).trim();
+  const normalized = raw.toLowerCase().replace(/[\s-]+/g, '_');
+  const numericAck = raw.match(/^(?:ack\D*)?(-?\d+)$/i)?.[1];
+  if (normalized === '-1' || /(^|_)(error|failed|failure|rejected|undeliverable|nack)(_|$)/.test(normalized)) {
+    return normalized.includes('463') ? 'FAILED_463' : 'FAILED';
+  }
+  if (normalized.includes('463')) return 'FAILED_463';
+  if (numericAck === '4' || normalized.includes('played')) return 'READ';
+  if (numericAck === '3' || normalized.includes('read')) return 'READ';
+  if (numericAck === '2' || normalized.includes('delivered') || normalized.includes('delivery')) return 'DELIVERED';
+  if (numericAck === '1' || normalized.includes('server_ack') || normalized === 'sent') return 'SERVER_ACK';
+  if (numericAck === '0' || normalized.includes('pending') || normalized.includes('queued') || normalized.includes('accepted')) return 'ACCEPTED';
+  return raw.toUpperCase();
+}
+
+function providerFailureStatus(status, data) {
+  const diagnostic = `${status || ''} ${JSON.stringify(data || {})}`;
+  return diagnostic.includes('463') ? 'FAILED_463' : 'FAILED';
 }
 
 async function recordWhatsAppMessage({
@@ -647,7 +681,7 @@ async function recordWhatsAppMessage({
   occurredAt = new Date(),
   metadata = {}
 }) {
-  const normalizedPhone = normalizePhone(phone) || String(phone || '').replace(/\D/g, '');
+  const normalizedPhone = normalizePhone(phone);
   const cleanBody = String(body || '').trim();
   if (!normalizedPhone || !cleanBody) return null;
 
@@ -721,6 +755,7 @@ async function recordWhatsAppMessage({
       where: {
         conversationId: conversation.id,
         direction: 'OUTBOUND',
+        providerStatus: { in: ['ACCEPTED', 'SERVER_ACK', 'PENDING', 'QUEUED', 'SENT'] },
         createdAt: { lt: message.createdAt }
       },
       orderBy: { createdAt: 'desc' },
@@ -746,7 +781,16 @@ async function recordWhatsAppMessage({
 }
 
 function normalizePhone(value) {
-  const digits = String(value || '').replace(/\D/g, '');
+  const raw = String(value || '').trim().replace(/@s\.whatsapp\.net$/i, '');
+  if (!raw) return '';
+
+  // Aceita apenas a pontuacao comum de um unico telefone. Campos com texto,
+  // ramal, barras, ponto e virgula ou mais de um "+" precisam ser corrigidos.
+  if (/[^\d\s()+.-]/.test(raw)) return '';
+  const plusSigns = raw.match(/\+/g)?.length || 0;
+  if (plusSigns > 1 || (plusSigns === 1 && !raw.startsWith('+'))) return '';
+
+  const digits = raw.replace(/\D/g, '');
   if (digits.length < 10 || digits.length > 13) return '';
   if (digits.length <= 11) return `55${digits}`;
   return digits;
@@ -929,6 +973,7 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
       : data?.message || data?.error || `Zpro respondeu com status ${providerResponse.status}`);
     error.status = 502;
     error.providerStatus = providerResponse.status;
+    error.deliveryStatus = providerFailureStatus(providerResponse.status, data);
     error.providerResponse = data;
     error.providerAttempts = attempts;
     throw error;
@@ -937,6 +982,7 @@ async function sendZproTextMessage({ phone, message, leadId = null, templateId =
   return {
     ok: true,
     provider: 'zpro-baileys',
+    deliveryStatus: 'ACCEPTED',
     channelId: config.channelId || null,
     apiId: config.apiId,
     phone: normalizedPhone,
@@ -1213,7 +1259,7 @@ app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
       leadName: request.body?.name || null,
       district: request.body?.district || null,
       provider: result.provider,
-      providerStatus: 'SENT',
+      providerStatus: 'ACCEPTED',
       providerResponse: result.providerResponse,
       providerMessageId: providerMessageId(result.providerResponse),
       occurredAt: sentAt,
@@ -1228,12 +1274,34 @@ app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
     });
   } catch (error) {
     console.error('[zpro:send:error]', error.message, error.providerResponse || '');
+    const failed = await recordWhatsAppMessage({
+      phone: request.body?.phone,
+      body: request.body?.message,
+      direction: 'OUTBOUND',
+      senderType: request.body?.senderType || 'USER',
+      senderName: request.user?.email || request.user?.sub || 'Sistema',
+      leadId: request.body?.leadId,
+      leadName: request.body?.name || null,
+      district: request.body?.district || null,
+      provider: 'zpro-baileys',
+      providerStatus: error.deliveryStatus || 'FAILED',
+      providerResponse: error.providerResponse || null,
+      occurredAt: new Date(),
+      metadata: {
+        failure: true,
+        providerHttpStatus: error.providerStatus || null,
+        attempts: error.providerAttempts || []
+      }
+    }).catch(() => null);
     response.status(error.status || 500).json({
       ok: false,
       message: error.message,
+      deliveryStatus: error.deliveryStatus || 'FAILED',
       providerStatus: error.providerStatus || null,
       providerResponse: error.providerResponse || null,
-      providerAttempts: error.providerAttempts || null
+      providerAttempts: error.providerAttempts || null,
+      conversationId: failed?.conversation?.id || null,
+      messageId: failed?.message?.id || null
     });
   }
 });
@@ -1265,7 +1333,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         leadName: recipient.name || null,
         district: recipient.district || null,
         provider: result.provider,
-        providerStatus: 'SENT',
+        providerStatus: 'ACCEPTED',
         providerResponse: result.providerResponse,
         providerMessageId: providerMessageId(result.providerResponse),
         metadata: { templateId: request.body?.templateId || null, batch: true, attempts: result.attempts || [] }
@@ -1274,15 +1342,38 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         ok: true,
         phone: result.phone,
         leadId: recipient.leadId || recipient.id || null,
+        deliveryStatus: 'ACCEPTED',
         conversationId: saved?.conversation?.id || null,
         messageId: saved?.message?.id || null
       });
     } catch (error) {
+      const failed = await recordWhatsAppMessage({
+        phone: recipient.phone || recipient.tel || recipient,
+        body: message,
+        direction: 'OUTBOUND',
+        senderType: request.body?.senderType || 'USER',
+        senderName: request.user?.email || request.user?.sub || 'Sistema',
+        leadId: recipient.leadId || recipient.id || null,
+        leadName: recipient.name || null,
+        district: recipient.district || null,
+        provider: 'zpro-baileys',
+        providerStatus: error.deliveryStatus || 'FAILED',
+        providerResponse: error.providerResponse || null,
+        metadata: {
+          failure: true,
+          batch: true,
+          providerHttpStatus: error.providerStatus || null,
+          attempts: error.providerAttempts || []
+        }
+      }).catch(() => null);
       results.push({
         ok: false,
         phone: recipient.phone || recipient.tel || recipient,
         leadId: recipient.leadId || recipient.id || null,
-        message: error.message
+        message: error.message,
+        deliveryStatus: error.deliveryStatus || 'FAILED',
+        conversationId: failed?.conversation?.id || null,
+        messageId: failed?.message?.id || null
       });
     }
   }
@@ -1312,17 +1403,19 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
 
   const payload = coerceWebhookPayload(request.body);
   const event = readZproMessage(payload);
+  const normalizedStatus = normalizeProviderStatus(event.status);
   console.log('[zpro:webhook]', JSON.stringify(webhookDiagnostics(request, payload, event)));
 
-  if (!event.text && event.status) {
+  if (!event.text && normalizedStatus) {
     let updated = { count: 0 };
     if (event.messageId) {
       updated = await prisma.whatsAppMessage.updateMany({
         where: { providerMessageId: event.messageId },
         data: {
-          providerStatus: event.status,
+          providerStatus: normalizedStatus,
           metadata: {
-            status: event.status,
+            status: normalizedStatus,
+            rawStatus: event.status,
             channelId: event.channelId,
             event: event.event,
             raw: payload
@@ -1335,21 +1428,26 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
         where: { phone: normalizePhone(event.phone) || event.phone },
         select: {
           messages: {
-            where: { direction: 'OUTBOUND' },
+            where: {
+              direction: 'OUTBOUND',
+              providerStatus: { in: ['ACCEPTED', 'SERVER_ACK', 'PENDING', 'QUEUED', 'SENT'] },
+              createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+            },
             orderBy: { createdAt: 'desc' },
-            take: 1,
+            take: 2,
             select: { id: true }
           }
         }
       }).catch(() => null);
-      const latestMessageId = conversation?.messages?.[0]?.id;
+      const latestMessageId = conversation?.messages?.length === 1 ? conversation.messages[0].id : null;
       if (latestMessageId) {
         await prisma.whatsAppMessage.update({
           where: { id: latestMessageId },
           data: {
-            providerStatus: event.status,
+            providerStatus: normalizedStatus,
             metadata: {
-              status: event.status,
+              status: normalizedStatus,
+              rawStatus: event.status,
               channelId: event.channelId,
               event: event.event,
               raw: payload
@@ -1375,7 +1473,7 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     senderType: event.fromMe ? 'SYSTEM' : 'LEAD',
     senderName: event.fromMe ? 'WhatsApp' : event.name,
     provider: 'zpro-baileys',
-    providerStatus: event.status || event.event,
+    providerStatus: normalizedStatus || event.event,
     providerMessageId: event.messageId,
     occurredAt: new Date(),
     metadata: {
