@@ -29,6 +29,20 @@
   background: linear-gradient(180deg, #2563eb, #172554);
 }
 
+.conversation-expanded-panel {
+  left: 50% !important;
+  width: min(84vw, 1380px) !important;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 900px) {
+  .conversation-expanded-panel {
+    left: 0.5rem !important;
+    width: calc(100vw - 1rem) !important;
+    transform: none;
+  }
+}
+
 @layer base {
   * {
     box-sizing: border-box;

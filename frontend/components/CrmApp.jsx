@@ -7996,7 +7996,7 @@ function ConversationsView({ records = [] }) {
         </aside>
 
         {conversationExpanded ? <button aria-label="Fechar conversa ampliada" className="fixed inset-0 z-[2147483644] cursor-default bg-slate-950/75 backdrop-blur-sm" onClick={() => setConversationExpanded(false)} type="button" /> : null}
-        <article className={`${panelClass} flex min-h-0 flex-col overflow-hidden transition-[width,height,top,left] duration-300 ${conversationExpanded ? '!fixed left-[2vw] top-[3vh] z-[2147483645] !h-[94vh] !w-[96vw] max-w-none rounded-[2rem] border border-white/40 shadow-[0_42px_140px_rgba(0,0,0,0.62)]' : 'h-full max-2xl:h-[42rem]'}`}>
+        <article className={`${panelClass} flex min-h-0 flex-col overflow-hidden transition-[width,height,top,left] duration-300 ${conversationExpanded ? 'conversation-expanded-panel !fixed top-[3vh] z-[2147483645] !h-[94vh] max-w-none rounded-[2rem] border border-white/40 shadow-[0_42px_140px_rgba(0,0,0,0.62)]' : 'h-full max-2xl:h-[42rem]'}`}>
           <div className={`border-b border-white/[0.07] p-5 ${conversationExpanded ? 'bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(219,234,254,0.94),rgba(241,245,249,0.98))] px-7 py-5' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-4">
