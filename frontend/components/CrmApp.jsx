@@ -8831,9 +8831,22 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
   const [mode, setMode] = useState('assistido');
   const [active, setActive] = useState(false);
   const [selectedReviewLead, setSelectedReviewLead] = useState(null);
+  const [anaSummary, setAnaSummary] = useState(null);
+  const [anaLoading, setAnaLoading] = useState(true);
   const hotWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
   const studyWhatsapp = records.filter((lead) => lead.t && lead.e).length;
   const vipWhatsapp = records.filter((lead) => lead.t && lead.v).length;
+  const anaMetrics = anaSummary?.metrics || {};
+  const anaConversations = anaSummary?.conversations || [];
+  const anaTraining = anaSummary?.training || null;
+  const anaAgent = anaSummary?.agent || null;
+  const toneClasses = {
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    orange: 'bg-orange-50 text-orange-700 border-orange-100',
+    red: 'bg-red-50 text-red-700 border-red-100',
+    slate: 'bg-slate-100 text-slate-700 border-slate-200'
+  };
   const reviewQueue = records
     .filter((lead) => lead.t && (lead.p === 'Hot' || lead.e || lead.v))
     .sort((a, b) => (b.s || 0) - (a.s || 0))
@@ -8868,6 +8881,30 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
     ['Encaminhamento', 'Quando necessario, envia para gestor, coordenador ou voluntario.']
   ];
 
+  useEffect(() => {
+    let activeRequest = true;
+    setAnaLoading(true);
+    apiFetch('/api/ai/ana/summary?limit=120')
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => {
+        if (activeRequest && payload) {
+          setAnaSummary(payload);
+          setActive(Boolean(payload.agent?.configured));
+        }
+      })
+      .catch(() => {
+        if (activeRequest) {
+          toast.error('Resumo da Ana indisponivel', {
+            description: 'Nao foi possivel carregar as conversas da IA agora.'
+          });
+        }
+      })
+      .finally(() => {
+        if (activeRequest) setAnaLoading(false);
+      });
+    return () => { activeRequest = false; };
+  }, []);
+
   return (
     <div className="grid gap-6">
       <section className={`${panelClass} overflow-hidden p-6`}>
@@ -8876,7 +8913,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
             <span className={labelClass}>IA de atendimento</span>
             <h1 className="silver-title mt-2 text-5xl font-black leading-tight tracking-normal max-md:text-4xl">Agente IA</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
-              Configure a IA que futuramente fara triagem, sugestao de respostas e acompanhamento das campanhas no WhatsApp, sempre preservando revisao humana e auditoria.
+              Ana acompanha as respostas recebidas depois dos disparos, resume cada conversa e sinaliza quando precisa de revisao humana.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -8901,11 +8938,11 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
       </section>
 
       <section className="grid grid-cols-5 gap-4 max-xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
-        <MetricCard detail={active ? 'modo ativo' : 'modo pausado'} icon={WandSparkles} label="Status IA" tone={active ? 'green' : 'violet'} value={active ? 'Ativa' : 'Pausada'} />
-        <MetricCard detail="leads prioritarios" icon={Sparkles} label="Quentes WhatsApp" tone="orange" value={formatNumber(hotWhatsapp)} />
-        <MetricCard detail="para acompanhar" icon={ClipboardList} label="Estudos ativos" tone="green" value={formatNumber(studyWhatsapp)} />
-        <MetricCard detail="relacionamento" icon={Crown} label="VIPs WhatsApp" tone="violet" value={formatNumber(vipWhatsapp)} />
-        <MetricCard detail="primeira etapa segura" icon={ShieldCheck} label="Modo" value={mode === 'assistido' ? 'Assistido' : mode === 'rascunho' ? 'Rascunho' : 'Auto'} />
+        <MetricCard detail={anaAgent?.configured ? 'chave carregada' : 'configure ASSISTENTE_ANA'} icon={WandSparkles} label="Ana" tone={anaAgent?.configured ? 'green' : 'violet'} value={anaAgent?.configured ? 'Pronta' : 'Pendente'} />
+        <MetricCard detail="com resposta ou IA" icon={MessageCircle} label="Conversas" tone="green" value={anaLoading ? '...' : formatNumber(anaMetrics.conversations || 0)} />
+        <MetricCard detail="entraram em contato" icon={ClipboardList} label="Respostas" tone="orange" value={anaLoading ? '...' : formatNumber(anaMetrics.leadReplies || 0)} />
+        <MetricCard detail="mensagens da Ana" icon={Sparkles} label="IA respondeu" tone="violet" value={anaLoading ? '...' : formatNumber(anaMetrics.aiReplies || 0)} />
+        <MetricCard detail={anaTraining?.loaded ? 'arquivos carregados' : 'verificar treinamento'} icon={ShieldCheck} label="Treinamento" value={anaTraining?.loaded ? 'OK' : 'Pendente'} />
       </section>
 
       <section className={`${panelClass} p-3`}>
@@ -8926,31 +8963,63 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
       {tab === 'overview' ? (
         <section className="grid grid-cols-[1fr_0.85fr] gap-4 max-xl:grid-cols-1">
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Painel executivo</span>
-            <h2 className="mt-2 text-2xl font-black text-slate-50">Como a IA entra na operacao</h2>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <span className={labelClass}>Resumo das conversas</span>
+                <h2 className="mt-2 text-2xl font-black text-slate-50">Atendimentos da Ana depois do disparo</h2>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${anaAgent?.configured ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+                {anaAgent?.configured ? 'Ana configurada' : 'Chave pendente'}
+              </span>
+            </div>
             <div className="mt-5 grid gap-3">
-              {[
-                ['Triagem de respostas', 'Classifica interesse, duvida, visita, estudo ativo e pedido de pausa.'],
-                ['Sugestao de mensagem', 'Prepara resposta para aprovacao humana antes do envio.'],
-                ['Encaminhamento humano', 'Leads sensiveis ou promissores vao para gestor, coordenador ou voluntario.'],
-                ['Auditoria completa', 'Toda resposta sugerida, aprovada ou enviada fica registrada.']
-              ].map(([title, detail]) => (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={title}>
-                  <strong className="text-slate-950">{title}</strong>
-                  <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-600">{detail}</p>
+              {anaLoading ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-bold text-slate-600 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+                  Carregando conversas da Ana...
                 </div>
-              ))}
+              ) : anaConversations.length ? anaConversations.slice(0, 8).map((conversation) => {
+                const badgeClass = toneClasses[conversation.classification?.tone] || toneClasses.slate;
+                return (
+                  <article className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={conversation.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <strong className="block text-base text-slate-950">{conversation.leadName}</strong>
+                        <span className="mt-1 block text-xs font-semibold text-slate-500">{conversation.district} · {conversation.phone}</span>
+                      </div>
+                      <span className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-wide ${badgeClass}`}>
+                        {conversation.classification?.label || 'Triagem'}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-700">{conversation.summary}</p>
+                    <div className="mt-3 grid gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-600">
+                      <span><strong className="text-slate-900">Pessoa:</strong> {conversation.lastLeadMessage}</span>
+                      <span><strong className="text-slate-900">Ana:</strong> {conversation.lastAnaMessage}</span>
+                      <span><strong className="text-slate-900">Proxima acao:</strong> {conversation.classification?.action}</span>
+                    </div>
+                  </article>
+                );
+              }) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-bold text-slate-600 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+                  Ainda nao ha respostas registradas depois dos disparos. Quando alguem entrar em contato, o resumo aparece aqui.
+                </div>
+              )}
             </div>
           </article>
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Checklist de implantacao</span>
+            <span className={labelClass}>Treinamento da Ana</span>
             <div className="mt-5 grid gap-3">
-              {['Definir instrucao do agente', 'Selecionar campanhas permitidas', 'Cadastrar base de conhecimento', 'Ativar modo assistido', 'Revisar respostas antes do automatico'].map((item, index) => (
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-slate-950 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={item}>
-                  <span className={`grid h-8 w-8 place-items-center rounded-xl text-sm font-black text-white ${index < 2 ? 'bg-emerald-600' : 'bg-slate-700'}`}>{index + 1}</span>
-                  <strong className="text-sm">{item}</strong>
+              {(anaTraining?.files || []).map((item, index) => (
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-slate-950 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={item.fileName}>
+                  <span className={`grid h-8 w-8 place-items-center rounded-xl text-sm font-black text-white ${item.loaded ? 'bg-emerald-600' : 'bg-slate-700'}`}>{index + 1}</span>
+                  <div>
+                    <strong className="block text-sm">{item.description}</strong>
+                    <span className="mt-1 block text-xs font-semibold text-slate-500">{item.fileName} · {item.loaded ? 'carregado' : 'nao encontrado'}</span>
+                  </div>
                 </div>
               ))}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+                A Ana usa a persona da Escola Biblica Novo Tempo, resposta breve, guardrails doutrinarios e encaminhamento humano para temas sensiveis.
+              </div>
             </div>
           </article>
         </section>

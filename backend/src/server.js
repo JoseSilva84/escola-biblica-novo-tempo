@@ -891,6 +891,120 @@ function zproConfig() {
   return { baseUrl, token, channelId, apiId, sendPath, sendMediaPath };
 }
 
+function anaConfig() {
+  const apiKey = normalizeApiToken(process.env.ASSISTENTE_ANA || process.env.ANA_API_KEY);
+  return {
+    name: 'Ana',
+    provider: 'assistente-virtual',
+    configured: Boolean(apiKey),
+    apiKey: tokenDiagnostic(apiKey)
+  };
+}
+
+async function readAnaTrainingStatus() {
+  const trainingDir = path.resolve(process.cwd(), '..', 'TREINAMENTO_IA_NOVO_TEMPO');
+  const files = [
+    ['LEIA_PRIMEIRO.md', 'Contexto da operação'],
+    ['02_SYSTEM_PROMPT_ANA_V2.md', 'Persona, guardrails e régua de 21 dias'],
+    ['03_COPYS_ICEBREAKERS.md', 'Copys de primeiro contato e ramificações']
+  ];
+
+  const items = await Promise.all(files.map(async ([fileName, description]) => {
+    const fullPath = path.join(trainingDir, fileName);
+    try {
+      const stat = await fsp.stat(fullPath);
+      return {
+        fileName,
+        description,
+        loaded: true,
+        bytes: stat.size,
+        updatedAt: stat.mtime.toISOString()
+      };
+    } catch {
+      return {
+        fileName,
+        description,
+        loaded: false,
+        bytes: 0,
+        updatedAt: null
+      };
+    }
+  }));
+
+  return {
+    loaded: items.every((item) => item.loaded),
+    directory: trainingDir,
+    files: items
+  };
+}
+
+function compactText(value, fallback = 'Sem mensagem registrada.') {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return fallback;
+  return clean.length > 180 ? `${clean.slice(0, 177)}...` : clean;
+}
+
+function classifyAnaConversation(messages = []) {
+  const inboundText = messages
+    .filter((message) => message.direction === 'INBOUND')
+    .map((message) => message.body)
+    .join(' ')
+    .toLowerCase();
+  const outboundText = messages
+    .filter((message) => message.direction === 'OUTBOUND')
+    .map((message) => message.body)
+    .join(' ')
+    .toLowerCase();
+  const fullText = `${inboundText} ${outboundText}`;
+
+  if (/(parar|remover|cancelar|não quero|nao quero|sem interesse|sair)/i.test(fullText)) {
+    return { label: 'Opt-out', tone: 'red', action: 'Respeitar pedido e encerrar contato.' };
+  }
+  if (/(suicid|me matar|morrer|desespero|abuso|violência|violencia|ameaça|ameaca|urgente)/i.test(fullText)) {
+    return { label: 'Encaminhar humano', tone: 'red', action: 'Acionar responsável humano imediatamente.' };
+  }
+  if (/(visita|igreja|endereço|endereco|pastor|missionário|missionario|voluntário|voluntario)/i.test(fullText)) {
+    return { label: 'Visita/igreja', tone: 'green', action: 'Encaminhar para gestor ou voluntário.' };
+  }
+  if (/(não recebi|nao recebi|ainda não|ainda nao|não chegou|nao chegou|mandar|envia|enviar)/i.test(fullText)) {
+    return { label: 'Enviar material', tone: 'orange', action: 'Oferecer ou reenviar o material solicitado.' };
+  }
+  if (/(recebi|li|gostei|estudo|material|bíblia|biblia|oração|oracao|dúvida|duvida)/i.test(fullText)) {
+    return { label: 'Acompanhar estudo', tone: 'blue', action: 'Continuar conversa acolhedora com base no tema.' };
+  }
+  return { label: 'Triagem', tone: 'slate', action: 'Classificar intenção antes da próxima resposta.' };
+}
+
+function summarizeAnaConversation(conversation) {
+  const messages = conversation.messages || [];
+  const inboundMessages = messages.filter((message) => message.direction === 'INBOUND');
+  const aiMessages = messages.filter((message) => message.senderType === 'AI');
+  const outboundMessages = messages.filter((message) => message.direction === 'OUTBOUND');
+  const lastMessage = messages[messages.length - 1] || null;
+  const lastInbound = inboundMessages[inboundMessages.length - 1] || null;
+  const lastAi = aiMessages[aiMessages.length - 1] || null;
+  const classification = classifyAnaConversation(messages);
+
+  return {
+    id: conversation.id,
+    phone: conversation.phone,
+    leadName: conversation.leadName || conversation.lead?.name || 'Contato sem nome',
+    district: conversation.district || conversation.lead?.district?.name || 'Distrito não vinculado',
+    priority: conversation.leadPriority || conversation.lead?.priority || null,
+    status: conversation.status,
+    totalMessages: messages.length,
+    inboundCount: inboundMessages.length,
+    outboundCount: outboundMessages.length,
+    aiCount: aiMessages.length,
+    hasLeadReply: inboundMessages.length > 0,
+    lastMessageAt: lastMessage?.createdAt || conversation.updatedAt,
+    lastLeadMessage: compactText(lastInbound?.body),
+    lastAnaMessage: compactText(lastAi?.body || outboundMessages[outboundMessages.length - 1]?.body),
+    summary: `${classification.label}: ${compactText(lastInbound?.body || lastMessage?.body)}`,
+    classification
+  };
+}
+
 function tokenDiagnostic(token) {
   if (!token) return { loaded: false, length: 0, prefix: null };
   return {
@@ -1355,6 +1469,65 @@ app.get('/api/whatsapp/provider', requireAuth, (_request, response) => {
     sendPath: config.sendPath,
     token: tokenDiagnostic(config.token)
   });
+});
+
+app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
+  response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.set('Pragma', 'no-cache');
+  response.set('Expires', '0');
+
+  try {
+    const training = await readAnaTrainingStatus();
+    if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+      response.json({
+        agent: anaConfig(),
+        training,
+        metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, needsHuman: 0, optOut: 0 },
+        conversations: []
+      });
+      return;
+    }
+
+    const limit = Math.min(Math.max(Number(request.query?.limit) || 80, 1), 200);
+    const conversations = await prisma.whatsAppConversation.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+      include: {
+        lead: { select: whatsappLeadSelect },
+        messages: {
+          orderBy: { createdAt: 'asc' },
+          take: 200
+        }
+      }
+    });
+
+    const summarized = conversations
+      .map(summarizeAnaConversation)
+      .filter((conversation) => conversation.hasLeadReply || conversation.aiCount > 0);
+
+    response.json({
+      agent: anaConfig(),
+      training,
+      metrics: {
+        conversations: summarized.length,
+        contacted: conversations.filter((conversation) => (conversation.messages || []).some((message) => message.direction === 'OUTBOUND')).length,
+        leadReplies: summarized.filter((conversation) => conversation.hasLeadReply).length,
+        aiReplies: summarized.filter((conversation) => conversation.aiCount > 0).length,
+        needsHuman: summarized.filter((conversation) => conversation.classification?.label === 'Encaminhar humano').length,
+        optOut: summarized.filter((conversation) => conversation.classification?.label === 'Opt-out').length
+      },
+      conversations: summarized
+    });
+  } catch (error) {
+    console.error('[ai:ana:summary:error]', error.message);
+    response.status(500).json({
+      agent: anaConfig(),
+      training: await readAnaTrainingStatus().catch(() => ({ loaded: false, files: [] })),
+      metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, needsHuman: 0, optOut: 0 },
+      conversations: [],
+      message: 'Nao foi possivel carregar o resumo da Ana.'
+    });
+  }
 });
 
 app.get('/api/whatsapp/leads', requireAuth, async (request, response) => {
