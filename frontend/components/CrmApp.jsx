@@ -8391,18 +8391,6 @@ function ConversationsView({ records = [] }) {
     .map((lead) => lead._directoryLead || dashboardLeadToWhatsAppLead(lead)), [filteredContactLeadRecords]);
 
   const filteredContactLeads = useMemo(() => allFilteredContactLeads.slice(0, 100), [allFilteredContactLeads]);
-  const hasActiveCombinedContactFilter = useMemo(() => (
-    ['districts', 'neighborhoods', 'materials', 'ageGroups', 'genders', 'priorities', 'recency']
-      .some((key) => deferredContactFilters[key]?.length)
-    || ['whatsapp', 'email', 'study', 'vip', 'religion', 'birthday']
-      .some((key) => deferredContactFilters[key] && deferredContactFilters[key] !== 'all')
-  ), [deferredContactFilters]);
-
-  useEffect(() => {
-    if (!leadPickerOpen || newContactMode || !hasActiveCombinedContactFilter) return;
-    setBroadcastSelectedLeads(allFilteredContactLeads);
-  }, [allFilteredContactLeads, hasActiveCombinedContactFilter, leadPickerOpen, newContactMode]);
-
   const leadOptions = useMemo(
     () => records
       .filter((lead) => lead.t && phoneDigits(lead.tel))
@@ -8561,11 +8549,12 @@ function ConversationsView({ records = [] }) {
       setMessageText('');
       setMessageAttachment(null);
       if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+      setSending(false);
+      toast.success('Mensagem enviada', {
+        description: `Mensagem aceita para ${payload.phone || phone}.`
+      });
       await loadConversations(phone, { selectSearched: true });
       setSelectedId(payload.conversationId || selectedId);
-      toast.success('Mensagem aceita pelo provedor', {
-        description: `Histórico atualizado para ${payload.phone || phone}; aguardando confirmação de entrega.`
-      });
     } catch (error) {
       toast.error('Falha ao enviar', { description: error.message });
     } finally {
