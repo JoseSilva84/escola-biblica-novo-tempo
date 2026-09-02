@@ -7977,6 +7977,7 @@ function ConversationsView({ records = [] }) {
   const attachmentInputRef = useRef(null);
   const activePhoneRef = useRef('');
   const lastSeenMessageIdRef = useRef(null);
+  const conversationRefreshInFlightRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -8172,6 +8173,8 @@ function ConversationsView({ records = [] }) {
 
   async function loadConversations(phone = '', options = {}) {
     const { silent = false, notify = false, selectSearched = false } = options;
+    if (silent && conversationRefreshInFlightRef.current) return;
+    conversationRefreshInFlightRef.current = true;
     if (!silent) setLoading(true);
     try {
       const query = phoneDigits(phone);
@@ -8237,6 +8240,7 @@ function ConversationsView({ records = [] }) {
     } catch {
       if (!silent) setConversations([]);
     } finally {
+      conversationRefreshInFlightRef.current = false;
       if (!silent) setLoading(false);
     }
   }
@@ -8512,9 +8516,59 @@ function ConversationsView({ records = [] }) {
   useEffect(() => {
     const interval = window.setInterval(() => {
       loadConversations(activePhoneRef.current || phoneSearch, { silent: true, notify: true });
-    }, 1000);
+    }, 750);
     return () => window.clearInterval(interval);
   }, [phoneSearch, selectedId]);
+
+  function appendOptimisticOutboundMessage(payload, fallbackPhone, body) {
+    const now = payload.sentAt || new Date().toISOString();
+    const normalizedPhone = phoneDigits(payload.phone || fallbackPhone);
+    const conversationId = payload.conversationId || selectedConversation?.id || `temp-${normalizedPhone}`;
+    const outgoingMessage = {
+      id: payload.messageId || `temp-message-${Date.now()}`,
+      conversationId,
+      body,
+      direction: 'OUTBOUND',
+      senderType: 'USER',
+      senderName: payload.sentBy || 'Sistema',
+      provider: payload.provider || 'zpro-baileys',
+      providerStatus: payload.deliveryStatus || 'ACCEPTED',
+      sentAt: now,
+      createdAt: now
+    };
+
+    setConversations((current) => {
+      const next = [...current];
+      const index = next.findIndex((conversation) => (
+        conversation.id === conversationId
+        || phoneDigits(conversation.phone).endsWith(normalizedPhone.slice(-10))
+      ));
+      if (index >= 0) {
+        const existing = next[index];
+        const messages = Array.isArray(existing.messages) ? existing.messages : [];
+        const alreadyExists = messages.some((messageItem) => messageItem.id === outgoingMessage.id);
+        next[index] = {
+          ...existing,
+          id: existing.id || conversationId,
+          phone: existing.phone || normalizedPhone,
+          updatedAt: now,
+          messages: alreadyExists ? messages : [...messages, outgoingMessage]
+        };
+        return next.sort((left, right) => new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0));
+      }
+      return [{
+        id: conversationId,
+        phone: normalizedPhone,
+        leadName: activeLeadName,
+        district: activeLeadDistrict,
+        lead: activeLead || null,
+        messages: [outgoingMessage],
+        updatedAt: now,
+        createdAt: now
+      }, ...next].slice(0, 10);
+    });
+    setSelectedId(conversationId);
+  }
 
   async function submitMessage(event) {
     event.preventDefault();
@@ -8546,6 +8600,7 @@ function ConversationsView({ records = [] }) {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
+      appendOptimisticOutboundMessage(payload, phone, message || mediaPayload?.fileName || '[anexo]');
       setMessageText('');
       setMessageAttachment(null);
       if (attachmentInputRef.current) attachmentInputRef.current.value = '';
