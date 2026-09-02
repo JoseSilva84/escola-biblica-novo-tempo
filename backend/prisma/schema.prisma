@@ -271,6 +271,47 @@ model WhatsAppMessage {
   @@index([providerMessageId])
 }
 
+model WhatsAppBroadcast {
+  id             String                       @id @default(cuid())
+  broadcastKey   String                       @unique
+  name           String
+  messageTemplate String
+  recipientTotal Int                          @default(0)
+  createdById    String?
+  createdByName  String?
+  recipients      WhatsAppBroadcastRecipient[]
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@index([createdAt])
+}
+
+model WhatsAppBroadcastRecipient {
+  id                  String            @id @default(cuid())
+  broadcastId         String
+  leadId              String?
+  externalLeadId      Int?
+  leadName            String?
+  phone               String
+  district            String?
+  material            String?
+  personalizedMessage String?
+  status              String            @default("PENDENTE")
+  deliveryStatus      String?
+  conversationId      String?
+  messageId           String?
+  error               String?
+  sentAt              DateTime?
+  repliedAt           DateTime?
+  broadcast           WhatsAppBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@unique([broadcastId, phone])
+  @@index([broadcastId])
+  @@index([conversationId])
+}
+
 model DatasetUploadHistory {
   id              String   @id @default(cuid())
   status          String   @default("COMPLETED")

@@ -87,6 +87,7 @@ const associationNavItems = [
   ['automations', 'WhatsApp', MessageCircle],
   ['reports', 'Relat\u00f3rios', PieChart]
 ];
+const defaultBroadcastMessage = 'Oi {{NOME}}, tudo bem? Eu sou a Ana, assistente virtual da Novo Tempo para acompanhamento espiritual 😊\n\nVi aqui que você pediu um material sobre {{TEMA}} pela Escola Bíblica Novo Tempo. Quero só confirmar com você: esse material chegou até aí?';
 const crmPriorityLabels = {
   Hot: 'Quente',
   Warm: 'Potencial',
@@ -3956,7 +3957,21 @@ function leadNeighborhood(lead) {
 }
 
 function leadMaterial(lead) {
-  return lead?.materialName || lead?.tm || 'Nao informado';
+  return lead?.material || lead?.materialName || lead?.materialPrincipal || lead?.tm || 'Nao informado';
+}
+
+function renderPreviewTemplate(message, lead = {}) {
+  const name = lead?.name || lead?.n || 'Nome do lead';
+  const firstName = String(name).trim().split(/\s+/)[0] || 'amigo';
+  const replacements = {
+    NOME: name,
+    PRIMEIRO_NOME: firstName,
+    TEMA: leadMaterial(lead) || 'estudos bíblicos',
+    MATERIAL: leadMaterial(lead) || 'estudos bíblicos',
+    DISTRITO: lead?.district || lead?.d || 'sua região',
+    WHATSAPP: lead?.phone || lead?.tel || ''
+  };
+  return String(message || '').replace(/\{\{\s*([A-Z_]+)\s*\}\}/gi, (match, key) => replacements[key.toUpperCase()] || match);
 }
 
 function leadAgeGroup(lead) {
@@ -6435,7 +6450,13 @@ function AdminGeneralView({
       const response = await apiFetch('/api/whatsapp/send-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipients, message })
+        body: JSON.stringify({
+          recipients,
+          message,
+          listName: `Lote WhatsApp ${new Date().toLocaleDateString('pt-BR')}`,
+          broadcastId: globalThis.crypto?.randomUUID?.() || `batch-${Date.now()}`,
+          recipientTotal: recipients.length
+        })
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -7456,7 +7477,6 @@ function WhatsAppLeadPickerModal({
   onNewContactSubmit,
   onOpenBroadcast,
   onSearch,
-  onSelectAll,
   onSelect,
   onToggleSelect,
   onToggleNewContact,
@@ -7508,7 +7528,7 @@ function WhatsAppLeadPickerModal({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {!newContactMode ? (
-              <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-200/50 bg-[#00a884] px-4 text-sm font-black text-white shadow-lg shadow-emerald-950/20 transition duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:bg-[#06cf9c] focus:outline-none focus:ring-4 focus:ring-emerald-200/30" onClick={onOpenBroadcast} type="button">
+              <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-200/50 bg-[#00a884] px-4 text-sm font-black text-white shadow-lg shadow-emerald-950/20 transition duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:bg-[#06cf9c] focus:outline-none focus:ring-4 focus:ring-emerald-200/30 disabled:cursor-not-allowed disabled:opacity-50" disabled={!selectedLeads.length} onClick={onOpenBroadcast} type="button">
                 <Send size={18} /> Lista de transmissão {selectedLeads.length ? `(${selectedLeads.length})` : ''}
               </button>
             ) : null}
@@ -7646,11 +7666,10 @@ function WhatsAppLeadPickerModal({
                 <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{selectedLeads.length} selecionados</span>
               </div>
               <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-                {selectedLeads.length ? `${selectedLeads.slice(0, 4).map((lead) => lead.name).join(', ')}${selectedLeads.length > 4 ? ` e mais ${selectedLeads.length - 4}` : ''}` : 'Os resultados dos filtros serão selecionados automaticamente.'}
+                {selectedLeads.length ? `${selectedLeads.slice(0, 4).map((lead) => lead.name).join(', ')}${selectedLeads.length > 4 ? ` e mais ${selectedLeads.length - 4}` : ''}` : 'Marque manualmente os contatos que receberão esta transmissão.'}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 transition hover:border-emerald-400 hover:text-emerald-700" disabled={!leads.length} onClick={() => onSelectAll(leads)} type="button">Selecionar resultados</button>
               {selectedLeads.length ? <button className="h-9 rounded-lg px-3 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-950" onClick={onClearSelected} type="button">Limpar</button> : null}
               <button className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#00a884] px-4 text-xs font-black text-white shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={!selectedLeads.length} onClick={onOpenBroadcast} type="button"><Send size={15} /> Criar transmissão</button>
             </div>
@@ -7677,6 +7696,7 @@ function WhatsAppLeadPickerModal({
                       <span className="min-w-0 flex-1">
                         <strong className="block truncate text-base font-black text-slate-950">{lead.name}</strong>
                         <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{lead.district || 'Distrito não vinculado'} · {lead.phone}</span>
+                        <span className="mt-1 block truncate text-xs font-semibold text-slate-500">Material: {leadMaterial(lead)}</span>
                         <span className="mt-2 flex flex-wrap items-center gap-2">
                           <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${priorityBadgeClasses(whatsappPriorityBadgeKey(lead.priority))}`}>
                             {whatsappPriorityLabels[lead.priority] || lead.priority || 'Sem tipo'}
@@ -7712,6 +7732,8 @@ function WhatsAppBroadcastModal({
   recipients = [],
   sending = false
 }) {
+  const previewLead = recipients[0] || null;
+  const previewMessage = renderPreviewTemplate(message || defaultBroadcastMessage, previewLead || {});
   return createPortal(
     <div className="fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-broadcast-title">
       <form className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#f0f2f5] shadow-[0_34px_110px_rgba(0,0,0,0.6)]" onSubmit={onSubmit}>
@@ -7725,8 +7747,8 @@ function WhatsAppBroadcastModal({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           <label className="grid gap-1.5">
-            <span className="text-xs font-black uppercase tracking-wide text-slate-600">Nome da lista (opcional)</span>
-            <input className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onListNameChange(event.target.value)} placeholder="Ex.: Aniversariantes de agosto" value={listName} />
+            <span className="text-xs font-black uppercase tracking-wide text-slate-600">Nome da transmissão *</span>
+            <input className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onListNameChange(event.target.value)} placeholder="Ex.: Reativação estudo de Daniel" required value={listName} />
           </label>
           <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
@@ -7747,11 +7769,32 @@ function WhatsAppBroadcastModal({
             <span className="text-xs font-black uppercase tracking-wide text-slate-600">Mensagem *</span>
             <textarea autoFocus className="min-h-36 resize-y rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onMessageChange(event.target.value)} placeholder="Digite a mensagem que todos receberão" required value={message} />
           </label>
-          <p className="mt-2 text-xs font-semibold text-slate-500">Cada destinatário receberá uma conversa separada; os contatos não verão os demais participantes.</p>
+          <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <span className="text-[11px] font-black uppercase tracking-wide text-emerald-800">Variáveis disponíveis</span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {['{{NOME}}', '{{PRIMEIRO_NOME}}', '{{TEMA}}', '{{MATERIAL}}', '{{DISTRITO}}'].map((item) => (
+                <button
+                  className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-800 transition hover:bg-[#d9fdd3]"
+                  key={item}
+                  onClick={() => onMessageChange(`${message}${message ? ' ' : ''}${item}`)}
+                  type="button"
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 rounded-xl bg-white p-3 text-sm font-semibold leading-relaxed text-slate-700">
+              <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500">
+                Prévia {previewLead ? `para ${previewLead.name || previewLead.n}` : ''}
+              </span>
+              <p className="whitespace-pre-line">{previewMessage}</p>
+            </div>
+          </div>
+          <p className="mt-2 text-xs font-semibold text-slate-500">Esta transmissão ficará salva com estes destinatários. Cada contato receberá uma conversa separada e não verá os demais participantes.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white p-4">
           <button className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50" onClick={onClose} type="button">Cancelar</button>
-          <button className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !recipients.length || !message.trim()} type="submit"><Send size={18} /> {sending ? 'Enviando...' : `Enviar para ${recipients.length}`}</button>
+          <button className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !recipients.length || !listName.trim() || !message.trim()} type="submit"><Send size={18} /> {sending ? 'Enviando...' : `Enviar para ${recipients.length}`}</button>
         </div>
       </form>
     </div>,
@@ -7773,7 +7816,7 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
           <span className={labelClass}>Desempenho das transmissões</span>
           <h2 className="mt-2 text-2xl font-black text-slate-50">Painel de mensagens enviadas aos leads</h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-relaxed text-slate-400">
-            Cada envio é medido separadamente. A seleção de destinatários continua temporária e não é salva como lista reutilizável.
+            Cada envio é medido separadamente com o nome da transmissão e os destinatários escolhidos.
           </p>
         </div>
         <button className={`${ghostButtonClass} h-10 px-4`} onClick={onRefresh} type="button">Atualizar painel</button>
@@ -7826,6 +7869,45 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
                     );
                   })}
                 </div>
+                {Array.isArray(transmission.recipients) && transmission.recipients.length ? (
+                  <div className="border-t border-[#e9edef] px-5 pb-5">
+                    <div className="mb-3 mt-4 flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-black uppercase tracking-wide text-[#667781]">Destinatários deste disparo</span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-[#3b4a54]">
+                        {formatNumber(transmission.recipients.length)}
+                      </span>
+                    </div>
+                    <div className="conversation-tools-scroll max-h-52 overflow-y-auto rounded-xl border border-[#e9edef]">
+                      {transmission.recipients.slice(0, 120).map((recipient) => {
+                        const failed = recipient.status === 'FALHA';
+                        const replied = Boolean(recipient.repliedAt);
+                        const statusLabel = failed ? 'Falha' : replied ? 'Respondeu' : 'Enviado';
+                        const statusClass = failed
+                          ? 'bg-red-50 text-red-700'
+                          : replied ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700';
+                        return (
+                          <div className="grid gap-2 border-b border-[#e9edef] px-3 py-3 last:border-b-0 sm:grid-cols-[1fr_auto]" key={recipient.id || `${transmission.id}-${recipient.phone}`}>
+                            <span className="min-w-0">
+                              <strong className="block truncate text-sm font-black text-[#111b21]">{recipient.name || 'Contato sem nome'}</strong>
+                              <span className="mt-1 block truncate text-xs font-semibold text-[#667781]">
+                                {recipient.phone} · {recipient.district || 'Distrito não vinculado'}
+                              </span>
+                              {recipient.material ? <span className="mt-1 block truncate text-xs font-semibold text-[#667781]">Material: {recipient.material}</span> : null}
+                            </span>
+                            <span className={`inline-flex h-7 items-center justify-center rounded-full px-3 text-[11px] font-black ${statusClass}`}>
+                              {statusLabel}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {transmission.recipients.length > 120 ? (
+                        <div className="px-3 py-3 text-xs font-bold text-[#667781]">
+                          + {formatNumber(transmission.recipients.length - 120)} destinatários nesta transmissão
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
                 {transmission.failed ? (
                   <div className="border-t border-red-100 bg-red-50 px-5 py-2 text-xs font-bold text-red-700">
                     {formatNumber(transmission.failed)} envio(s) com falha
@@ -7881,7 +7963,7 @@ function ConversationsView({ records = [] }) {
   const [broadcastSelectedLeads, setBroadcastSelectedLeads] = useState([]);
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
   const [broadcastListName, setBroadcastListName] = useState('');
-  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState(defaultBroadcastMessage);
   const [broadcastSending, setBroadcastSending] = useState(false);
   const [broadcastAnalytics, setBroadcastAnalytics] = useState([]);
   const [broadcastAnalyticsLoading, setBroadcastAnalyticsLoading] = useState(true);
@@ -8009,19 +8091,14 @@ function ConversationsView({ records = [] }) {
     });
   }
 
-  function selectAllBroadcastLeads(leads) {
-    setBroadcastSelectedLeads((current) => {
-      const merged = new Map(current.map((lead) => [phoneDigits(lead.phone).slice(-10), lead]));
-      leads.forEach((lead) => {
-        merged.set(phoneDigits(lead.phone).slice(-10), lead);
-      });
-      return Array.from(merged.values());
-    });
-  }
-
   async function submitBroadcast(event) {
     event.preventDefault();
-    if (!broadcastSelectedLeads.length || !broadcastMessage.trim()) return;
+    if (!broadcastSelectedLeads.length) return;
+    if (!broadcastListName.trim()) {
+      toast.error('Nome da transmissão obrigatório', { description: 'Dê um nome para acompanhar esse disparo depois.' });
+      return;
+    }
+    if (!broadcastMessage.trim()) return;
     setBroadcastSending(true);
     try {
       const recipients = broadcastSelectedLeads.map((lead) => ({
@@ -8029,6 +8106,8 @@ function ConversationsView({ records = [] }) {
         leadId: lead.id,
         name: lead.name,
         district: lead.district || null,
+        material: leadMaterial(lead),
+        theme: leadMaterial(lead),
         priority: lead.priority || null,
         phone: phoneDigits(lead.phone)
       }));
@@ -8043,7 +8122,7 @@ function ConversationsView({ records = [] }) {
           body: JSON.stringify({
             recipients: chunk,
             message: broadcastMessage.trim(),
-            listName: broadcastListName.trim() || null,
+            listName: broadcastListName.trim(),
             broadcastId,
             recipientTotal: recipients.length
           })
@@ -8060,7 +8139,7 @@ function ConversationsView({ records = [] }) {
       setLeadPickerOpen(false);
       setBroadcastSelectedLeads([]);
       setBroadcastListName('');
-      setBroadcastMessage('');
+      setBroadcastMessage(defaultBroadcastMessage);
       await loadConversations('', { silent: true });
       await loadBroadcastAnalytics({ silent: true });
     } catch (error) {
@@ -8204,6 +8283,7 @@ function ConversationsView({ records = [] }) {
         tel: phone,
         t: true,
         d: lead.district || null,
+        material: lead.material || lead.materialName || lead.materialPrincipal || lead.tm || null,
         p: lead.priority ? whatsappPriorityBadgeKey(lead.priority) : null,
         em: null,
         e: Boolean(lead.hasActiveStudy),
@@ -8803,7 +8883,6 @@ function ConversationsView({ records = [] }) {
           onNewContactSubmit={submitNewContact}
           onOpenBroadcast={() => setBroadcastModalOpen(true)}
           onSearch={submitLeadSearch}
-          onSelectAll={selectAllBroadcastLeads}
           onSelect={selectRecipientLead}
           onToggleSelect={toggleBroadcastLead}
           onToggleNewContact={() => setNewContactMode((current) => !current)}
