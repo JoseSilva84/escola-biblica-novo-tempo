@@ -35,6 +35,7 @@ WORKDIR /app/backend
 
 COPY backend/src ./src
 COPY dataset /app/dataset
+COPY TREINAMENTO_IA_NOVO_TEMPO /app/TREINAMENTO_IA_NOVO_TEMPO
 COPY regiaoDistritoIgreja.md /app/regiaoDistritoIgreja.md
 COPY igreja_endereco.md /app/igreja_endereco.md
 

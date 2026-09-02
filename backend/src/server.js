@@ -1005,6 +1005,115 @@ function summarizeAnaConversation(conversation) {
   };
 }
 
+function leadFirstName(value) {
+  return String(value || '').trim().split(/\s+/)[0] || 'Oi';
+}
+
+function detectAnaReplyIntent(messageText) {
+  const text = String(messageText || '').toLowerCase();
+  if (/(parar|remover|cancelar|não quero|nao quero|sem interesse|sair)/i.test(text)) return 'optout';
+  if (/(suicid|me matar|morrer|desespero|abuso|violência|violencia|ameaça|ameaca|urgente)/i.test(text)) return 'human';
+  if (/(estado dos mortos|sábado|sabado|domingo|juízo|juizo|dízimo|dizimo|oferta|ellen|outra igreja|denominação|denominacao)/i.test(text)) return 'human';
+  if (/(não lembro|nao lembro|quem é você|quem e voce|qual material|que material)/i.test(text)) return 'does_not_remember';
+  if (/(visita|igreja|endereço|endereco|pastor|missionário|missionario|voluntário|voluntario)/i.test(text)) return 'visit';
+  if (/(não recebi|nao recebi|ainda não|ainda nao|não chegou|nao chegou|não|nao)/i.test(text)) return 'not_received';
+  if (/(recebi|chegou|consegui|sim|li|gostei)/i.test(text)) return 'received';
+  return 'general';
+}
+
+function inferLeadStudyTheme(lead) {
+  const metadata = lead?.metadata && typeof lead.metadata === 'object' ? lead.metadata : {};
+  return lead?.studyType
+    || lead?.material
+    || lead?.course
+    || metadata.studyType
+    || metadata.material
+    || metadata.tema
+    || metadata.tipo_estudo
+    || 'estudos bíblicos';
+}
+
+function buildAnaReply({ conversation, inboundMessage }) {
+  const name = leadFirstName(conversation?.leadName || conversation?.lead?.name);
+  const theme = inferLeadStudyTheme(conversation?.lead || {});
+  const intent = detectAnaReplyIntent(inboundMessage?.body);
+
+  if (intent === 'optout') {
+    return `Tudo bem, ${name}, sem problemas nenhum! 🙏\n\nSe um dia quiser retomar, é só me mandar uma mensagem aqui. Desejo tudo de bom pra você! Deus te abençoe!`;
+  }
+  if (intent === 'human') {
+    return `${name}, obrigada por me contar. Esse assunto é importante demais para ficar só por mensagem automática.\n\nVou pedir para alguém da nossa equipe conversar com você com mais calma, tudo bem?`;
+  }
+  if (intent === 'not_received') {
+    return `Poxa, ${name}, que pena! Não era pra ter acontecido isso.\n\nEu consigo te enviar o material sobre ${theme} aqui pelo WhatsApp. Quer que eu mande agora?`;
+  }
+  if (intent === 'does_not_remember') {
+    return `Sem problemas, ${name}! Eu sou a Ana, da equipe da Escola Bíblica Novo Tempo.\n\nUm tempo atrás, você solicitou um material sobre ${theme}. A gente está fazendo um acompanhamento para garantir que todo mundo recebeu direitinho. Se quiser, posso te enviar aqui pelo WhatsApp.`;
+  }
+  if (intent === 'received') {
+    return `Que bom saber, ${name}! 😊\n\nMe conta: você chegou a dar uma olhada no material? Teve alguma parte que chamou mais sua atenção?`;
+  }
+  if (intent === 'visit') {
+    return `Que bom você falar sobre isso, ${name}.\n\nPosso pedir para alguém da nossa equipe te orientar sobre uma igreja ou visita perto de você, sem compromisso?`;
+  }
+  return `${name}, obrigada por responder! 😊\n\nMe conta um pouquinho: você chegou a receber ou acessar o material da Escola Bíblica Novo Tempo?`;
+}
+
+async function maybeReplyWithAna(saved, inboundMessage) {
+  if (!saved?.conversation?.id || !inboundMessage?.body) return null;
+  const config = anaConfig();
+  if (!config.configured) return null;
+  if (String(process.env.ASSISTENTE_ANA_AUTO_REPLY || 'true').toLowerCase() === 'false') return null;
+
+  const conversation = await prisma.whatsAppConversation.findUnique({
+    where: { id: saved.conversation.id },
+    include: {
+      lead: { select: whatsappLeadSelect },
+      messages: {
+        orderBy: { createdAt: 'asc' },
+        take: 20
+      }
+    }
+  });
+  const recentAnaReply = (conversation?.messages || []).find((message) => (
+    message.senderType === 'AI'
+    && message.direction === 'OUTBOUND'
+    && message.metadata?.replyToMessageId === inboundMessage.id
+  ));
+  if (recentAnaReply) return null;
+
+  const message = buildAnaReply({ conversation, inboundMessage });
+  const result = await sendZproTextMessage({
+    phone: conversation?.phone || saved.conversation.phone,
+    message,
+    leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
+    templateId: 'ana-auto-reply'
+  });
+
+  return recordWhatsAppMessage({
+    phone: result.phone,
+    body: message,
+    direction: 'OUTBOUND',
+    senderType: 'AI',
+    senderName: 'Ana',
+    leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
+    leadName: conversation?.leadName || conversation?.lead?.name || null,
+    district: conversation?.district || conversation?.lead?.district?.name || null,
+    provider: result.provider,
+    providerStatus: result.deliveryStatus,
+    providerResponse: result.providerResponse,
+    providerMessageId: providerMessageId(result.providerResponse),
+    occurredAt: new Date(),
+    metadata: {
+      assistant: 'Ana',
+      autoReply: true,
+      replyToMessageId: inboundMessage.id,
+      intent: detectAnaReplyIntent(inboundMessage.body),
+      attempts: result.attempts || []
+    }
+  });
+}
+
 function tokenDiagnostic(token) {
   if (!token) return { loaded: false, length: 0, prefix: null };
   return {
@@ -2179,6 +2288,26 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     }
   }
 
+  if (!event.fromMe && event.messageId) {
+    const existingInbound = await prisma.whatsAppMessage.findFirst({
+      where: {
+        providerMessageId: event.messageId,
+        direction: 'INBOUND'
+      },
+      select: { id: true, conversationId: true }
+    }).catch(() => null);
+    if (existingInbound?.id) {
+      response.json({
+        ok: true,
+        received: true,
+        duplicate: true,
+        conversationId: existingInbound.conversationId,
+        messageId: existingInbound.id
+      });
+      return;
+    }
+  }
+
   const saved = await recordWhatsAppMessage({
     phone: event.phone,
     body: event.text,
@@ -2196,12 +2325,22 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     }
   });
 
+  let anaReply = null;
+  if (saved?.message?.direction === 'INBOUND') {
+    try {
+      anaReply = await maybeReplyWithAna(saved, saved.message);
+    } catch (error) {
+      console.error('[ai:ana:auto-reply:error]', error.message, error.providerResponse || '');
+    }
+  }
+
   response.json({
     ok: true,
     received: true,
     saved: Boolean(saved),
     conversationId: saved?.conversation?.id || null,
-    messageId: saved?.message?.id || null
+    messageId: saved?.message?.id || null,
+    anaReplied: Boolean(anaReply)
   });
 });
 
