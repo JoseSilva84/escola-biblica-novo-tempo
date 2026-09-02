@@ -8599,7 +8599,11 @@ function ConversationsView({ records = [] }) {
         })
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
+      if (!response.ok) {
+        const error = new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
+        error.payload = payload;
+        throw error;
+      }
       appendOptimisticOutboundMessage(payload, phone, message || mediaPayload?.fileName || '[anexo]');
       setMessageText('');
       setMessageAttachment(null);
@@ -8611,6 +8615,14 @@ function ConversationsView({ records = [] }) {
       await loadConversations(phone, { selectSearched: true });
       setSelectedId(payload.conversationId || selectedId);
     } catch (error) {
+      if (error.payload?.messageId || error.payload?.conversationId) {
+        appendOptimisticOutboundMessage({
+          ...error.payload,
+          deliveryStatus: error.payload.deliveryStatus || 'FAILED',
+          sentAt: new Date().toISOString()
+        }, phone, message || mediaPayload?.fileName || '[anexo]');
+        await loadConversations(phone, { selectSearched: true, silent: true });
+      }
       toast.error('Falha ao enviar', { description: error.message });
     } finally {
       setSending(false);
