@@ -21,7 +21,16 @@ const DATASET_DIR = resolveDatasetDir();
 const MAX_DATASET_UPLOAD_BYTES = Number(process.env.DATASET_UPLOAD_LIMIT_BYTES || 150 * 1024 * 1024);
 const gzipAsync = promisify(gzip);
 const ANA_SEQUENCE_GUIDE_FILE = 'PLANO_SEQUENCIA_ANA_PRESENTE_19_SETEMBRO.md';
-let anaSequenceGuideCache = { path: null, text: '', loadedAt: 0 };
+const ANA_TRAINING_DIR = 'TREINAMENTO_IA_NOVO_TEMPO';
+const ANA_TRAINING_FILES = [
+  ['01_LEIA_PRIMEIRO.md', 'Contexto da operacao V3'],
+  ['02_GUIA_RESUMIDO_IMPLEMENTACAO.md', 'Guia resumido de implementacao'],
+  ['03_SYSTEM_PROMPT_ANA_V3.md', 'System prompt Ana V3'],
+  ['04_REGUA_21_DIAS_COMPLETA.md', 'Regua completa de 21 dias'],
+  ['05_CAMPANHA_EXPRESSA_19_09.md', 'Campanha expressa 19/09'],
+  ['06_COPYS_ICEBREAKERS.md', 'Copys, icebreakers e ramificacoes']
+];
+let anaSequenceGuideCache = { cacheKey: null, text: '', sources: [], loadedAt: 0 };
 
 function resolveDatasetDir() {
   if (process.env.DATASET_DIR) return path.resolve(process.env.DATASET_DIR);
@@ -932,43 +941,109 @@ function resolveAnaSequenceGuidePath() {
   return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[1];
 }
 
+function resolveAnaTrainingDir() {
+  const configured = String(process.env.ANA_TRAINING_DIR || '').trim();
+  const candidates = [
+    configured && (path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured)),
+    path.resolve(process.cwd(), '..', ANA_TRAINING_DIR),
+    path.resolve(process.cwd(), ANA_TRAINING_DIR)
+  ].filter(Boolean);
+  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[1];
+}
+
+async function readAnaGuideSource(sourcePath, title) {
+  const stat = await fsp.stat(sourcePath);
+  const text = await fsp.readFile(sourcePath, 'utf8');
+  return {
+    path: sourcePath,
+    title,
+    fileName: path.basename(sourcePath),
+    bytes: stat.size,
+    updatedAt: stat.mtime.toISOString(),
+    mtimeMs: stat.mtimeMs,
+    text
+  };
+}
+
 async function readAnaSequenceGuide() {
   const guidePath = resolveAnaSequenceGuidePath();
-  const stat = await fsp.stat(guidePath);
+  const trainingDir = resolveAnaTrainingDir();
+  const sourceSpecs = [
+    [guidePath, 'Manual consolidado obrigatorio da Ana'],
+    ...ANA_TRAINING_FILES.map(([fileName, description]) => [path.join(trainingDir, fileName), description])
+  ];
+  const sources = [];
+  for (const [sourcePath, title] of sourceSpecs) {
+    try {
+      sources.push(await readAnaGuideSource(sourcePath, title));
+    } catch (error) {
+      sources.push({
+        path: sourcePath,
+        title,
+        fileName: path.basename(sourcePath),
+        bytes: 0,
+        updatedAt: null,
+        mtimeMs: 0,
+        text: '',
+        error: error.message
+      });
+    }
+  }
+  const loadedSources = sources.filter((source) => source.text);
+  const cacheKey = loadedSources
+    .map((source) => `${source.path}:${source.mtimeMs}:${source.bytes}`)
+    .join('|');
   if (
-    anaSequenceGuideCache.path === guidePath
-    && anaSequenceGuideCache.loadedAt >= stat.mtimeMs
+    anaSequenceGuideCache.cacheKey === cacheKey
     && anaSequenceGuideCache.text
   ) {
     return {
       path: guidePath,
       text: anaSequenceGuideCache.text,
-      bytes: stat.size,
-      updatedAt: stat.mtime.toISOString()
+      bytes: Buffer.byteLength(anaSequenceGuideCache.text, 'utf8'),
+      updatedAt: anaSequenceGuideCache.sources
+        .map((source) => source.updatedAt)
+        .filter(Boolean)
+        .sort()
+        .at(-1) || null,
+      sources: anaSequenceGuideCache.sources
     };
   }
 
-  const text = await fsp.readFile(guidePath, 'utf8');
+  const text = loadedSources.map((source) => [
+    `# Fonte: ${source.fileName}`,
+    `Descricao: ${source.title}`,
+    '',
+    source.text.trim()
+  ].join('\n')).join('\n\n---\n\n');
+  const sourceSummary = sources.map(({ text: _text, mtimeMs: _mtimeMs, ...source }) => ({
+    ...source,
+    loaded: Boolean(_text)
+  }));
   anaSequenceGuideCache = {
-    path: guidePath,
+    cacheKey,
     text,
-    loadedAt: stat.mtimeMs
+    sources: sourceSummary,
+    loadedAt: Date.now()
   };
   return {
     path: guidePath,
     text,
-    bytes: stat.size,
-    updatedAt: stat.mtime.toISOString()
+    bytes: Buffer.byteLength(text, 'utf8'),
+    updatedAt: sourceSummary
+      .map((source) => source.updatedAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1) || null,
+    sources: sourceSummary
   };
 }
 
 async function readAnaTrainingStatus() {
-  const trainingDir = path.resolve(process.cwd(), '..', 'TREINAMENTO_IA_NOVO_TEMPO');
+  const trainingDir = resolveAnaTrainingDir();
   const files = [
     [path.resolve(process.cwd(), '..', ANA_SEQUENCE_GUIDE_FILE), 'Sequência específica: material bíblico e presente físico'],
-    ['LEIA_PRIMEIRO.md', 'Contexto da operação'],
-    ['02_SYSTEM_PROMPT_ANA_V2.md', 'Persona, guardrails e régua de 21 dias'],
-    ['03_COPYS_ICEBREAKERS.md', 'Copys de primeiro contato e ramificações']
+    ...ANA_TRAINING_FILES
   ];
 
   const items = await Promise.all(files.map(async ([fileName, description]) => {
@@ -1133,6 +1208,59 @@ function conversationMessagesForPrompt(messages = []) {
   }));
 }
 
+function inferAnaConversationState(conversation) {
+  const messages = conversation?.messages || [];
+  const fullHistory = messages.map((message) => message.body).join(' ').toLowerCase();
+  const outboundHistory = messages
+    .filter((message) => message.direction === 'OUTBOUND')
+    .map((message) => message.body)
+    .join(' ')
+    .toLowerCase();
+  const inboundHistory = messages
+    .filter((message) => message.direction === 'INBOUND')
+    .map((message) => message.body)
+    .join(' ')
+    .toLowerCase();
+  const lastInbound = [...messages].reverse().find((message) => message.direction === 'INBOUND');
+  const lastOutbound = [...messages].reverse().find((message) => message.direction === 'OUTBOUND');
+  const address = addressFromConversation(conversation);
+
+  return {
+    initial_message_sent: /(material|escola biblica|escola bíblica|novo tempo)/i.test(outboundHistory),
+    material_confirmado: /(recebi|chegou|consegui acessar|sim, chegou|sim chegou)/i.test(inboundHistory)
+      ? 'sim'
+      : /(não recebi|nao recebi|não chegou|nao chegou|ainda não|ainda nao)/i.test(inboundHistory)
+        ? 'nao'
+        : 'desconhecido',
+    leu_material: /(li|olhei|gostei|dei uma olhada|chamou minha atenção|chamou minha atencao)/i.test(inboundHistory)
+      ? 'sim'
+      : /(não li|nao li|não olhei|nao olhei|ainda não li|ainda nao li)/i.test(inboundHistory)
+        ? 'nao'
+        : 'desconhecido',
+    interesse_continuar: /(quero|tenho interesse|pode mandar|manda|gostaria|sim)/i.test(inboundHistory)
+      ? 'sim'
+      : /(não quero|nao quero|sem interesse|parar|cancelar|remover)/i.test(inboundHistory)
+        ? 'nao'
+        : 'desconhecido',
+    convite_presente_enviado: /(presente|brinde|19 de setembro|dia 19)/i.test(outboundHistory),
+    aceita_presente: /(quero receber|pode entregar|aceito|gostaria de receber|pode passar|sim.*presente|sim.*brinde)/i.test(inboundHistory)
+      ? 'sim'
+      : /(não quero|nao quero|não posso|nao posso|não precisa|nao precisa)/i.test(inboundHistory)
+        ? 'nao'
+        : 'desconhecido',
+    endereco_cadastrado: address || null,
+    endereco_confirmado: /(endereço está certo|endereco esta certo|esse mesmo|está correto|esta correto|pode ser nesse)/i.test(inboundHistory)
+      ? 'sim'
+      : 'desconhecido',
+    representante_acionado: /(vou deixar registrado|equipe da novo tempo acompanhar|missionario conversar|missionário conversar)/i.test(outboundHistory),
+    pausado: /(parar|remover|cancelar|não quero|nao quero|sair)/i.test(inboundHistory),
+    ultima_pergunta_feita: lastOutbound?.body || null,
+    ultima_resposta_recebida_em: lastInbound?.createdAt || null,
+    proxima_acao: classifyAnaConversation(messages).action,
+    resumo_historico: compactText(fullHistory, 'Sem historico anterior.')
+  };
+}
+
 function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
   const name = conversation?.leadName || conversation?.lead?.name || '';
   const firstName = leadFirstName(name);
@@ -1148,6 +1276,7 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     endereco_cadastrado: address || null,
     prioridade: conversation?.leadPriority || conversation?.lead?.priority || null
   };
+  const state = inferAnaConversationState(conversation);
 
   return [
     'Você deve responder como a Ana, assistente virtual da Novo Tempo.',
@@ -1158,6 +1287,9 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     '',
     '=== DADOS DO LEAD ===',
     JSON.stringify(lead, null, 2),
+    '',
+    '=== ESTADO INFERIDO DA CONVERSA ===',
+    JSON.stringify(state, null, 2),
     '',
     '=== HISTÓRICO RECENTE DA CONVERSA ===',
     JSON.stringify(conversationMessagesForPrompt(conversation?.messages || []), null, 2),
@@ -1417,6 +1549,7 @@ async function maybeReplyWithAna(saved, inboundMessage) {
   const message = anaReply.message;
   const delayMs = anaReplyDelayMs(message, inboundMessage);
   const typing = await sendZproTypingIndicator(conversation?.phone || saved.conversation.phone);
+  const conversationState = inferAnaConversationState(conversation);
   await sleep(delayMs);
   let result;
   try {
@@ -1452,6 +1585,7 @@ async function maybeReplyWithAna(saved, inboundMessage) {
         typing,
         model: config.model,
         modelError: anaReply.error || null,
+        conversationState,
         failure: true,
         providerHttpStatus: error.providerStatus || error.status || null,
         attempts: error.providerAttempts || []
@@ -1485,6 +1619,7 @@ async function maybeReplyWithAna(saved, inboundMessage) {
       typing,
       model: config.model,
       modelError: anaReply.error || null,
+      conversationState,
       attempts: result.attempts || []
     }
   });
