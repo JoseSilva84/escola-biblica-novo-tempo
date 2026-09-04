@@ -8671,7 +8671,7 @@ function ConversationsView({ records = [] }) {
         <aside className={`${panelClass} whatsapp-sidebar flex h-full min-h-0 flex-col overflow-hidden p-4 max-2xl:h-[46rem]`}>
           <div className="flex items-center justify-between gap-3">
             <span className={labelClass}>Leads</span>
-            <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations()} type="button">Atualizar</button>
+            <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations(activePhoneRef.current || phoneSearch, { selectSearched: Boolean(activePhoneRef.current || phoneSearch) })} type="button">Atualizar</button>
           </div>
           <label className="relative mt-3 block shrink-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />

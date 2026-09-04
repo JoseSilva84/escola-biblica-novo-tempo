@@ -1394,12 +1394,46 @@ async function maybeReplyWithAna(saved, inboundMessage) {
   const delayMs = anaReplyDelayMs(message, inboundMessage);
   const typing = await sendZproTypingIndicator(conversation?.phone || saved.conversation.phone);
   await sleep(delayMs);
-  const result = await sendZproTextMessage({
-    phone: conversation?.phone || saved.conversation.phone,
-    message,
-    leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
-    templateId: 'ana-auto-reply'
-  });
+  let result;
+  try {
+    result = await sendZproTextMessage({
+      phone: conversation?.phone || saved.conversation.phone,
+      message,
+      leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
+      templateId: 'ana-auto-reply'
+    });
+  } catch (error) {
+    return recordWhatsAppMessage({
+      phone: conversation?.phone || saved.conversation.phone,
+      body: message,
+      direction: 'OUTBOUND',
+      senderType: 'AI',
+      senderName: 'Ana',
+      leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
+      leadName: conversation?.leadName || conversation?.lead?.name || null,
+      district: conversation?.district || conversation?.lead?.district?.name || null,
+      provider: 'zpro-baileys',
+      providerStatus: error.deliveryStatus || 'FAILED',
+      providerResponse: error.providerResponse || null,
+      occurredAt: new Date(),
+      metadata: {
+        assistant: 'Ana',
+        autoReply: true,
+        replyToMessageId: inboundMessage.id,
+        intent: detectAnaReplyIntent(inboundMessage.body),
+        source: anaReply.source,
+        guidePath: anaReply.guide?.path || null,
+        guideUpdatedAt: anaReply.guide?.updatedAt || null,
+        delayMs,
+        typing,
+        model: config.model,
+        modelError: anaReply.error || null,
+        failure: true,
+        providerHttpStatus: error.providerStatus || error.status || null,
+        attempts: error.providerAttempts || []
+      }
+    });
+  }
 
   return recordWhatsAppMessage({
     phone: result.phone,
