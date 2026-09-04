@@ -1042,7 +1042,7 @@ async function readAnaSequenceGuide() {
 async function readAnaTrainingStatus() {
   const trainingDir = resolveAnaTrainingDir();
   const files = [
-    [path.resolve(process.cwd(), '..', ANA_SEQUENCE_GUIDE_FILE), 'Sequência específica: material bíblico e presente físico'],
+    [resolveAnaSequenceGuidePath(), 'Sequência específica: material bíblico e presente físico'],
     ...ANA_TRAINING_FILES
   ];
 
