@@ -1069,6 +1069,21 @@ async function readAnaTrainingStatus() {
       };
     }
   }));
+  const sequenceItem = items[0];
+  const sourceItems = items.slice(1);
+  const sourceTrainingLoaded = sourceItems.length > 0 && sourceItems.every((item) => item.loaded);
+  if (sequenceItem && !sequenceItem.loaded && sourceTrainingLoaded) {
+    sequenceItem.loaded = true;
+    sequenceItem.generated = true;
+    sequenceItem.description = `${sequenceItem.description} (gerado pelos arquivos V3 carregados)`;
+    sequenceItem.path = resolveAnaSequenceGuidePath();
+    sequenceItem.bytes = sourceItems.reduce((total, item) => total + (item.bytes || 0), 0);
+    sequenceItem.updatedAt = sourceItems
+      .map((item) => item.updatedAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1) || null;
+  }
 
   return {
     loaded: items.every((item) => item.loaded),
