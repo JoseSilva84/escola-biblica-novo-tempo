@@ -7658,7 +7658,7 @@ function WhatsAppLeadPickerModal({
               selected={filters.recency}
             />
           </div> : null}
-          {advancedFiltersOpen ? <p className="text-[11px] font-semibold text-slate-500">Todos é o padrão. Ao escolher uma opção, os contatos são atualizados automaticamente.</p> : null}
+          {advancedFiltersOpen ? <p className="text-[11px] font-semibold text-slate-500">Todos é o padrão. Ao escolher uma opção, os contatos e a lista de transmissão são atualizados automaticamente.</p> : null}
           <button
             aria-expanded={advancedFiltersOpen}
             className="sticky bottom-0 z-20 mx-auto inline-flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-600 shadow-[0_8px_24px_rgba(15,23,42,0.16)] transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
@@ -7678,7 +7678,7 @@ function WhatsAppLeadPickerModal({
                 <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{selectedLeads.length} selecionados</span>
               </div>
               <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-                {selectedLeads.length ? `${selectedLeads.slice(0, 4).map((lead) => lead.name).join(', ')}${selectedLeads.length > 4 ? ` e mais ${selectedLeads.length - 4}` : ''}` : 'Marque manualmente os contatos que receberão esta transmissão.'}
+                {selectedLeads.length ? `${selectedLeads.slice(0, 4).map((lead) => lead.name).join(', ')}${selectedLeads.length > 4 ? ` e mais ${selectedLeads.length - 4}` : ''}` : 'A lista acompanha os filtros escolhidos.'}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -8617,6 +8617,11 @@ function ConversationsView({ records = [] }) {
     .map((lead) => lead._directoryLead || dashboardLeadToWhatsAppLead(lead)), [filteredContactLeadRecords]);
 
   const filteredContactLeads = useMemo(() => allFilteredContactLeads.slice(0, 100), [allFilteredContactLeads]);
+  useEffect(() => {
+    if (!leadPickerOpen || newContactMode) return;
+    setBroadcastSelectedLeads(allFilteredContactLeads);
+  }, [allFilteredContactLeads, leadPickerOpen, newContactMode]);
+
   const leadOptions = useMemo(
     () => records
       .filter((lead) => lead.t && phoneDigits(lead.tel))
