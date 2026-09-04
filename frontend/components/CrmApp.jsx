@@ -8043,6 +8043,19 @@ function ConversationsView({ records = [] }) {
     });
   }
 
+  function openConversationFromAlert(conversation) {
+    if (!conversation?.id) return;
+    setHiddenConversationIds((current) => {
+      const next = current.filter((id) => id !== conversation.id);
+      window.localStorage.setItem('whatsapp-hidden-conversations', JSON.stringify(next));
+      return next;
+    });
+    setConversationListSearch('');
+    setPhoneSearch(conversation.phone || '');
+    setSelectedId(conversation.id);
+    setConversationExpanded(true);
+  }
+
   async function loadLeadDirectory() {
     const fallbackDistricts = Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b));
     const fallbackLeads = records
@@ -8293,7 +8306,11 @@ function ConversationsView({ records = [] }) {
         && latestLastMessage.direction === 'INBOUND'
       ) {
         toast.success('Nova resposta recebida', {
-          description: latestLastMessage.body
+          description: latestLastMessage.body,
+          action: {
+            label: 'Abrir',
+            onClick: () => openConversationFromAlert(latestConversation)
+          }
         });
       }
     } catch {
@@ -8824,7 +8841,8 @@ function ConversationsView({ records = [] }) {
                     className="flex w-full items-center gap-3 p-4 pr-11 text-left"
                     onClick={() => {
                       setSelectedId(conversation.id);
-                      setPhoneSearch('');
+                      setPhoneSearch(conversation.phone || '');
+                      setConversationExpanded(true);
                     }}
                     type="button"
                   >

@@ -1230,8 +1230,14 @@ function isAffirmativeReply(value) {
   return /\b(sim|s|claro|pode|quero|aceito|gostaria|isso|correto|certo|esse mesmo|essa mesma|ta certo|tá certo|esta certo|está certo|confirmo|ok)\b/i.test(String(value || ''));
 }
 
+function looksLikeAddress(value) {
+  return /(rua|avenida|av\.|travessa|bairro|cep|n[ºo.]|numero|\d{2,})/i.test(String(value || ''));
+}
+
 function isNegativeReply(value) {
-  return /\b(não|nao|n|negativo|ainda não|ainda nao|não chegou|nao chegou|não recebi|nao recebi|nao quero|não quero|não pode|nao pode)\b/i.test(String(value || ''));
+  const text = String(value || '').trim();
+  if (/^n$/i.test(text)) return true;
+  return /\b(não|nao|negativo|ainda não|ainda nao|não chegou|nao chegou|não recebi|nao recebi|nao quero|não quero|não pode|nao pode|não posso|nao posso|não precisa|nao precisa)\b/i.test(text);
 }
 
 function pickUnusedAnaReply(variants = [], historyText = '') {
@@ -1372,7 +1378,8 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     'Não convide para o presente do dia 19 logo após a pessoa confirmar que recebeu o material.',
     'Antes de falar do presente, converse primeiro sobre o material: pergunte o que ela entendeu, quais pontos chamaram atenção e se gostaria de receber um próximo material semelhante.',
     'Somente depois dessas etapas fale que no sábado, 19 de setembro de 2026, à tarde, uma equipe da Novo Tempo entregará um material/brinde.',
-    'Se ela aceitar o presente e houver endereço cadastrado, confirme o endereço citado. Se não houver endereço, peça o endereço completo.'
+    'Se ela aceitar o presente e houver endereço cadastrado, confirme o endereço citado. Se não houver endereço, peça o endereço completo.',
+    'Quando a pessoa enviar o endereço completo, reconheça o endereço, agradeça e diga que passará para a equipe organizar a entrega com carinho. Não trate endereço como resposta negativa.'
   ].join('\n');
 }
 
@@ -1583,7 +1590,7 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     && !alreadyConfirmedDelivery
     && !isAffirmativeReply(inboundText)
     && !isNegativeReply(inboundText)
-    && /(rua|avenida|av\.|travessa|bairro|cep|n[ºo.]|numero|\d{2,})/i.test(inboundText);
+    && looksLikeAddress(inboundText);
 
   if (intent === 'optout') {
     return `Tudo bem${anaNameSuffix(name)}, sem problema nenhum. Vou respeitar seu pedido e encerrar o contato por aqui. Deus te abençoe! 🙏`;
@@ -1601,7 +1608,7 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     return `Obrigado por avisar${anaNameSuffix(name)}. Para eu registrar certinho a entrega do presente no dia 19 de setembro de 2026, você pode me enviar seu endereço completo atual?`;
   }
   if (sentAddress) {
-    return `Perfeito${anaNameSuffix(name)}. Vou registrar esse endereço para a entrega do material especial.\n\nNo sábado, dia 19 de setembro de 2026, pela parte da tarde, você poderá receber o representante da Novo Tempo?`;
+    return `Perfeito${anaNameSuffix(name)}, recebi seu endereço. Muito obrigado por enviar.\n\nVou deixar registrado e passar para a equipe da Novo Tempo organizar essa entrega com carinho. No sábado, dia 19 de setembro de 2026, pela parte da tarde, o representante levará esse material especial até você.`;
   }
   if (acceptedGift) {
     if (address) {
@@ -2165,6 +2172,16 @@ function zproTicketDate(ticket = {}) {
   )) || new Date();
 }
 
+function stableZproMessageId(ticket = {}, message = {}) {
+  const rawId = providerMessageId(message) || providerMessageId(ticket);
+  if (rawId) return rawId;
+  const ticketId = ticket.id || ticket.ticketId || ticket.uuid || ticket.protocol || zproTicketPhone(ticket);
+  const dateValue = firstValue(message.createdAt, message.timestamp, message.messageTimestamp, ticket.updatedAt, ticket.lastMessageAt, ticket.createdAt);
+  const direction = message.fromMe || ticket.fromMe ? 'out' : 'in';
+  const body = compactText(readMessageText(message) || zproTicketLastText(ticket), '').slice(0, 60);
+  return `zpro-sync:${ticketId || 'ticket'}:${dateValue || 'date'}:${direction}:${body}`;
+}
+
 async function syncZproConversations({ statuses = ['open', 'pending', 'closed'], limit = 120 } = {}) {
   const listPath = String(process.env.ZPRO_LIST_TICKETS_PATH || '/v2/api/external/{apiId}/listTickets').trim();
   const normalizedStatuses = Array.from(new Set(statuses.map((status) => String(status || '').trim()).filter(Boolean)));
@@ -2219,7 +2236,7 @@ async function syncZproConversations({ statuses = ['open', 'pending', 'closed'],
           senderName: fromMe ? 'WhatsApp' : zproTicketName(ticket) || null,
           provider: 'zpro-baileys',
           providerStatus: 'SYNCED',
-          providerMessageId: providerMessageId(ticket.lastMessage || ticket.message || ticket),
+          providerMessageId: stableZproMessageId(ticket, ticket.lastMessage || ticket.message || ticket),
           occurredAt,
           metadata: {
             syncedFromZpro: true,
