@@ -1247,6 +1247,10 @@ function pickUnusedAnaReply(variants = [], historyText = '') {
   }) || variants[0] || '';
 }
 
+function anaHistoryIncludes(historyText, pattern) {
+  return pattern.test(String(historyText || '').toLowerCase());
+}
+
 function inferLeadStudyTheme(lead) {
   const metadata = lead?.metadata && typeof lead.metadata === 'object' ? lead.metadata : {};
   return lead?.studyType
@@ -1365,7 +1369,10 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     'Não use listas.',
     'Faça no máximo uma pergunta principal.',
     'Se não houver nome confiável, não invente nome e não use "Oi" como nome.',
-    'Respeite o roteiro do presente físico em 19 de setembro de 2026 somente quando houver abertura na conversa.'
+    'Não convide para o presente do dia 19 logo após a pessoa confirmar que recebeu o material.',
+    'Antes de falar do presente, converse primeiro sobre o material: pergunte o que ela entendeu, quais pontos chamaram atenção e se gostaria de receber um próximo material semelhante.',
+    'Somente depois dessas etapas fale que no sábado, 19 de setembro de 2026, à tarde, uma equipe da Novo Tempo entregará um material/brinde.',
+    'Se ela aceitar o presente e houver endereço cadastrado, confirme o endereço citado. Se não houver endereço, peça o endereço completo.'
   ].join('\n');
 }
 
@@ -1428,6 +1435,12 @@ function validateAnaReply(message, { conversation, inboundMessage }) {
   const alreadyAnsweredMaterial = /(recebi|chegou|chegou sim|material chegou)/i.test(history);
   const repeatsArrivalQuestion = /(material chegou|chegou até aí|chegou ate ai|chegou a receber|receber ou acessar)/i.test(clean);
   if (alreadyAnsweredMaterial && repeatsArrivalQuestion) clean = fallback;
+
+  const askedUnderstanding = anaHistoryIncludes(history, /(o que você entendeu|o que voce entendeu|pontos importantes|chamou mais sua atenção|chamou mais sua atencao|conseguiu dar uma olhada|já conseguiu começar|ja conseguiu comecar)/i);
+  const askedNextMaterial = anaHistoryIncludes(history, /(próximo material|proximo material|outro material|material semelhante|continuar recebendo|continuar esse estudo)/i);
+  const giftTooEarly = /(19 de setembro|dia 19|presente|brinde|entrega especial)/i.test(clean)
+    && (!askedUnderstanding || !askedNextMaterial);
+  if (giftTooEarly) clean = fallback;
 
   const normalizedClean = clean.toLowerCase().replace(/\s+/g, ' ').trim();
   const repeated = (conversation?.messages || []).some((item) => {
@@ -1556,12 +1569,21 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
   const intent = detectAnaReplyIntent(inboundMessage?.body);
   const fullHistory = (conversation?.messages || []).map((message) => message.body).join(' ').toLowerCase();
   const alreadyAskedMaterialRead = /(dar uma olhada|chamou mais sua atenção|chamou mais sua atencao)/i.test(fullHistory);
+  const alreadyAskedUnderstanding = /(o que você entendeu|o que voce entendeu|pontos importantes|chamou mais sua atenção|chamou mais sua atencao|qual parte fez mais sentido|já conseguiu começar|ja conseguiu comecar)/i.test(fullHistory);
+  const alreadyAskedNextMaterial = /(próximo material|proximo material|outro material|material semelhante|continuar recebendo|continuar esse estudo)/i.test(fullHistory);
   const alreadyOfferedGift = /(presente físico|presente fisico|19 de setembro)/i.test(fullHistory);
   const alreadyAskedAddress = /(endereço em nossos registros|endereco em nossos registros|esse ainda é o melhor endereço|esse ainda e o melhor endereco|o seu endereço é|o seu endereco e)/i.test(fullHistory);
   const alreadyConfirmedDelivery = /(entrega no dia 19 de setembro|entregar o presente em mãos|entregar o presente em maos|representantes para esse fim|receber os representantes)/i.test(fullHistory);
+  const alreadyAskedCanReceive = /(você poderá receber os representantes|voce podera receber os representantes|você poderá receber esse material|voce podera receber esse material|poderá receber esse material|podera receber esse material)/i.test(fullHistory);
   const acceptedGift = alreadyOfferedGift && !alreadyAskedAddress && (isAffirmativeReply(inboundText) || /(quero receber|pode entregar|aceito|gostaria de receber|sim.*presente|sim.*brinde)/i.test(inboundText));
   const confirmedAddress = alreadyAskedAddress && !alreadyConfirmedDelivery && isAffirmativeReply(inboundText);
   const deniedAddress = alreadyAskedAddress && !alreadyConfirmedDelivery && isNegativeReply(inboundText);
+  const confirmedVisit = alreadyAskedCanReceive && isAffirmativeReply(inboundText);
+  const sentAddress = alreadyAskedAddress
+    && !alreadyConfirmedDelivery
+    && !isAffirmativeReply(inboundText)
+    && !isNegativeReply(inboundText)
+    && /(rua|avenida|av\.|travessa|bairro|cep|n[ºo.]|numero|\d{2,})/i.test(inboundText);
 
   if (intent === 'optout') {
     return `Tudo bem${anaNameSuffix(name)}, sem problema nenhum. Vou respeitar seu pedido e encerrar o contato por aqui. Deus te abençoe! 🙏`;
@@ -1569,17 +1591,43 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
   if (intent === 'human') {
     return `${anaNameText(name)}obrigada por me contar. Esse assunto merece uma atenção mais cuidadosa, então vou deixar registrado para alguém da equipe Novo Tempo acompanhar com carinho.`;
   }
+  if (confirmedVisit) {
+    return `Muito obrigado${anaNameSuffix(name)}. Então fica combinado: no sábado, dia 19 de setembro de 2026, pela parte da tarde, um representante da equipe Novo Tempo irá até você para entregar esse material especial em suas mãos.`;
+  }
   if (confirmedAddress) {
     return `Perfeito${anaNameSuffix(name)}. Então vou deixar combinado: no dia 19 de setembro de 2026, pela parte da tarde, um representante da Novo Tempo levará o presente até você.\n\nVocê poderá receber os representantes nesse horário?`;
   }
   if (deniedAddress) {
     return `Obrigado por avisar${anaNameSuffix(name)}. Para eu registrar certinho a entrega do presente no dia 19 de setembro de 2026, você pode me enviar seu endereço completo atual?`;
   }
+  if (sentAddress) {
+    return `Perfeito${anaNameSuffix(name)}. Vou registrar esse endereço para a entrega do material especial.\n\nNo sábado, dia 19 de setembro de 2026, pela parte da tarde, você poderá receber o representante da Novo Tempo?`;
+  }
   if (acceptedGift) {
     if (address) {
       return `Perfeito${anaNameSuffix(name)}. Encontrei este endereço em nossos registros: ${address}\n\nEsse ainda é o melhor endereço para você receber o presente?`;
     }
     return `Que bom${anaNameSuffix(name)}. Para organizar a entrega do presente no dia 19 de setembro de 2026, você pode me enviar seu endereço atual completo?`;
+  }
+  if (alreadyAskedUnderstanding && !alreadyAskedNextMaterial && !isNegativeReply(inboundText)) {
+    return pickUnusedAnaReply([
+      `Obrigado por compartilhar${anaNameSuffix(name)}. É muito bom saber como você está acompanhando.\n\nVocê gostaria de receber um próximo material semelhante para continuar esse estudo?`,
+      `Entendi${anaNameSuffix(name)}. Fico feliz que você já teve contato com o conteúdo.\n\nVocê gostaria que a Novo Tempo te enviasse outro material nessa mesma linha?`,
+      `Que bom${anaNameSuffix(name)}. A ideia é caminhar com você aos poucos.\n\nVocê gostaria de continuar recebendo orientação e materiais da Escola Bíblica Novo Tempo?`
+    ], fullHistory);
+  }
+  if (alreadyAskedNextMaterial && !alreadyOfferedGift) {
+    if (isNegativeReply(inboundText)) {
+      return `Tudo bem${anaNameSuffix(name)}. Vou deixar seu retorno registrado com carinho para a equipe da Novo Tempo.`;
+    }
+    return pickUnusedAnaReply([
+      `Que bom que você deseja continuar${anaNameSuffix(name)}. Olha, no sábado, dia 19 de setembro de 2026, pela parte da tarde, uma equipe da Novo Tempo vai entregar um material especial, um brinde, para quem está acompanhando a Escola Bíblica.\n\nVocê poderá receber esse material?`,
+      `${anaNameText(name)}fico feliz em saber disso. No sábado, 19 de setembro de 2026, à tarde, a Novo Tempo terá uma equipe fazendo uma entrega especial de um material/brinde.\n\nVocê poderá receber?`,
+      `Perfeito${anaNameSuffix(name)}. Então posso te contar uma coisa: no sábado, dia 19 de setembro de 2026, pela parte da tarde, representantes da Novo Tempo vão entregar um presente para apoiar esse acompanhamento.\n\nVocê poderá receber esse material?`
+    ], fullHistory);
+  }
+  if (alreadyOfferedGift && !alreadyAskedAddress && isNegativeReply(inboundText)) {
+    return `Tudo bem${anaNameSuffix(name)}, sem problema. Vou deixar registrado que você não poderá receber essa entrega agora.`;
   }
   if (intent === 'not_received') {
     return pickUnusedAnaReply([
@@ -1592,18 +1640,25 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     return `Sem problema${anaNameSuffix(name)}. Esse contato é sobre ${theme}, que aparece nos registros da Escola Bíblica Novo Tempo.\n\nVocê gostaria que eu te ajudasse a retomar esse estudo?`;
   }
   if (intent === 'received') {
-    if (!alreadyAskedMaterialRead) {
+    if (!alreadyAskedMaterialRead && !alreadyAskedUnderstanding) {
       return pickUnusedAnaReply([
-        `Que bom saber${anaNameSuffix(name)}. Fico feliz que o material chegou certinho 😊\n\nVocê conseguiu dar uma olhada nele?`,
-        `Que alegria${anaNameSuffix(name)}. Fico feliz que o material chegou.\n\nTeve alguma parte que chamou mais sua atenção?`,
-        `Ótimo${anaNameSuffix(name)}. Esse material foi preparado com muito carinho.\n\nVocê já conseguiu começar a acompanhar o estudo?`
+        `Que bom saber${anaNameSuffix(name)}. Fico feliz que o material chegou certinho 😊\n\nO que você conseguiu entender dele até agora?`,
+        `Que alegria${anaNameSuffix(name)}. Fico feliz que o material chegou.\n\nQual ponto desse material chamou mais sua atenção?`,
+        `Ótimo${anaNameSuffix(name)}. Esse material foi preparado com muito carinho.\n\nTeve alguma parte que fez mais sentido para você?`
+      ], fullHistory);
+    }
+    if (!alreadyAskedNextMaterial) {
+      return pickUnusedAnaReply([
+        `Obrigado por compartilhar${anaNameSuffix(name)}. É muito bom saber como você está acompanhando.\n\nVocê gostaria de receber um próximo material semelhante para continuar esse estudo?`,
+        `Entendi${anaNameSuffix(name)}. Fico feliz que você já teve contato com o conteúdo.\n\nVocê gostaria que a Novo Tempo te enviasse outro material nessa mesma linha?`,
+        `Que bom${anaNameSuffix(name)}. A ideia é caminhar com você aos poucos.\n\nVocê gostaria de continuar recebendo orientação e materiais da Escola Bíblica Novo Tempo?`
       ], fullHistory);
     }
     if (!alreadyOfferedGift) {
       return pickUnusedAnaReply([
-        `${anaNameText(name)}fico muito feliz com seu interesse. Além desse acompanhamento, a Novo Tempo está preparando uma entrega especial no dia 19 de setembro de 2026.\n\nVocê gostaria de receber esse presente em sua residência?`,
-        `Que bom que você está acompanhando${anaNameSuffix(name)}. A Novo Tempo também está organizando uma entrega especial para o dia 19 de setembro de 2026, pensada para quem pediu esse material.\n\nVocê gostaria de receber esse presente em casa?`,
-        `${anaNameText(name)}obrigada por compartilhar. Para continuar esse cuidado, a Novo Tempo preparou um presente especial que será entregue no dia 19 de setembro de 2026.\n\nVocê gostaria de receber?`
+        `Que bom que você deseja continuar${anaNameSuffix(name)}. Olha, no sábado, dia 19 de setembro de 2026, pela parte da tarde, uma equipe da Novo Tempo vai entregar um material especial, um brinde, para quem está acompanhando a Escola Bíblica.\n\nVocê poderá receber esse material?`,
+        `${anaNameText(name)}fico feliz em saber disso. No sábado, 19 de setembro de 2026, à tarde, a Novo Tempo terá uma equipe fazendo uma entrega especial de um material/brinde.\n\nVocê poderá receber?`,
+        `Perfeito${anaNameSuffix(name)}. Então posso te contar uma coisa: no sábado, dia 19 de setembro de 2026, pela parte da tarde, representantes da Novo Tempo vão entregar um presente para apoiar esse acompanhamento.\n\nVocê poderá receber esse material?`
       ], fullHistory);
     }
     return `Perfeito${anaNameSuffix(name)}. Vou deixar isso registrado para a equipe da Novo Tempo acompanhar com carinho.`;

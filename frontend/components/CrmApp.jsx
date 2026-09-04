@@ -6037,6 +6037,7 @@ function AdminGeneralView({
   const [batchLoading, setBatchLoading] = useState(false);
   const [lastBatch, setLastBatch] = useState(null);
   const [whatsappConversations, setWhatsappConversations] = useState([]);
+  const [whatsappSyncing, setWhatsappSyncing] = useState(false);
   const [selectedInboxId, setSelectedInboxId] = useState(null);
   const [conversationModalOpen, setConversationModalOpen] = useState(false);
   const [selectedAdminLead, setSelectedAdminLead] = useState(null);
@@ -6065,15 +6066,14 @@ function AdminGeneralView({
       .catch(() => {
         if (active) setProvider({ configured: false, provider: 'zpro-baileys' });
       });
-    apiFetch('/api/whatsapp/conversations?limit=50')
-      .then((response) => response.ok ? response.json() : null)
-      .then((payload) => {
-        if (active && payload?.conversations) setWhatsappConversations(payload.conversations);
-      })
-      .catch(() => {
-        if (active) setWhatsappConversations([]);
-      });
-    return () => { active = false; };
+    refreshWhatsappConversations({ sync: true, silent: true, active: () => active });
+    const timer = window.setInterval(() => {
+      refreshWhatsappConversations({ sync: true, silent: true, active: () => active });
+    }, 9000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [section]);
 
   const adminSections = [
@@ -6310,14 +6310,25 @@ function AdminGeneralView({
     URL.revokeObjectURL(url);
   }
 
-  async function refreshWhatsappConversations() {
+  async function refreshWhatsappConversations(options = {}) {
+    const { sync = false, silent = false, active = () => true } = options;
+    if (sync && !silent) setWhatsappSyncing(true);
     try {
+      if (sync) {
+        await apiFetch('/api/whatsapp/sync-zpro', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: 120, statuses: ['open', 'pending', 'closed'] })
+        }).catch(() => null);
+      }
       const response = await apiFetch('/api/whatsapp/conversations?limit=50');
       if (!response.ok) return;
       const payload = await response.json();
-      setWhatsappConversations(payload.conversations || []);
+      if (active()) setWhatsappConversations(payload.conversations || []);
     } catch {
-      setWhatsappConversations([]);
+      if (active()) setWhatsappConversations([]);
+    } finally {
+      if (sync && !silent) setWhatsappSyncing(false);
     }
   }
 
@@ -6404,7 +6415,7 @@ function AdminGeneralView({
         throw new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
       }
       setLastSend(payload);
-      await refreshWhatsappConversations();
+      await refreshWhatsappConversations({ sync: true });
       toast.success('Mensagem aceita pelo provedor', {
         description: `Solicitação aceita para ${payload.phone}; aguardando confirmação de entrega.`
       });
@@ -6465,7 +6476,7 @@ function AdminGeneralView({
         throw new Error(payload.message || 'Nao foi possivel enviar o lote.');
       }
       setLastBatch(payload);
-      await refreshWhatsappConversations();
+      await refreshWhatsappConversations({ sync: true });
       toast.success('Lote enviado', {
         description: `${payload.sent || 0} mensagens aceitas pelo provedor.`
       });
@@ -6686,13 +6697,12 @@ function AdminGeneralView({
               </div>
               <button
                 className={primaryButtonClass}
-                onClick={() => toast.success('Operação WhatsApp revisada', {
-                  description: 'A aba agora mostra apenas dados reais carregados ou envios feitos na sessão.'
-                })}
+                disabled={whatsappSyncing}
+                onClick={() => refreshWhatsappConversations({ sync: true })}
                 type="button"
               >
-                <MessageCircle size={18} />
-                Revisar WhatsApp
+                <RefreshCw size={18} />
+                {whatsappSyncing ? 'Atualizando...' : 'Atualizar Z-PRO'}
               </button>
             </div>
             <div className="mt-6 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
@@ -8007,6 +8017,7 @@ function ConversationsView({ records = [] }) {
   const activePhoneRef = useRef('');
   const lastSeenMessageIdRef = useRef(null);
   const conversationRefreshInFlightRef = useRef(false);
+  const zproSyncInFlightRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -8295,6 +8306,8 @@ function ConversationsView({ records = [] }) {
 
   async function syncZproConversations(options = {}) {
     const { silent = false } = options;
+    if (zproSyncInFlightRef.current) return null;
+    zproSyncInFlightRef.current = true;
     if (!silent) setZproSyncing(true);
     try {
       const response = await apiFetch('/api/whatsapp/sync-zpro', {
@@ -8314,6 +8327,7 @@ function ConversationsView({ records = [] }) {
       if (!silent) toast.error('Falha ao atualizar Z-PRO', { description: error.message });
       return null;
     } finally {
+      zproSyncInFlightRef.current = false;
       if (!silent) setZproSyncing(false);
     }
   }
@@ -8356,6 +8370,19 @@ function ConversationsView({ records = [] }) {
     const interval = window.setInterval(() => loadBroadcastAnalytics({ silent: true }), 15000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(async () => {
+      await syncZproConversations({ silent: true });
+      await loadConversations(phoneSearch, {
+        silent: true,
+        notify: true,
+        selectSearched: Boolean(phoneDigits(phoneSearch)),
+        selectLatestOnNew: !phoneDigits(phoneSearch)
+      });
+    }, 9000);
+    return () => window.clearInterval(interval);
+  }, [phoneSearch]);
 
   const contactFilterRecords = useMemo(() => {
     const byPhone = new Map();
