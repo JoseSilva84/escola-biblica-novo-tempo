@@ -2787,12 +2787,18 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
   const numericLeadId = externalLeadId(request.query?.leadId);
   const limit = Math.min(Math.max(Number(request.query?.limit) || 50, 1), 200);
 
-  const where = {};
+  let where = {};
   if (conversationId) {
     where.id = conversationId;
   } else {
-    if (phone) where.phone = phone;
-    if (numericLeadId) where.externalLeadId = numericLeadId;
+    const filters = [];
+    if (phone) {
+      const suffix = phone.slice(-10);
+      filters.push({ phone });
+      if (suffix) filters.push({ phone: { endsWith: suffix } });
+    }
+    if (numericLeadId) filters.push({ externalLeadId: numericLeadId });
+    where = filters.length > 1 ? { OR: filters } : filters[0] || {};
   }
 
   const conversations = await prisma.whatsAppConversation.findMany({
