@@ -7965,6 +7965,64 @@ function mergeConversationSnapshots(serverConversations = [], localConversations
     .sort((left, right) => new Date(right.updatedAt || right.createdAt || 0) - new Date(left.updatedAt || left.createdAt || 0));
 }
 
+function anaSummaryToConversationSnapshot(summary) {
+  if (!summary?.id && !summary?.phone) return null;
+  const now = new Date().toISOString();
+  const phone = phoneDigits(summary.phone);
+  const rawMessages = Array.isArray(summary.messages) ? summary.messages : [];
+  const messages = rawMessages.length
+    ? rawMessages.map((message, index) => ({
+      id: message.id || `ana-snapshot-${summary.id || phone}-${index}`,
+      conversationId: message.conversationId || summary.id || `ana-snapshot-${phone}`,
+      direction: message.direction || (message.senderType === 'LEAD' ? 'INBOUND' : 'OUTBOUND'),
+      senderType: message.senderType || (message.direction === 'INBOUND' ? 'LEAD' : 'AI'),
+      senderName: message.senderName || (message.direction === 'INBOUND' ? summary.leadName : 'Ana'),
+      body: message.body || '',
+      provider: message.provider || 'ana-summary',
+      providerStatus: message.providerStatus || 'SUMMARY',
+      metadata: message.metadata || {},
+      sentAt: message.sentAt || null,
+      receivedAt: message.receivedAt || null,
+      createdAt: message.createdAt || summary.lastMessageAt || now
+    })).filter((message) => message.body)
+    : [
+      summary.lastLeadMessage && summary.lastLeadMessage !== 'Sem mensagem registrada.' ? {
+        id: `ana-snapshot-${summary.id || phone}-lead`,
+        conversationId: summary.id || `ana-snapshot-${phone}`,
+        direction: 'INBOUND',
+        senderType: 'LEAD',
+        senderName: summary.leadName,
+        body: summary.lastLeadMessage,
+        provider: 'ana-summary',
+        providerStatus: 'SUMMARY',
+        createdAt: summary.lastMessageAt || now
+      } : null,
+      summary.lastAnaMessage && summary.lastAnaMessage !== 'Sem mensagem registrada.' ? {
+        id: `ana-snapshot-${summary.id || phone}-ana`,
+        conversationId: summary.id || `ana-snapshot-${phone}`,
+        direction: 'OUTBOUND',
+        senderType: 'AI',
+        senderName: 'Ana',
+        body: summary.lastAnaMessage,
+        provider: 'ana-summary',
+        providerStatus: 'SUMMARY',
+        createdAt: summary.lastMessageAt || now
+      } : null
+    ].filter(Boolean);
+
+  return {
+    id: summary.id || `ana-snapshot-${phone}`,
+    phone,
+    leadName: summary.leadName || null,
+    district: summary.district || null,
+    leadPriority: summary.priority || null,
+    status: summary.status || 'ABERTA',
+    updatedAt: summary.lastMessageAt || now,
+    createdAt: summary.lastMessageAt || now,
+    messages
+  };
+}
+
 function ConversationsView({ records = [] }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -8226,7 +8284,7 @@ function ConversationsView({ records = [] }) {
   }
 
   async function loadConversations(phone = '', options = {}) {
-    const { silent = false, notify = false, selectSearched = false, selectLatestOnNew = false } = options;
+    const { silent = false, notify = false, selectSearched = false, selectLatestOnNew = false, conversationId = '', seedConversation = null } = options;
     if (silent && conversationRefreshInFlightRef.current) return;
     conversationRefreshInFlightRef.current = true;
     if (!silent) setLoading(true);
@@ -8240,6 +8298,7 @@ function ConversationsView({ records = [] }) {
         limit: '1',
         _: String(Date.now())
       });
+      if (conversationId) searchedParams.set('id', conversationId);
       if (query) searchedParams.set('phone', query);
 
       const requestOptions = {
@@ -8248,19 +8307,21 @@ function ConversationsView({ records = [] }) {
       };
       const [recentResponse, searchedResponse] = await Promise.all([
         apiFetch(`/api/whatsapp/conversations?${recentParams.toString()}`, requestOptions),
-        query ? apiFetch(`/api/whatsapp/conversations?${searchedParams.toString()}`, requestOptions) : Promise.resolve(null)
+        (query || conversationId) ? apiFetch(`/api/whatsapp/conversations?${searchedParams.toString()}`, requestOptions) : Promise.resolve(null)
       ]);
       const recentPayload = recentResponse.ok ? await recentResponse.json() : { conversations: [] };
       const searchedPayload = searchedResponse?.ok ? await searchedResponse.json() : { conversations: [] };
       const byId = new Map();
-      [...(searchedPayload.conversations || []), ...(recentPayload.conversations || [])].forEach((conversation) => {
+      [seedConversation, ...(searchedPayload.conversations || []), ...(recentPayload.conversations || [])].filter(Boolean).forEach((conversation) => {
         byId.set(conversation.id, conversation);
       });
       const serverConversations = Array.from(byId.values());
       const nextConversations = mergeConversationSnapshots(serverConversations, conversations, query).slice(0, query ? 51 : 50);
-      const searchedConversation = query
-        ? nextConversations.find((conversation) => phoneDigits(conversation.phone).endsWith(query.slice(-10)))
-        : null;
+      const searchedConversation = conversationId
+        ? nextConversations.find((conversation) => conversation.id === conversationId)
+        : query
+          ? nextConversations.find((conversation) => phoneDigits(conversation.phone).endsWith(query.slice(-10)))
+          : null;
       const latestConversation = nextConversations[0] || null;
       const latestMessages = latestConversation?.messages || [];
       const latestLastMessage = latestMessages[latestMessages.length - 1] || null;
@@ -8379,13 +8440,39 @@ function ConversationsView({ records = [] }) {
   }
 
   useEffect(() => {
-    const requestedPhone = phoneDigits(window.localStorage.getItem('open-whatsapp-phone') || '');
-    if (requestedPhone) {
+    let openRequest = null;
+    try {
+      openRequest = JSON.parse(window.localStorage.getItem('open-whatsapp-request') || 'null');
+    } catch {
+      openRequest = null;
+    }
+    const legacyPhone = window.localStorage.getItem('open-whatsapp-phone') || '';
+    const requestedPhone = phoneDigits(openRequest?.phone || legacyPhone || '');
+    const requestedId = String(openRequest?.conversationId || '').trim();
+    const seedConversation = anaSummaryToConversationSnapshot(openRequest?.snapshot);
+    window.localStorage.removeItem('open-whatsapp-request');
+    window.localStorage.removeItem('open-whatsapp-phone');
+    if (requestedPhone || requestedId) {
       window.localStorage.removeItem('open-whatsapp-phone');
       setPhoneSearch(requestedPhone);
       setConversationListSearch(requestedPhone);
+      if (requestedId) {
+        setHiddenConversationIds((current) => {
+          const next = current.filter((id) => id !== requestedId);
+          window.localStorage.setItem('whatsapp-hidden-conversations', JSON.stringify(next));
+          return next;
+        });
+      }
       setConversationExpanded(true);
-      syncZproConversations({ silent: true }).finally(() => loadConversations(requestedPhone, { selectSearched: true }));
+      if (seedConversation) {
+        setConversations((current) => mergeConversationSnapshots([seedConversation], current, requestedPhone));
+        setSelectedId(seedConversation.id);
+      }
+      syncZproConversations({ silent: true }).finally(() => loadConversations(requestedPhone, {
+        conversationId: requestedId || seedConversation?.id || '',
+        seedConversation,
+        selectSearched: true
+      }));
     } else {
       syncZproConversations({ silent: true }).finally(() => loadConversations());
     }
@@ -9161,7 +9248,11 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
       toast.error('Conversa sem telefone', { description: 'Não foi possível abrir este atendimento.' });
       return;
     }
-    window.localStorage.setItem('open-whatsapp-phone', phone);
+    window.localStorage.setItem('open-whatsapp-request', JSON.stringify({
+      phone,
+      conversationId: conversation?.id || '',
+      snapshot: conversation
+    }));
     onNavigate?.('conversations');
   }
 

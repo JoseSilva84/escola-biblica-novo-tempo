@@ -1190,7 +1190,21 @@ function summarizeAnaConversation(conversation) {
     lastLeadMessage: compactText(lastInbound?.body),
     lastAnaMessage: compactText(lastAi?.body || outboundMessages[outboundMessages.length - 1]?.body),
     summary: `${classification.label}: ${compactText(lastInbound?.body || lastMessage?.body)}`,
-    classification
+    classification,
+    messages: messages.map((message) => ({
+      id: message.id,
+      conversationId: message.conversationId,
+      direction: message.direction,
+      senderType: message.senderType,
+      senderName: message.senderName,
+      body: message.body,
+      provider: message.provider,
+      providerStatus: message.providerStatus,
+      metadata: message.metadata,
+      sentAt: message.sentAt,
+      receivedAt: message.receivedAt,
+      createdAt: message.createdAt
+    }))
   };
 }
 
@@ -2769,12 +2783,17 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
   }
 
   const phone = normalizePhone(request.query?.phone);
+  const conversationId = String(request.query?.id || '').trim();
   const numericLeadId = externalLeadId(request.query?.leadId);
   const limit = Math.min(Math.max(Number(request.query?.limit) || 50, 1), 200);
 
   const where = {};
-  if (phone) where.phone = phone;
-  if (numericLeadId) where.externalLeadId = numericLeadId;
+  if (conversationId) {
+    where.id = conversationId;
+  } else {
+    if (phone) where.phone = phone;
+    if (numericLeadId) where.externalLeadId = numericLeadId;
+  }
 
   const conversations = await prisma.whatsAppConversation.findMany({
     where,
