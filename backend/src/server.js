@@ -46,9 +46,11 @@ allowedOrigins.add('http://localhost:3000');
 function webhookAllowed(request) {
   const secret = String(process.env.ZPRO_WEBHOOK_SECRET || '').trim();
   if (!secret && process.env.NODE_ENV !== 'production') return true;
+  const authorization = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
   const received = String(
     request.headers['x-webhook-secret']
     || request.headers['x-zpro-webhook-secret']
+    || authorization
     || request.query?.token
     || ''
   ).trim();
@@ -470,6 +472,15 @@ function firstValue(...values) {
   return values.find((value) => value !== undefined && value !== null && String(value).trim() !== '');
 }
 
+function cleanWhatsAppJid(value) {
+  return String(value || '')
+    .trim()
+    .replace(/@s\.whatsapp\.net$/i, '')
+    .replace(/@c\.us$/i, '')
+    .replace(/@g\.us$/i, '')
+    .replace(/@lid$/i, '');
+}
+
 function readMessageText(data = {}) {
   const message = data.message || data.messages?.[0]?.message || {};
   return firstValue(
@@ -541,7 +552,7 @@ function readZproMessage(payload = {}) {
     key.remoteJid,
     key.participant
   ) || '';
-  const phone = String(rawPhone).replace(/@s\.whatsapp\.net$/i, '').replace(/\D/g, '');
+  const phone = cleanWhatsAppJid(rawPhone).replace(/\D/g, '');
   const text = firstValue(
     readMessageText(data),
     readMessageText(payload.msg),
@@ -808,7 +819,7 @@ async function recordWhatsAppMessage({
 }
 
 function normalizePhone(value) {
-  const raw = String(value || '').trim().replace(/@s\.whatsapp\.net$/i, '');
+  const raw = cleanWhatsAppJid(value);
   if (!raw) return '';
 
   // Aceita apenas a pontuacao comum de um unico telefone. Campos com texto,
@@ -898,10 +909,14 @@ function zproConfig() {
 
 function anaConfig() {
   const apiKey = normalizeApiToken(process.env.ASSISTENTE_ANA || process.env.ANA_API_KEY);
+  const autoReplyEnabled = String(process.env.ASSISTENTE_ANA_AUTO_REPLY || 'true').toLowerCase() !== 'false';
+  const modelEnabled = String(process.env.ASSISTENTE_ANA_USE_MODEL || 'true').toLowerCase() !== 'false';
   return {
     name: 'Ana',
     provider: 'openai-responses',
     configured: Boolean(apiKey),
+    autoReplyEnabled,
+    modelEnabled,
     model: process.env.ANA_MODEL || 'gpt-4.1-mini',
     apiKey: tokenDiagnostic(apiKey)
   };
@@ -1230,13 +1245,21 @@ function validateAnaReply(message, { conversation, inboundMessage }) {
 }
 
 async function buildAnaReply({ conversation, inboundMessage, config }) {
-  const guide = await readAnaSequenceGuide();
+  let guide = null;
+  let guideError = null;
+  try {
+    guide = await readAnaSequenceGuide();
+  } catch (error) {
+    guideError = { message: error.message };
+    console.error('[ai:ana:guide:error]', error.message);
+  }
   const fallback = buildAnaFallbackReply({ conversation, inboundMessage });
-  if (String(process.env.ASSISTENTE_ANA_USE_MODEL || 'true').toLowerCase() === 'false') {
+  if (!config.configured || String(process.env.ASSISTENTE_ANA_USE_MODEL || 'true').toLowerCase() === 'false') {
     return {
       message: validateAnaReply(fallback, { conversation, inboundMessage }),
-      source: 'fallback',
-      guide
+      source: config.configured ? 'fallback' : 'fallback-no-api-key',
+      guide,
+      error: guideError
     };
   }
 
@@ -1244,13 +1267,14 @@ async function buildAnaReply({ conversation, inboundMessage, config }) {
     const modelMessage = await callAnaModel({
       conversation,
       inboundMessage,
-      guideText: guide.text,
+      guideText: guide?.text || '',
       config
     });
     return {
       message: validateAnaReply(modelMessage, { conversation, inboundMessage }),
       source: 'model',
-      guide
+      guide,
+      error: guideError
     };
   } catch (error) {
     console.error('[ai:ana:model:error]', error.message);
@@ -1260,7 +1284,8 @@ async function buildAnaReply({ conversation, inboundMessage, config }) {
       guide,
       error: {
         message: error.message,
-        providerStatus: error.providerStatus || null
+        providerStatus: error.providerStatus || null,
+        guide: guideError
       }
     };
   }
@@ -1366,8 +1391,7 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
 async function maybeReplyWithAna(saved, inboundMessage) {
   if (!saved?.conversation?.id || !inboundMessage?.body) return null;
   const config = anaConfig();
-  if (!config.configured) return null;
-  if (String(process.env.ASSISTENTE_ANA_AUTO_REPLY || 'true').toLowerCase() === 'false') return null;
+  if (!config.autoReplyEnabled) return null;
 
   const conversation = await prisma.whatsAppConversation.findUnique({
     where: { id: saved.conversation.id },
