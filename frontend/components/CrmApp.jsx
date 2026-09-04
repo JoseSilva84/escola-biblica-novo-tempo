@@ -7929,6 +7929,32 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
   );
 }
 
+function mergeConversationSnapshots(serverConversations = [], localConversations = [], query = '') {
+  const queryDigits = phoneDigits(query);
+  const merged = new Map();
+  serverConversations.forEach((conversation) => {
+    if (conversation?.id) merged.set(conversation.id, conversation);
+  });
+  localConversations.forEach((conversation) => {
+    if (!conversation?.id) return;
+    const phone = phoneDigits(conversation.phone);
+    const matchesQuery = queryDigits && phone.endsWith(queryDigits.slice(-10));
+    const existsByPhone = Array.from(merged.values()).some((item) => {
+      const itemPhone = phoneDigits(item.phone);
+      return phone && itemPhone && itemPhone.endsWith(phone.slice(-10));
+    });
+    if (matchesQuery && !existsByPhone) {
+      merged.set(conversation.id, conversation);
+      return;
+    }
+    if (String(conversation.id).startsWith('temp-') && !existsByPhone) {
+      merged.set(conversation.id, conversation);
+    }
+  });
+  return Array.from(merged.values())
+    .sort((left, right) => new Date(right.updatedAt || right.createdAt || 0) - new Date(left.updatedAt || left.createdAt || 0));
+}
+
 function ConversationsView({ records = [] }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -8205,7 +8231,8 @@ function ConversationsView({ records = [] }) {
       [...(searchedPayload.conversations || []), ...(recentPayload.conversations || [])].forEach((conversation) => {
         byId.set(conversation.id, conversation);
       });
-      const nextConversations = Array.from(byId.values()).slice(0, query ? 51 : 50);
+      const serverConversations = Array.from(byId.values());
+      const nextConversations = mergeConversationSnapshots(serverConversations, conversations, query).slice(0, query ? 51 : 50);
       const searchedConversation = query
         ? nextConversations.find((conversation) => phoneDigits(conversation.phone).endsWith(query.slice(-10)))
         : null;
