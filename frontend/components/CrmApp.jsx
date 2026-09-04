@@ -8175,14 +8175,14 @@ function ConversationsView({ records = [] }) {
   }
 
   async function loadConversations(phone = '', options = {}) {
-    const { silent = false, notify = false, selectSearched = false } = options;
+    const { silent = false, notify = false, selectSearched = false, selectLatestOnNew = false } = options;
     if (silent && conversationRefreshInFlightRef.current) return;
     conversationRefreshInFlightRef.current = true;
     if (!silent) setLoading(true);
     try {
       const query = phoneDigits(phone);
       const recentParams = new URLSearchParams({
-        limit: '10',
+        limit: '50',
         _: String(Date.now())
       });
       const searchedParams = new URLSearchParams({
@@ -8205,39 +8205,56 @@ function ConversationsView({ records = [] }) {
       [...(searchedPayload.conversations || []), ...(recentPayload.conversations || [])].forEach((conversation) => {
         byId.set(conversation.id, conversation);
       });
-      const nextConversations = Array.from(byId.values()).slice(0, query ? 11 : 10);
+      const nextConversations = Array.from(byId.values()).slice(0, query ? 51 : 50);
       const searchedConversation = query
         ? nextConversations.find((conversation) => phoneDigits(conversation.phone).endsWith(query.slice(-10)))
         : null;
+      const latestConversation = nextConversations[0] || null;
+      const latestMessages = latestConversation?.messages || [];
+      const latestLastMessage = latestMessages[latestMessages.length - 1] || null;
+      const previousLastMessageId = lastSeenMessageIdRef.current;
+      const shouldSelectLatest = Boolean(
+        selectLatestOnNew
+        && !query
+        && latestConversation?.id
+        && latestLastMessage?.id
+        && previousLastMessageId
+        && latestLastMessage.id !== previousLastMessageId
+      );
       const nextSelected = selectSearched
         ? searchedConversation
+        : shouldSelectLatest
+          ? latestConversation
         : nextConversations.find((conversation) => conversation.id === selectedId)
           || nextConversations[0]
           || null;
       const nextMessages = nextSelected?.messages || [];
       const nextLastMessage = nextMessages[nextMessages.length - 1] || null;
-      const previousLastMessageId = lastSeenMessageIdRef.current;
 
       setConversations(nextConversations);
       setSelectedId((current) => (
         selectSearched
           ? searchedConversation?.id || null
+          : shouldSelectLatest
+          ? latestConversation?.id || null
           : nextConversations.some((conversation) => conversation.id === current)
           ? current
           : nextConversations[0]?.id || null
       ));
-      if (nextLastMessage?.id) {
+      if (latestLastMessage?.id) {
+        lastSeenMessageIdRef.current = latestLastMessage.id;
+      } else if (nextLastMessage?.id) {
         lastSeenMessageIdRef.current = nextLastMessage.id;
       }
       if (
         notify
         && previousLastMessageId
-        && nextLastMessage?.id
-        && nextLastMessage.id !== previousLastMessageId
-        && nextLastMessage.direction === 'INBOUND'
+        && latestLastMessage?.id
+        && latestLastMessage.id !== previousLastMessageId
+        && latestLastMessage.direction === 'INBOUND'
       ) {
         toast.success('Nova resposta recebida', {
-          description: nextLastMessage.body
+          description: latestLastMessage.body
         });
       }
     } catch {
@@ -8519,7 +8536,8 @@ function ConversationsView({ records = [] }) {
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      loadConversations(activePhoneRef.current || phoneSearch, { silent: true, notify: true });
+      const query = phoneDigits(phoneSearch);
+      loadConversations(query, { silent: true, notify: true, selectLatestOnNew: !query });
     }, 750);
     return () => window.clearInterval(interval);
   }, [phoneSearch, selectedId]);
@@ -8671,7 +8689,7 @@ function ConversationsView({ records = [] }) {
         <aside className={`${panelClass} whatsapp-sidebar flex h-full min-h-0 flex-col overflow-hidden p-4 max-2xl:h-[46rem]`}>
           <div className="flex items-center justify-between gap-3">
             <span className={labelClass}>Leads</span>
-            <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations(activePhoneRef.current || phoneSearch, { selectSearched: Boolean(activePhoneRef.current || phoneSearch) })} type="button">Atualizar</button>
+            <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations(phoneSearch, { selectSearched: Boolean(phoneSearch), selectLatestOnNew: !phoneDigits(phoneSearch) })} type="button">Atualizar</button>
           </div>
           <label className="relative mt-3 block shrink-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
@@ -8716,7 +8734,7 @@ function ConversationsView({ records = [] }) {
                     className="flex w-full items-center gap-3 p-4 pr-11 text-left"
                     onClick={() => {
                       setSelectedId(conversation.id);
-                      setPhoneSearch(conversation.phone);
+                      setPhoneSearch('');
                     }}
                     type="button"
                   >
