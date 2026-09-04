@@ -8379,7 +8379,16 @@ function ConversationsView({ records = [] }) {
   }
 
   useEffect(() => {
-    syncZproConversations({ silent: true }).finally(() => loadConversations());
+    const requestedPhone = phoneDigits(window.localStorage.getItem('open-whatsapp-phone') || '');
+    if (requestedPhone) {
+      window.localStorage.removeItem('open-whatsapp-phone');
+      setPhoneSearch(requestedPhone);
+      setConversationListSearch(requestedPhone);
+      setConversationExpanded(true);
+      syncZproConversations({ silent: true }).finally(() => loadConversations(requestedPhone, { selectSearched: true }));
+    } else {
+      syncZproConversations({ silent: true }).finally(() => loadConversations());
+    }
     loadBroadcastAnalytics();
   }, []);
 
@@ -9091,7 +9100,7 @@ function ConversationsView({ records = [] }) {
   );
 }
 
-function AIAgentView({ associations = [], campaigns = [], data, records = [] }) {
+function AIAgentView({ associations = [], campaigns = [], data, records = [], onNavigate }) {
   const [tab, setTab] = useState('overview');
   const [mode, setMode] = useState('assistido');
   const [active, setActive] = useState(false);
@@ -9146,28 +9155,54 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
     ['Encaminhamento', 'Quando necessario, envia para gestor, coordenador ou voluntario.']
   ];
 
-  useEffect(() => {
-    let activeRequest = true;
-    setAnaLoading(true);
+  function openAnaConversation(conversation) {
+    const phone = phoneDigits(conversation?.phone);
+    if (!phone) {
+      toast.error('Conversa sem telefone', { description: 'Não foi possível abrir este atendimento.' });
+      return;
+    }
+    window.localStorage.setItem('open-whatsapp-phone', phone);
+    onNavigate?.('conversations');
+  }
+
+  async function loadAnaSummary(options = {}) {
+    const { silent = false, activeRequest = () => true } = options;
+    if (!silent) setAnaLoading(true);
+    await apiFetch('/api/whatsapp/sync-zpro', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ limit: 120, statuses: ['open', 'pending', 'closed'] })
+    }).catch(() => null);
     apiFetch('/api/ai/ana/summary?limit=120')
       .then((response) => response.ok ? response.json() : null)
       .then((payload) => {
-        if (activeRequest && payload) {
+        if (activeRequest() && payload) {
           setAnaSummary(payload);
           setActive(Boolean(payload.agent?.configured));
         }
       })
       .catch(() => {
-        if (activeRequest) {
+        if (activeRequest() && !silent) {
           toast.error('Resumo da Ana indisponivel', {
             description: 'Nao foi possivel carregar as conversas da IA agora.'
           });
         }
       })
       .finally(() => {
-        if (activeRequest) setAnaLoading(false);
+        if (activeRequest() && !silent) setAnaLoading(false);
       });
-    return () => { activeRequest = false; };
+  }
+
+  useEffect(() => {
+    let activeRequest = true;
+    loadAnaSummary({ activeRequest: () => activeRequest });
+    const timer = window.setInterval(() => {
+      loadAnaSummary({ silent: true, activeRequest: () => activeRequest });
+    }, 9000);
+    return () => {
+      activeRequest = false;
+      window.clearInterval(timer);
+    };
   }, []);
 
   return (
@@ -9261,6 +9296,14 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
                       <span><strong className="text-slate-900">Ana:</strong> {conversation.lastAnaMessage}</span>
                       <span><strong className="text-slate-900">Proxima acao:</strong> {conversation.classification?.action}</span>
                     </div>
+                    <button
+                      className={`${primaryButtonClass} mt-3 h-10 px-4 text-xs`}
+                      onClick={() => openAnaConversation(conversation)}
+                      type="button"
+                    >
+                      <MessageCircle size={16} />
+                      Abrir conversa completa
+                    </button>
                   </article>
                 );
               }) : (
@@ -9374,8 +9417,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [] }) 
             title="Abrir detalhes do primeiro lead da fila"
             type="button"
           >
-            <span className={labelClass}>Revisao assistida</span>
-            <h2 className="mt-1 text-2xl font-black text-slate-50">Leads para a IA sugerir resposta</h2>
+            <span className="font-white text-slate-50">Revisao assistida</span>
+            <h2 className="mt-1 text-2xl font-white text-slate-50">Leads para a IA sugerir resposta</h2>
           </button>
           <div className="mt-5 grid gap-3">
             {reviewQueue.map((lead) => (
@@ -10287,7 +10330,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   } else if (effectiveView === 'conversations') {
     content = <ConversationsView records={records} />;
   } else if (effectiveView === 'ai-agent') {
-    content = <AIAgentView associations={filteredAssociations} campaigns={adminCampaigns} data={data} records={records} />;
+    content = <AIAgentView associations={filteredAssociations} campaigns={adminCampaigns} data={data} onNavigate={navigateView} records={records} />;
   } else if (effectiveView === 'reports') {
     content = isAdminUser(user)
       ? <AdminGeneralView {...adminGeneralProps} initialSection="audit" />

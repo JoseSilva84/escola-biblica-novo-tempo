@@ -28,7 +28,8 @@ const ANA_TRAINING_FILES = [
   ['03_SYSTEM_PROMPT_ANA_V3.md', 'System prompt Ana V3'],
   ['04_REGUA_21_DIAS_COMPLETA.md', 'Regua completa de 21 dias'],
   ['05_CAMPANHA_EXPRESSA_19_09.md', 'Campanha expressa 19/09'],
-  ['06_COPYS_ICEBREAKERS.md', 'Copys, icebreakers e ramificacoes']
+  ['06_COPYS_ICEBREAKERS.md', 'Copys, icebreakers e ramificacoes'],
+  ['07_ESTUDOS_BIBLICOS_ADVENTISTAS.md', 'Base bíblica adventista oficial para acompanhamento']
 ];
 let anaSequenceGuideCache = { cacheKey: null, text: '', sources: [], loadedAt: 0 };
 
@@ -1123,6 +1124,15 @@ function compactText(value, fallback = 'Sem mensagem registrada.') {
   return clean.length > 180 ? `${clean.slice(0, 177)}...` : clean;
 }
 
+function normalizeMessageSignature(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 220);
+}
+
 function classifyAnaConversation(messages = []) {
   const inboundText = messages
     .filter((message) => message.direction === 'INBOUND')
@@ -2161,6 +2171,33 @@ function zproTicketLastText(ticket = {}) {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 }
 
+function zproTicketMessages(ticket = {}) {
+  const arrays = [
+    ticket.messages,
+    ticket.Messages,
+    ticket.chatMessages,
+    ticket.ticketMessages,
+    ticket.lastMessages,
+    ...collectArraysFromPayload(ticket)
+  ].filter(Array.isArray);
+  const unique = new Map();
+  for (const item of arrays.flat()) {
+    if (!item || typeof item !== 'object') continue;
+    const text = String(readMessageText(item) || item.body || item.text || '').trim();
+    if (!text) continue;
+    const key = providerMessageId(item)
+      || `${firstValue(item.createdAt, item.timestamp, item.messageTimestamp, item.updatedAt) || ''}:${Boolean(item.fromMe || item.key?.fromMe)}:${text.slice(0, 80)}`;
+    if (!unique.has(key)) unique.set(key, item);
+  }
+  return Array.from(unique.values())
+    .sort((left, right) => {
+      const leftDate = parseZproDate(firstValue(left.createdAt, left.timestamp, left.messageTimestamp, left.updatedAt)) || new Date(0);
+      const rightDate = parseZproDate(firstValue(right.createdAt, right.timestamp, right.messageTimestamp, right.updatedAt)) || new Date(0);
+      return leftDate - rightDate;
+    })
+    .slice(-200);
+}
+
 function zproTicketDate(ticket = {}) {
   return parseZproDate(firstValue(
     ticket.updatedAt,
@@ -2208,6 +2245,39 @@ async function syncZproConversations({ statuses = ['open', 'pending', 'closed'],
           continue;
         }
         seenPhones.add(phone);
+        const ticketMessages = zproTicketMessages(ticket);
+        if (ticketMessages.length > 1) {
+          for (const ticketMessage of ticketMessages) {
+            const messageText = String(readMessageText(ticketMessage) || ticketMessage.body || ticketMessage.text || '').trim();
+            if (!messageText) continue;
+            const messageFromMe = Boolean(ticketMessage.fromMe || ticketMessage.key?.fromMe || ticketMessage.message?.key?.fromMe);
+            const messageOccurredAt = parseZproDate(firstValue(
+              ticketMessage.createdAt,
+              ticketMessage.timestamp,
+              ticketMessage.messageTimestamp,
+              ticketMessage.updatedAt,
+              ticket.updatedAt
+            )) || zproTicketDate(ticket);
+            await recordWhatsAppMessage({
+              phone,
+              body: messageText,
+              direction: messageFromMe ? 'OUTBOUND' : 'INBOUND',
+              senderType: messageFromMe ? 'SYSTEM' : 'LEAD',
+              senderName: messageFromMe ? 'WhatsApp' : zproTicketName(ticket) || null,
+              provider: 'zpro-baileys',
+              providerStatus: 'SYNCED',
+              providerMessageId: stableZproMessageId(ticket, ticketMessage),
+              occurredAt: messageOccurredAt,
+              metadata: {
+                syncedFromZpro: true,
+                ticketId: ticket.id || ticket.ticketId || null,
+                ticketStatus: ticket.status || status || null
+              }
+            });
+          }
+          result.imported += ticketMessages.length;
+          continue;
+        }
         const text = String(zproTicketLastText(ticket) || '').trim();
         const fromMe = Boolean(ticket.lastMessage?.fromMe || ticket.message?.fromMe || ticket.fromMe);
         const occurredAt = zproTicketDate(ticket);
@@ -3378,6 +3448,64 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
         duplicate: true,
         conversationId: existingInbound.conversationId,
         messageId: existingInbound.id
+      });
+      return;
+    }
+  }
+
+  if (!event.fromMe && event.phone && event.text) {
+    const normalizedPhone = normalizePhone(event.phone) || event.phone;
+    const recentConversation = await prisma.whatsAppConversation.findUnique({
+      where: { phone: normalizedPhone },
+      include: {
+        messages: {
+          where: { createdAt: { gte: new Date(Date.now() - 2 * 60 * 60 * 1000) } },
+          orderBy: { createdAt: 'desc' },
+          take: 30
+        }
+      }
+    }).catch(() => null);
+    const incomingSignature = normalizeMessageSignature(event.text);
+    const repeatedInbound = (recentConversation?.messages || []).find((message) => (
+      message.direction === 'INBOUND'
+      && normalizeMessageSignature(message.body) === incomingSignature
+    ));
+    if (repeatedInbound?.id) {
+      response.json({
+        ok: true,
+        received: true,
+        duplicate: true,
+        reason: 'recent-inbound-body',
+        conversationId: repeatedInbound.conversationId,
+        messageId: repeatedInbound.id
+      });
+      return;
+    }
+    const outboundEcho = (recentConversation?.messages || []).find((message) => (
+      message.direction === 'OUTBOUND'
+      && normalizeMessageSignature(message.body) === incomingSignature
+    ));
+    if (outboundEcho?.id) {
+      await prisma.whatsAppMessage.update({
+        where: { id: outboundEcho.id },
+        data: {
+          providerStatus: normalizedStatus || 'SERVER_ACK',
+          metadata: {
+            ...(outboundEcho.metadata && typeof outboundEcho.metadata === 'object' ? outboundEcho.metadata : {}),
+            outboundEchoIgnored: true,
+            rawStatus: event.status,
+            channelId: event.channelId,
+            event: event.event
+          }
+        }
+      }).catch(() => null);
+      response.json({
+        ok: true,
+        received: true,
+        duplicate: true,
+        reason: 'outbound-echo',
+        conversationId: outboundEcho.conversationId,
+        messageId: outboundEcho.id
       });
       return;
     }
