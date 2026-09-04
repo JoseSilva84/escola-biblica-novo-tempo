@@ -755,6 +755,31 @@ async function recordWhatsAppMessage({
     }
   });
 
+  if (messageId) {
+    const existingMessage = await prisma.whatsAppMessage.findFirst({
+      where: { providerMessageId: messageId },
+      include: { conversation: true }
+    }).catch(() => null);
+    if (existingMessage) {
+      const updatedMessage = await prisma.whatsAppMessage.update({
+        where: { id: existingMessage.id },
+        data: {
+          providerStatus: providerStatus || existingMessage.providerStatus,
+          metadata: {
+            ...(existingMessage.metadata && typeof existingMessage.metadata === 'object' ? existingMessage.metadata : {}),
+            ...metadata,
+            providerResponse: providerResponse || existingMessage.metadata?.providerResponse || null
+          }
+        }
+      }).catch(() => existingMessage);
+      await prisma.whatsAppConversation.update({
+        where: { id: existingMessage.conversationId },
+        data: { updatedAt: occurredAt }
+      }).catch(() => null);
+      return { conversation: existingMessage.conversation || conversation, message: updatedMessage };
+    }
+  }
+
   const message = await prisma.whatsAppMessage.create({
     data: {
       conversationId: conversation.id,
@@ -1201,6 +1226,27 @@ function detectAnaReplyIntent(messageText) {
   return 'general';
 }
 
+function isAffirmativeReply(value) {
+  return /\b(sim|s|claro|pode|quero|aceito|gostaria|isso|correto|certo|esse mesmo|essa mesma|ta certo|tá certo|esta certo|está certo|confirmo|ok)\b/i.test(String(value || ''));
+}
+
+function isNegativeReply(value) {
+  return /\b(não|nao|n|negativo|ainda não|ainda nao|não chegou|nao chegou|não recebi|nao recebi|nao quero|não quero|não pode|nao pode)\b/i.test(String(value || ''));
+}
+
+function pickUnusedAnaReply(variants = [], historyText = '') {
+  const normalizedHistory = String(historyText || '').toLowerCase();
+  return variants.find((variant) => {
+    const signature = String(variant || '')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 90);
+    return signature && !normalizedHistory.includes(signature.slice(0, 48));
+  }) || variants[0] || '';
+}
+
 function inferLeadStudyTheme(lead) {
   const metadata = lead?.metadata && typeof lead.metadata === 'object' ? lead.metadata : {};
   return lead?.studyType
@@ -1383,6 +1429,16 @@ function validateAnaReply(message, { conversation, inboundMessage }) {
   const repeatsArrivalQuestion = /(material chegou|chegou até aí|chegou ate ai|chegou a receber|receber ou acessar)/i.test(clean);
   if (alreadyAnsweredMaterial && repeatsArrivalQuestion) clean = fallback;
 
+  const normalizedClean = clean.toLowerCase().replace(/\s+/g, ' ').trim();
+  const repeated = (conversation?.messages || []).some((item) => {
+    const previous = String(item.body || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return item.direction === 'OUTBOUND' && previous && (
+      previous === normalizedClean
+      || previous.slice(0, 90) === normalizedClean.slice(0, 90)
+    );
+  });
+  if (repeated) clean = fallback;
+
   const questionCount = (clean.match(/\?/g) || []).length;
   if (questionCount > 1) {
     const firstQuestionEnd = clean.indexOf('?');
@@ -1496,17 +1552,28 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
   const name = leadFirstName(conversation?.leadName || conversation?.lead?.name);
   const theme = materialFromConversation(conversation);
   const address = addressFromConversation(conversation);
+  const inboundText = String(inboundMessage?.body || '').toLowerCase();
   const intent = detectAnaReplyIntent(inboundMessage?.body);
   const fullHistory = (conversation?.messages || []).map((message) => message.body).join(' ').toLowerCase();
   const alreadyAskedMaterialRead = /(dar uma olhada|chamou mais sua atenção|chamou mais sua atencao)/i.test(fullHistory);
   const alreadyOfferedGift = /(presente físico|presente fisico|19 de setembro)/i.test(fullHistory);
-  const acceptedGift = /(quero receber|pode entregar|aceito|gostaria de receber|sim.*presente|sim.*brinde)/i.test(String(inboundMessage?.body || '').toLowerCase()) && alreadyOfferedGift;
+  const alreadyAskedAddress = /(endereço em nossos registros|endereco em nossos registros|esse ainda é o melhor endereço|esse ainda e o melhor endereco|o seu endereço é|o seu endereco e)/i.test(fullHistory);
+  const alreadyConfirmedDelivery = /(entrega no dia 19 de setembro|entregar o presente em mãos|entregar o presente em maos|representantes para esse fim|receber os representantes)/i.test(fullHistory);
+  const acceptedGift = alreadyOfferedGift && !alreadyAskedAddress && (isAffirmativeReply(inboundText) || /(quero receber|pode entregar|aceito|gostaria de receber|sim.*presente|sim.*brinde)/i.test(inboundText));
+  const confirmedAddress = alreadyAskedAddress && !alreadyConfirmedDelivery && isAffirmativeReply(inboundText);
+  const deniedAddress = alreadyAskedAddress && !alreadyConfirmedDelivery && isNegativeReply(inboundText);
 
   if (intent === 'optout') {
     return `Tudo bem${anaNameSuffix(name)}, sem problema nenhum. Vou respeitar seu pedido e encerrar o contato por aqui. Deus te abençoe! 🙏`;
   }
   if (intent === 'human') {
     return `${anaNameText(name)}obrigada por me contar. Esse assunto merece uma atenção mais cuidadosa, então vou deixar registrado para alguém da equipe Novo Tempo acompanhar com carinho.`;
+  }
+  if (confirmedAddress) {
+    return `Perfeito${anaNameSuffix(name)}. Então vou deixar combinado: no dia 19 de setembro de 2026, pela parte da tarde, um representante da Novo Tempo levará o presente até você.\n\nVocê poderá receber os representantes nesse horário?`;
+  }
+  if (deniedAddress) {
+    return `Obrigado por avisar${anaNameSuffix(name)}. Para eu registrar certinho a entrega do presente no dia 19 de setembro de 2026, você pode me enviar seu endereço completo atual?`;
   }
   if (acceptedGift) {
     if (address) {
@@ -1515,17 +1582,29 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     return `Que bom${anaNameSuffix(name)}. Para organizar a entrega do presente no dia 19 de setembro de 2026, você pode me enviar seu endereço atual completo?`;
   }
   if (intent === 'not_received') {
-    return `Entendi${anaNameSuffix(name)}. Obrigada por me avisar.\n\nPosso verificar uma forma de te ajudar com esse material por aqui?`;
+    return pickUnusedAnaReply([
+      `Entendi${anaNameSuffix(name)}. Obrigada por me avisar.\n\nPosso verificar uma forma de te ajudar com esse material por aqui?`,
+      `Poxa, obrigado por me contar${anaNameSuffix(name)}. Vou deixar isso registrado para a equipe conferir o envio do seu material.\n\nVocê prefere receber ajuda por aqui mesmo no WhatsApp?`,
+      `Certo${anaNameSuffix(name)}. Vou te ajudar com isso. Para eu orientar melhor, você lembra se pediu material impresso ou acesso digital?`
+    ], fullHistory);
   }
   if (intent === 'does_not_remember') {
     return `Sem problema${anaNameSuffix(name)}. Esse contato é sobre ${theme}, que aparece nos registros da Escola Bíblica Novo Tempo.\n\nVocê gostaria que eu te ajudasse a retomar esse estudo?`;
   }
   if (intent === 'received') {
     if (!alreadyAskedMaterialRead) {
-      return `Que bom saber${anaNameSuffix(name)}. Fico feliz que o material chegou certinho 😊\n\nVocê conseguiu dar uma olhada nele?`;
+      return pickUnusedAnaReply([
+        `Que bom saber${anaNameSuffix(name)}. Fico feliz que o material chegou certinho 😊\n\nVocê conseguiu dar uma olhada nele?`,
+        `Que alegria${anaNameSuffix(name)}. Fico feliz que o material chegou.\n\nTeve alguma parte que chamou mais sua atenção?`,
+        `Ótimo${anaNameSuffix(name)}. Esse material foi preparado com muito carinho.\n\nVocê já conseguiu começar a acompanhar o estudo?`
+      ], fullHistory);
     }
     if (!alreadyOfferedGift) {
-      return `${anaNameText(name)}fico muito feliz com seu interesse. Além desse acompanhamento, a Novo Tempo está preparando uma entrega especial no dia 19 de setembro de 2026.\n\nVocê gostaria de receber esse presente em sua residência?`;
+      return pickUnusedAnaReply([
+        `${anaNameText(name)}fico muito feliz com seu interesse. Além desse acompanhamento, a Novo Tempo está preparando uma entrega especial no dia 19 de setembro de 2026.\n\nVocê gostaria de receber esse presente em sua residência?`,
+        `Que bom que você está acompanhando${anaNameSuffix(name)}. A Novo Tempo também está organizando uma entrega especial para o dia 19 de setembro de 2026, pensada para quem pediu esse material.\n\nVocê gostaria de receber esse presente em casa?`,
+        `${anaNameText(name)}obrigada por compartilhar. Para continuar esse cuidado, a Novo Tempo preparou um presente especial que será entregue no dia 19 de setembro de 2026.\n\nVocê gostaria de receber?`
+      ], fullHistory);
     }
     return `Perfeito${anaNameSuffix(name)}. Vou deixar isso registrado para a equipe da Novo Tempo acompanhar com carinho.`;
   }
@@ -1916,6 +1995,191 @@ async function sendZproMediaMessage({ phone, message = '', fileName, mimeType, b
     providerResponse: data,
     media: { fileName: safeFileName, mimeType: cleanMimeType }
   };
+}
+
+function zproExternalUrl(pathValue, query = {}) {
+  const config = zproConfig();
+  if (!config.baseUrl || !config.token || !config.apiId) {
+    const error = new Error('Configuracao Z-PRO incompleta para sincronizar conversas.');
+    error.status = 500;
+    throw error;
+  }
+  const resolvedPath = applyPathParams(pathValue, {
+    apiId: config.apiId,
+    channelId: config.channelId || config.apiId,
+    sessionId: config.channelId || config.apiId
+  });
+  const url = new URL(resolvedPath.startsWith('http')
+    ? resolvedPath
+    : `${config.baseUrl}${resolvedPath.startsWith('/') ? '' : '/'}${resolvedPath}`);
+  Object.entries(query || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      url.searchParams.set(key, String(value));
+    }
+  });
+  if (!url.searchParams.has('bearertoken')) url.searchParams.set('bearertoken', config.token);
+  return { url, config };
+}
+
+async function fetchZproExternalJson(pathValue, { method = 'GET', query = {}, body = null } = {}) {
+  const { url, config } = zproExternalUrl(pathValue, query);
+  const providerResponse = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      Accept: 'application/json',
+      ...(body ? { 'Content-Type': 'application/json' } : {})
+    },
+    ...(body ? { body: JSON.stringify({ ...body, bearertoken: config.token }) } : {})
+  });
+  const data = await parseProviderResponse(providerResponse);
+  if (!providerResponse.ok) {
+    const error = new Error(data?.message || data?.error || `Z-PRO respondeu com status ${providerResponse.status}`);
+    error.status = 502;
+    error.providerStatus = providerResponse.status;
+    error.providerResponse = data;
+    throw error;
+  }
+  return data;
+}
+
+function collectArraysFromPayload(value, arrays = []) {
+  if (Array.isArray(value)) {
+    arrays.push(value);
+    return arrays;
+  }
+  if (!value || typeof value !== 'object') return arrays;
+  Object.values(value).forEach((child) => collectArraysFromPayload(child, arrays));
+  return arrays;
+}
+
+function largestObjectArray(payload) {
+  return collectArraysFromPayload(payload)
+    .filter((items) => items.some((item) => item && typeof item === 'object'))
+    .sort((left, right) => right.length - left.length)[0] || [];
+}
+
+function parseZproDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function zproTicketPhone(ticket = {}) {
+  const contact = ticket.contact || ticket.Contact || ticket.sender || {};
+  return firstValue(
+    ticket.phone,
+    ticket.number,
+    ticket.whatsapp,
+    ticket.remoteJid,
+    ticket.contactId,
+    contact.phone,
+    contact.number,
+    contact.remoteJid,
+    ticket.lastMessage?.remoteJid,
+    ticket.message?.remoteJid,
+    ticket.messages?.[0]?.remoteJid
+  );
+}
+
+function zproTicketName(ticket = {}) {
+  const contact = ticket.contact || ticket.Contact || ticket.sender || {};
+  return firstValue(contact.name, contact.pushName, ticket.name, ticket.pushName, ticket.contactName);
+}
+
+function zproTicketLastText(ticket = {}) {
+  const value = firstValue(
+    readMessageText(ticket.lastMessage || {}),
+    readMessageText(ticket.message || {}),
+    ticket.lastMessage,
+    ticket.lastMessageBody,
+    ticket.body,
+    ticket.text
+  );
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+}
+
+function zproTicketDate(ticket = {}) {
+  return parseZproDate(firstValue(
+    ticket.updatedAt,
+    ticket.lastMessageAt,
+    ticket.lastMessage?.createdAt,
+    ticket.lastMessage?.messageTimestamp,
+    ticket.message?.createdAt,
+    ticket.createdAt
+  )) || new Date();
+}
+
+async function syncZproConversations({ statuses = ['open', 'pending', 'closed'], limit = 120 } = {}) {
+  const listPath = String(process.env.ZPRO_LIST_TICKETS_PATH || '/v2/api/external/{apiId}/listTickets').trim();
+  const normalizedStatuses = Array.from(new Set(statuses.map((status) => String(status || '').trim()).filter(Boolean)));
+  const seenPhones = new Set();
+  const result = { imported: 0, skipped: 0, tickets: 0, errors: [] };
+
+  for (const status of normalizedStatuses.length ? normalizedStatuses : ['open']) {
+    if (seenPhones.size >= limit) break;
+    try {
+      const payload = await fetchZproExternalJson(listPath, {
+        query: {
+          status,
+          pageNumber: 1,
+          page: 1,
+          limit
+        }
+      });
+      const tickets = largestObjectArray(payload).slice(0, Math.max(1, limit - seenPhones.size));
+      result.tickets += tickets.length;
+      for (const ticket of tickets) {
+        const phone = normalizePhone(zproTicketPhone(ticket));
+        if (!phone || seenPhones.has(phone)) {
+          result.skipped += 1;
+          continue;
+        }
+        seenPhones.add(phone);
+        const text = String(zproTicketLastText(ticket) || '').trim();
+        const fromMe = Boolean(ticket.lastMessage?.fromMe || ticket.message?.fromMe || ticket.fromMe);
+        const occurredAt = zproTicketDate(ticket);
+        if (!text) {
+          await prisma.whatsAppConversation.upsert({
+            where: { phone },
+            create: {
+              phone,
+              leadName: zproTicketName(ticket) || null,
+              status: String(ticket.status || status || 'ABERTA').toUpperCase()
+            },
+            update: {
+              ...(zproTicketName(ticket) ? { leadName: zproTicketName(ticket) } : {}),
+              status: String(ticket.status || status || 'ABERTA').toUpperCase(),
+              updatedAt: occurredAt
+            }
+          });
+          result.imported += 1;
+          continue;
+        }
+        await recordWhatsAppMessage({
+          phone,
+          body: text,
+          direction: fromMe ? 'OUTBOUND' : 'INBOUND',
+          senderType: fromMe ? 'SYSTEM' : 'LEAD',
+          senderName: fromMe ? 'WhatsApp' : zproTicketName(ticket) || null,
+          provider: 'zpro-baileys',
+          providerStatus: 'SYNCED',
+          providerMessageId: providerMessageId(ticket.lastMessage || ticket.message || ticket),
+          occurredAt,
+          metadata: {
+            syncedFromZpro: true,
+            ticketId: ticket.id || ticket.ticketId || null,
+            ticketStatus: ticket.status || status || null
+          }
+        });
+        result.imported += 1;
+      }
+    } catch (error) {
+      result.errors.push({ status, message: error.message, providerStatus: error.providerStatus || null });
+    }
+  }
+
+  return result;
 }
 
 app.use(cors({
@@ -2320,6 +2584,35 @@ app.post('/api/whatsapp/leads', requireAuth, async (request, response) => {
   } catch (error) {
     console.error('[whatsapp:lead:create:error]', error.message);
     response.status(500).json({ message: 'Nao foi possivel salvar o novo contato.' });
+  }
+});
+
+app.post('/api/whatsapp/sync-zpro', requireAuth, async (request, response) => {
+  response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.set('Pragma', 'no-cache');
+  response.set('Expires', '0');
+
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.status(403).json({ ok: false, message: 'Usuario sem permissao para sincronizar o Z-PRO.' });
+    return;
+  }
+
+  try {
+    const statuses = Array.isArray(request.body?.statuses)
+      ? request.body.statuses
+      : String(request.body?.statuses || 'open,pending,closed').split(',');
+    const result = await syncZproConversations({
+      statuses,
+      limit: Math.min(Math.max(Number(request.body?.limit) || 120, 1), 300)
+    });
+    response.json({ ok: true, ...result });
+  } catch (error) {
+    console.error('[whatsapp:zpro-sync:error]', error.message);
+    response.status(error.status || 500).json({
+      ok: false,
+      message: error.message || 'Nao foi possivel sincronizar conversas do Z-PRO.',
+      providerStatus: error.providerStatus || null
+    });
   }
 });
 

@@ -7962,6 +7962,7 @@ function ConversationsView({ records = [] }) {
   const [conversationListSearch, setConversationListSearch] = useState('');
   const [hiddenConversationIds, setHiddenConversationIds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [zproSyncing, setZproSyncing] = useState(false);
   const [sending, setSending] = useState(false);
   const [conversationExpanded, setConversationExpanded] = useState(false);
   const [leadPickerOpen, setLeadPickerOpen] = useState(false);
@@ -8292,6 +8293,39 @@ function ConversationsView({ records = [] }) {
     }
   }
 
+  async function syncZproConversations(options = {}) {
+    const { silent = false } = options;
+    if (!silent) setZproSyncing(true);
+    try {
+      const response = await apiFetch('/api/whatsapp/sync-zpro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 120, statuses: ['open', 'pending', 'closed'] })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || 'Nao foi possivel sincronizar o Z-PRO.');
+      if (!silent && payload.imported) {
+        toast.success('Conversas atualizadas', {
+          description: `${payload.imported} conversa(s) lidas do Z-PRO.`
+        });
+      }
+      return payload;
+    } catch (error) {
+      if (!silent) toast.error('Falha ao atualizar Z-PRO', { description: error.message });
+      return null;
+    } finally {
+      if (!silent) setZproSyncing(false);
+    }
+  }
+
+  async function refreshConversationsNow() {
+    await syncZproConversations();
+    await loadConversations(phoneSearch, {
+      selectSearched: Boolean(phoneSearch),
+      selectLatestOnNew: !phoneDigits(phoneSearch)
+    });
+  }
+
   async function loadBroadcastAnalytics(options = {}) {
     const { silent = false } = options;
     if (!silent) setBroadcastAnalyticsLoading(true);
@@ -8314,7 +8348,7 @@ function ConversationsView({ records = [] }) {
   }
 
   useEffect(() => {
-    loadConversations();
+    syncZproConversations({ silent: true }).finally(() => loadConversations());
     loadBroadcastAnalytics();
   }, []);
 
@@ -8614,7 +8648,7 @@ function ConversationsView({ records = [] }) {
         messages: [outgoingMessage],
         updatedAt: now,
         createdAt: now
-      }, ...next].slice(0, 10);
+      }, ...next].slice(0, 50);
     });
     setSelectedId(conversationId);
   }
@@ -8716,7 +8750,9 @@ function ConversationsView({ records = [] }) {
         <aside className={`${panelClass} whatsapp-sidebar flex h-full min-h-0 flex-col overflow-hidden p-4 max-2xl:h-[46rem]`}>
           <div className="flex items-center justify-between gap-3">
             <span className={labelClass}>Leads</span>
-            <button className={`${ghostButtonClass} h-9 px-3`} onClick={() => loadConversations(phoneSearch, { selectSearched: Boolean(phoneSearch), selectLatestOnNew: !phoneDigits(phoneSearch) })} type="button">Atualizar</button>
+            <button className={`${ghostButtonClass} h-9 px-3`} disabled={zproSyncing} onClick={refreshConversationsNow} type="button">
+              {zproSyncing ? 'Atualizando...' : 'Atualizar Z-PRO'}
+            </button>
           </div>
           <label className="relative mt-3 block shrink-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
@@ -8724,7 +8760,7 @@ function ConversationsView({ records = [] }) {
               aria-label="Buscar na lista de leads"
               className="h-10 w-full rounded-xl border border-[#d1d7db] bg-white pl-9 pr-9 text-xs font-bold text-[#111b21] shadow-inner outline-none transition placeholder:text-[#667781] focus:border-[#00a884] focus:ring-4 focus:ring-[#00a884]/10"
               onChange={(event) => setConversationListSearch(event.target.value)}
-              placeholder="Buscar nome, número ou distrito"
+              placeholder="Buscar ou digitar número"
               value={conversationListSearch}
             />
             {conversationListSearch ? (
@@ -8804,8 +8840,8 @@ function ConversationsView({ records = [] }) {
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700">
                 {conversationListSearch
-                  ? 'Nenhuma conversa encontrada nesta lista. Você também pode usar “Buscar e selecionar lead”.'
-                  : 'Nenhuma conversa salva. Use “Buscar e selecionar lead” para iniciar um atendimento.'}
+                  ? 'Nenhuma conversa encontrada. Digite o WhatsApp completo para iniciar com um número novo.'
+                  : 'Nenhuma conversa salva. Clique em Atualizar Z-PRO ou digite um WhatsApp para iniciar.'}
               </div>
             )}
           </div>
