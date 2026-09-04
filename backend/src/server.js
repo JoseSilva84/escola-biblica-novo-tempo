@@ -20,6 +20,8 @@ const port = Number(process.env.PORT || 4000);
 const DATASET_DIR = resolveDatasetDir();
 const MAX_DATASET_UPLOAD_BYTES = Number(process.env.DATASET_UPLOAD_LIMIT_BYTES || 150 * 1024 * 1024);
 const gzipAsync = promisify(gzip);
+const ANA_SEQUENCE_GUIDE_FILE = 'PLANO_SEQUENCIA_ANA_PRESENTE_19_SETEMBRO.md';
+let anaSequenceGuideCache = { path: null, text: '', loadedAt: 0 };
 
 function resolveDatasetDir() {
   if (process.env.DATASET_DIR) return path.resolve(process.env.DATASET_DIR);
@@ -593,11 +595,12 @@ function externalLeadId(value) {
 }
 
 async function findLeadReference({ leadId, phone }) {
+  const leadSelect = { id: true, externalId: true, name: true, phone: true, address: true, district: { select: { name: true } } };
   const numericLeadId = externalLeadId(leadId);
   if (numericLeadId) {
     const lead = await prisma.lead.findFirst({
       where: { externalId: numericLeadId },
-      select: { id: true, externalId: true, name: true, phone: true, district: { select: { name: true } } }
+      select: leadSelect
     });
     if (lead) return lead;
   }
@@ -606,7 +609,7 @@ async function findLeadReference({ leadId, phone }) {
   if (textLeadId && !numericLeadId && !textLeadId.startsWith('manual-')) {
     const lead = await prisma.lead.findUnique({
       where: { id: textLeadId },
-      select: { id: true, externalId: true, name: true, phone: true, district: { select: { name: true } } }
+      select: leadSelect
     }).catch(() => null);
     if (lead) return lead;
   }
@@ -621,7 +624,7 @@ async function findLeadReference({ leadId, phone }) {
           { phone: { contains: normalizedPhone.slice(-11) } }
         ]
       },
-      select: { id: true, externalId: true, name: true, phone: true, district: { select: { name: true } } }
+      select: leadSelect
     });
     if (lead) return lead;
   }
@@ -844,6 +847,7 @@ const whatsappLeadSelect = {
   externalId: true,
   name: true,
   phone: true,
+  address: true,
   priority: true,
   score: true,
   isVip: true,
@@ -860,6 +864,7 @@ function serializeWhatsAppLead(lead) {
     name: lead?.name || null,
     phone,
     storedPhone: lead?.phone || null,
+    address: lead?.address || null,
     district: lead?.district?.name || null,
     priority: lead?.priority || null,
     score: lead?.score == null ? null : Number(lead.score),
@@ -895,36 +900,80 @@ function anaConfig() {
   const apiKey = normalizeApiToken(process.env.ASSISTENTE_ANA || process.env.ANA_API_KEY);
   return {
     name: 'Ana',
-    provider: 'assistente-virtual',
+    provider: 'openai-responses',
     configured: Boolean(apiKey),
+    model: process.env.ANA_MODEL || 'gpt-4.1-mini',
     apiKey: tokenDiagnostic(apiKey)
+  };
+}
+
+function resolveAnaSequenceGuidePath() {
+  const configured = String(process.env.ANA_SEQUENCE_GUIDE_PATH || '').trim();
+  const candidates = [
+    configured && (path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured)),
+    path.resolve(process.cwd(), '..', ANA_SEQUENCE_GUIDE_FILE),
+    path.resolve(process.cwd(), ANA_SEQUENCE_GUIDE_FILE)
+  ].filter(Boolean);
+  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[1];
+}
+
+async function readAnaSequenceGuide() {
+  const guidePath = resolveAnaSequenceGuidePath();
+  const stat = await fsp.stat(guidePath);
+  if (
+    anaSequenceGuideCache.path === guidePath
+    && anaSequenceGuideCache.loadedAt >= stat.mtimeMs
+    && anaSequenceGuideCache.text
+  ) {
+    return {
+      path: guidePath,
+      text: anaSequenceGuideCache.text,
+      bytes: stat.size,
+      updatedAt: stat.mtime.toISOString()
+    };
+  }
+
+  const text = await fsp.readFile(guidePath, 'utf8');
+  anaSequenceGuideCache = {
+    path: guidePath,
+    text,
+    loadedAt: stat.mtimeMs
+  };
+  return {
+    path: guidePath,
+    text,
+    bytes: stat.size,
+    updatedAt: stat.mtime.toISOString()
   };
 }
 
 async function readAnaTrainingStatus() {
   const trainingDir = path.resolve(process.cwd(), '..', 'TREINAMENTO_IA_NOVO_TEMPO');
   const files = [
+    [path.resolve(process.cwd(), '..', ANA_SEQUENCE_GUIDE_FILE), 'Sequência específica: material bíblico e presente físico'],
     ['LEIA_PRIMEIRO.md', 'Contexto da operação'],
     ['02_SYSTEM_PROMPT_ANA_V2.md', 'Persona, guardrails e régua de 21 dias'],
     ['03_COPYS_ICEBREAKERS.md', 'Copys de primeiro contato e ramificações']
   ];
 
   const items = await Promise.all(files.map(async ([fileName, description]) => {
-    const fullPath = path.join(trainingDir, fileName);
+    const fullPath = path.isAbsolute(fileName) ? fileName : path.join(trainingDir, fileName);
     try {
       const stat = await fsp.stat(fullPath);
       return {
-        fileName,
+        fileName: path.basename(fileName),
         description,
         loaded: true,
+        path: fullPath,
         bytes: stat.size,
         updatedAt: stat.mtime.toISOString()
       };
     } catch {
       return {
-        fileName,
+        fileName: path.basename(fileName),
         description,
         loaded: false,
+        path: fullPath,
         bytes: 0,
         updatedAt: null
       };
@@ -1006,7 +1055,33 @@ function summarizeAnaConversation(conversation) {
 }
 
 function leadFirstName(value) {
-  return String(value || '').trim().split(/\s+/)[0] || 'Oi';
+  const first = String(value || '').trim().split(/\s+/)[0] || '';
+  return /^(oi|olá|ola|bom|boa|bom dia|boa tarde|boa noite)$/i.test(first) ? '' : first;
+}
+
+function addressFromConversation(conversation) {
+  const leadAddress = String(conversation?.lead?.address || '').replace(/\s+/g, ' ').trim();
+  if (leadAddress && !/^n\/?i$|^nao informado$|^não informado$/i.test(leadAddress)) return leadAddress;
+  const metadataAddress = (conversation?.messages || [])
+    .map((message) => message.metadata?.leadAddress || message.metadata?.address)
+    .find(Boolean);
+  return String(metadataAddress || '').replace(/\s+/g, ' ').trim();
+}
+
+function materialFromConversation(conversation) {
+  const metadataMaterial = [...(conversation?.messages || [])]
+    .reverse()
+    .map((message) => message.metadata?.material || message.metadata?.theme || message.metadata?.leadMaterial)
+    .find(Boolean);
+  return cleanTemplateVariable(metadataMaterial || inferLeadStudyTheme(conversation?.lead || {}), 'um material da Escola Bíblica Novo Tempo');
+}
+
+function anaNameText(name) {
+  return name ? `${name}, ` : '';
+}
+
+function anaNameSuffix(name) {
+  return name ? `, ${name}` : '';
 }
 
 function detectAnaReplyIntent(messageText) {
@@ -1033,30 +1108,259 @@ function inferLeadStudyTheme(lead) {
     || 'estudos bíblicos';
 }
 
-function buildAnaReply({ conversation, inboundMessage }) {
+function conversationMessagesForPrompt(messages = []) {
+  return messages.slice(-16).map((message) => ({
+    direction: message.direction,
+    senderType: message.senderType,
+    senderName: message.senderName || (message.direction === 'INBOUND' ? 'Lead' : 'Ana'),
+    body: String(message.body || '').slice(0, 900),
+    createdAt: message.createdAt
+  }));
+}
+
+function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
+  const name = conversation?.leadName || conversation?.lead?.name || '';
+  const firstName = leadFirstName(name);
+  const material = materialFromConversation(conversation);
+  const address = addressFromConversation(conversation);
+  const district = conversation?.district || conversation?.lead?.district?.name || 'Distrito não vinculado';
+  const lead = {
+    nome_cadastrado: name || null,
+    primeiro_nome_confiavel: firstName || null,
+    telefone: conversation?.phone || null,
+    distrito: district,
+    material_solicitado: material,
+    endereco_cadastrado: address || null,
+    prioridade: conversation?.leadPriority || conversation?.lead?.priority || null
+  };
+
+  return [
+    'Você deve responder como a Ana, assistente virtual da Novo Tempo.',
+    'Use o documento abaixo como manual obrigatório de comportamento e roteiro.',
+    '',
+    '=== MANUAL DA ANA ===',
+    guideText,
+    '',
+    '=== DADOS DO LEAD ===',
+    JSON.stringify(lead, null, 2),
+    '',
+    '=== HISTÓRICO RECENTE DA CONVERSA ===',
+    JSON.stringify(conversationMessagesForPrompt(conversation?.messages || []), null, 2),
+    '',
+    '=== ÚLTIMA MENSAGEM RECEBIDA ===',
+    String(inboundMessage?.body || ''),
+    '',
+    '=== TAREFA ===',
+    'Gere apenas a próxima mensagem da Ana para WhatsApp.',
+    'Não explique sua decisão.',
+    'Não use Markdown.',
+    'Não use listas.',
+    'Faça no máximo uma pergunta principal.',
+    'Se não houver nome confiável, não invente nome e não use "Oi" como nome.',
+    'Respeite o roteiro do presente físico em 19 de setembro de 2026 somente quando houver abertura na conversa.'
+  ].join('\n');
+}
+
+async function callAnaModel({ conversation, inboundMessage, guideText, config }) {
+  const prompt = buildAnaPrompt({ conversation, inboundMessage, guideText });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.ANA_MODEL_TIMEOUT_MS || 18000));
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    signal: controller.signal,
+    headers: {
+      Authorization: `Bearer ${normalizeApiToken(process.env.ASSISTENTE_ANA || process.env.ANA_API_KEY)}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: config.model,
+      input: [
+        {
+          role: 'system',
+          content: 'Você é a Ana da Novo Tempo. Siga estritamente o manual e responda somente com a mensagem final para WhatsApp.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.4,
+      max_output_tokens: 220
+    })
+  }).finally(() => clearTimeout(timeout));
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload?.error?.message || `Modelo da Ana respondeu com status ${response.status}`);
+    error.providerStatus = response.status;
+    error.providerResponse = payload;
+    throw error;
+  }
+
+  const text = payload.output_text
+    || payload.output?.flatMap((item) => item.content || [])
+      .map((content) => content.text || '')
+      .join('')
+    || '';
+  return String(text || '').trim();
+}
+
+function validateAnaReply(message, { conversation, inboundMessage }) {
+  let clean = String(message || '').replace(/\r/g, '').trim();
+  const fallback = buildAnaFallbackReply({ conversation, inboundMessage });
+  if (!clean) return fallback;
+  clean = clean.replace(/\*\*/g, '').replace(/^\s*Ana:\s*/i, '').trim();
+  if (clean.length > 700) clean = fallback;
+  if (/^(oi|olá|ola),?\s/i.test(clean) && !leadFirstName(conversation?.leadName || conversation?.lead?.name)) {
+    clean = clean.replace(/^(oi|olá|ola),?\s*/i, '');
+  }
+  if (/\bOi\b[,!]*\s+(obrigad|fico|que|entendi|perfeito)/i.test(clean)) clean = fallback;
+
+  const history = (conversation?.messages || []).map((item) => item.body).join(' ').toLowerCase();
+  const alreadyAnsweredMaterial = /(recebi|chegou|chegou sim|material chegou)/i.test(history);
+  const repeatsArrivalQuestion = /(material chegou|chegou até aí|chegou ate ai|chegou a receber|receber ou acessar)/i.test(clean);
+  if (alreadyAnsweredMaterial && repeatsArrivalQuestion) clean = fallback;
+
+  const questionCount = (clean.match(/\?/g) || []).length;
+  if (questionCount > 1) {
+    const firstQuestionEnd = clean.indexOf('?');
+    clean = clean.slice(0, firstQuestionEnd + 1).trim();
+  }
+  return clean;
+}
+
+async function buildAnaReply({ conversation, inboundMessage, config }) {
+  const guide = await readAnaSequenceGuide();
+  const fallback = buildAnaFallbackReply({ conversation, inboundMessage });
+  if (String(process.env.ASSISTENTE_ANA_USE_MODEL || 'true').toLowerCase() === 'false') {
+    return {
+      message: validateAnaReply(fallback, { conversation, inboundMessage }),
+      source: 'fallback',
+      guide
+    };
+  }
+
+  try {
+    const modelMessage = await callAnaModel({
+      conversation,
+      inboundMessage,
+      guideText: guide.text,
+      config
+    });
+    return {
+      message: validateAnaReply(modelMessage, { conversation, inboundMessage }),
+      source: 'model',
+      guide
+    };
+  } catch (error) {
+    console.error('[ai:ana:model:error]', error.message);
+    return {
+      message: validateAnaReply(fallback, { conversation, inboundMessage }),
+      source: 'fallback-after-model-error',
+      guide,
+      error: {
+        message: error.message,
+        providerStatus: error.providerStatus || null
+      }
+    };
+  }
+}
+
+function anaReplyDelayMs(message, inboundMessage) {
+  const inboundLength = String(inboundMessage?.body || '').length;
+  const outboundLength = String(message || '').length;
+  const base = inboundLength <= 25 ? 4000 : inboundLength <= 140 ? 8000 : 15000;
+  const calculated = base + Math.round(outboundLength / 25) * 1000;
+  const sensitive = detectAnaReplyIntent(inboundMessage?.body) === 'human';
+  const max = sensitive ? 35000 : 25000;
+  return Math.min(Math.max(calculated, 4000), max);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendZproTypingIndicator(phone) {
+  const typingPath = String(process.env.ZPRO_TYPING_PATH || '').trim();
+  if (!typingPath) return { ok: false, skipped: true };
+  const config = zproConfig();
+  if (!config.baseUrl || !config.token || !config.apiId) return { ok: false, skipped: true };
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) return { ok: false, skipped: true };
+  const pathValue = applyPathParams(typingPath, {
+    apiId: config.apiId,
+    channelId: config.channelId || config.apiId,
+    sessionId: config.channelId || config.apiId,
+    phone: normalizedPhone,
+    number: normalizedPhone
+  });
+  const url = pathValue.startsWith('http') ? pathValue : `${config.baseUrl}${pathValue.startsWith('/') ? '' : '/'}${pathValue}`;
+
+  try {
+    const providerResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        number: normalizedPhone,
+        phone: normalizedPhone,
+        to: normalizedPhone,
+        typing: true,
+        presence: 'composing',
+        channelId: config.channelId || config.apiId,
+        sessionId: config.channelId || config.apiId,
+        bearertoken: config.token
+      })
+    });
+    return { ok: providerResponse.ok, status: providerResponse.status };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
+
+function buildAnaFallbackReply({ conversation, inboundMessage }) {
   const name = leadFirstName(conversation?.leadName || conversation?.lead?.name);
-  const theme = inferLeadStudyTheme(conversation?.lead || {});
+  const theme = materialFromConversation(conversation);
+  const address = addressFromConversation(conversation);
   const intent = detectAnaReplyIntent(inboundMessage?.body);
+  const fullHistory = (conversation?.messages || []).map((message) => message.body).join(' ').toLowerCase();
+  const alreadyAskedMaterialRead = /(dar uma olhada|chamou mais sua atenção|chamou mais sua atencao)/i.test(fullHistory);
+  const alreadyOfferedGift = /(presente físico|presente fisico|19 de setembro)/i.test(fullHistory);
+  const acceptedGift = /(quero receber|pode entregar|aceito|gostaria de receber|sim.*presente|sim.*brinde)/i.test(String(inboundMessage?.body || '').toLowerCase()) && alreadyOfferedGift;
 
   if (intent === 'optout') {
-    return `Tudo bem, ${name}, sem problemas nenhum! 🙏\n\nSe um dia quiser retomar, é só me mandar uma mensagem aqui. Desejo tudo de bom pra você! Deus te abençoe!`;
+    return `Tudo bem${anaNameSuffix(name)}, sem problema nenhum. Vou respeitar seu pedido e encerrar o contato por aqui. Deus te abençoe! 🙏`;
   }
   if (intent === 'human') {
-    return `${name}, obrigada por me contar. Esse assunto é importante demais para ficar só por mensagem automática.\n\nVou pedir para alguém da nossa equipe conversar com você com mais calma, tudo bem?`;
+    return `${anaNameText(name)}obrigada por me contar. Esse assunto merece uma atenção mais cuidadosa, então vou deixar registrado para alguém da equipe Novo Tempo acompanhar com carinho.`;
+  }
+  if (acceptedGift) {
+    if (address) {
+      return `Perfeito${anaNameSuffix(name)}. Encontrei este endereço em nossos registros: ${address}\n\nEsse ainda é o melhor endereço para você receber o presente?`;
+    }
+    return `Que bom${anaNameSuffix(name)}. Para organizar a entrega do presente no dia 19 de setembro de 2026, você pode me enviar seu endereço atual completo?`;
   }
   if (intent === 'not_received') {
-    return `Poxa, ${name}, que pena! Não era pra ter acontecido isso.\n\nEu consigo te enviar o material sobre ${theme} aqui pelo WhatsApp. Quer que eu mande agora?`;
+    return `Entendi${anaNameSuffix(name)}. Obrigada por me avisar.\n\nPosso verificar uma forma de te ajudar com esse material por aqui?`;
   }
   if (intent === 'does_not_remember') {
-    return `Sem problemas, ${name}! Eu sou a Ana, da equipe da Escola Bíblica Novo Tempo.\n\nUm tempo atrás, você solicitou um material sobre ${theme}. A gente está fazendo um acompanhamento para garantir que todo mundo recebeu direitinho. Se quiser, posso te enviar aqui pelo WhatsApp.`;
+    return `Sem problema${anaNameSuffix(name)}. Esse contato é sobre ${theme}, que aparece nos registros da Escola Bíblica Novo Tempo.\n\nVocê gostaria que eu te ajudasse a retomar esse estudo?`;
   }
   if (intent === 'received') {
-    return `Que bom saber, ${name}! 😊\n\nMe conta: você chegou a dar uma olhada no material? Teve alguma parte que chamou mais sua atenção?`;
+    if (!alreadyAskedMaterialRead) {
+      return `Que bom saber${anaNameSuffix(name)}. Fico feliz que o material chegou certinho 😊\n\nVocê conseguiu dar uma olhada nele?`;
+    }
+    if (!alreadyOfferedGift) {
+      return `${anaNameText(name)}fico muito feliz com seu interesse. Além desse acompanhamento, a Novo Tempo está preparando uma entrega especial no dia 19 de setembro de 2026.\n\nVocê gostaria de receber esse presente em sua residência?`;
+    }
+    return `Perfeito${anaNameSuffix(name)}. Vou deixar isso registrado para a equipe da Novo Tempo acompanhar com carinho.`;
   }
   if (intent === 'visit') {
-    return `Que bom você falar sobre isso, ${name}.\n\nPosso pedir para alguém da nossa equipe te orientar sobre uma igreja ou visita perto de você, sem compromisso?`;
+    return `Que bom você falar sobre isso${anaNameSuffix(name)}. Vou deixar registrado para alguém da equipe Novo Tempo acompanhar com carinho.`;
   }
-  return `${name}, obrigada por responder! 😊\n\nMe conta um pouquinho: você chegou a receber ou acessar o material da Escola Bíblica Novo Tempo?`;
+  return `${anaNameText(name)}obrigada por responder 😊\n\nPara eu seguir com o acompanhamento certinho: você chegou a receber o material da Escola Bíblica Novo Tempo?`;
 }
 
 async function maybeReplyWithAna(saved, inboundMessage) {
@@ -1070,11 +1374,14 @@ async function maybeReplyWithAna(saved, inboundMessage) {
     include: {
       lead: { select: whatsappLeadSelect },
       messages: {
-        orderBy: { createdAt: 'asc' },
-        take: 20
+        orderBy: { createdAt: 'desc' },
+        take: 24
       }
     }
   });
+  if (conversation?.messages) {
+    conversation.messages = [...conversation.messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }
   const recentAnaReply = (conversation?.messages || []).find((message) => (
     message.senderType === 'AI'
     && message.direction === 'OUTBOUND'
@@ -1082,7 +1389,11 @@ async function maybeReplyWithAna(saved, inboundMessage) {
   ));
   if (recentAnaReply) return null;
 
-  const message = buildAnaReply({ conversation, inboundMessage });
+  const anaReply = await buildAnaReply({ conversation, inboundMessage, config });
+  const message = anaReply.message;
+  const delayMs = anaReplyDelayMs(message, inboundMessage);
+  const typing = await sendZproTypingIndicator(conversation?.phone || saved.conversation.phone);
+  await sleep(delayMs);
   const result = await sendZproTextMessage({
     phone: conversation?.phone || saved.conversation.phone,
     message,
@@ -1109,6 +1420,13 @@ async function maybeReplyWithAna(saved, inboundMessage) {
       autoReply: true,
       replyToMessageId: inboundMessage.id,
       intent: detectAnaReplyIntent(inboundMessage.body),
+      source: anaReply.source,
+      guidePath: anaReply.guide?.path || null,
+      guideUpdatedAt: anaReply.guide?.updatedAt || null,
+      delayMs,
+      typing,
+      model: config.model,
+      modelError: anaReply.error || null,
       attempts: result.attempts || []
     }
   });
@@ -2068,7 +2386,18 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         providerStatus: result.deliveryStatus,
         providerResponse: result.providerResponse,
         providerMessageId: providerMessageId(result.providerResponse),
-        metadata: { templateId: request.body?.templateId || null, batch: true, broadcastId, listName, recipientTotal, templateMessage: message, attempts: result.attempts || [] }
+        metadata: {
+          templateId: request.body?.templateId || null,
+          batch: true,
+          broadcastId,
+          listName,
+          recipientTotal,
+          templateMessage: message,
+          material: recipient.material || recipient.theme || null,
+          theme: recipient.theme || recipient.material || null,
+          leadAddress: recipient.address || null,
+          attempts: result.attempts || []
+        }
       });
       await prisma.whatsAppBroadcastRecipient.update({
         where: { id: recipientRecord.id },
@@ -2108,6 +2437,9 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
           broadcastId,
           listName,
           recipientTotal,
+          material: recipient.material || recipient.theme || null,
+          theme: recipient.theme || recipient.material || null,
+          leadAddress: recipient.address || null,
           providerHttpStatus: error.providerStatus || null,
           attempts: error.providerAttempts || []
         }
@@ -2495,13 +2827,10 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     }
   });
 
-  let anaReply = null;
   if (saved?.message?.direction === 'INBOUND') {
-    try {
-      anaReply = await maybeReplyWithAna(saved, saved.message);
-    } catch (error) {
+    maybeReplyWithAna(saved, saved.message).catch((error) => {
       console.error('[ai:ana:auto-reply:error]', error.message, error.providerResponse || '');
-    }
+    });
   }
 
   response.json({
@@ -2510,7 +2839,7 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     saved: Boolean(saved),
     conversationId: saved?.conversation?.id || null,
     messageId: saved?.message?.id || null,
-    anaReplied: Boolean(anaReply)
+    anaReplyQueued: Boolean(saved?.message?.direction === 'INBOUND')
   });
 });
 

@@ -87,7 +87,7 @@ const associationNavItems = [
   ['automations', 'WhatsApp', MessageCircle],
   ['reports', 'Relat\u00f3rios', PieChart]
 ];
-const defaultBroadcastMessage = 'Oi {{NOME}}, tudo bem? Eu sou a Ana, assistente virtual da Novo Tempo para acompanhamento espiritual 😊\n\nVi aqui que você pediu um material sobre {{TEMA}} pela Escola Bíblica Novo Tempo. Quero só confirmar com você: esse material chegou até aí?';
+const defaultBroadcastMessage = 'Boa noite, {{NOME}}, tudo bem? Eu sou a Ana, assistente virtual da Novo Tempo 😊\n\nVi aqui, em nossos registros da Novo Tempo, que você pediu um material sobre {{TEMA}} pela Escola Bíblica Novo Tempo.\n\nQuero só confirmar com você: esse material chegou até aí?';
 const crmPriorityLabels = {
   Hot: 'Quente',
   Warm: 'Potencial',
@@ -126,6 +126,8 @@ function dashboardLeadToWhatsAppLead(lead) {
     name: lead?.n || `Contato ${phone.slice(-4)}`,
     phone,
     district: lead?.d || null,
+    address: lead?.address || lead?.endereco || lead?.end || null,
+    material: lead?.materialName || lead?.materialPrincipal || lead?.material || lead?.tm || null,
     priority,
     score: lead?.s ?? null,
     isVip: Boolean(lead?.v),
@@ -8107,6 +8109,7 @@ function ConversationsView({ records = [] }) {
         leadId: lead.id,
         name: lead.name,
         district: lead.district || null,
+        address: lead.address || null,
         material: leadMaterial(lead),
         theme: leadMaterial(lead),
         priority: lead.priority || null,
@@ -8287,6 +8290,7 @@ function ConversationsView({ records = [] }) {
         tel: phone,
         t: true,
         d: lead.district || null,
+        address: lead.address || null,
         material: lead.material || lead.materialName || lead.materialPrincipal || lead.tm || null,
         p: lead.priority ? whatsappPriorityBadgeKey(lead.priority) : null,
         em: null,
