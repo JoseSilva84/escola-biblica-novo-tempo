@@ -3134,11 +3134,21 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
     }
   }
 
-  response.json({
-    ok: results.some((item) => item.ok),
+  const sent = results.filter((item) => item.ok).length;
+  const failed = results.length - sent;
+  const firstFailure = results.find((item) => !item.ok);
+  const messageText = sent
+    ? failed
+      ? `${sent} mensagem(ns) foram aceitas pelo Z-PRO e ${failed} falharam.`
+      : `${sent} mensagem(ns) foram aceitas pelo Z-PRO.`
+    : `Nenhuma mensagem foi aceita pelo Z-PRO.${firstFailure?.message ? ` Motivo: ${firstFailure.message}` : ''}`;
+
+  response.status(sent ? 200 : 502).json({
+    ok: sent > 0,
+    message: messageText,
     total: results.length,
-    sent: results.filter((item) => item.ok).length,
-    failed: results.filter((item) => !item.ok).length,
+    sent,
+    failed,
     results
   });
 });
@@ -3219,6 +3229,7 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
             delivered: recipients.filter((recipient) => recipient.delivered).length,
             responded: recipients.filter((recipient) => recipient.repliedAt).length,
             failed: recipients.filter((recipient) => recipient.status === 'FALHA').length,
+            lastError: recipients.find((recipient) => recipient.status === 'FALHA' && recipient.error)?.error || null,
             recipients
           };
         })

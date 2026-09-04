@@ -1,6 +1,6 @@
 'use client';
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Area,
@@ -15,6 +15,7 @@ import {
   YAxis
 } from 'recharts';
 import {
+  AlertTriangle,
   ArrowRight,
   BadgePlus,
   Bell,
@@ -105,6 +106,50 @@ const whatsappPriorityLabels = {
   Cold: 'Frio'
 };
 const birthdayMonthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+class CrmErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null, view: props.view };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  static getDerivedStateFromProps(props, state) {
+    if (state.view !== props.view) {
+      return { error: null, view: props.view };
+    }
+    return null;
+  }
+
+  componentDidCatch(error, info) {
+    console.error('[crm:view:error]', error, info);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <section className={`${panelClass} mx-auto grid max-w-3xl gap-4 p-6 text-center`}>
+        <span className={labelClass}>Tela indisponível</span>
+        <h1 className="text-2xl font-black text-slate-50">Não foi possível abrir esta área agora</h1>
+        <p className="text-sm font-semibold leading-relaxed text-slate-400">
+          A página encontrou um erro ao montar este módulo. Volte ao painel e tente abrir novamente; o restante do sistema continua disponível.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <button className={primaryButtonClass} onClick={this.props.onReset} type="button">
+            <LayoutDashboard size={18} />
+            Voltar ao painel
+          </button>
+          <button className={ghostButtonClass} onClick={() => this.setState({ error: null })} type="button">
+            Tentar novamente
+          </button>
+        </div>
+      </section>
+    );
+  }
+}
 
 function birthdayParts(value) {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value || '').trim());
@@ -7818,7 +7863,8 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
   const metricDefinitions = [
     { key: 'sent', label: 'Enviados', icon: Send, color: '#00a884', track: '#d9fdd3' },
     { key: 'delivered', label: 'Receberam', icon: CheckCheck, color: '#0284c7', track: '#e0f2fe' },
-    { key: 'responded', label: 'Responderam', icon: MessageCircle, color: '#7c3aed', track: '#ede9fe' }
+    { key: 'responded', label: 'Responderam', icon: MessageCircle, color: '#7c3aed', track: '#ede9fe' },
+    { key: 'failed', label: 'Falharam', icon: AlertTriangle, color: '#dc2626', track: '#fee2e2' }
   ];
 
   return (
@@ -7859,7 +7905,7 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
                   </div>
                   <p className="mt-3 line-clamp-2 text-sm font-semibold leading-relaxed text-[#3b4a54]">{transmission.message}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-3 p-4 max-sm:grid-cols-1">
+                <div className="grid grid-cols-4 gap-3 p-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
                   {metricDefinitions.map((metric) => {
                     const Icon = metric.icon;
                     const value = Number(transmission[metric.key]) || 0;
@@ -7921,8 +7967,9 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
                   </div>
                 ) : null}
                 {transmission.failed ? (
-                  <div className="border-t border-red-100 bg-red-50 px-5 py-2 text-xs font-bold text-red-700">
-                    {formatNumber(transmission.failed)} envio(s) com falha
+                  <div className="border-t border-red-100 bg-red-50 px-5 py-3 text-xs font-bold text-red-700">
+                    {formatNumber(transmission.failed)} envio(s) com falha.
+                    {transmission.lastError ? <span className="ml-1">Motivo: {transmission.lastError}</span> : null}
                   </div>
                 ) : null}
               </article>
@@ -8241,9 +8288,17 @@ function ConversationsView({ records = [] }) {
           })
         });
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.message || 'Não foi possível enviar a transmissão.');
+        if (!response.ok || payload.ok === false) {
+          const firstFailure = Array.isArray(payload.results)
+            ? payload.results.find((item) => !item.ok)
+            : null;
+          throw new Error(payload.message || firstFailure?.message || 'Nenhuma mensagem foi aceita pelo Z-PRO.');
+        }
         totals.sent += payload.sent || 0;
         totals.failed += payload.failed || 0;
+      }
+      if (!totals.sent) {
+        throw new Error('Nenhuma mensagem foi aceita pelo Z-PRO. Confira o painel para ver o motivo da falha.');
       }
       toast.success('Transmissão concluída', {
         description: `${totals.sent} enviadas${totals.failed ? ` e ${totals.failed} com falha` : ''}.`
@@ -10462,7 +10517,9 @@ export default function CrmApp({ payload: initialPayload = null }) {
           Abrindo página…
         </div>
       ) : null}
-      {content}
+      <CrmErrorBoundary onReset={() => navigateView(defaultViewForUser(user))} view={effectiveView}>
+        {content}
+      </CrmErrorBoundary>
     </AppShell>
   );
 }
