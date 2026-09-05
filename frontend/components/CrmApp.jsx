@@ -3976,7 +3976,7 @@ function AssociationDashboard({ association, data, records = [], interestRecords
           <h2 className="mt-1 text-xl font-black text-slate-50">Volume de interessados</h2>
           <div className="mt-5 h-80">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={data.topDistricts} layout="vertical" margin={{ left: 12, right: 16 }}>
+              <BarChart data={data?.topDistricts ?? []} layout="vertical" margin={{ left: 12, right: 16 }}>
                 <CartesianGrid stroke="rgba(226,232,240,0.08)" horizontal={false} />
                 <XAxis hide type="number" />
                 <YAxis dataKey="name" stroke="#94a3b8" tickLine={false} type="category" width={115} />
@@ -6132,7 +6132,7 @@ function AdminGeneralView({
   ];
   const activeCampaigns = campaigns.filter((campaign) => campaign.status === 'Ativa').length;
   const pendingUsers = users.filter((item) => item.status !== 'Ativo').length;
-  const topDistrict = data.topDistricts[0];
+  const topDistrict = data?.topDistricts?.[0] ?? null;
   const operationCards = [
     ['Permissões por perfil', 'Admin geral, gestor de associação, coordenador e voluntário com escopos separados.', 'Pronto para backend', 'from-blue-600 to-cyan-500', 'bg-blue-500/95'],
     ['Territórios e igrejas', 'Admin geral organiza associações, distritos e igrejas antes de distribuir leads.', 'Camada visual', 'from-emerald-600 to-teal-500', 'bg-emerald-500/95'],
