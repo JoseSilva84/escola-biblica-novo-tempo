@@ -868,6 +868,35 @@ async function registeredAddressState(lead) {
   };
 }
 
+async function anaGiftWasOffered(event) {
+  const normalizedPhone = normalizePhone(event.phone);
+  if (!normalizedPhone) return false;
+
+  const conversation = await prisma.whatsAppConversation.findUnique({
+    where: { phone: normalizedPhone },
+    select: {
+      messages: {
+        where: { direction: 'OUTBOUND' },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+        select: { body: true }
+      }
+    }
+  }).catch(() => null);
+  const history = (conversation?.messages || []).map((message) => message.body).join(' ');
+  return /(brinde|presente).*(19 de setembro|dia 19)|(19 de setembro|dia 19).*(brinde|presente)/i.test(history);
+}
+
+function explicitContactOptOut(value) {
+  return /(pare de (me )?(mandar|enviar)|nao (me )?(mande|envie|procure|contate)|não (me )?(mande|envie|procure|contate)|remova meu (numero|número|contato)|quero sair|cancele meu contato|nao quero mais mensagens|não quero mais mensagens)/i.test(String(value || ''));
+}
+
+function anaGiftOfferReply(name) {
+  const firstName = String(name || '').trim().split(/\s+/)[0];
+  const greetingName = firstName ? `, ${firstName}` : '';
+  return `Que bom${greetingName}! A Novo Tempo preparou um brinde especial para você. Gostaríamos de entregá-lo no sábado, dia 19 de setembro, pela parte da tarde, por meio de um representante da nossa equipe. Você gostaria de receber esse brinde em casa?`;
+}
+
 async function anaIntentReply(event) {
   const intent = normalizedIntentName(event.intentName);
   const lead = await findLeadReference({ leadId: event.leadId, phone: event.phone });
@@ -875,12 +904,55 @@ async function anaIntentReply(event) {
   const firstName = String(lead?.name || event.leadName || '').trim().split(/\s+/)[0];
   const greetingName = firstName ? `, ${firstName}` : '';
 
+  const giftWasOffered = await anaGiftWasOffered(event);
+  const currentGiftContext = /(brinde|presente|entrega.*casa|receber.*casa)/i.test(event.inboundText);
+
   if (intent.includes('registrar interesse') || intent.includes('interesse em continuar')) {
+    if (!giftWasOffered && !currentGiftContext) {
+      return {
+        action: 'OFFER_GIFT',
+        reply: anaGiftOfferReply(lead?.name || event.leadName),
+        leadFound: Boolean(lead),
+        hasRegisteredAddress: addressState.hasAddress,
+        addressShouldBeHidden: true
+      };
+    }
+
     return {
       action: addressState.hasAddress ? 'CONFIRM_REGISTERED_ADDRESS' : 'REQUEST_NEW_ADDRESS',
       reply: addressState.hasAddress
         ? 'Que bom! 😊 Temos seu endereço em nossos dados. Ele continua o mesmo para receber o brinde?'
         : 'Que bom! 😊 Para organizarmos a entrega do brinde, pode me informar seu endereço completo?',
+      leadFound: Boolean(lead),
+      hasRegisteredAddress: addressState.hasAddress,
+      addressShouldBeHidden: true
+    };
+  }
+
+  if (intent.includes('encerrar contato') || intent.includes('finalizar contato')) {
+    if (explicitContactOptOut(event.inboundText)) {
+      return {
+        action: 'END_CONTACT',
+        reply: `Tudo bem${greetingName}. Respeitaremos seu pedido e não enviaremos novas mensagens. Deus abençoe você e sua família.`,
+        leadFound: Boolean(lead),
+        hasRegisteredAddress: addressState.hasAddress,
+        addressShouldBeHidden: true
+      };
+    }
+
+    if (!giftWasOffered) {
+      return {
+        action: 'OFFER_GIFT_BEFORE_ENDING',
+        reply: anaGiftOfferReply(lead?.name || event.leadName),
+        leadFound: Boolean(lead),
+        hasRegisteredAddress: addressState.hasAddress,
+        addressShouldBeHidden: true
+      };
+    }
+
+    return {
+      action: 'END_AFTER_GIFT_DECISION',
+      reply: `Tudo bem${greetingName}. Agradeço por conversar conosco. Deus abençoe você e sua família.`,
       leadFound: Boolean(lead),
       hasRegisteredAddress: addressState.hasAddress,
       addressShouldBeHidden: true
