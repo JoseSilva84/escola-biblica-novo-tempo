@@ -126,6 +126,7 @@ class CrmErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[crm:view:error]', error, info);
+    this.setState({ errorMessage: String(error?.message || error), errorStack: info?.componentStack || '' });
   }
 
   render() {
@@ -137,6 +138,15 @@ class CrmErrorBoundary extends Component {
         <p className="text-sm font-semibold leading-relaxed text-slate-400">
           A página encontrou um erro ao montar este módulo. Volte ao painel e tente abrir novamente; o restante do sistema continua disponível.
         </p>
+        {this.state.errorMessage ? (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-left">
+            <p className="text-xs font-black uppercase tracking-widest text-red-400">Erro técnico (para diagnóstico)</p>
+            <p className="mt-2 break-all text-xs font-mono text-red-300">{this.state.errorMessage}</p>
+            {this.state.errorStack ? (
+              <pre className="mt-2 max-h-32 overflow-auto text-[10px] text-red-400/70">{this.state.errorStack.slice(0, 600)}</pre>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex flex-wrap justify-center gap-3">
           <button className={primaryButtonClass} onClick={this.props.onReset} type="button">
             <LayoutDashboard size={18} />
