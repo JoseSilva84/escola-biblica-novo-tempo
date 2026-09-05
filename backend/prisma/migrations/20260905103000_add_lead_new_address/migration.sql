@@ -1,0 +1,1 @@
+ALTER TABLE "Lead" ADD COLUMN "newAddress" TEXT;

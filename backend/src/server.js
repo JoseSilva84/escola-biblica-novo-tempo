@@ -725,6 +725,16 @@ function readGptMakerIntentEvent(payload = {}) {
     data.event_id,
     output.id
   );
+  const address = firstText(
+    payload.newAddress,
+    payload.enderecoNovo,
+    payload.address,
+    payload.endereco,
+    data.newAddress,
+    data.enderecoNovo,
+    data.address,
+    data.endereco
+  );
 
   return {
     phone,
@@ -734,6 +744,7 @@ function readGptMakerIntentEvent(payload = {}) {
     leadId,
     inboundText,
     agentText,
+    address,
     eventId,
     agentName: firstText(agent.name, agent.nome, payload.agentName, data.agentName, 'Ana'),
     raw: payload
@@ -764,7 +775,7 @@ function externalLeadId(value) {
 }
 
 async function findLeadReference({ leadId, phone }) {
-  const leadSelect = { id: true, externalId: true, name: true, phone: true, address: true, district: { select: { name: true } } };
+  const leadSelect = { id: true, externalId: true, name: true, phone: true, address: true, newAddress: true, district: { select: { name: true } } };
   const numericLeadId = externalLeadId(leadId);
   if (numericLeadId) {
     const lead = await prisma.lead.findFirst({
@@ -796,6 +807,145 @@ async function findLeadReference({ leadId, phone }) {
       select: leadSelect
     });
     if (lead) return lead;
+  }
+
+  return null;
+}
+
+function normalizedIntentName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function confirmsRegisteredAddress(value) {
+  const answer = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (/^(sim|s|isso|correto|certo|esta correto|esta certo|sim esta correto|sim esta certo|continua o mesmo|e o mesmo|o mesmo|pode ser|confirmo)$/.test(answer)) return true;
+  return /\b(sim|correto|confirmo)\b/.test(answer)
+    && /\b(mesmo|igual|endereco|dados)\b/.test(answer)
+    && !/\b(mudou|mudei|novo|diferente|incorreto)\b/.test(answer);
+}
+
+function plausibleNewAddress(value) {
+  const address = String(value || '').replace(/\s+/g, ' ').trim();
+  const hasAddressMarker = /(rua|avenida|av\.?|travessa|alameda|rodovia|estrada|praca|praça|lote|quadra|bairro|cep)/i.test(address);
+  const hasStreetAndNumber = address.length >= 15 && /\p{L}/u.test(address) && /\d/.test(address);
+  if (address.length < 8 || confirmsRegisteredAddress(address) || (!hasAddressMarker && !hasStreetAndNumber)) return '';
+  return address.slice(0, 500);
+}
+
+async function registeredAddressState(lead) {
+  if (!lead) return { hasAddress: false, source: null };
+
+  if (String(lead.newAddress || '').trim()) {
+    return { hasAddress: true, source: 'updated' };
+  }
+
+  const recentUpdates = await prisma.leadInteraction.findMany({
+    where: { leadId: lead.id, channel: 'SISTEMA' },
+    orderBy: { createdAt: 'desc' },
+    take: 25,
+    select: { metadata: true }
+  }).catch(() => []);
+  const hasNewAddress = recentUpdates.some((interaction) => {
+    const metadata = interaction?.metadata;
+    return metadata && typeof metadata === 'object'
+      && metadata.type === 'ANA_ADDRESS_UPDATE'
+      && Boolean(String(metadata.newAddress || '').trim());
+  });
+
+  return {
+    hasAddress: hasNewAddress || Boolean(String(lead.address || '').trim()),
+    source: hasNewAddress ? 'updated' : (lead.address ? 'original' : null)
+  };
+}
+
+async function anaIntentReply(event) {
+  const intent = normalizedIntentName(event.intentName);
+  const lead = await findLeadReference({ leadId: event.leadId, phone: event.phone });
+  const addressState = await registeredAddressState(lead);
+  const firstName = String(lead?.name || event.leadName || '').trim().split(/\s+/)[0];
+  const greetingName = firstName ? `, ${firstName}` : '';
+
+  if (intent.includes('registrar interesse') || intent.includes('interesse em continuar')) {
+    return {
+      action: addressState.hasAddress ? 'CONFIRM_REGISTERED_ADDRESS' : 'REQUEST_NEW_ADDRESS',
+      reply: addressState.hasAddress
+        ? 'Que bom! 😊 Temos seu endereço em nossos dados. Ele continua o mesmo para receber o brinde?'
+        : 'Que bom! 😊 Para organizarmos a entrega do brinde, pode me informar seu endereço completo?',
+      leadFound: Boolean(lead),
+      hasRegisteredAddress: addressState.hasAddress,
+      addressShouldBeHidden: true
+    };
+  }
+
+  if (intent.includes('registrar endereco')) {
+    const explicitAddress = plausibleNewAddress(event.address);
+    const informedAddress = explicitAddress || plausibleNewAddress(event.inboundText);
+    const confirmedExisting = confirmsRegisteredAddress(event.inboundText) && addressState.hasAddress;
+
+    if (lead && informedAddress) {
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { newAddress: informedAddress }
+      });
+      await prisma.leadInteraction.create({
+        data: {
+          leadId: lead.id,
+          channel: 'SISTEMA',
+          summary: 'Endereco atualizado pela Ana para a entrega do brinde.',
+          metadata: {
+            type: 'ANA_ADDRESS_UPDATE',
+            newAddress: informedAddress,
+            previousAddressPresent: Boolean(String(lead.address || '').trim()),
+            source: 'gpt-maker-intention'
+          }
+        }
+      });
+    } else if (lead && confirmedExisting) {
+      await prisma.leadInteraction.create({
+        data: {
+          leadId: lead.id,
+          channel: 'SISTEMA',
+          summary: 'Endereco existente confirmado para a entrega do brinde.',
+          metadata: {
+            type: 'ANA_ADDRESS_CONFIRMATION',
+            source: 'gpt-maker-intention'
+          }
+        }
+      });
+    }
+
+    if (!informedAddress && !confirmedExisting) {
+      return {
+        action: addressState.hasAddress ? 'CONFIRM_REGISTERED_ADDRESS' : 'REQUEST_NEW_ADDRESS',
+        reply: addressState.hasAddress
+          ? 'Temos seu endereço em nossos dados. Ele continua o mesmo para receber o brinde?'
+          : 'Pode me informar seu endereço completo para organizarmos a entrega do brinde?',
+        leadFound: Boolean(lead),
+        hasRegisteredAddress: addressState.hasAddress,
+        addressShouldBeHidden: true,
+        addressSaved: false
+      };
+    }
+
+    return {
+      action: 'CONFIRM_GIFT_DELIVERY',
+      reply: `Perfeito${greetingName}. Só para confirmar: no sábado, dia 19 de setembro, pela parte da tarde, um representante da Novo Tempo irá até sua casa para entregar o seu brinde em mãos. Deus abençoe você e sua família.`,
+      leadFound: Boolean(lead),
+      hasRegisteredAddress: true,
+      addressShouldBeHidden: true,
+      addressSaved: Boolean(lead && informedAddress),
+      existingAddressConfirmed: Boolean(confirmedExisting)
+    };
   }
 
   return null;
@@ -1042,6 +1192,7 @@ const whatsappLeadSelect = {
   name: true,
   phone: true,
   address: true,
+  newAddress: true,
   priority: true,
   score: true,
   isVip: true,
@@ -1059,6 +1210,7 @@ function serializeWhatsAppLead(lead) {
     phone,
     storedPhone: lead?.phone || null,
     address: lead?.address || null,
+    newAddress: lead?.newAddress || null,
     district: lead?.district?.name || null,
     priority: lead?.priority || null,
     score: lead?.score == null ? null : Number(lead.score),
@@ -1092,7 +1244,7 @@ function zproConfig() {
 
 function anaConfig() {
   const apiKey = normalizeApiToken(process.env.ASSISTENTE_ANA || process.env.ANA_API_KEY);
-  const autoReplyEnabled = String(process.env.ASSISTENTE_ANA_AUTO_REPLY || 'true').toLowerCase() !== 'false';
+  const autoReplyEnabled = String(process.env.ASSISTENTE_ANA_AUTO_REPLY || 'false').toLowerCase() === 'true';
   const modelEnabled = String(process.env.ASSISTENTE_ANA_USE_MODEL || 'true').toLowerCase() !== 'false';
   return {
     name: 'Ana',
@@ -1362,7 +1514,7 @@ function leadFirstName(value) {
 }
 
 function addressFromConversation(conversation) {
-  const leadAddress = String(conversation?.lead?.address || '').replace(/\s+/g, ' ').trim();
+  const leadAddress = String(conversation?.lead?.newAddress || conversation?.lead?.address || '').replace(/\s+/g, ' ').trim();
   if (leadAddress && !/^n\/?i$|^nao informado$|^não informado$/i.test(leadAddress)) return leadAddress;
   const metadataAddress = (conversation?.messages || [])
     .map((message) => message.metadata?.leadAddress || message.metadata?.address)
@@ -1390,7 +1542,6 @@ function detectAnaReplyIntent(messageText) {
   const text = String(messageText || '').toLowerCase();
   if (/(parar|remover|cancelar|não quero|nao quero|sem interesse|sair)/i.test(text)) return 'optout';
   if (/(suicid|me matar|morrer|desespero|abuso|violência|violencia|ameaça|ameaca|urgente)/i.test(text)) return 'human';
-  if (/(estado dos mortos|sábado|sabado|domingo|juízo|juizo|dízimo|dizimo|oferta|ellen|outra igreja|denominação|denominacao)/i.test(text)) return 'human';
   if (/(não lembro|nao lembro|quem é você|quem e voce|qual material|que material)/i.test(text)) return 'does_not_remember';
   if (/(visita|igreja|endereço|endereco|pastor|missionário|missionario|voluntário|voluntario)/i.test(text)) return 'visit';
   if (/(não recebi|nao recebi|ainda não|ainda nao|não chegou|nao chegou|não|nao)/i.test(text)) return 'not_received';
@@ -1491,7 +1642,7 @@ function inferAnaConversationState(conversation) {
       : /(não quero|nao quero|não posso|nao posso|não precisa|nao precisa)/i.test(inboundHistory)
         ? 'nao'
         : 'desconhecido',
-    endereco_cadastrado: address || null,
+    possui_endereco_cadastrado: Boolean(address),
     endereco_confirmado: /(endereço está certo|endereco esta certo|esse mesmo|está correto|esta correto|pode ser nesse)/i.test(inboundHistory)
       ? 'sim'
       : 'desconhecido',
@@ -1516,7 +1667,7 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     telefone: conversation?.phone || null,
     distrito: district,
     material_solicitado: material,
-    endereco_cadastrado: address || null,
+    possui_endereco_cadastrado: Boolean(address),
     prioridade: conversation?.leadPriority || conversation?.lead?.priority || null
   };
   const state = inferAnaConversationState(conversation);
@@ -1784,7 +1935,7 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
   }
   if (acceptedGift) {
     if (address) {
-      return `Perfeito${anaNameSuffix(name)}. Encontrei este endereço em nossos registros: ${address}\n\nEsse ainda é o melhor endereço para você receber o presente?`;
+      return `Perfeito${anaNameSuffix(name)}. Temos seu endereço em nossos dados. Ele continua o mesmo para você receber o presente?`;
     }
     return `Que bom${anaNameSuffix(name)}. Para organizar a entrega do presente no dia 19 de setembro de 2026, você pode me enviar seu endereço atual completo?`;
   }
@@ -2770,7 +2921,7 @@ app.get('/api/ai-intentions', (request, response) => {
     webhook: 'ready',
     provider: 'gpt-maker',
     requiredFields: ['phone ou telefone', 'agentMessage ou resposta'],
-    optionalFields: ['userMessage', 'intent', 'name', 'leadId']
+    optionalFields: ['userMessage', 'intent', 'name', 'leadId', 'address ou endereco']
   });
 });
 
@@ -2793,6 +2944,7 @@ app.post('/api/ai-intentions', async (request, response) => {
   }));
 
   try {
+    const intentReply = await anaIntentReply(event);
     let inboundSaved = null;
     if (event.phone && event.inboundText) {
       inboundSaved = await recordWhatsAppMessage({
@@ -2844,6 +2996,13 @@ app.post('/api/ai-intentions', async (request, response) => {
       messageId: saved?.message?.id || null,
       inboundMessageId: inboundSaved?.message?.id || null,
       missingPhone: !event.phone,
+      action: intentReply?.action || 'REGISTER_EVENT',
+      reply: intentReply?.reply || '',
+      leadFound: intentReply?.leadFound ?? Boolean(saved?.conversation?.leadId || inboundSaved?.conversation?.leadId),
+      hasRegisteredAddress: intentReply?.hasRegisteredAddress ?? false,
+      addressShouldBeHidden: intentReply?.addressShouldBeHidden ?? true,
+      addressSaved: intentReply?.addressSaved ?? false,
+      existingAddressConfirmed: intentReply?.existingAddressConfirmed ?? false,
       message: event.phone
         ? 'Evento da Ana recebido pelo backend.'
         : 'Evento recebido, mas nao foi salvo em conversa porque faltou telefone.'

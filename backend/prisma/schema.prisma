@@ -116,6 +116,7 @@ model Lead {
   gender         String?
   age            Int?
   address        String?
+  newAddress     String?
   priority       LeadPriority?
   score          Decimal?          @db.Decimal(5, 2)
   isVip          Boolean           @default(false)
