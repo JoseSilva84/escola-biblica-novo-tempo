@@ -67,6 +67,25 @@ function webhookAllowed(request) {
   return Boolean(secret && received === secret);
 }
 
+function aiIntentWebhookAllowed(request) {
+  const secret = String(
+    process.env.AI_INTENTIONS_WEBHOOK_SECRET
+    || process.env.GPTMAKER_WEBHOOK_SECRET
+    || process.env.WEBHOOK_SECRET
+    || ''
+  ).trim();
+  if (!secret) return true;
+  const authorization = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  const received = String(
+    request.headers['x-webhook-secret']
+    || request.headers['x-gptmaker-secret']
+    || authorization
+    || request.query?.token
+    || ''
+  ).trim();
+  return received === secret;
+}
+
 function requireAdminGeral(request, response, next) {
   if (!isAdminGeralUser(request.user)) {
     response.status(403).json({ message: 'Apenas Admin Geral pode atualizar a base de dados.' });
@@ -589,6 +608,135 @@ function readZproMessage(payload = {}) {
     name: contact.name || contact.pushName || data.pushName || data.senderName || null,
     status: status ? String(status) : null,
     text: String(text || '').trim()
+  };
+}
+
+function scalarText(value) {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value).trim();
+  }
+  return '';
+}
+
+function firstText(...values) {
+  for (const value of values) {
+    const text = scalarText(value);
+    if (text) return text;
+  }
+  return '';
+}
+
+function readGptMakerIntentEvent(payload = {}) {
+  const data = payload.data || payload.payload || payload.event || payload.body || payload;
+  const contact = data.contact || data.contato || data.customer || data.cliente || payload.contact || payload.contato || {};
+  const agent = data.agent || data.agente || payload.agent || payload.agente || {};
+  const output = data.output || data.outputs || data.response || data.resposta || data.result || payload.output || payload.response || {};
+  const input = data.input || data.inputs || data.message || data.mensagem || payload.input || payload.message || {};
+
+  const rawPhone = firstText(
+    payload.phone,
+    payload.telefone,
+    payload.whatsapp,
+    payload.number,
+    data.phone,
+    data.telefone,
+    data.whatsapp,
+    data.number,
+    data.remoteJid,
+    contact.phone,
+    contact.telefone,
+    contact.whatsapp,
+    contact.number,
+    contact.remoteJid
+  );
+
+  const phone = normalizePhone(rawPhone);
+  const intentName = firstText(
+    payload.intent,
+    payload.intencao,
+    payload.intentName,
+    payload.intent_name,
+    data.intent,
+    data.intencao,
+    data.intentName,
+    data.intent_name,
+    output.intent,
+    output.intencao,
+    'Intencao da Ana'
+  );
+  const leadName = firstText(
+    payload.name,
+    payload.nome,
+    payload.leadName,
+    data.name,
+    data.nome,
+    data.leadName,
+    contact.name,
+    contact.nome,
+    contact.pushName
+  );
+  const leadId = firstText(
+    payload.leadId,
+    payload.lead_id,
+    payload.externalLeadId,
+    data.leadId,
+    data.lead_id,
+    data.externalLeadId,
+    contact.leadId,
+    contact.id
+  );
+  const inboundText = firstText(
+    payload.userMessage,
+    payload.pergunta,
+    payload.input,
+    data.userMessage,
+    data.pergunta,
+    input.text,
+    input.body,
+    input.message,
+    input.mensagem
+  );
+  const agentText = firstText(
+    payload.agentMessage,
+    payload.agentResponse,
+    payload.resposta,
+    payload.mensagem,
+    payload.message,
+    payload.text,
+    data.agentMessage,
+    data.agentResponse,
+    data.resposta,
+    data.mensagem,
+    data.text,
+    output.text,
+    output.body,
+    output.message,
+    output.mensagem,
+    output.answer,
+    output.resposta
+  );
+  const eventId = firstText(
+    payload.id,
+    payload.eventId,
+    payload.event_id,
+    data.id,
+    data.eventId,
+    data.event_id,
+    output.id
+  );
+
+  return {
+    phone,
+    rawPhone,
+    intentName,
+    leadName,
+    leadId,
+    inboundText,
+    agentText,
+    eventId,
+    agentName: firstText(agent.name, agent.nome, payload.agentName, data.agentName, 'Ana'),
+    raw: payload
   };
 }
 
@@ -2608,6 +2756,103 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, needsHuman: 0, optOut: 0 },
       conversations: [],
       message: 'Nao foi possivel carregar o resumo da Ana.'
+    });
+  }
+});
+
+app.get('/api/ai-intentions', (request, response) => {
+  if (!aiIntentWebhookAllowed(request)) {
+    response.status(401).json({ ok: false, message: 'Webhook da Ana nao autorizado' });
+    return;
+  }
+  response.json({
+    ok: true,
+    webhook: 'ready',
+    provider: 'gpt-maker',
+    requiredFields: ['phone ou telefone', 'agentMessage ou resposta'],
+    optionalFields: ['userMessage', 'intent', 'name', 'leadId']
+  });
+});
+
+app.post('/api/ai-intentions', async (request, response) => {
+  if (!aiIntentWebhookAllowed(request)) {
+    response.status(401).json({ ok: false, message: 'Webhook da Ana nao autorizado' });
+    return;
+  }
+
+  const payload = coerceWebhookPayload(request.body);
+  const event = readGptMakerIntentEvent(payload);
+  const occurredAt = new Date();
+
+  console.log('[gptmaker:intention]', JSON.stringify({
+    phone: event.phone || event.rawPhone || null,
+    intent: event.intentName,
+    hasInbound: Boolean(event.inboundText),
+    hasAgentMessage: Boolean(event.agentText),
+    leadName: event.leadName || null
+  }));
+
+  try {
+    let inboundSaved = null;
+    if (event.phone && event.inboundText) {
+      inboundSaved = await recordWhatsAppMessage({
+        phone: event.phone,
+        body: event.inboundText,
+        direction: 'INBOUND',
+        senderType: 'LEAD',
+        senderName: event.leadName || 'Interessado',
+        leadId: event.leadId || null,
+        leadName: event.leadName || null,
+        provider: 'gpt-maker',
+        providerStatus: event.intentName,
+        providerMessageId: event.eventId ? `${event.eventId}:inbound` : null,
+        occurredAt,
+        metadata: {
+          source: 'gpt-maker-intention',
+          intent: event.intentName,
+          raw: event.raw
+        }
+      });
+    }
+
+    const body = event.agentText || `[Intencao acionada] ${event.intentName}`;
+    const saved = event.phone ? await recordWhatsAppMessage({
+      phone: event.phone,
+      body,
+      direction: 'OUTBOUND',
+      senderType: 'AI',
+      senderName: event.agentName || 'Ana',
+      leadId: event.leadId || null,
+      leadName: event.leadName || null,
+      provider: 'gpt-maker',
+      providerStatus: event.intentName,
+      providerMessageId: event.eventId ? `${event.eventId}:agent` : null,
+      occurredAt,
+      metadata: {
+        source: 'gpt-maker-intention',
+        intent: event.intentName,
+        inboundMessageId: inboundSaved?.message?.id || null,
+        raw: event.raw
+      }
+    }) : null;
+
+    response.json({
+      ok: true,
+      received: true,
+      saved: Boolean(saved),
+      conversationId: saved?.conversation?.id || inboundSaved?.conversation?.id || null,
+      messageId: saved?.message?.id || null,
+      inboundMessageId: inboundSaved?.message?.id || null,
+      missingPhone: !event.phone,
+      message: event.phone
+        ? 'Evento da Ana recebido pelo backend.'
+        : 'Evento recebido, mas nao foi salvo em conversa porque faltou telefone.'
+    });
+  } catch (error) {
+    console.error('[gptmaker:intention:error]', error.message);
+    response.status(500).json({
+      ok: false,
+      message: 'Nao foi possivel registrar o evento da Ana no backend.'
     });
   }
 });
