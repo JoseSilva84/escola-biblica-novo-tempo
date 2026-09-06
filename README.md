@@ -74,7 +74,7 @@ GPTMAKER_API_URL="https://api.gptmaker.ai"
 GPTMAKER_API_TOKEN="token-privado-da-api-do-gpt-maker"
 GPTMAKER_AGENT_ID="id-do-agente-ana-no-gpt-maker"
 GPTMAKER_AGENT_NAME="Ana"
-GPTMAKER_AUTO_REPLY="true"
+GPTMAKER_AUTO_REPLY="false"
 GPTMAKER_WEBHOOK_SECRET="segredo-privado-do-webhook-gpt-maker"
 ADMIN_EMAIL="admin@leadsnt.com.br"
 ADMIN_PASSWORD="senha-com-no-minimo-8-caracteres"
@@ -120,11 +120,11 @@ WHATSAPP_HOOK_CUSTOM_HEADERS="X-Waha-Webhook-Secret:O_MESMO_VALOR_DE_WAHA_WEBHOO
 
 Envie o mesmo segredo de `WAHA_WEBHOOK_SECRET` no header `x-waha-webhook-secret`. Os eventos usados são `message`, `message.any` e `message.ack`. O evento `message.any` registra também mensagens enviadas pelo próprio numero, inclusive por automacoes externas conectadas ao WhatsApp.
 
-O WAHA recebe e envia as mensagens. O backend grava o histórico e encaminha cada mensagem recebida ao agente configurado no GPT Maker.
+O WAHA recebe e envia as mensagens, e o backend grava o historico completo. Quando o proprio GPT Maker ja esta conectado ao WhatsApp e responde por sua automacao, mantenha `GPTMAKER_AUTO_REPLY="false"` para existir apenas um fluxo respondendo. Use `true` somente quando o backend for o unico responsavel por chamar o agente e enviar a resposta.
 
 ### Agente do GPT Maker
 
-O backend conversa com o agente usando `GPTMAKER_AGENT_ID` e `GPTMAKER_API_TOKEN`. Use o mesmo telefone como contexto da conversa para que o agente mantenha o histórico do interessado.
+Quando `GPTMAKER_AUTO_REPLY="true"`, o backend conversa com o agente usando `GPTMAKER_AGENT_ID` e `GPTMAKER_API_TOKEN`. Use o mesmo telefone como contexto da conversa para que o agente mantenha o historico do interessado. Nao ative essa opcao ao mesmo tempo que uma automacao do GPT Maker que ja envia respostas diretamente ao WhatsApp.
 
 As intenções e qualificações configuradas no GPT Maker devem chamar:
 

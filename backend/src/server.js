@@ -949,10 +949,10 @@ function plausibleNewAddress(value) {
 }
 
 async function registeredAddressState(lead) {
-  if (!lead) return { hasAddress: false, source: null };
+  if (!lead) return { hasAddress: false, confirmed: false, source: null };
 
   if (String(lead.newAddress || '').trim()) {
-    return { hasAddress: true, source: 'updated' };
+    return { hasAddress: true, confirmed: true, source: 'updated' };
   }
 
   const recentUpdates = await prisma.leadInteraction.findMany({
@@ -967,30 +967,123 @@ async function registeredAddressState(lead) {
       && metadata.type === 'ANA_ADDRESS_UPDATE'
       && Boolean(String(metadata.newAddress || '').trim());
   });
+  const hasAddressConfirmation = recentUpdates.some((interaction) => {
+    const metadata = interaction?.metadata;
+    return metadata && typeof metadata === 'object'
+      && metadata.type === 'ANA_ADDRESS_CONFIRMATION';
+  });
 
   return {
     hasAddress: hasNewAddress || Boolean(String(lead.address || '').trim()),
+    confirmed: hasNewAddress || hasAddressConfirmation,
     source: hasNewAddress ? 'updated' : (lead.address ? 'original' : null)
   };
 }
 
-async function anaGiftWasOffered(event) {
-  const normalizedPhone = normalizePhone(event.phone);
-  if (!normalizedPhone) return false;
+function anaDeliveryQuestion(value) {
+  const text = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text.includes('?')) return null;
+  if (/(endereco|dados)/.test(text) && /(continua o mesmo|ainda e o mesmo|esta correto|esta certo|confirmar)/.test(text)) {
+    return 'ADDRESS_CONFIRMATION';
+  }
+  if (/endereco/.test(text) && /(informar|enviar|passar|qual e|endereco completo|endereco atual)/.test(text)) {
+    return 'ADDRESS_REQUEST';
+  }
+  if (/(brinde|presente|material especial)/.test(text) && /(gostaria|podera|pode|quer|aceita|receber)/.test(text)) {
+    return 'GIFT_ACCEPTANCE';
+  }
+  if (/material/.test(text) && /(chegou|recebeu|receber)/.test(text)) return 'MATERIAL_RECEIVED';
+  if (/(material|estudo)/.test(text) && /(olhada|leu|ler|entendeu|atencao)/.test(text)) return 'MATERIAL_READ';
+  return null;
+}
 
-  const conversation = await prisma.whatsAppConversation.findUnique({
-    where: { phone: normalizedPhone },
-    select: {
-      messages: {
-        where: { direction: 'OUTBOUND' },
-        orderBy: { createdAt: 'desc' },
-        take: 30,
-        select: { body: true }
+function anaDeliveryWasConfirmed(value) {
+  const text = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  return /(representante|equipe da novo tempo)/.test(text)
+    && /(19 de setembro|dia 19)/.test(text)
+    && /(entregar|entrega|levara|ira ate)/.test(text)
+    && !text.includes('?');
+}
+
+async function inferAnaDeliveryState(event, lead, addressState) {
+  const conversation = event.phone
+    ? await prisma.whatsAppConversation.findUnique({
+      where: { phone: normalizePhone(event.phone) },
+      select: {
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 80
+        }
       }
+    }).catch(() => null)
+    : null;
+  const messages = dedupeWhatsAppMessageList([...(conversation?.messages || [])].reverse());
+  const eventText = String(event.inboundText || '').trim();
+  const lastMessage = messages[messages.length - 1];
+  if (eventText && !(
+    lastMessage?.direction === 'INBOUND'
+    && normalizeMessageSignature(lastMessage.body) === normalizeMessageSignature(eventText)
+  )) {
+    messages.push({ direction: 'INBOUND', body: eventText, createdAt: new Date() });
+  }
+
+  const state = {
+    giftOffered: false,
+    giftAccepted: 'desconhecido',
+    hasRegisteredAddress: Boolean(addressState?.hasAddress),
+    addressConfirmed: Boolean(addressState?.confirmed),
+    addressProvided: Boolean(String(lead?.newAddress || '').trim()),
+    deliveryConfirmed: false,
+    pendingQuestion: null
+  };
+
+  for (const message of messages) {
+    const body = String(message.body || '').trim();
+    if (!body) continue;
+    if (message.direction === 'OUTBOUND') {
+      if (/(brinde|presente).*(19 de setembro|dia 19)|(19 de setembro|dia 19).*(brinde|presente)/i.test(body)) {
+        state.giftOffered = true;
+      }
+      if (anaDeliveryWasConfirmed(body)) state.deliveryConfirmed = true;
+      const question = anaDeliveryQuestion(body);
+      if (question) state.pendingQuestion = question;
+      continue;
     }
-  }).catch(() => null);
-  const history = (conversation?.messages || []).map((message) => message.body).join(' ');
-  return /(brinde|presente).*(19 de setembro|dia 19)|(19 de setembro|dia 19).*(brinde|presente)/i.test(history);
+
+    const informedAddress = plausibleNewAddress(body);
+    const affirmative = isAffirmativeReply(body);
+    const negative = isNegativeReply(body);
+    if (informedAddress) {
+      state.addressProvided = true;
+      state.addressConfirmed = true;
+      state.pendingQuestion = null;
+      continue;
+    }
+    if (/(quero receber|pode entregar|aceito|gostaria de receber|pode trazer)/i.test(body)) {
+      state.giftAccepted = 'sim';
+    }
+    if (affirmative) {
+      if (state.pendingQuestion === 'GIFT_ACCEPTANCE') state.giftAccepted = 'sim';
+      if (state.pendingQuestion === 'ADDRESS_CONFIRMATION' && state.hasRegisteredAddress) state.addressConfirmed = true;
+      state.pendingQuestion = null;
+      continue;
+    }
+    if (negative) {
+      if (state.pendingQuestion === 'GIFT_ACCEPTANCE' && state.giftAccepted !== 'sim') state.giftAccepted = 'nao';
+      // Once an address was confirmed or provided, a later reply cannot reopen that completed step.
+      state.pendingQuestion = null;
+    }
+  }
+
+  return state;
 }
 
 function explicitContactOptOut(value) {
@@ -1007,17 +1100,79 @@ async function anaIntentReply(event) {
   const intent = normalizedIntentName(event.intentName);
   const lead = await findLeadReference({ leadId: event.leadId, phone: event.phone });
   const addressState = await registeredAddressState(lead);
+  const deliveryState = await inferAnaDeliveryState(event, lead, addressState);
   const firstName = String(lead?.name || event.leadName || '').trim().split(/\s+/)[0];
   const greetingName = firstName ? `, ${firstName}` : '';
+  const explicitAddress = plausibleNewAddress(event.address);
+  const informedAddress = explicitAddress || plausibleNewAddress(event.inboundText);
+  const confirmedExisting = deliveryState.addressConfirmed && addressState.hasAddress;
+  const addressReady = Boolean(informedAddress || deliveryState.addressProvided || confirmedExisting);
+  const deliveryIntent = intent.includes('registrar interesse')
+    || intent.includes('interesse em continuar')
+    || intent.includes('registrar endereco');
+  const finalDeliveryReply = `Perfeito${greetingName}. No sábado, dia 19 de setembro, pela parte da tarde, um representante da Novo Tempo irá até sua casa para entregar o seu brinde em mãos. Deus abençoe você e sua família.`;
 
-  const giftWasOffered = await anaGiftWasOffered(event);
-  const currentGiftContext = /(brinde|presente|entrega.*casa|receber.*casa)/i.test(event.inboundText);
+  if (lead && informedAddress && String(lead.newAddress || '').trim() !== informedAddress) {
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: { newAddress: informedAddress }
+    });
+    await prisma.leadInteraction.create({
+      data: {
+        leadId: lead.id,
+        channel: 'SISTEMA',
+        summary: 'Endereco atualizado pela Ana para a entrega do brinde.',
+        metadata: {
+          type: 'ANA_ADDRESS_UPDATE',
+          newAddress: informedAddress,
+          previousAddressPresent: Boolean(String(lead.address || '').trim()),
+          source: 'gpt-maker-intention'
+        }
+      }
+    });
+  } else if (lead && confirmedExisting && !addressState.confirmed) {
+    await prisma.leadInteraction.create({
+      data: {
+        leadId: lead.id,
+        channel: 'SISTEMA',
+        summary: 'Endereco existente confirmado para a entrega do brinde.',
+        metadata: {
+          type: 'ANA_ADDRESS_CONFIRMATION',
+          source: 'gpt-maker-intention'
+        }
+      }
+    });
+  }
+
+  if ((deliveryIntent || informedAddress) && deliveryState.giftAccepted === 'sim' && addressReady) {
+    return {
+      action: deliveryState.deliveryConfirmed ? 'DELIVERY_ALREADY_CONFIRMED' : 'CONFIRM_GIFT_DELIVERY',
+      reply: deliveryState.deliveryConfirmed
+        ? `Tudo certo${greetingName}. Sua entrega já está confirmada para sábado, dia 19 de setembro, pela parte da tarde.`
+        : finalDeliveryReply,
+      leadFound: Boolean(lead),
+      hasRegisteredAddress: true,
+      addressShouldBeHidden: true,
+      addressSaved: Boolean(lead && informedAddress),
+      existingAddressConfirmed: Boolean(confirmedExisting)
+    };
+  }
 
   if (intent.includes('registrar interesse') || intent.includes('interesse em continuar')) {
-    if (!giftWasOffered && !currentGiftContext) {
+    if (!deliveryState.giftOffered) {
       return {
         action: 'OFFER_GIFT',
         reply: anaGiftOfferReply(lead?.name || event.leadName),
+        leadFound: Boolean(lead),
+        hasRegisteredAddress: addressState.hasAddress,
+        addressShouldBeHidden: true
+      };
+    }
+
+    if (deliveryState.giftAccepted === 'nao') {
+      return {
+        action: 'GIFT_DECLINED',
+        reply: `Tudo bem${greetingName}. Agradeço por nos avisar. Deus abençoe você e sua família.`,
         leadFound: Boolean(lead),
         hasRegisteredAddress: addressState.hasAddress,
         addressShouldBeHidden: true
@@ -1066,43 +1221,7 @@ async function anaIntentReply(event) {
   }
 
   if (intent.includes('registrar endereco')) {
-    const explicitAddress = plausibleNewAddress(event.address);
-    const informedAddress = explicitAddress || plausibleNewAddress(event.inboundText);
-    const confirmedExisting = confirmsRegisteredAddress(event.inboundText) && addressState.hasAddress;
-
-    if (lead && informedAddress) {
-      await prisma.lead.update({
-        where: { id: lead.id },
-        data: { newAddress: informedAddress }
-      });
-      await prisma.leadInteraction.create({
-        data: {
-          leadId: lead.id,
-          channel: 'SISTEMA',
-          summary: 'Endereco atualizado pela Ana para a entrega do brinde.',
-          metadata: {
-            type: 'ANA_ADDRESS_UPDATE',
-            newAddress: informedAddress,
-            previousAddressPresent: Boolean(String(lead.address || '').trim()),
-            source: 'gpt-maker-intention'
-          }
-        }
-      });
-    } else if (lead && confirmedExisting) {
-      await prisma.leadInteraction.create({
-        data: {
-          leadId: lead.id,
-          channel: 'SISTEMA',
-          summary: 'Endereco existente confirmado para a entrega do brinde.',
-          metadata: {
-            type: 'ANA_ADDRESS_CONFIRMATION',
-            source: 'gpt-maker-intention'
-          }
-        }
-      });
-    }
-
-    if (!informedAddress && !confirmedExisting) {
+    if (!addressReady) {
       return {
         action: addressState.hasAddress ? 'CONFIRM_REGISTERED_ADDRESS' : 'REQUEST_NEW_ADDRESS',
         reply: addressState.hasAddress
@@ -1117,7 +1236,7 @@ async function anaIntentReply(event) {
 
     return {
       action: 'CONFIRM_GIFT_DELIVERY',
-      reply: `Perfeito${greetingName}. Só para confirmar: no sábado, dia 19 de setembro, pela parte da tarde, um representante da Novo Tempo irá até sua casa para entregar o seu brinde em mãos. Deus abençoe você e sua família.`,
+      reply: finalDeliveryReply,
       leadFound: Boolean(lead),
       hasRegisteredAddress: true,
       addressShouldBeHidden: true,
@@ -1523,7 +1642,7 @@ function gptMakerConfig() {
     || process.env.GPT_MAKER_API_TOKEN
   );
   const agentId = String(process.env.GPTMAKER_AGENT_ID || '').trim();
-  const autoReplyEnabled = String(process.env.GPTMAKER_AUTO_REPLY || 'true').toLowerCase() !== 'false';
+  const autoReplyEnabled = String(process.env.GPTMAKER_AUTO_REPLY || 'false').toLowerCase() === 'true';
   return {
     name: process.env.GPTMAKER_AGENT_NAME || 'Ana',
     provider: 'gpt-maker',
@@ -1742,11 +1861,15 @@ function dedupeWhatsAppMessageList(messages = []) {
   for (const message of messages) {
     const eventTime = new Date(message.receivedAt || message.sentAt || message.createdAt).getTime();
     const signature = `${message.direction}:${normalizeMessageSignature(message.body)}`;
-    const duplicateIndex = result.findLastIndex((candidate) => {
+    const duplicateIndex = result.findLastIndex((candidate, candidateIndex) => {
       if (!['waha-gows', 'gpt-maker'].includes(candidate.provider)) return false;
       const candidateTime = new Date(candidate.receivedAt || candidate.sentAt || candidate.createdAt).getTime();
+      const hasInterveningReply = result
+        .slice(candidateIndex + 1)
+        .some((intervening) => intervening.direction !== message.direction);
       return `${candidate.direction}:${normalizeMessageSignature(candidate.body)}` === signature
-        && Math.abs(candidateTime - eventTime) <= 2000;
+        && Math.abs(candidateTime - eventTime) <= 2000
+        && !hasInterveningReply;
     });
     if (duplicateIndex < 0 || !['waha-gows', 'gpt-maker'].includes(message.provider)) {
       result.push(message);
