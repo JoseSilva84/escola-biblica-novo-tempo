@@ -114,11 +114,11 @@ No recurso do WAHA, configure o webhook global para a URL publica do backend:
 
 ```env
 WHATSAPP_HOOK_URL="https://SEU_BACKEND_PUBLICO/api/webhooks/waha/whatsapp"
-WHATSAPP_HOOK_EVENTS="message,message.ack"
+WHATSAPP_HOOK_EVENTS="message,message.any,message.ack"
 WHATSAPP_HOOK_CUSTOM_HEADERS="X-Waha-Webhook-Secret:O_MESMO_VALOR_DE_WAHA_WEBHOOK_SECRET"
 ```
 
-Envie o mesmo segredo de `WAHA_WEBHOOK_SECRET` no header `x-waha-webhook-secret`. Os eventos usados são `message` e `message.ack`.
+Envie o mesmo segredo de `WAHA_WEBHOOK_SECRET` no header `x-waha-webhook-secret`. Os eventos usados são `message`, `message.any` e `message.ack`. O evento `message.any` registra também mensagens enviadas pelo próprio numero, inclusive por automacoes externas conectadas ao WhatsApp.
 
 O WAHA recebe e envia as mensagens. O backend grava o histórico e encaminha cada mensagem recebida ao agente configurado no GPT Maker.
 

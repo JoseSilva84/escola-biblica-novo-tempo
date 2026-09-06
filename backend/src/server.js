@@ -634,16 +634,21 @@ function wahaJidValue(value) {
 
 function readWahaMessage(payload = {}) {
   const data = payload.payload || payload.data || {};
-  const fromMe = Boolean(data.fromMe);
-  const primaryChatId = firstValue(fromMe ? data.to : data.from, data.chatId);
+  const internalInfo = data._data?.Info || {};
+  const internalKey = data._data?.key || {};
+  const fromMe = Boolean(data.fromMe ?? internalInfo.IsFromMe ?? internalKey.fromMe);
   const chatIdCandidates = [
-    primaryChatId,
     data.pn,
-    data._data?.Info?.SenderAlt,
-    data._data?.key?.remoteJidAlt,
-    data._data?.Info?.Sender,
-    data._data?.key?.remoteJid,
     data.chatId,
+    internalInfo.Chat,
+    internalKey.remoteJidAlt,
+    internalKey.remoteJid,
+    fromMe ? data.to : data.from,
+    fromMe ? data.from : data.to,
+    internalInfo.RecipientAlt,
+    internalInfo.Recipient,
+    internalInfo.SenderAlt,
+    internalInfo.Sender,
     data.participant
   ].map(wahaJidValue).filter(Boolean);
   const chatId = chatIdCandidates.find((value) => !String(value).includes('@lid')) || chatIdCandidates[0];
@@ -653,7 +658,7 @@ function readWahaMessage(payload = {}) {
   return {
     event: String(payload.event || '').trim().toLowerCase(),
     session: String(payload.session || '').trim(),
-    phone: String(primaryChatId || '').includes('@g.us') ? '' : cleanWhatsAppJid(chatId),
+    phone: String(chatId || '').includes('@g.us') ? '' : cleanWhatsAppJid(chatId),
     text: String(firstValue(data.body, data.text, data.caption, '') || '').trim(),
     name: firstValue(data.notifyName, data.pushName, data._data?.Info?.PushName, data._data?.NotifyName) || null,
     fromMe,
