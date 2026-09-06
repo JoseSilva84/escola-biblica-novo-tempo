@@ -637,18 +637,30 @@ function readWahaMessage(payload = {}) {
   const internalInfo = data._data?.Info || {};
   const internalKey = data._data?.key || {};
   const fromMe = Boolean(data.fromMe ?? internalInfo.IsFromMe ?? internalKey.fromMe);
+  const directionCandidates = fromMe
+    ? [
+        data.to,
+        internalInfo.RecipientAlt,
+        internalInfo.Recipient,
+        data.from,
+        internalInfo.SenderAlt,
+        internalInfo.Sender
+      ]
+    : [
+        data.from,
+        internalInfo.SenderAlt,
+        internalInfo.Sender,
+        data.to,
+        internalInfo.RecipientAlt,
+        internalInfo.Recipient
+      ];
   const chatIdCandidates = [
     data.pn,
     data.chatId,
     internalInfo.Chat,
     internalKey.remoteJidAlt,
     internalKey.remoteJid,
-    fromMe ? data.to : data.from,
-    fromMe ? data.from : data.to,
-    internalInfo.RecipientAlt,
-    internalInfo.Recipient,
-    internalInfo.SenderAlt,
-    internalInfo.Sender,
+    ...directionCandidates,
     data.participant
   ].map(wahaJidValue).filter(Boolean);
   const chatId = chatIdCandidates.find((value) => !String(value).includes('@lid')) || chatIdCandidates[0];
@@ -1226,22 +1238,42 @@ async function recordWhatsAppMessage({
       include: { conversation: true }
     }).catch(() => null);
     if (existingMessage) {
+      const existingMetadata = existingMessage.metadata && typeof existingMessage.metadata === 'object'
+        ? existingMessage.metadata
+        : {};
+      const incomingEvent = String(metadata?.event || '').toLowerCase();
+      const existingEvent = String(existingMetadata.event || '').toLowerCase();
+      const shouldRelink = provider === 'waha-gows'
+        && existingMessage.conversationId !== conversation.id
+        && (incomingEvent === 'message' || !existingEvent);
       const updatedMessage = await prisma.whatsAppMessage.update({
         where: { id: existingMessage.id },
         data: {
+          ...(shouldRelink ? {
+            conversationId: conversation.id,
+            leadId: dbLeadId,
+            externalLeadId: numericLeadId,
+            direction,
+            senderType,
+            senderName,
+            body: cleanBody,
+            sentAt: direction === 'OUTBOUND' ? occurredAt : null,
+            receivedAt: direction === 'INBOUND' ? occurredAt : null
+          } : {}),
           providerStatus: providerStatus || existingMessage.providerStatus,
           metadata: {
-            ...(existingMessage.metadata && typeof existingMessage.metadata === 'object' ? existingMessage.metadata : {}),
+            ...existingMetadata,
             ...metadata,
             providerResponse: providerResponse || existingMessage.metadata?.providerResponse || null
           }
         }
       }).catch(() => existingMessage);
+      const activeConversation = shouldRelink ? conversation : existingMessage.conversation || conversation;
       await prisma.whatsAppConversation.update({
-        where: { id: existingMessage.conversationId },
+        where: { id: activeConversation.id },
         data: { updatedAt: occurredAt }
       }).catch(() => null);
-      return { conversation: existingMessage.conversation || conversation, message: updatedMessage };
+      return { conversation: activeConversation, message: updatedMessage, created: false };
     }
   }
 
@@ -1314,7 +1346,7 @@ async function recordWhatsAppMessage({
     }
   }
 
-  return { conversation, message };
+  return { conversation, message, created: true };
 }
 
 function normalizePhone(value) {
@@ -4618,23 +4650,6 @@ app.post('/api/webhooks/waha/whatsapp', async (request, response) => {
     return;
   }
 
-  if (event.messageId) {
-    const existing = await prisma.whatsAppMessage.findFirst({
-      where: { providerMessageId: event.messageId },
-      select: { id: true, conversationId: true }
-    }).catch(() => null);
-    if (existing?.id) {
-      response.json({
-        ok: true,
-        received: true,
-        duplicate: true,
-        conversationId: existing.conversationId,
-        messageId: existing.id
-      });
-      return;
-    }
-  }
-
   const saved = await recordWhatsAppMessage({
     phone: event.phone,
     body: event.text,
@@ -4652,7 +4667,7 @@ app.post('/api/webhooks/waha/whatsapp', async (request, response) => {
     }
   });
 
-  if (saved?.message?.direction === 'INBOUND') {
+  if (saved?.created && saved.message?.direction === 'INBOUND') {
     maybeReplyWithGptMaker(saved, saved.message).catch((error) => {
       console.error('[gptmaker:auto-reply:error]', error.message, error.providerResponse || '');
     });
@@ -4662,9 +4677,10 @@ app.post('/api/webhooks/waha/whatsapp', async (request, response) => {
     ok: true,
     received: true,
     saved: Boolean(saved),
+    duplicate: Boolean(saved && !saved.created),
     conversationId: saved?.conversation?.id || null,
     messageId: saved?.message?.id || null,
-    agentReplyQueued: Boolean(saved?.message?.direction === 'INBOUND' && gptMakerConfig().configured)
+    agentReplyQueued: Boolean(saved?.created && saved.message?.direction === 'INBOUND' && gptMakerConfig().configured)
   });
 });
 
