@@ -697,6 +697,31 @@ function firstText(...values) {
   return '';
 }
 
+function nestedTextByKey(root, keyPattern, excludedPathPattern = null) {
+  const queue = [{ value: root, path: '' }];
+  const visited = new Set();
+
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current?.value || typeof current.value !== 'object' || visited.has(current.value)) continue;
+    visited.add(current.value);
+
+    for (const [key, value] of Object.entries(current.value)) {
+      const path = current.path ? `${current.path}.${key}` : key;
+      if (excludedPathPattern?.test(path)) continue;
+      if (keyPattern.test(key)) {
+        const text = scalarText(value);
+        if (text) return text;
+      }
+      if (value && typeof value === 'object' && path.split('.').length < 8) {
+        queue.push({ value, path });
+      }
+    }
+  }
+
+  return '';
+}
+
 function readGptMakerIntentEvent(payload = {}) {
   const data = payload.data || payload.payload || payload.event || payload.body || payload;
   const contact = data.contact || data.contato || data.customer || data.cliente || payload.contact || payload.contato || {};
@@ -765,7 +790,12 @@ function readGptMakerIntentEvent(payload = {}) {
     input.text,
     input.body,
     input.message,
-    input.mensagem
+    input.mensagem,
+    nestedTextByKey(
+      payload,
+      /^(userMessage|user_message|lastUserMessage|last_user_message|pergunta)$/i,
+      /(^|\.)(output|outputs|response|resposta|result|agent|agente)(\.|$)/i
+    )
   );
   const agentText = firstText(
     payload.agentMessage,
@@ -803,7 +833,12 @@ function readGptMakerIntentEvent(payload = {}) {
     data.newAddress,
     data.enderecoNovo,
     data.address,
-    data.endereco
+    data.endereco,
+    nestedTextByKey(
+      payload,
+      /^(newAddress|new_address|enderecoNovo|endereco_novo|address|endereco)$/i,
+      /(^|\.)(output|outputs|response|resposta|result)(\.|$)/i
+    )
   );
   const qualification = firstText(
     payload.qualification,
@@ -1098,15 +1133,31 @@ function anaGiftOfferReply(name) {
 
 async function anaIntentReply(event) {
   const intent = normalizedIntentName(event.intentName);
-  const lead = await findLeadReference({ leadId: event.leadId, phone: event.phone });
-  const addressState = await registeredAddressState(lead);
-  const deliveryState = await inferAnaDeliveryState(event, lead, addressState);
+  const addressIntent = intent.includes('registrar endereco');
+  let lead = await findLeadReference({ leadId: event.leadId, phone: event.phone });
+  let addressState = await registeredAddressState(lead);
+  let deliveryState = await inferAnaDeliveryState(event, lead, addressState);
+  const explicitAddress = plausibleNewAddress(event.address);
+  let informedAddress = explicitAddress || plausibleNewAddress(event.inboundText);
+  let addressReady = Boolean(informedAddress || deliveryState.addressProvided || addressState.hasAddress);
+
+  // GPT Maker and WAHA can notify the same inbound message concurrently. Give WAHA
+  // a short window to persist the address before deciding to ask for it again.
+  if (addressIntent && !addressReady && event.phone) {
+    for (const delay of [400, 800, 1200]) {
+      await sleep(delay);
+      lead = await findLeadReference({ leadId: event.leadId, phone: event.phone });
+      addressState = await registeredAddressState(lead);
+      deliveryState = await inferAnaDeliveryState(event, lead, addressState);
+      informedAddress = explicitAddress || plausibleNewAddress(event.inboundText);
+      addressReady = Boolean(informedAddress || deliveryState.addressProvided || addressState.hasAddress);
+      if (addressReady) break;
+    }
+  }
+
   const firstName = String(lead?.name || event.leadName || '').trim().split(/\s+/)[0];
   const greetingName = firstName ? `, ${firstName}` : '';
-  const explicitAddress = plausibleNewAddress(event.address);
-  const informedAddress = explicitAddress || plausibleNewAddress(event.inboundText);
   const confirmedExisting = deliveryState.addressConfirmed && addressState.hasAddress;
-  const addressReady = Boolean(informedAddress || deliveryState.addressProvided || addressState.hasAddress);
   const giftAccepted = deliveryState.giftAccepted === 'sim'
     || (deliveryState.giftOffered && isAffirmativeReply(event.inboundText));
   const contactOptOut = explicitContactOptOut(event.inboundText);
@@ -1199,7 +1250,7 @@ async function anaIntentReply(event) {
       };
     }
 
-    if (!giftWasOffered) {
+    if (!deliveryState.giftOffered) {
       return {
         action: 'OFFER_GIFT_BEFORE_ENDING',
         reply: anaGiftOfferReply(lead?.name || event.leadName),
