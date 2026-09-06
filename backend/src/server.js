@@ -1106,10 +1106,10 @@ async function anaIntentReply(event) {
   const explicitAddress = plausibleNewAddress(event.address);
   const informedAddress = explicitAddress || plausibleNewAddress(event.inboundText);
   const confirmedExisting = deliveryState.addressConfirmed && addressState.hasAddress;
-  const addressReady = Boolean(informedAddress || deliveryState.addressProvided || confirmedExisting);
-  const deliveryIntent = intent.includes('registrar interesse')
-    || intent.includes('interesse em continuar')
-    || intent.includes('registrar endereco');
+  const addressReady = Boolean(informedAddress || deliveryState.addressProvided || addressState.hasAddress);
+  const giftAccepted = deliveryState.giftAccepted === 'sim'
+    || (deliveryState.giftOffered && isAffirmativeReply(event.inboundText));
+  const contactOptOut = explicitContactOptOut(event.inboundText);
   const finalDeliveryReply = `Perfeito${greetingName}. No sábado, dia 19 de setembro, pela parte da tarde, um representante da Novo Tempo irá até sua casa para entregar o seu brinde em mãos. Deus abençoe você e sua família.`;
 
   if (lead && informedAddress && String(lead.newAddress || '').trim() !== informedAddress) {
@@ -1144,7 +1144,7 @@ async function anaIntentReply(event) {
     });
   }
 
-  if ((deliveryIntent || informedAddress) && deliveryState.giftAccepted === 'sim' && addressReady) {
+  if (!contactOptOut && giftAccepted && addressReady) {
     return {
       action: deliveryState.deliveryConfirmed ? 'DELIVERY_ALREADY_CONFIRMED' : 'CONFIRM_GIFT_DELIVERY',
       reply: deliveryState.deliveryConfirmed
@@ -1154,7 +1154,7 @@ async function anaIntentReply(event) {
       hasRegisteredAddress: true,
       addressShouldBeHidden: true,
       addressSaved: Boolean(lead && informedAddress),
-      existingAddressConfirmed: Boolean(confirmedExisting)
+      existingAddressConfirmed: Boolean(addressState.hasAddress)
     };
   }
 
@@ -1180,12 +1180,10 @@ async function anaIntentReply(event) {
     }
 
     return {
-      action: addressState.hasAddress ? 'CONFIRM_REGISTERED_ADDRESS' : 'REQUEST_NEW_ADDRESS',
-      reply: addressState.hasAddress
-        ? 'Que bom! 😊 Temos seu endereço em nossos dados. Ele continua o mesmo para receber o brinde?'
-        : 'Que bom! 😊 Para organizarmos a entrega do brinde, pode me informar seu endereço completo?',
+      action: 'REQUEST_NEW_ADDRESS',
+      reply: 'Que bom! 😊 Para organizarmos a entrega do brinde, pode me informar seu endereço completo?',
       leadFound: Boolean(lead),
-      hasRegisteredAddress: addressState.hasAddress,
+      hasRegisteredAddress: false,
       addressShouldBeHidden: true
     };
   }
@@ -1223,12 +1221,10 @@ async function anaIntentReply(event) {
   if (intent.includes('registrar endereco')) {
     if (!addressReady) {
       return {
-        action: addressState.hasAddress ? 'CONFIRM_REGISTERED_ADDRESS' : 'REQUEST_NEW_ADDRESS',
-        reply: addressState.hasAddress
-          ? 'Temos seu endereço em nossos dados. Ele continua o mesmo para receber o brinde?'
-          : 'Pode me informar seu endereço completo para organizarmos a entrega do brinde?',
+        action: 'REQUEST_NEW_ADDRESS',
+        reply: 'Pode me informar seu endereço completo para organizarmos a entrega do brinde?',
         leadFound: Boolean(lead),
-        hasRegisteredAddress: addressState.hasAddress,
+        hasRegisteredAddress: false,
         addressShouldBeHidden: true,
         addressSaved: false
       };
@@ -2211,8 +2207,10 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     'Não convide para o presente do dia 19 logo após a pessoa confirmar que recebeu o material.',
     'Antes de falar do presente, converse primeiro sobre o material: pergunte o que ela entendeu, quais pontos chamaram atenção e se gostaria de receber um próximo material semelhante.',
     'Somente depois dessas etapas fale que no sábado, 19 de setembro de 2026, à tarde, uma equipe da Novo Tempo entregará um material/brinde.',
-    'Se ela aceitar o presente e houver endereço cadastrado, confirme o endereço citado. Se não houver endereço, peça o endereço completo.',
-    'Quando a pessoa enviar o endereço completo, reconheça o endereço, agradeça e diga que passará para a equipe organizar a entrega com carinho. Não trate endereço como resposta negativa.'
+    'Se ela aceitar o presente e houver endereço cadastrado, considere o endereço pronto e finalize confirmando a data e o período da entrega. Não peça confirmação do endereço.',
+    'Se não houver endereço cadastrado, peça o endereço completo apenas uma vez.',
+    'Quando a pessoa enviar o endereço completo, reconheça o endereço e finalize confirmando a entrega. Não peça o endereço novamente e não encaminhe para atendente.',
+    'Se a pessoa disser "já dei", "já enviei" ou equivalente, releia o histórico, use o endereço já informado e finalize a entrega sem fazer outra pergunta.'
   ].join('\n');
 }
 
