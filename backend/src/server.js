@@ -1189,6 +1189,60 @@ function providerFailureStatus(status, data) {
   return diagnostic.includes('463') ? 'FAILED_463' : 'FAILED';
 }
 
+async function reconcileNearbyWhatsAppDuplicate({ message, occurredAt }) {
+  if (!message || !['waha-gows', 'gpt-maker'].includes(message.provider)) {
+    return { message, created: true };
+  }
+
+  const eventTime = occurredAt instanceof Date && !Number.isNaN(occurredAt.getTime())
+    ? occurredAt
+    : new Date();
+  const timeField = message.direction === 'INBOUND' ? 'receivedAt' : 'sentAt';
+  const nearby = await prisma.whatsAppMessage.findMany({
+    where: {
+      conversationId: message.conversationId,
+      direction: message.direction,
+      provider: { in: ['waha-gows', 'gpt-maker'] },
+      [timeField]: {
+        gte: new Date(eventTime.getTime() - 2000),
+        lte: new Date(eventTime.getTime() + 2000)
+      }
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    take: 20
+  }).catch(() => []);
+  const signature = normalizeMessageSignature(message.body);
+  const duplicates = nearby.filter((candidate) => (
+    normalizeMessageSignature(candidate.body) === signature
+  ));
+  if (duplicates.length < 2) return { message, created: true };
+
+  const canonical = duplicates[0];
+  const wahaMessage = duplicates.find((candidate) => candidate.provider === 'waha-gows');
+  const aiMessage = duplicates.find((candidate) => candidate.senderType === 'AI');
+  const mergedMetadata = duplicates.reduce((result, candidate) => ({
+    ...result,
+    ...(candidate.metadata && typeof candidate.metadata === 'object' ? candidate.metadata : {})
+  }), {});
+  const merged = await prisma.whatsAppMessage.update({
+    where: { id: canonical.id },
+    data: {
+      provider: wahaMessage?.provider || canonical.provider,
+      providerMessageId: wahaMessage?.providerMessageId || canonical.providerMessageId,
+      providerStatus: wahaMessage?.providerStatus || canonical.providerStatus,
+      senderType: aiMessage?.senderType || canonical.senderType,
+      senderName: aiMessage?.senderName || canonical.senderName,
+      metadata: mergedMetadata
+    }
+  }).catch(() => canonical);
+
+  await prisma.whatsAppMessage.deleteMany({
+    where: { id: { in: duplicates.slice(1).map((candidate) => candidate.id) } }
+  }).catch(() => null);
+
+  return { message: merged, created: canonical.id === message.id };
+}
+
 async function recordWhatsAppMessage({
   phone,
   body,
@@ -1277,7 +1331,7 @@ async function recordWhatsAppMessage({
     }
   }
 
-  const message = await prisma.whatsAppMessage.create({
+  const createdMessage = await prisma.whatsAppMessage.create({
     data: {
       conversationId: conversation.id,
       leadId: dbLeadId,
@@ -1298,10 +1352,20 @@ async function recordWhatsAppMessage({
     }
   });
 
+  const reconciled = await reconcileNearbyWhatsAppDuplicate({
+    message: createdMessage,
+    occurredAt
+  });
+  const message = reconciled.message;
+
   await prisma.whatsAppConversation.update({
     where: { id: conversation.id },
     data: { updatedAt: occurredAt }
   }).catch(() => null);
+
+  if (!reconciled.created) {
+    return { conversation, message, created: false };
+  }
 
   if (dbLeadId && direction === 'INBOUND') {
     await prisma.leadInteraction.create({
@@ -1671,6 +1735,41 @@ function normalizeMessageSignature(value) {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 220);
+}
+
+function dedupeWhatsAppMessageList(messages = []) {
+  const result = [];
+  for (const message of messages) {
+    const eventTime = new Date(message.receivedAt || message.sentAt || message.createdAt).getTime();
+    const signature = `${message.direction}:${normalizeMessageSignature(message.body)}`;
+    const duplicateIndex = result.findLastIndex((candidate) => {
+      if (!['waha-gows', 'gpt-maker'].includes(candidate.provider)) return false;
+      const candidateTime = new Date(candidate.receivedAt || candidate.sentAt || candidate.createdAt).getTime();
+      return `${candidate.direction}:${normalizeMessageSignature(candidate.body)}` === signature
+        && Math.abs(candidateTime - eventTime) <= 2000;
+    });
+    if (duplicateIndex < 0 || !['waha-gows', 'gpt-maker'].includes(message.provider)) {
+      result.push(message);
+      continue;
+    }
+
+    const existing = result[duplicateIndex];
+    const wahaMessage = [existing, message].find((candidate) => candidate.provider === 'waha-gows');
+    const aiMessage = [existing, message].find((candidate) => candidate.senderType === 'AI');
+    result[duplicateIndex] = {
+      ...existing,
+      provider: wahaMessage?.provider || existing.provider,
+      providerMessageId: wahaMessage?.providerMessageId || existing.providerMessageId,
+      providerStatus: wahaMessage?.providerStatus || existing.providerStatus,
+      senderType: aiMessage?.senderType || existing.senderType,
+      senderName: aiMessage?.senderName || existing.senderName,
+      metadata: {
+        ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+        ...(message.metadata && typeof message.metadata === 'object' ? message.metadata : {})
+      }
+    };
+  }
+  return result;
 }
 
 function classifyAnaConversation(messages = []) {
@@ -3831,6 +3930,7 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
     const { lead: _lead, ...conversationData } = conversation;
     return {
       ...conversationData,
+      messages: dedupeWhatsAppMessageList(conversationData.messages),
       lead: serializedLead,
       leadId: conversation.leadId || serializedLead?.id || null,
       externalLeadId: conversation.externalLeadId || serializedLead?.externalId || null,
