@@ -6120,7 +6120,7 @@ function AdminGeneralView({
         if (active && payload) setProvider(payload);
       })
       .catch(() => {
-        if (active) setProvider({ configured: false, provider: 'zpro-baileys' });
+        if (active) setProvider({ configured: false, provider: 'waha-gows' });
       });
     refreshWhatsappConversations({ sync: true, silent: true, active: () => active });
     const timer = window.setInterval(() => {
@@ -6367,16 +6367,9 @@ function AdminGeneralView({
   }
 
   async function refreshWhatsappConversations(options = {}) {
-    const { sync = false, silent = false, active = () => true } = options;
-    if (sync && !silent) setWhatsappSyncing(true);
+    const { silent = false, active = () => true } = options;
+    if (!silent) setWhatsappSyncing(true);
     try {
-      if (sync) {
-        await apiFetch('/api/whatsapp/sync-zpro', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ limit: 120, statuses: ['open', 'pending', 'closed'] })
-        }).catch(() => null);
-      }
       const response = await apiFetch('/api/whatsapp/conversations?limit=50');
       if (!response.ok) return;
       const payload = await response.json();
@@ -6384,7 +6377,7 @@ function AdminGeneralView({
     } catch {
       if (active()) setWhatsappConversations([]);
     } finally {
-      if (sync && !silent) setWhatsappSyncing(false);
+      if (!silent) setWhatsappSyncing(false);
     }
   }
 
@@ -6748,7 +6741,7 @@ function AdminGeneralView({
                 <span className={labelClass}>WhatsApp CRM</span>
                 <h2 className="mt-2 text-3xl font-black tracking-normal text-slate-50 max-md:text-2xl">Centro operacional de conversas</h2>
                 <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
-                  Registros importados, indicadores, segmentos, recência, critérios, alertas e relatórios calculados com a base real, sem remover os envios atuais.
+                  Mensagens recebidas pelo WAHA, indicadores, segmentos, recência, critérios, alertas e relatórios calculados com a base real.
                 </p>
               </div>
               <button
@@ -6758,7 +6751,7 @@ function AdminGeneralView({
                 type="button"
               >
                 <RefreshCw size={18} />
-                {whatsappSyncing ? 'Atualizando...' : 'Atualizar Z-PRO'}
+                {whatsappSyncing ? 'Atualizando...' : 'Atualizar conversas'}
               </button>
             </div>
             <div className="mt-6 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
@@ -7030,10 +7023,10 @@ function AdminGeneralView({
           <article className={`${panelClass} grid content-start gap-5 p-6`}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <span className={labelClass}>WhatsApp Zpro</span>
+                <span className={labelClass}>WhatsApp WAHA</span>
                 <h2 className="mt-2 text-2xl font-extrabold text-slate-50">Disparo Individual</h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                  Envie uma mensagem real pelo canal Baileys configurado antes de ativar filas maiores.
+                  Envie uma mensagem real pela sessão principal do WAHA antes de ativar filas maiores.
                 </p>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${provider?.configured ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
@@ -7041,10 +7034,9 @@ function AdminGeneralView({
               </span>
             </div>
             <div className="hidden">
-              <span>Provedor: {provider?.provider || 'zpro-baileys'}</span>
-              <span>API ID: {provider?.apiId || 'configure ZPRO_API_ID'}</span>
-              <span>Canal: {provider?.channelId || 'configure ZPRO_CHANNEL_ID'}</span>
-              <span>Base: {provider?.baseUrl || 'configure ZPRO_API_URL'}</span>
+              <span>Provedor: {provider?.provider || 'waha-gows'}</span>
+              <span>Sessão: {provider?.session || 'default'}</span>
+              <span>Base: {provider?.baseUrl || 'configure WAHA_API_URL'}</span>
               <span>Token: {provider?.token?.loaded ? `${provider.token.length} caracteres · ${provider.token.prefix}` : 'não carregado'}</span>
             </div>
             <form className="grid gap-3" onSubmit={submitWhatsAppTest}>
@@ -7063,7 +7055,7 @@ function AdminGeneralView({
             </form>
             {lastSend ? (
               <div className="rounded-2xl border border-emerald-300/45 bg-emerald-600/80 p-4 text-sm font-semibold text-white shadow-lg shadow-emerald-900/15">
-                Mensagem aceita pelo provedor para {lastSend.phone} via {lastSend.transport || 'Z-PRO'}.
+                Mensagem aceita pelo WAHA para {lastSend.phone}.
               </div>
             ) : null}
             {sendError ? (
@@ -8088,7 +8080,7 @@ function ConversationsView({ records = [] }) {
   const [conversationListSearch, setConversationListSearch] = useState('');
   const [hiddenConversationIds, setHiddenConversationIds] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [zproSyncing, setZproSyncing] = useState(false);
+  const [conversationRefreshing, setConversationRefreshing] = useState(false);
   const [sending, setSending] = useState(false);
   const [conversationExpanded, setConversationExpanded] = useState(false);
   const [leadPickerOpen, setLeadPickerOpen] = useState(false);
@@ -8133,7 +8125,6 @@ function ConversationsView({ records = [] }) {
   const activePhoneRef = useRef('');
   const lastSeenMessageIdRef = useRef(null);
   const conversationRefreshInFlightRef = useRef(false);
-  const zproSyncInFlightRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -8303,13 +8294,13 @@ function ConversationsView({ records = [] }) {
           const firstFailure = Array.isArray(payload.results)
             ? payload.results.find((item) => !item.ok)
             : null;
-          throw new Error(payload.message || firstFailure?.message || 'Nenhuma mensagem foi aceita pelo Z-PRO.');
+          throw new Error(payload.message || firstFailure?.message || 'Nenhuma mensagem foi aceita pelo WAHA.');
         }
         totals.sent += payload.sent || 0;
         totals.failed += payload.failed || 0;
       }
       if (!totals.sent) {
-        throw new Error('Nenhuma mensagem foi aceita pelo Z-PRO. Confira o painel para ver o motivo da falha.');
+        throw new Error('Nenhuma mensagem foi aceita pelo WAHA. Confira o painel para ver o motivo da falha.');
       }
       toast.success('Transmissão concluída', {
         description: `${totals.sent} enviadas${totals.failed ? ` e ${totals.failed} com falha` : ''}.`
@@ -8448,40 +8439,16 @@ function ConversationsView({ records = [] }) {
     }
   }
 
-  async function syncZproConversations(options = {}) {
-    const { silent = false } = options;
-    if (zproSyncInFlightRef.current) return null;
-    zproSyncInFlightRef.current = true;
-    if (!silent) setZproSyncing(true);
-    try {
-      const response = await apiFetch('/api/whatsapp/sync-zpro', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 120, statuses: ['open', 'pending', 'closed'] })
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.message || 'Nao foi possivel sincronizar o Z-PRO.');
-      if (!silent && payload.imported) {
-        toast.success('Conversas atualizadas', {
-          description: `${payload.imported} conversa(s) lidas do Z-PRO.`
-        });
-      }
-      return payload;
-    } catch (error) {
-      if (!silent) toast.error('Falha ao atualizar Z-PRO', { description: error.message });
-      return null;
-    } finally {
-      zproSyncInFlightRef.current = false;
-      if (!silent) setZproSyncing(false);
-    }
-  }
-
   async function refreshConversationsNow() {
-    await syncZproConversations();
-    await loadConversations(phoneSearch, {
-      selectSearched: Boolean(phoneSearch),
-      selectLatestOnNew: !phoneDigits(phoneSearch)
-    });
+    setConversationRefreshing(true);
+    try {
+      await loadConversations(phoneSearch, {
+        selectSearched: Boolean(phoneSearch),
+        selectLatestOnNew: !phoneDigits(phoneSearch)
+      });
+    } finally {
+      setConversationRefreshing(false);
+    }
   }
 
   async function loadBroadcastAnalytics(options = {}) {
@@ -8534,13 +8501,13 @@ function ConversationsView({ records = [] }) {
         setConversations((current) => mergeConversationSnapshots([seedConversation], current, requestedPhone));
         setSelectedId(seedConversation.id);
       }
-      syncZproConversations({ silent: true }).finally(() => loadConversations(requestedPhone, {
+      loadConversations(requestedPhone, {
         conversationId: requestedId || seedConversation?.id || '',
         seedConversation,
         selectSearched: true
-      }));
+      });
     } else {
-      syncZproConversations({ silent: true }).finally(() => loadConversations());
+      loadConversations();
     }
     loadBroadcastAnalytics();
   }, []);
@@ -8552,7 +8519,6 @@ function ConversationsView({ records = [] }) {
 
   useEffect(() => {
     const interval = window.setInterval(async () => {
-      await syncZproConversations({ silent: true });
       await loadConversations(phoneSearch, {
         silent: true,
         notify: true,
@@ -8825,7 +8791,7 @@ function ConversationsView({ records = [] }) {
       direction: 'OUTBOUND',
       senderType: 'USER',
       senderName: payload.sentBy || 'Sistema',
-      provider: payload.provider || 'zpro-baileys',
+      provider: payload.provider || 'waha-gows',
       providerStatus: payload.deliveryStatus || 'ACCEPTED',
       sentAt: now,
       createdAt: now
@@ -8961,8 +8927,8 @@ function ConversationsView({ records = [] }) {
         <aside className={`${panelClass} whatsapp-sidebar flex h-full min-h-0 flex-col overflow-hidden p-4 max-2xl:h-[46rem]`}>
           <div className="flex items-center justify-between gap-3">
             <span className={labelClass}>Leads</span>
-            <button className={`${ghostButtonClass} h-9 px-3`} disabled={zproSyncing} onClick={refreshConversationsNow} type="button">
-              {zproSyncing ? 'Atualizando...' : 'Atualizar Z-PRO'}
+            <button className={`${ghostButtonClass} h-9 px-3`} disabled={conversationRefreshing} onClick={refreshConversationsNow} type="button">
+              {conversationRefreshing ? 'Atualizando...' : 'Atualizar conversas'}
             </button>
           </div>
           <label className="relative mt-3 block shrink-0">
@@ -9053,7 +9019,7 @@ function ConversationsView({ records = [] }) {
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700">
                 {conversationListSearch
                   ? 'Nenhuma conversa encontrada. Digite o WhatsApp completo para iniciar com um número novo.'
-                  : 'Nenhuma conversa salva. Clique em Atualizar Z-PRO ou digite um WhatsApp para iniciar.'}
+                  : 'Nenhuma conversa salva. As novas mensagens do WAHA aparecerão aqui automaticamente.'}
               </div>
             )}
           </div>
@@ -9260,8 +9226,6 @@ function ConversationsView({ records = [] }) {
 
 function AIAgentView({ associations = [], campaigns = [], data, records = [], onNavigate }) {
   const [tab, setTab] = useState('overview');
-  const [mode, setMode] = useState('assistido');
-  const [active, setActive] = useState(false);
   const [selectedReviewLead, setSelectedReviewLead] = useState(null);
   const [anaSummary, setAnaSummary] = useState(null);
   const [anaLoading, setAnaLoading] = useState(true);
@@ -9272,6 +9236,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const anaConversations = anaSummary?.conversations || [];
   const anaTraining = anaSummary?.training || null;
   const anaAgent = anaSummary?.agent || null;
+  const active = Boolean(anaAgent?.configured && anaAgent?.autoReplyEnabled);
   const toneClasses = {
     blue: 'bg-blue-50 text-blue-700 border-blue-100',
     green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -9299,13 +9264,6 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
     ['safety', 'Seguranca'],
     ['metrics', 'Metricas']
   ];
-  const guardrails = [
-    'Nao prometer visita sem confirmacao humana.',
-    'Encaminhar temas sensiveis para humano.',
-    'Respeitar pedido de parar contato.',
-    'Responder apenas dentro das campanhas liberadas.',
-    'Registrar toda sugestao, resposta e decisao no historico.'
-  ];
   const flowSteps = [
     ['Entrada', 'Lead responde no WhatsApp ou entra em campanha autorizada.'],
     ['Triagem', 'IA identifica interesse, duvida, pedido de visita ou opt-out.'],
@@ -9330,17 +9288,11 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   async function loadAnaSummary(options = {}) {
     const { silent = false, activeRequest = () => true } = options;
     if (!silent) setAnaLoading(true);
-    await apiFetch('/api/whatsapp/sync-zpro', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ limit: 120, statuses: ['open', 'pending', 'closed'] })
-    }).catch(() => null);
     apiFetch('/api/ai/ana/summary?limit=120')
       .then((response) => response.ok ? response.json() : null)
       .then((payload) => {
         if (activeRequest() && payload) {
           setAnaSummary(payload);
-          setActive(Boolean(payload.agent?.configured));
         }
       })
       .catch(() => {
@@ -9375,36 +9327,22 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             <span className={labelClass}>IA de atendimento</span>
             <h1 className="silver-title mt-2 text-5xl font-black leading-tight tracking-normal max-md:text-4xl">Agente IA</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
-              Ana acompanha as respostas recebidas depois dos disparos, resume cada conversa e sinaliza quando precisa de revisao humana.
+              O agente Ana do GPT Maker responde às mensagens recebidas pelo WAHA, qualifica os atendimentos e sinaliza quando precisa de revisão humana.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              className={active ? ghostButtonClass : primaryButtonClass}
-              onClick={() => {
-                setActive((value) => !value);
-                toast.message(active ? 'IA pausada' : 'IA ativada em modo assistido');
-              }}
-              type="button"
-            >
-              <WandSparkles size={18} />
-              {active ? 'Pausar IA' : 'Ativar IA'}
-            </button>
-            <select className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-950 shadow-[0_10px_28px_rgba(15,23,42,0.07)] outline-none" onChange={(event) => setMode(event.target.value)} value={mode}>
-              <option value="assistido">Modo assistido</option>
-              <option value="rascunho">Somente rascunho</option>
-              <option value="automatico">Automatico com limites</option>
-            </select>
+          <div className={`inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-black ${active ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+            <WandSparkles size={18} />
+            {active ? 'GPT Maker conectado' : 'GPT Maker pendente'}
           </div>
         </div>
       </section>
 
       <section className="grid grid-cols-5 gap-4 max-xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
-        <MetricCard detail={anaAgent?.configured ? 'chave carregada' : 'configure ASSISTENTE_ANA'} icon={WandSparkles} label="Ana" tone={anaAgent?.configured ? 'green' : 'violet'} value={anaAgent?.configured ? 'Pronta' : 'Pendente'} />
+        <MetricCard detail={anaAgent?.configured ? 'agente do GPT Maker' : 'configure o GPT Maker'} icon={WandSparkles} label="Ana" tone={anaAgent?.configured ? 'green' : 'violet'} value={anaAgent?.configured ? 'Pronta' : 'Pendente'} />
         <MetricCard detail="com resposta ou IA" icon={MessageCircle} label="Conversas" tone="green" value={anaLoading ? '...' : formatNumber(anaMetrics.conversations || 0)} />
         <MetricCard detail="entraram em contato" icon={ClipboardList} label="Respostas" tone="orange" value={anaLoading ? '...' : formatNumber(anaMetrics.leadReplies || 0)} />
         <MetricCard detail="mensagens da Ana" icon={Sparkles} label="IA respondeu" tone="violet" value={anaLoading ? '...' : formatNumber(anaMetrics.aiReplies || 0)} />
-        <MetricCard detail={anaTraining?.loaded ? 'arquivos carregados' : 'verificar treinamento'} icon={ShieldCheck} label="Treinamento" value={anaTraining?.loaded ? 'OK' : 'Pendente'} />
+        <MetricCard detail="gerenciado no GPT Maker" icon={ShieldCheck} label="Treinamento" value={anaTraining?.loaded ? 'Conectado' : 'Pendente'} />
       </section>
 
       <section className={`${panelClass} p-3`}>
@@ -9431,7 +9369,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 <h2 className="mt-2 text-2xl font-black text-slate-50">Atendimentos da Ana depois do disparo</h2>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${anaAgent?.configured ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
-                {anaAgent?.configured ? 'Ana configurada' : 'Chave pendente'}
+                {anaAgent?.configured ? 'GPT Maker conectado' : 'Configuração pendente'}
               </span>
             </div>
             <div className="mt-5 grid gap-3">
@@ -9476,19 +9414,10 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             </div>
           </article>
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Treinamento da Ana</span>
+            <span className={labelClass}>Agente no GPT Maker</span>
             <div className="mt-5 grid gap-3">
-              {(anaTraining?.files || []).map((item, index) => (
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-slate-950 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={item.fileName}>
-                  <span className={`grid h-8 w-8 place-items-center rounded-xl text-sm font-black text-white ${item.loaded ? 'bg-emerald-600' : 'bg-slate-700'}`}>{index + 1}</span>
-                  <div>
-                    <strong className="block text-sm">{item.description}</strong>
-                    <span className="mt-1 block text-xs font-semibold text-slate-500">{item.fileName} · {item.loaded ? 'carregado' : 'nao encontrado'}</span>
-                  </div>
-                </div>
-              ))}
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
-                A Ana usa a persona da Escola Biblica Novo Tempo, resposta breve, guardrails doutrinarios e encaminhamento humano para temas sensiveis.
+                As instruções, os treinamentos e as intenções da Ana são administrados no GPT Maker. Este painel mostra somente os resultados recebidos desse agente.
               </div>
             </div>
           </article>
@@ -9498,23 +9427,27 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
       {tab === 'agent' ? (
         <section className="grid grid-cols-[1fr_0.9fr] gap-4 max-xl:grid-cols-1">
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Configuracao do agente</span>
-            <div className="mt-5 grid gap-4">
-              <label className="grid gap-2 text-sm font-bold text-slate-300">Nome da IA<input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" defaultValue="Assistente Novo Tempo" /></label>
-              <label className="grid gap-2 text-sm font-bold text-slate-300">Tom de voz<select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" defaultValue="acolhedor"><option value="acolhedor">Acolhedor e breve</option><option value="formal">Formal</option><option value="jovem">Jovem e simples</option><option value="pastoral">Pastoral cuidadoso</option></select></label>
-              <label className="grid gap-2 text-sm font-bold text-slate-300">Instrucao principal<textarea className="min-h-36 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 py-3 text-slate-100 outline-none" defaultValue="Voce e uma assistente da Escola Biblica Novo Tempo. Seja acolhedora, objetiva e respeitosa. Ajude a confirmar interesse, tirar duvidas simples e encaminhar casos sensiveis para um humano." /></label>
-              <button className={primaryButtonClass} onClick={() => toast.success('Configuracao da IA preparada')} type="button"><CheckCircle2 size={18} />Salvar configuracao</button>
+            <span className={labelClass}>Conexão do agente</span>
+            <div className="mt-5 grid gap-3">
+              {[
+                ['Plataforma', 'GPT Maker'],
+                ['Agente', anaAgent?.name || 'Ana'],
+                ['Respostas', active ? 'Automáticas pelo WAHA' : 'Aguardando configuração'],
+                ['Qualificação', 'Intenções recebidas do GPT Maker']
+              ].map(([label, value]) => (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={label}>
+                  <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</span>
+                  <strong className="mt-1 block text-slate-950">{value}</strong>
+                </div>
+              ))}
             </div>
           </article>
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Limites do agente</span>
+            <span className={labelClass}>Administração</span>
             <div className="mt-5 grid gap-3">
-              {guardrails.map((item) => (
-                <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-800 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={item}>
-                  <input className="mt-1 h-4 w-4 accent-blue-600" defaultChecked type="checkbox" />
-                  {item}
-                </label>
-              ))}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold leading-relaxed text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
+                Nome, tom de voz, instruções, treinamento, limites e intenções são alterados diretamente no agente Ana dentro do GPT Maker.
+              </div>
             </div>
           </article>
         </section>
@@ -9618,9 +9551,9 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
         <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-md:grid-cols-1">
           {[
             ['Elegiveis para IA', hotWhatsapp + studyWhatsapp + vipWhatsapp, 'quentes, estudos e VIPs'],
-            ['Modo atual', mode === 'assistido' ? 'Assistido' : mode === 'rascunho' ? 'Rascunho' : 'Auto', 'politica de resposta'],
+            ['Modo atual', active ? 'Automático' : 'Inativo', 'configurado no GPT Maker'],
             ['Campanhas ativas', campaigns.filter((campaign) => campaign.status === 'Ativa').length, 'podem receber IA'],
-            ['Custo estimado', 'R$ 0,00', 'sem uso de IA ainda']
+            ['Custo', 'GPT Maker', 'acompanhar na plataforma']
           ].map(([label, value, detail]) => (
             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={label}>
               <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</span>

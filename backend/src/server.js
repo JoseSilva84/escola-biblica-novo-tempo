@@ -67,6 +67,20 @@ function webhookAllowed(request) {
   return Boolean(secret && received === secret);
 }
 
+function wahaWebhookAllowed(request) {
+  const secret = String(process.env.WAHA_WEBHOOK_SECRET || '').trim();
+  if (!secret && process.env.NODE_ENV !== 'production') return true;
+  const authorization = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  const received = String(
+    request.headers['x-waha-webhook-secret']
+    || request.headers['x-webhook-secret']
+    || authorization
+    || request.query?.token
+    || ''
+  ).trim();
+  return Boolean(secret && received === secret);
+}
+
 function aiIntentWebhookAllowed(request) {
   const secret = String(
     process.env.AI_INTENTIONS_WEBHOOK_SECRET
@@ -611,6 +625,45 @@ function readZproMessage(payload = {}) {
   };
 }
 
+function wahaJidValue(value) {
+  if (!value || typeof value !== 'object') return value;
+  const user = value.User || value.user;
+  const server = value.Server || value.server;
+  return user ? `${user}${server ? `@${server}` : ''}` : '';
+}
+
+function readWahaMessage(payload = {}) {
+  const data = payload.payload || payload.data || {};
+  const fromMe = Boolean(data.fromMe);
+  const primaryChatId = firstValue(fromMe ? data.to : data.from, data.chatId);
+  const chatIdCandidates = [
+    primaryChatId,
+    data.pn,
+    data._data?.Info?.SenderAlt,
+    data._data?.key?.remoteJidAlt,
+    data._data?.Info?.Sender,
+    data._data?.key?.remoteJid,
+    data.chatId,
+    data.participant
+  ].map(wahaJidValue).filter(Boolean);
+  const chatId = chatIdCandidates.find((value) => !String(value).includes('@lid')) || chatIdCandidates[0];
+  const timestamp = Number(data.timestamp || payload.timestamp || Date.now());
+  const occurredAt = new Date(timestamp < 1e12 ? timestamp * 1000 : timestamp);
+
+  return {
+    event: String(payload.event || '').trim().toLowerCase(),
+    session: String(payload.session || '').trim(),
+    phone: String(primaryChatId || '').includes('@g.us') ? '' : cleanWhatsAppJid(chatId),
+    text: String(firstValue(data.body, data.text, data.caption, '') || '').trim(),
+    name: firstValue(data.notifyName, data.pushName, data._data?.Info?.PushName, data._data?.NotifyName) || null,
+    fromMe,
+    messageId: firstValue(data.id, data.messageId, data.key?.id) || null,
+    status: firstValue(data.ackName, data.ack, data.status) || null,
+    occurredAt: Number.isNaN(occurredAt.getTime()) ? new Date() : occurredAt,
+    raw: data
+  };
+}
+
 function scalarText(value) {
   if (value === undefined || value === null) return '';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -735,6 +788,39 @@ function readGptMakerIntentEvent(payload = {}) {
     data.address,
     data.endereco
   );
+  const qualification = firstText(
+    payload.qualification,
+    payload.qualificacao,
+    payload.classification,
+    payload.classificacao,
+    data.qualification,
+    data.qualificacao,
+    data.classification,
+    data.classificacao,
+    output.qualification,
+    output.qualificacao,
+    output.classification,
+    output.classificacao
+  );
+  const summary = firstText(
+    payload.summary,
+    payload.resumo,
+    data.summary,
+    data.resumo,
+    output.summary,
+    output.resumo
+  );
+  const nextAction = firstText(
+    payload.nextAction,
+    payload.proximaAcao,
+    payload.proxima_acao,
+    data.nextAction,
+    data.proximaAcao,
+    data.proxima_acao,
+    output.nextAction,
+    output.proximaAcao,
+    output.proxima_acao
+  );
 
   return {
     phone,
@@ -745,6 +831,9 @@ function readGptMakerIntentEvent(payload = {}) {
     inboundText,
     agentText,
     address,
+    qualification,
+    summary,
+    nextAction,
     eventId,
     agentName: firstText(agent.name, agent.nome, payload.agentName, data.agentName, 'Ana'),
     raw: payload
@@ -1314,6 +1403,48 @@ function zproConfig() {
   return { baseUrl, token, channelId, apiId, sendPath, sendMediaPath };
 }
 
+function whatsappProvider() {
+  return 'waha';
+}
+
+function wahaConfig() {
+  return {
+    baseUrl: String(process.env.WAHA_API_URL || '').trim().replace(/\/+$/, ''),
+    apiKey: normalizeApiToken(process.env.WAHA_API_KEY),
+    session: String(process.env.WAHA_SESSION || 'default').trim() || 'default'
+  };
+}
+
+function gptMakerConfig() {
+  const apiToken = normalizeApiToken(
+    process.env.GPTMAKER_API_TOKEN
+    || process.env.GPTMAKER_API_KEY
+    || process.env.GPT_MAKER_API_TOKEN
+  );
+  const agentId = String(process.env.GPTMAKER_AGENT_ID || '').trim();
+  const autoReplyEnabled = String(process.env.GPTMAKER_AUTO_REPLY || 'true').toLowerCase() !== 'false';
+  return {
+    name: process.env.GPTMAKER_AGENT_NAME || 'Ana',
+    provider: 'gpt-maker',
+    configured: Boolean(apiToken && agentId),
+    autoReplyEnabled,
+    baseUrl: String(process.env.GPTMAKER_API_URL || 'https://api.gptmaker.ai').trim().replace(/\/+$/, ''),
+    agentId,
+    workspaceId: String(process.env.GPTMAKER_WORKSPACE_ID || '').trim() || null,
+    apiToken: { loaded: Boolean(apiToken) }
+  };
+}
+
+function gptMakerTrainingStatus() {
+  const config = gptMakerConfig();
+  return {
+    loaded: config.configured,
+    managedExternally: true,
+    provider: 'gpt-maker',
+    files: []
+  };
+}
+
 function anaConfig() {
   const apiKey = normalizeApiToken(process.env.ASSISTENTE_ANA || process.env.ANA_API_KEY);
   const autoReplyEnabled = String(process.env.ASSISTENTE_ANA_AUTO_REPLY || 'false').toLowerCase() === 'true';
@@ -1536,6 +1667,52 @@ function classifyAnaConversation(messages = []) {
   return { label: 'Triagem', tone: 'slate', action: 'Classificar intenção antes da próxima resposta.' };
 }
 
+function gptMakerClassification(messages = []) {
+  const qualificationMessage = [...messages].reverse().find((message) => {
+    const metadata = message?.metadata;
+    return metadata && typeof metadata === 'object' && (
+      metadata.gptMakerQualification
+      || metadata.intent
+      || metadata.gptMakerAction
+      || metadata.gptMakerSummary
+    );
+  });
+  const metadata = qualificationMessage?.metadata || {};
+  const rawLabel = String(metadata.gptMakerQualification || metadata.intent || '').trim();
+  const actionCode = String(metadata.gptMakerAction || '').trim();
+  const normalized = normalizedIntentName(`${rawLabel} ${actionCode}`);
+
+  if (!rawLabel && !actionCode) {
+    return {
+      label: 'Aguardando GPT Maker',
+      tone: 'slate',
+      action: 'Aguardar a qualificacao enviada pelo agente do GPT Maker.',
+      source: 'gpt-maker'
+    };
+  }
+  if (/(opt.?out|encerrar contato|finalizar contato|end_contact)/i.test(normalized)) {
+    return { label: 'Opt-out', tone: 'red', action: 'Respeitar pedido e encerrar contato.', source: 'gpt-maker' };
+  }
+  if (/(humano|human|transfer|sensivel|sensiveis|urgente)/i.test(normalized)) {
+    return { label: 'Encaminhar humano', tone: 'red', action: 'Acionar responsavel humano.', source: 'gpt-maker' };
+  }
+  if (/(visita|igreja|voluntario|pastor|missionario)/i.test(normalized)) {
+    return { label: 'Visita/igreja', tone: 'green', action: 'Encaminhar para gestor ou voluntario.', source: 'gpt-maker' };
+  }
+  if (/(endereco|address|entrega|brinde|presente)/i.test(normalized)) {
+    return { label: 'Entrega/endereco', tone: 'orange', action: 'Conferir os dados para a entrega.', source: 'gpt-maker' };
+  }
+  if (/(material|estudo|biblia|interesse|continuar)/i.test(normalized)) {
+    return { label: 'Acompanhar estudo', tone: 'blue', action: 'Continuar o acompanhamento indicado pelo agente.', source: 'gpt-maker' };
+  }
+  return {
+    label: rawLabel || 'Qualificado',
+    tone: 'blue',
+    action: String(metadata.gptMakerNextAction || '').trim() || 'Seguir a orientacao registrada pelo GPT Maker.',
+    source: 'gpt-maker'
+  };
+}
+
 function summarizeAnaConversation(conversation) {
   const messages = conversation.messages || [];
   const inboundMessages = messages.filter((message) => message.direction === 'INBOUND');
@@ -1544,7 +1721,9 @@ function summarizeAnaConversation(conversation) {
   const lastMessage = messages[messages.length - 1] || null;
   const lastInbound = inboundMessages[inboundMessages.length - 1] || null;
   const lastAi = aiMessages[aiMessages.length - 1] || null;
-  const classification = classifyAnaConversation(messages);
+  const classification = gptMakerClassification(messages);
+  const qualificationMessage = [...messages].reverse().find((message) => message?.metadata?.gptMakerSummary);
+  const gptMakerSummary = String(qualificationMessage?.metadata?.gptMakerSummary || '').trim();
 
   return {
     id: conversation.id,
@@ -1561,7 +1740,7 @@ function summarizeAnaConversation(conversation) {
     lastMessageAt: lastMessage?.createdAt || conversation.updatedAt,
     lastLeadMessage: compactText(lastInbound?.body),
     lastAnaMessage: compactText(lastAi?.body || outboundMessages[outboundMessages.length - 1]?.body),
-    summary: `${classification.label}: ${compactText(lastInbound?.body || lastMessage?.body)}`,
+    summary: gptMakerSummary || `${classification.label}: ${compactText(lastInbound?.body || lastMessage?.body)}`,
     classification,
     messages: messages.map((message) => ({
       id: message.id,
@@ -1963,6 +2142,27 @@ async function sendZproTypingIndicator(phone) {
   }
 }
 
+async function sendWahaTypingIndicator(phone) {
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) return { ok: false, skipped: true };
+  const config = wahaConfig();
+  try {
+    await sendWahaRequest('/api/startTyping', {
+      session: config.session,
+      chatId: `${normalizedPhone}@c.us`
+    });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
+
+async function sendWhatsAppTypingIndicator(phone) {
+  return whatsappProvider() === 'waha'
+    ? sendWahaTypingIndicator(phone)
+    : sendZproTypingIndicator(phone);
+}
+
 function buildAnaFallbackReply({ conversation, inboundMessage }) {
   const name = leadFirstName(conversation?.leadName || conversation?.lead?.name);
   const theme = materialFromConversation(conversation);
@@ -2071,10 +2271,81 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
   return `${anaNameText(name)}obrigada por responder 😊\n\nPara eu seguir com o acompanhamento certinho: você chegou a receber o material da Escola Bíblica Novo Tempo?`;
 }
 
-async function maybeReplyWithAna(saved, inboundMessage) {
+function gptMakerContextId(phone) {
+  return normalizePhone(phone);
+}
+
+async function sendGptMakerRequest(endpoint, body) {
+  const config = gptMakerConfig();
+  const apiToken = normalizeApiToken(
+    process.env.GPTMAKER_API_TOKEN
+    || process.env.GPTMAKER_API_KEY
+    || process.env.GPT_MAKER_API_TOKEN
+  );
+  if (!config.baseUrl || !apiToken || !config.agentId) {
+    const error = new Error('Configuracao do GPT Maker incompleta. Informe GPTMAKER_API_TOKEN e GPTMAKER_AGENT_ID.');
+    error.status = 500;
+    throw error;
+  }
+
+  const providerResponse = await fetch(`${config.baseUrl}/v2/agent/${encodeURIComponent(config.agentId)}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(Math.min(Math.max(Number(process.env.GPTMAKER_TIMEOUT_MS) || 90000, 5000), 120000))
+  });
+  const data = await parseProviderResponse(providerResponse);
+  if (!providerResponse.ok) {
+    const error = new Error(data?.error || data?.message || `GPT Maker respondeu com status ${providerResponse.status}`);
+    error.status = 502;
+    error.providerStatus = providerResponse.status;
+    error.providerResponse = data;
+    throw error;
+  }
+  return data;
+}
+
+async function askGptMakerAgent({ conversation, inboundMessage }) {
+  const contextId = gptMakerContextId(conversation?.phone);
+  const prompt = String(inboundMessage?.body || '').trim();
+  if (!contextId || !prompt) return null;
+
+  const data = await sendGptMakerRequest('/conversation', {
+    contextId,
+    prompt,
+    chatName: conversation?.leadName || conversation?.lead?.name || 'Interessado',
+    phone: contextId
+  });
+  const message = String(data?.message || '').trim();
+  if (!message) {
+    const error = new Error('O agente do GPT Maker respondeu sem texto.');
+    error.status = 502;
+    error.providerResponse = data;
+    throw error;
+  }
+  return { message, contextId, providerResponse: data };
+}
+
+async function addGptMakerContext({ phone, message, role = 'assistant' }) {
+  const config = gptMakerConfig();
+  const contextId = gptMakerContextId(phone);
+  const prompt = String(message || '').trim();
+  if (!config.configured || !contextId || !prompt) return { skipped: true };
+  return sendGptMakerRequest('/add-message', { contextId, prompt, role });
+}
+
+async function maybeReplyWithGptMaker(saved, inboundMessage) {
   if (!saved?.conversation?.id || !inboundMessage?.body) return null;
-  const config = anaConfig();
+  const config = gptMakerConfig();
   if (!config.autoReplyEnabled) return null;
+  if (!config.configured) {
+    console.warn('[gptmaker:auto-reply:skipped] GPT Maker nao configurado');
+    return null;
+  }
 
   const conversation = await prisma.whatsAppConversation.findUnique({
     where: { id: saved.conversation.id },
@@ -2089,26 +2360,40 @@ async function maybeReplyWithAna(saved, inboundMessage) {
   if (conversation?.messages) {
     conversation.messages = [...conversation.messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   }
-  const recentAnaReply = (conversation?.messages || []).find((message) => (
+  const recentAgentReply = (conversation?.messages || []).find((message) => (
     message.senderType === 'AI'
     && message.direction === 'OUTBOUND'
     && message.metadata?.replyToMessageId === inboundMessage.id
   ));
-  if (recentAnaReply) return null;
+  if (recentAgentReply) return null;
 
-  const anaReply = await buildAnaReply({ conversation, inboundMessage, config });
-  const message = anaReply.message;
-  const delayMs = anaReplyDelayMs(message, inboundMessage);
-  const typing = await sendZproTypingIndicator(conversation?.phone || saved.conversation.phone);
-  const conversationState = inferAnaConversationState(conversation);
-  await sleep(delayMs);
+  const typing = await sendWhatsAppTypingIndicator(conversation?.phone || saved.conversation.phone);
+  let agentReply;
+  try {
+    agentReply = await askGptMakerAgent({ conversation, inboundMessage });
+  } catch (error) {
+    await prisma.whatsAppMessage.update({
+      where: { id: inboundMessage.id },
+      data: {
+        metadata: {
+          ...(inboundMessage.metadata && typeof inboundMessage.metadata === 'object' ? inboundMessage.metadata : {}),
+          gptMakerError: error.message,
+          gptMakerHttpStatus: error.providerStatus || null,
+          gptMakerAttemptedAt: new Date().toISOString()
+        }
+      }
+    }).catch(() => null);
+    throw error;
+  }
+
+  const message = agentReply.message;
   let result;
   try {
-    result = await sendZproTextMessage({
+    result = await sendWhatsAppTextMessage({
       phone: conversation?.phone || saved.conversation.phone,
       message,
       leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
-      templateId: 'ana-auto-reply'
+      templateId: 'gptmaker-auto-reply'
     });
   } catch (error) {
     return recordWhatsAppMessage({
@@ -2120,23 +2405,21 @@ async function maybeReplyWithAna(saved, inboundMessage) {
       leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
       leadName: conversation?.leadName || conversation?.lead?.name || null,
       district: conversation?.district || conversation?.lead?.district?.name || null,
-      provider: 'zpro-baileys',
+      provider: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
       providerStatus: error.deliveryStatus || 'FAILED',
       providerResponse: error.providerResponse || null,
       occurredAt: new Date(),
       metadata: {
         assistant: 'Ana',
+        aiProvider: 'gpt-maker',
+        transport: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
         autoReply: true,
         replyToMessageId: inboundMessage.id,
-        intent: detectAnaReplyIntent(inboundMessage.body),
-        source: anaReply.source,
-        guidePath: anaReply.guide?.path || null,
-        guideUpdatedAt: anaReply.guide?.updatedAt || null,
-        delayMs,
+        source: 'gpt-maker-conversation',
+        gptMakerAgentId: config.agentId,
+        gptMakerContextId: agentReply.contextId,
+        gptMakerResponse: agentReply.providerResponse,
         typing,
-        model: config.model,
-        modelError: anaReply.error || null,
-        conversationState,
         failure: true,
         providerHttpStatus: error.providerStatus || error.status || null,
         attempts: error.providerAttempts || []
@@ -2160,17 +2443,15 @@ async function maybeReplyWithAna(saved, inboundMessage) {
     occurredAt: new Date(),
     metadata: {
       assistant: 'Ana',
+      aiProvider: 'gpt-maker',
+      transport: result.provider,
       autoReply: true,
       replyToMessageId: inboundMessage.id,
-      intent: detectAnaReplyIntent(inboundMessage.body),
-      source: anaReply.source,
-      guidePath: anaReply.guide?.path || null,
-      guideUpdatedAt: anaReply.guide?.updatedAt || null,
-      delayMs,
+      source: 'gpt-maker-conversation',
+      gptMakerAgentId: config.agentId,
+      gptMakerContextId: agentReply.contextId,
+      gptMakerResponse: agentReply.providerResponse,
       typing,
-      model: config.model,
-      modelError: anaReply.error || null,
-      conversationState,
       attempts: result.attempts || []
     }
   });
@@ -2242,6 +2523,128 @@ async function parseProviderResponse(providerResponse) {
   } catch {
     return { raw: text };
   }
+}
+
+async function sendWahaRequest(pathValue, body) {
+  const config = wahaConfig();
+  if (!config.baseUrl || !config.apiKey) {
+    const missing = [
+      !config.baseUrl && 'WAHA_API_URL',
+      !config.apiKey && 'WAHA_API_KEY'
+    ].filter(Boolean);
+    const error = new Error(`Configuracao WAHA incompleta: ${missing.join(', ')}`);
+    error.status = 500;
+    throw error;
+  }
+
+  const providerResponse = await fetch(`${config.baseUrl}${pathValue}`, {
+    method: 'POST',
+    headers: {
+      'X-Api-Key': config.apiKey,
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  const data = await parseProviderResponse(providerResponse);
+  if (!providerResponse.ok) {
+    const error = new Error(data?.message || data?.error || `WAHA respondeu com status ${providerResponse.status}`);
+    error.status = 502;
+    error.providerStatus = providerResponse.status;
+    error.deliveryStatus = providerFailureStatus(providerResponse.status, data);
+    error.providerResponse = data;
+    throw error;
+  }
+  return data;
+}
+
+async function sendWahaTextMessage({ phone, message }) {
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) {
+    const error = new Error('Telefone invalido. Use DDI + DDD + numero, ou DDD + numero brasileiro.');
+    error.status = 400;
+    throw error;
+  }
+  const cleanMessage = String(message || '').trim();
+  if (cleanMessage.length < 2) {
+    const error = new Error('Mensagem vazia ou muito curta.');
+    error.status = 400;
+    throw error;
+  }
+
+  const config = wahaConfig();
+  const data = await sendWahaRequest('/api/sendText', {
+    session: config.session,
+    chatId: `${normalizedPhone}@c.us`,
+    text: cleanMessage
+  });
+  return {
+    ok: true,
+    provider: 'waha-gows',
+    deliveryStatus: providerResponseDeliveryStatus(data),
+    phone: normalizedPhone,
+    providerResponse: data,
+    attempts: []
+  };
+}
+
+async function sendWahaMediaMessage({ phone, message = '', fileName, mimeType, base64Data }) {
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) {
+    const error = new Error('Telefone invalido. Use DDI + DDD + numero, ou DDD + numero brasileiro.');
+    error.status = 400;
+    throw error;
+  }
+
+  const cleanMimeType = String(mimeType || '').toLowerCase();
+  if (!cleanMimeType.startsWith('image/') && !cleanMimeType.startsWith('video/')) {
+    const error = new Error('Envie somente imagem ou video.');
+    error.status = 400;
+    throw error;
+  }
+
+  const cleanBase64 = String(base64Data || '').replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+  const mediaBytes = Buffer.byteLength(cleanBase64, 'base64');
+  if (!cleanBase64 || !mediaBytes || mediaBytes > 10 * 1024 * 1024) {
+    const error = new Error('O anexo deve ter no maximo 10 MB.');
+    error.status = 400;
+    throw error;
+  }
+
+  const safeFileName = path.basename(String(fileName || (cleanMimeType.startsWith('video/') ? 'video' : 'imagem')))
+    .replace(/[^\w .()\-À-ÿ]/g, '_');
+  const config = wahaConfig();
+  const data = await sendWahaRequest(cleanMimeType.startsWith('video/') ? '/api/sendVideo' : '/api/sendImage', {
+    session: config.session,
+    chatId: `${normalizedPhone}@c.us`,
+    file: {
+      mimetype: cleanMimeType,
+      filename: safeFileName,
+      data: cleanBase64
+    },
+    caption: String(message || '').trim()
+  });
+
+  return {
+    ok: true,
+    provider: 'waha-gows',
+    deliveryStatus: providerResponseDeliveryStatus(data),
+    phone: normalizedPhone,
+    providerResponse: data,
+    media: { fileName: safeFileName, mimeType: cleanMimeType }
+  };
+}
+
+async function sendWhatsAppTextMessage(options) {
+  return whatsappProvider() === 'waha'
+    ? sendWahaTextMessage(options)
+    : sendZproTextMessage(options);
+}
+
+async function sendWhatsAppMediaMessage(options) {
+  return whatsappProvider() === 'waha'
+    ? sendWahaMediaMessage(options)
+    : sendZproMediaMessage(options);
 }
 
 async function sendZproByParams({ config, phone, message, externalKey }) {
@@ -2912,6 +3315,17 @@ app.get('/api/dataset/history', requireAuth, requireAdminGeral, async (_request,
 });
 
 app.get('/api/whatsapp/provider', requireAuth, (_request, response) => {
+  if (whatsappProvider() === 'waha') {
+    const config = wahaConfig();
+    response.json({
+      provider: 'waha-gows',
+      configured: Boolean(config.baseUrl && config.apiKey),
+      baseUrl: config.baseUrl || null,
+      session: config.session,
+      token: { loaded: Boolean(config.apiKey) }
+    });
+    return;
+  }
   const config = zproConfig();
   response.json({
     provider: 'zpro-baileys',
@@ -2930,10 +3344,10 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
   response.set('Expires', '0');
 
   try {
-    const training = await readAnaTrainingStatus();
+    const training = gptMakerTrainingStatus();
     if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
       response.json({
-        agent: anaConfig(),
+        agent: gptMakerConfig(),
         training,
         metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, needsHuman: 0, optOut: 0 },
         conversations: []
@@ -2959,7 +3373,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       .filter((conversation) => conversation.hasLeadReply || conversation.aiCount > 0);
 
     response.json({
-      agent: anaConfig(),
+      agent: gptMakerConfig(),
       training,
       metrics: {
         conversations: summarized.length,
@@ -2974,8 +3388,8 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
   } catch (error) {
     console.error('[ai:ana:summary:error]', error.message);
     response.status(500).json({
-      agent: anaConfig(),
-      training: await readAnaTrainingStatus().catch(() => ({ loaded: false, files: [] })),
+      agent: gptMakerConfig(),
+      training: gptMakerTrainingStatus(),
       metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, needsHuman: 0, optOut: 0 },
       conversations: [],
       message: 'Nao foi possivel carregar o resumo da Ana.'
@@ -2997,6 +3411,21 @@ app.get('/api/ai-intentions', (request, response) => {
   });
 });
 
+async function mergeWhatsAppMessageMetadata(messageId, metadata) {
+  if (!messageId) return null;
+  const current = await prisma.whatsAppMessage.findUnique({ where: { id: messageId } }).catch(() => null);
+  if (!current) return null;
+  return prisma.whatsAppMessage.update({
+    where: { id: messageId },
+    data: {
+      metadata: {
+        ...(current.metadata && typeof current.metadata === 'object' ? current.metadata : {}),
+        ...metadata
+      }
+    }
+  });
+}
+
 app.post('/api/ai-intentions', async (request, response) => {
   if (!aiIntentWebhookAllowed(request)) {
     response.status(401).json({ ok: false, message: 'Webhook da Ana nao autorizado' });
@@ -3017,60 +3446,107 @@ app.post('/api/ai-intentions', async (request, response) => {
 
   try {
     const intentReply = await anaIntentReply(event);
+    const qualification = event.qualification || event.intentName;
+    const qualificationMetadata = {
+      source: 'gpt-maker-intention',
+      aiProvider: 'gpt-maker',
+      intent: event.intentName,
+      gptMakerQualification: qualification,
+      gptMakerSummary: event.summary || null,
+      gptMakerNextAction: event.nextAction || null,
+      gptMakerAction: intentReply?.action || null,
+      gptMakerEventId: event.eventId || null,
+      gptMakerReceivedAt: occurredAt.toISOString(),
+      raw: event.raw
+    };
+    const conversation = event.phone
+      ? await prisma.whatsAppConversation.findUnique({ where: { phone: event.phone } }).catch(() => null)
+      : null;
     let inboundSaved = null;
+    let inboundMessage = null;
     if (event.phone && event.inboundText) {
-      inboundSaved = await recordWhatsAppMessage({
-        phone: event.phone,
-        body: event.inboundText,
-        direction: 'INBOUND',
-        senderType: 'LEAD',
-        senderName: event.leadName || 'Interessado',
-        leadId: event.leadId || null,
-        leadName: event.leadName || null,
-        provider: 'gpt-maker',
-        providerStatus: event.intentName,
-        providerMessageId: event.eventId ? `${event.eventId}:inbound` : null,
-        occurredAt,
-        metadata: {
-          source: 'gpt-maker-intention',
-          intent: event.intentName,
-          raw: event.raw
-        }
-      });
+      const signature = normalizeMessageSignature(event.inboundText);
+      const candidates = conversation ? await prisma.whatsAppMessage.findMany({
+        where: { conversationId: conversation.id, direction: 'INBOUND' },
+        orderBy: { createdAt: 'desc' },
+        take: 20
+      }) : [];
+      inboundMessage = candidates.find((message) => normalizeMessageSignature(message.body) === signature) || null;
+      if (inboundMessage) {
+        inboundMessage = await mergeWhatsAppMessageMetadata(inboundMessage.id, qualificationMetadata);
+      } else {
+        inboundSaved = await recordWhatsAppMessage({
+          phone: event.phone,
+          body: event.inboundText,
+          direction: 'INBOUND',
+          senderType: 'LEAD',
+          senderName: event.leadName || 'Interessado',
+          leadId: event.leadId || null,
+          leadName: event.leadName || null,
+          provider: 'gpt-maker',
+          providerStatus: event.intentName,
+          providerMessageId: event.eventId ? `${event.eventId}:inbound` : null,
+          occurredAt,
+          metadata: qualificationMetadata
+        });
+        inboundMessage = inboundSaved?.message || null;
+      }
     }
 
-    const body = event.agentText || `[Intencao acionada] ${event.intentName}`;
-    const saved = event.phone ? await recordWhatsAppMessage({
-      phone: event.phone,
-      body,
-      direction: 'OUTBOUND',
-      senderType: 'AI',
-      senderName: event.agentName || 'Ana',
-      leadId: event.leadId || null,
-      leadName: event.leadName || null,
-      provider: 'gpt-maker',
-      providerStatus: event.intentName,
-      providerMessageId: event.eventId ? `${event.eventId}:agent` : null,
-      occurredAt,
-      metadata: {
-        source: 'gpt-maker-intention',
-        intent: event.intentName,
-        inboundMessageId: inboundSaved?.message?.id || null,
-        raw: event.raw
+    let saved = null;
+    if (event.phone && event.agentText) {
+      const activeConversation = conversation || inboundSaved?.conversation || null;
+      const signature = normalizeMessageSignature(event.agentText);
+      const candidates = activeConversation ? await prisma.whatsAppMessage.findMany({
+        where: { conversationId: activeConversation.id, direction: 'OUTBOUND', senderType: 'AI' },
+        orderBy: { createdAt: 'desc' },
+        take: 20
+      }) : [];
+      const existingAgentMessage = candidates.find((message) => normalizeMessageSignature(message.body) === signature) || null;
+      if (existingAgentMessage) {
+        const updated = await mergeWhatsAppMessageMetadata(existingAgentMessage.id, {
+          ...qualificationMetadata,
+          inboundMessageId: inboundMessage?.id || null
+        });
+        saved = { conversation: activeConversation, message: updated };
+      } else {
+        saved = await recordWhatsAppMessage({
+          phone: event.phone,
+          body: event.agentText,
+          direction: 'OUTBOUND',
+          senderType: 'AI',
+          senderName: event.agentName || 'Ana',
+          leadId: event.leadId || null,
+          leadName: event.leadName || null,
+          provider: 'gpt-maker',
+          providerStatus: event.intentName,
+          providerMessageId: event.eventId ? `${event.eventId}:agent` : null,
+          occurredAt,
+          metadata: {
+            ...qualificationMetadata,
+            inboundMessageId: inboundMessage?.id || null
+          }
+        });
       }
-    }) : null;
+    } else if (event.phone && !inboundMessage) {
+      const latestMessage = conversation ? await prisma.whatsAppMessage.findFirst({
+        where: { conversationId: conversation.id },
+        orderBy: { createdAt: 'desc' }
+      }) : null;
+      if (latestMessage) await mergeWhatsAppMessageMetadata(latestMessage.id, qualificationMetadata);
+    }
 
     response.json({
       ok: true,
       received: true,
-      saved: Boolean(saved),
-      conversationId: saved?.conversation?.id || inboundSaved?.conversation?.id || null,
+      saved: Boolean(saved || inboundMessage),
+      conversationId: saved?.conversation?.id || inboundSaved?.conversation?.id || conversation?.id || null,
       messageId: saved?.message?.id || null,
-      inboundMessageId: inboundSaved?.message?.id || null,
+      inboundMessageId: inboundMessage?.id || null,
       missingPhone: !event.phone,
       action: intentReply?.action || 'REGISTER_EVENT',
       reply: intentReply?.reply || '',
-      leadFound: intentReply?.leadFound ?? Boolean(saved?.conversation?.leadId || inboundSaved?.conversation?.leadId),
+      leadFound: intentReply?.leadFound ?? Boolean(saved?.conversation?.leadId || inboundSaved?.conversation?.leadId || conversation?.leadId),
       hasRegisteredAddress: intentReply?.hasRegisteredAddress ?? false,
       addressShouldBeHidden: intentReply?.addressShouldBeHidden ?? true,
       addressSaved: intentReply?.addressSaved ?? false,
@@ -3220,6 +3696,12 @@ app.post('/api/whatsapp/leads', requireAuth, async (request, response) => {
 });
 
 app.post('/api/whatsapp/sync-zpro', requireAuth, async (request, response) => {
+  response.status(410).json({
+    ok: false,
+    message: 'A sincronizacao do Z-PRO foi desativada. As conversas agora chegam em tempo real pelo webhook do WAHA.'
+  });
+  return;
+
   response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   response.set('Pragma', 'no-cache');
   response.set('Expires', '0');
@@ -3327,7 +3809,7 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
 app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
   try {
     const sentAt = new Date();
-    const result = await sendZproTextMessage({
+    const result = await sendWhatsAppTextMessage({
       phone: request.body?.phone,
       message: request.body?.message,
       leadId: request.body?.leadId,
@@ -3349,6 +3831,11 @@ app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
       occurredAt: sentAt,
       metadata: { templateId: request.body?.templateId || null, attempts: result.attempts || [] }
     });
+    await addGptMakerContext({
+      phone: result.phone,
+      message: request.body?.message,
+      role: 'assistant'
+    }).catch((error) => console.warn('[gptmaker:add-context:error]', error.message));
     response.json({
       ...result,
       conversationId: saved?.conversation?.id || null,
@@ -3357,7 +3844,7 @@ app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
       sentAt: sentAt.toISOString()
     });
   } catch (error) {
-    console.error('[zpro:send:error]', error.message, error.providerResponse || '');
+    console.error('[whatsapp:send:error]', error.message, error.providerResponse || '');
     const failed = await recordWhatsAppMessage({
       phone: request.body?.phone,
       body: request.body?.message,
@@ -3367,7 +3854,7 @@ app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
       leadId: request.body?.leadId,
       leadName: request.body?.name || null,
       district: request.body?.district || null,
-      provider: 'zpro-baileys',
+      provider: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
       providerStatus: error.deliveryStatus || 'FAILED',
       providerResponse: error.providerResponse || null,
       occurredAt: new Date(),
@@ -3395,7 +3882,7 @@ app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
   const savedBody = String(request.body?.message || '').trim() || `[${mediaLabel}] ${request.body?.fileName || 'anexo'}`;
   try {
     const sentAt = new Date();
-    const result = await sendZproMediaMessage({
+    const result = await sendWhatsAppMediaMessage({
       phone: request.body?.phone,
       message: request.body?.message,
       fileName: request.body?.fileName,
@@ -3419,6 +3906,11 @@ app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
       occurredAt: sentAt,
       metadata: { media: result.media }
     });
+    await addGptMakerContext({
+      phone: result.phone,
+      message: savedBody,
+      role: 'assistant'
+    }).catch((error) => console.warn('[gptmaker:add-context:error]', error.message));
     response.json({
       ...result,
       conversationId: saved?.conversation?.id || null,
@@ -3426,7 +3918,7 @@ app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
       sentAt: sentAt.toISOString()
     });
   } catch (error) {
-    console.error('[zpro:send-media:error]', error.message, error.providerResponse || '');
+    console.error('[whatsapp:send-media:error]', error.message, error.providerResponse || '');
     await recordWhatsAppMessage({
       phone: request.body?.phone,
       body: savedBody,
@@ -3436,7 +3928,7 @@ app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
       leadId: request.body?.leadId,
       leadName: request.body?.name || null,
       district: request.body?.district || null,
-      provider: 'zpro-baileys',
+      provider: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
       providerStatus: error.deliveryStatus || 'FAILED',
       providerResponse: error.providerResponse || null,
       occurredAt: new Date(),
@@ -3511,7 +4003,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
       }
     });
     try {
-      const result = await sendZproTextMessage({
+      const result = await sendWhatsAppTextMessage({
         phone,
         message: personalizedMessage,
         leadId: recipient.leadId || recipient.id || null,
@@ -3543,6 +4035,11 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
           attempts: result.attempts || []
         }
       });
+      await addGptMakerContext({
+        phone: result.phone,
+        message: personalizedMessage,
+        role: 'assistant'
+      }).catch((error) => console.warn('[gptmaker:add-context:error]', error.message));
       await prisma.whatsAppBroadcastRecipient.update({
         where: { id: recipientRecord.id },
         data: {
@@ -3572,7 +4069,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         leadId: recipient.leadId || recipient.id || null,
         leadName: recipient.name || null,
         district: recipient.district || null,
-        provider: 'zpro-baileys',
+        provider: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
         providerStatus: error.deliveryStatus || 'FAILED',
         providerResponse: error.providerResponse || null,
         metadata: {
@@ -3615,9 +4112,9 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
   const firstFailure = results.find((item) => !item.ok);
   const messageText = sent
     ? failed
-      ? `${sent} mensagem(ns) foram aceitas pelo Z-PRO e ${failed} falharam.`
-      : `${sent} mensagem(ns) foram aceitas pelo Z-PRO.`
-    : `Nenhuma mensagem foi aceita pelo Z-PRO.${firstFailure?.message ? ` Motivo: ${firstFailure.message}` : ''}`;
+      ? `${sent} mensagem(ns) foram aceitas pelo WAHA e ${failed} falharam.`
+      : `${sent} mensagem(ns) foram aceitas pelo WAHA.`
+    : `Nenhuma mensagem foi aceita pelo WAHA.${firstFailure?.message ? ` Motivo: ${firstFailure.message}` : ''}`;
 
   response.status(sent ? 200 : 502).json({
     ok: sent > 0,
@@ -3836,6 +4333,9 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
 });
 
 app.get('/api/webhooks/zpro/whatsapp', (request, response) => {
+  response.status(410).json({ ok: false, provider: 'zpro-baileys', webhook: 'disabled' });
+  return;
+
   if (!webhookAllowed(request)) {
     response.status(401).json({ ok: false, message: 'Webhook nao autorizado' });
     return;
@@ -3844,6 +4344,13 @@ app.get('/api/webhooks/zpro/whatsapp', (request, response) => {
 });
 
 app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
+  response.status(410).json({
+    ok: false,
+    received: false,
+    message: 'Webhook do Z-PRO desativado. Use /api/webhooks/waha/whatsapp.'
+  });
+  return;
+
   if (!webhookAllowed(request)) {
     response.status(401).json({ ok: false, message: 'Webhook nao autorizado' });
     return;
@@ -4040,9 +4547,109 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     }
   });
 
+  response.json({
+    ok: true,
+    received: true,
+    saved: Boolean(saved),
+    conversationId: saved?.conversation?.id || null,
+    messageId: saved?.message?.id || null,
+    agentReplyQueued: false
+  });
+});
+
+app.get('/api/webhooks/waha/whatsapp', (request, response) => {
+  if (!wahaWebhookAllowed(request)) {
+    response.status(401).json({ ok: false, message: 'Webhook nao autorizado' });
+    return;
+  }
+  response.json({ ok: true, provider: 'waha-gows', webhook: 'ready' });
+});
+
+app.post('/api/webhooks/waha/whatsapp', async (request, response) => {
+  if (!wahaWebhookAllowed(request)) {
+    response.status(401).json({ ok: false, message: 'Webhook nao autorizado' });
+    return;
+  }
+
+  const payload = coerceWebhookPayload(request.body);
+  const event = readWahaMessage(payload);
+  const normalizedStatus = recognizedDeliveryStatus(event.status);
+  console.log('[waha:webhook]', JSON.stringify({
+    event: event.event,
+    session: event.session,
+    phone: event.phone,
+    fromMe: event.fromMe,
+    messageId: event.messageId,
+    status: normalizedStatus
+  }));
+
+  if (event.event === 'message.ack') {
+    const messages = event.messageId
+      ? await prisma.whatsAppMessage.findMany({ where: { providerMessageId: event.messageId } })
+      : [];
+    await Promise.all(messages.map((message) => prisma.whatsAppMessage.update({
+      where: { id: message.id },
+      data: {
+        providerStatus: normalizedStatus || 'ACCEPTED',
+        metadata: {
+          ...(message.metadata && typeof message.metadata === 'object' ? message.metadata : {}),
+          deliveryEvent: event.event,
+          deliverySession: event.session,
+          deliveryPayload: payload
+        }
+      }
+    })));
+    response.json({ ok: true, received: true, statusUpdated: messages.length });
+    return;
+  }
+
+  if (!['message', 'message.any'].includes(event.event)) {
+    response.json({ ok: true, received: true, ignored: true, event: event.event || null });
+    return;
+  }
+
+  if (!event.phone || !event.text) {
+    response.json({ ok: true, received: true, ignored: true, reason: 'message-without-phone-or-text' });
+    return;
+  }
+
+  if (event.messageId) {
+    const existing = await prisma.whatsAppMessage.findFirst({
+      where: { providerMessageId: event.messageId },
+      select: { id: true, conversationId: true }
+    }).catch(() => null);
+    if (existing?.id) {
+      response.json({
+        ok: true,
+        received: true,
+        duplicate: true,
+        conversationId: existing.conversationId,
+        messageId: existing.id
+      });
+      return;
+    }
+  }
+
+  const saved = await recordWhatsAppMessage({
+    phone: event.phone,
+    body: event.text,
+    direction: event.fromMe ? 'OUTBOUND' : 'INBOUND',
+    senderType: event.fromMe ? 'SYSTEM' : 'LEAD',
+    senderName: event.fromMe ? 'WhatsApp' : event.name,
+    provider: 'waha-gows',
+    providerStatus: normalizedStatus || event.event,
+    providerMessageId: event.messageId,
+    occurredAt: event.occurredAt,
+    metadata: {
+      session: event.session,
+      event: event.event,
+      raw: payload
+    }
+  });
+
   if (saved?.message?.direction === 'INBOUND') {
-    maybeReplyWithAna(saved, saved.message).catch((error) => {
-      console.error('[ai:ana:auto-reply:error]', error.message, error.providerResponse || '');
+    maybeReplyWithGptMaker(saved, saved.message).catch((error) => {
+      console.error('[gptmaker:auto-reply:error]', error.message, error.providerResponse || '');
     });
   }
 
@@ -4052,7 +4659,7 @@ app.post('/api/webhooks/zpro/whatsapp', async (request, response) => {
     saved: Boolean(saved),
     conversationId: saved?.conversation?.id || null,
     messageId: saved?.message?.id || null,
-    anaReplyQueued: Boolean(saved?.message?.direction === 'INBOUND')
+    agentReplyQueued: Boolean(saved?.message?.direction === 'INBOUND' && gptMakerConfig().configured)
   });
 });
 

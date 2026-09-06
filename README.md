@@ -66,12 +66,16 @@ DATABASE_URL="postgresql://usuario:senha@host:porta/banco"
 AUTH_SECRET="uma-chave-secreta-forte"
 FRONTEND_URL="http://localhost:3000"
 PORT=4000
-ZPRO_WEBHOOK_SECRET="uma-chave-para-webhook-zpro"
-ZPRO_API_URL="https://api.seu-provedor-zpro.com"
-ZPRO_API_TOKEN="token-completo-gerado-no-zpro-sem-escrever-Bearer"
-ZPRO_API_ID="id-da-api-criada-no-zpro"
-ZPRO_CHANNEL_ID="10"
-ZPRO_SEND_TEXT_PATH="/v2/api/external/{apiId}"
+WAHA_API_URL="https://waha.seu-dominio.com"
+WAHA_API_KEY="chave-privada-da-api-do-waha"
+WAHA_SESSION="default"
+WAHA_WEBHOOK_SECRET="segredo-privado-do-webhook-waha"
+GPTMAKER_API_URL="https://api.gptmaker.ai"
+GPTMAKER_API_TOKEN="token-privado-da-api-do-gpt-maker"
+GPTMAKER_AGENT_ID="id-do-agente-ana-no-gpt-maker"
+GPTMAKER_AGENT_NAME="Ana"
+GPTMAKER_AUTO_REPLY="true"
+GPTMAKER_WEBHOOK_SECRET="segredo-privado-do-webhook-gpt-maker"
 ADMIN_EMAIL="admin@leadsnt.com.br"
 ADMIN_PASSWORD="senha-com-no-minimo-8-caracteres"
 ADMIN_NAME="Admin"
@@ -99,47 +103,36 @@ Rotas principais:
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
 - `GET /api/dashboard`
-- `GET /api/webhooks/zpro/whatsapp`
-- `POST /api/webhooks/zpro/whatsapp`
+- `GET /api/webhooks/waha/whatsapp`
+- `POST /api/webhooks/waha/whatsapp`
+- `GET /api/ai-intentions`
+- `POST /api/ai-intentions`
 
-### Webhook do Zpro / Baileys
+### Webhook do WAHA
 
-No Zpro, em **Webhook do Canal > URL de destino**, use a URL publica do backend:
-
-```text
-https://SEU_BACKEND_PUBLICO/api/webhooks/zpro/whatsapp?token=SUA_CHAVE_ZPRO_WEBHOOK_SECRET
-```
-
-Tambem e possivel enviar a chave no header `x-webhook-secret` ou `x-zpro-webhook-secret`.
-
-Para desenvolvimento local, o endpoint fica:
-
-```text
-http://localhost:4000/api/webhooks/zpro/whatsapp?token=SUA_CHAVE_ZPRO_WEBHOOK_SECRET
-```
-
-O campo do Zpro recebe eventos de entrada, como mensagens recebidas e status do canal. Para envio automatico de mensagens, o Amigos NT devera chamar a API do Zpro usando as credenciais do provedor e registrar os disparos na tabela `WhatsAppSend`.
-
-### Envio de mensagens pelo Zpro
-
-Configure no backend:
+No recurso do WAHA, configure o webhook global para a URL publica do backend:
 
 ```env
-ZPRO_API_URL="https://api.seu-provedor-zpro.com"
-ZPRO_API_TOKEN="token-completo-gerado-no-zpro-sem-escrever-Bearer"
-ZPRO_API_ID="id-da-api-criada-no-zpro"
-ZPRO_CHANNEL_ID="10"
-ZPRO_SEND_TEXT_PATH="/v2/api/external/{apiId}"
+WHATSAPP_HOOK_URL="https://SEU_BACKEND_PUBLICO/api/webhooks/waha/whatsapp"
+WHATSAPP_HOOK_EVENTS="message,message.ack"
+WHATSAPP_HOOK_CUSTOM_HEADERS="X-Waha-Webhook-Secret:O_MESMO_VALOR_DE_WAHA_WEBHOOK_SECRET"
 ```
 
-O `ZPRO_API_ID` deve ser o ID da API criada na tela **API** do Zpro. O `ZPRO_CHANNEL_ID` pode continuar como referencia do canal Baileys conectado. Pelas telas do Zpro, o canal **Novo Tempo Seven** usa o ID `10`.
-No `ZPRO_API_TOKEN`, cole somente o token completo criado no Zpro. Nao coloque `Bearer` antes do token.
+Envie o mesmo segredo de `WAHA_WEBHOOK_SECRET` no header `x-waha-webhook-secret`. Os eventos usados são `message` e `message.ack`.
 
-Se a sua instalacao do Zpro usar outro caminho de envio, altere apenas `ZPRO_SEND_TEXT_PATH`. Ele aceita placeholders:
+O WAHA recebe e envia as mensagens. O backend grava o histórico e encaminha cada mensagem recebida ao agente configurado no GPT Maker.
 
-```env
-ZPRO_SEND_TEXT_PATH="/v2/api/external/{apiId}"
+### Agente do GPT Maker
+
+O backend conversa com o agente usando `GPTMAKER_AGENT_ID` e `GPTMAKER_API_TOKEN`. Use o mesmo telefone como contexto da conversa para que o agente mantenha o histórico do interessado.
+
+As intenções e qualificações configuradas no GPT Maker devem chamar:
+
+```text
+https://SEU_BACKEND_PUBLICO/api/ai-intentions?token=O_MESMO_VALOR_DE_GPTMAKER_WEBHOOK_SECRET
 ```
+
+Envie no corpo os campos `phone`, `intent`, `qualification`, `summary`, `nextAction`, `userMessage` e `agentMessage` quando estiverem disponíveis. Também é possível proteger o endpoint pelo header `x-gptmaker-secret` ou `x-webhook-secret`. A qualificação recebida é anexada à mensagem existente do WAHA e alimenta a tela do Agente IA sem duplicar a conversa.
 
 Rotas internas do Amigos NT para disparo:
 
