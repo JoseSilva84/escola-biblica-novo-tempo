@@ -9303,8 +9303,11 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const studyWhatsapp = records.filter((lead) => lead.t && lead.e).length;
   const vipWhatsapp = records.filter((lead) => lead.t && lead.v).length;
   const anaMetrics = anaSummary?.metrics || {};
+  const anaFunnel = anaSummary?.funnel || {};
+  const requestAgeBuckets = anaSummary?.requestAgeBuckets || [];
   const anaConversations = anaSummary?.conversations || [];
-  const acceptedConversations = anaConversations.filter((conversation) => conversation.delivery?.accepted);
+  const acceptedConversations = anaSummary?.acceptedConversations || anaConversations.filter((conversation) => conversation.delivery?.accepted);
+  const largestRequestAgeBucket = Math.max(1, ...requestAgeBuckets.map((bucket) => Number(bucket.count) || 0));
   const anaTraining = anaSummary?.training || null;
   const anaAgent = anaSummary?.agent || null;
   const active = Boolean(anaAgent?.configured && anaAgent?.autoReplyEnabled);
@@ -9383,7 +9386,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
     loadAnaSummary({ activeRequest: () => activeRequest });
     const timer = window.setInterval(() => {
       loadAnaSummary({ silent: true, activeRequest: () => activeRequest });
-    }, 9000);
+    }, 20000);
     return () => {
       activeRequest = false;
       window.clearInterval(timer);
@@ -9410,10 +9413,10 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
 
       <section className="grid grid-cols-6 gap-4 max-2xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
         <MetricCard detail={anaAgent?.configured ? 'agente do GPT Maker' : 'configure o GPT Maker'} icon={WandSparkles} label="Ana" tone={anaAgent?.configured ? 'green' : 'violet'} value={anaAgent?.configured ? 'Pronta' : 'Pendente'} />
-        <MetricCard detail="com resposta ou IA" icon={MessageCircle} label="Conversas" tone="green" value={anaLoading ? '...' : formatNumber(anaMetrics.conversations || 0)} />
-        <MetricCard detail="entraram em contato" icon={ClipboardList} label="Respostas" tone="orange" value={anaLoading ? '...' : formatNumber(anaMetrics.leadReplies || 0)} />
+        <MetricCard detail="mensagens iniciais enviadas" icon={Send} label="Disparos" tone="blue" value={anaLoading ? '...' : formatNumber(anaFunnel.dispatches || 0)} />
+        <MetricCard detail={`${anaFunnel.responseRate || 0}% dos disparos`} icon={MessageCircle} label="Respostas" tone="orange" value={anaLoading ? '...' : formatNumber(anaFunnel.responses || 0)} />
+        <MetricCard detail={`${anaFunnel.conversionRate || 0}% das respostas`} icon={CheckCircle2} label="Conversões" tone="green" value={anaLoading ? '...' : formatNumber(anaFunnel.conversions || 0)} />
         <MetricCard detail="mensagens da Ana" icon={Sparkles} label="IA respondeu" tone="violet" value={anaLoading ? '...' : formatNumber(anaMetrics.aiReplies || 0)} />
-        <MetricCard detail="confirmaram o recebimento" icon={CheckCircle2} label="Aceitaram visita" tone="green" value={anaLoading ? '...' : formatNumber(anaMetrics.acceptedVisits || 0)} />
         <MetricCard detail="gerenciado no GPT Maker" icon={ShieldCheck} label="Treinamento" value={anaTraining?.loaded ? 'Conectado' : 'Pendente'} />
       </section>
 
@@ -9434,6 +9437,59 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
 
       {tab === 'overview' ? (
         <div className="grid gap-4">
+          <section className="grid grid-cols-[0.9fr_1.1fr] gap-4 max-xl:grid-cols-1">
+            <article className={`${panelClass} p-6`}>
+              <span className={labelClass}>Desempenho do agente</span>
+              <h2 className="mt-2 text-2xl font-black text-slate-50">Funil dos atendimentos</h2>
+              <div className="mt-6 divide-y divide-white/10 border-y border-white/10">
+                {[
+                  ['Disparos realizados', anaFunnel.dispatches, 'Mensagens iniciais enviadas', Send],
+                  ['Pessoas que responderam', anaFunnel.responses, `${anaFunnel.responseRate || 0}% dos disparos`, MessageCircle],
+                  ['Pessoas que aceitaram', anaFunnel.conversions, `${anaFunnel.conversionRate || 0}% das respostas`, CheckCircle2]
+                ].map(([label, value, detail, Icon]) => (
+                  <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-4" key={label}>
+                    <span className="grid h-10 w-10 place-items-center rounded-lg bg-white/10 text-slate-100"><Icon size={19} /></span>
+                    <span>
+                      <strong className="block text-sm text-slate-100">{label}</strong>
+                      <span className="mt-1 block text-xs font-semibold text-slate-400">{detail}</span>
+                    </span>
+                    <strong className="text-2xl font-black text-white">{anaLoading ? '...' : formatNumber(value || 0)}</strong>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 text-center max-sm:grid-cols-1 max-sm:divide-x-0 max-sm:divide-y">
+                {[
+                  ['Resposta', anaFunnel.responseRate, 'respostas / disparos'],
+                  ['Conversão', anaFunnel.conversionRate, 'conversões / respostas'],
+                  ['Conversão geral', anaFunnel.overallConversionRate, 'conversões / disparos']
+                ].map(([label, value, detail]) => (
+                  <div className="px-3 py-2" key={label}>
+                    <span className="block text-[11px] font-black uppercase text-slate-400">{label}</span>
+                    <strong className="mt-1 block text-2xl font-black text-emerald-400">{anaLoading ? '...' : `${value || 0}%`}</strong>
+                    <span className="mt-1 block text-[11px] font-semibold text-slate-500">{detail}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className={`${panelClass} p-6`}>
+              <span className={labelClass}>Tempo desde a solicitação</span>
+              <h2 className="mt-2 text-2xl font-black text-slate-50">Quando o material foi solicitado</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-400">Somente entre as pessoas que aceitaram receber o brinde.</p>
+              <div className="mt-5 divide-y divide-white/10 border-y border-white/10">
+                {requestAgeBuckets.map((bucket) => (
+                  <div className="grid grid-cols-[minmax(150px,1fr)_minmax(100px,1.2fr)_auto] items-center gap-3 py-2.5 max-sm:grid-cols-[1fr_auto]" key={bucket.id}>
+                    <span className="text-xs font-bold text-slate-200">{bucket.label}</span>
+                    <span className="h-2 overflow-hidden rounded-full bg-white/10 max-sm:col-span-2 max-sm:row-start-2">
+                      <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(bucket.count ? 5 : 0, ((Number(bucket.count) || 0) / largestRequestAgeBucket) * 100)}%` }} />
+                    </span>
+                    <span className="text-right text-xs font-black text-slate-100">{formatNumber(bucket.count || 0)} · {bucket.percentage || 0}%</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </section>
+
           <section className={`${panelClass} p-6`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -9686,6 +9742,18 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                   <span className="block text-xs font-black uppercase text-slate-500">Endereço para a visita</span>
                   <strong className="mt-1 block text-base leading-relaxed">{selectedAcceptedConversation.delivery?.address || 'Endereço ainda não informado'}</strong>
                   <span className="mt-1 block text-xs font-semibold text-slate-500">{selectedAcceptedConversation.delivery?.addressSource}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-3 border-b border-slate-200 pb-4">
+                <ClipboardList className="mt-0.5 text-blue-700" size={20} />
+                <div>
+                  <span className="block text-xs font-black uppercase text-slate-500">Solicitação do material</span>
+                  <strong className="mt-1 block text-sm leading-relaxed">
+                    {selectedAcceptedConversation.delivery?.materialRequestedAt
+                      ? new Date(selectedAcceptedConversation.delivery.materialRequestedAt).toLocaleDateString('pt-BR')
+                      : 'Data não informada'}
+                  </strong>
+                  <span className="mt-1 block text-xs font-semibold text-slate-500">{selectedAcceptedConversation.delivery?.requestAgeLabel}</span>
                 </div>
               </div>
               <div className="text-sm font-semibold text-slate-600">

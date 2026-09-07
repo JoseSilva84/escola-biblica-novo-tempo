@@ -283,6 +283,7 @@ function transformRecord(row, ml, geocodeCache = {}) {
   const email = normalize(row.Email, '');
   const religiao = normalize(row.Religião, 'Não informado');
   const descricao = normalize(row.Descrição, 'N/I');
+  const materialRequestDate = normalize(row['Solicitação'], '');
   const lastContactDate = normalize(row['Data do Último Contato'], '');
 
   const lead = {
@@ -300,6 +301,7 @@ function transformRecord(row, ml, geocodeCache = {}) {
     e: /\(em andamento\)/i.test(String(row.Material ?? '')) ? 1 : 0,
     m: materialCount(row.Material),
     c: daysSince(lastContactDate),
+    requestDate: materialRequestDate,
     lastContactDate,
     a: Number.parseInt(normalize(row.Idade, ''), 10) || null,
     birthDate: normalize(row['Data de aniversário'], 'N/I'),

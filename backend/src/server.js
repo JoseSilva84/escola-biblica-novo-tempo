@@ -1034,6 +1034,7 @@ function anaDeliveryQuestion(value) {
   }
   if (/receb/.test(text)
     && /(gostaria|podera|pode|quer|aceita|ainda gostaria)/.test(text)
+    && /(representante|equipe|entrega|entregar|brinde|presente|19 de setembro|sabado|sua casa)/.test(text)
     && !/(chegou|ja recebeu|já recebeu|chegou a receber)/.test(text)) {
     return 'GIFT_ACCEPTANCE';
   }
@@ -2024,10 +2025,50 @@ function gptMakerClassification(messages = []) {
   };
 }
 
-function summarizeAnaDelivery(conversation) {
+const ANA_REQUEST_AGE_BUCKETS = [
+  { id: 'up-to-7-days', label: 'Até 7 dias', maxDays: 7 },
+  { id: '8-to-30-days', label: 'De 8 a 30 dias', maxDays: 30 },
+  { id: '31-to-60-days', label: 'De 31 a 60 dias', maxDays: 60 },
+  { id: '61-to-90-days', label: 'De 61 a 90 dias', maxDays: 90 },
+  { id: '3-to-6-months', label: 'De 3 a 6 meses', maxDays: 183 },
+  { id: '6-months-to-1-year', label: 'De 6 meses a 1 ano', maxDays: 365 },
+  { id: '1-to-2-years', label: 'De 1 a 2 anos', maxDays: 730 },
+  { id: '2-to-4-years', label: 'De 2 a 4 anos', maxDays: 1461 },
+  { id: '4-to-6-years', label: 'De 4 a 6 anos', maxDays: 2192 },
+  { id: 'over-6-years', label: 'Acima de 6 anos', maxDays: Number.POSITIVE_INFINITY }
+];
+
+function parseMaterialRequestDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const brazilian = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (brazilian) {
+    const parsed = new Date(Date.UTC(Number(brazilian[3]), Number(brazilian[2]) - 1, Number(brazilian[1])));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function anaRequestAge(requestedAt, acceptedAt) {
+  const requestDate = parseMaterialRequestDate(requestedAt);
+  const acceptanceDate = parseMaterialRequestDate(acceptedAt) || new Date();
+  if (!requestDate || requestDate > acceptanceDate) return null;
+  const days = Math.floor((acceptanceDate.getTime() - requestDate.getTime()) / (24 * 60 * 60 * 1000));
+  const bucket = ANA_REQUEST_AGE_BUCKETS.find((item) => days <= item.maxDays) || ANA_REQUEST_AGE_BUCKETS.at(-1);
+  return {
+    days,
+    bucketId: bucket.id,
+    bucketLabel: bucket.label,
+    requestedAt: requestDate.toISOString()
+  };
+}
+
+function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
   const messages = conversation?.messages || [];
   let pendingQuestion = null;
   let giftAccepted = false;
+  let acceptedAt = null;
   let typedAddress = '';
   let addressConfirmed = false;
   let deliveryConfirmed = false;
@@ -2053,8 +2094,10 @@ function summarizeAnaDelivery(conversation) {
     }
     if (/(quero receber|pode entregar|aceito|gostaria de receber|pode trazer)/i.test(body)) {
       giftAccepted = true;
+      acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
     } else if (pendingQuestion === 'GIFT_ACCEPTANCE' && isAffirmativeReply(body)) {
       giftAccepted = true;
+      acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
     }
     if (pendingQuestion === 'ADDRESS_CONFIRMATION' && isAffirmativeReply(body)) {
       addressConfirmed = true;
@@ -2073,18 +2116,174 @@ function summarizeAnaDelivery(conversation) {
     : address
       ? 'Cadastro do lead'
       : 'Não informado';
+  const externalLeadId = conversation?.externalLeadId || conversation?.lead?.externalId;
+  const dashboardRecord = dashboardRecordsById.get(String(externalLeadId || ''));
+  const requestAge = giftAccepted ? anaRequestAge(dashboardRecord?.requestDate, acceptedAt) : null;
 
   return {
     accepted: giftAccepted,
+    acceptedAt,
     address: address || null,
     addressSource,
     addressProvided: Boolean(typedAddress || leadUpdatedAddress),
     addressConfirmed: addressConfirmed || Boolean(leadUpdatedAddress),
-    deliveryConfirmed
+    deliveryConfirmed,
+    materialRequestedAt: requestAge?.requestedAt || null,
+    requestAgeDays: requestAge?.days ?? null,
+    requestAgeBucket: requestAge?.bucketId || null,
+    requestAgeLabel: requestAge?.bucketLabel || (giftAccepted ? 'Data não informada' : null)
   };
 }
 
-function summarizeAnaConversation(conversation) {
+let anaFunnelReportCache = { expiresAt: 0, value: null };
+
+async function trackedAnaFunnelReport(dashboardRecordsById) {
+  if (anaFunnelReportCache.expiresAt > Date.now()) return anaFunnelReportCache.value;
+
+  const recipients = await prisma.whatsAppBroadcastRecipient.findMany({
+    where: { status: 'ENVIADO' },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      conversationId: true,
+      leadId: true,
+      externalLeadId: true,
+      leadName: true,
+      phone: true,
+      district: true,
+      sentAt: true,
+      createdAt: true
+    }
+  });
+  const tracked = recipients.filter((recipient) => recipient.conversationId);
+  if (!recipients.length || !tracked.length) {
+    anaFunnelReportCache = { expiresAt: Date.now() + 30_000, value: null };
+    return null;
+  }
+
+  const trackedByConversation = new Map();
+  for (const recipient of tracked) {
+    const sentAt = recipient.sentAt || recipient.createdAt;
+    const current = trackedByConversation.get(recipient.conversationId);
+    if (!current || new Date(sentAt) < new Date(current.sentAt)) {
+      trackedByConversation.set(recipient.conversationId, {
+        sentAt,
+        leadId: recipient.leadId || current?.leadId || null,
+        externalLeadId: recipient.externalLeadId || current?.externalLeadId || null,
+        leadName: recipient.leadName || current?.leadName || null,
+        phone: recipient.phone || current?.phone || null,
+        district: recipient.district || current?.district || null
+      });
+    }
+  }
+
+  const leadIds = Array.from(new Set(Array.from(trackedByConversation.values()).map((item) => item.leadId).filter(Boolean)));
+  const leads = leadIds.length ? await prisma.lead.findMany({
+    where: { id: { in: leadIds } },
+    select: {
+      id: true,
+      externalId: true,
+      name: true,
+      address: true,
+      newAddress: true,
+      district: { select: { name: true } }
+    }
+  }) : [];
+  const leadsById = new Map(leads.map((lead) => [lead.id, lead]));
+
+  const messagesByConversation = new Map();
+  const conversationIds = Array.from(trackedByConversation.keys());
+  for (let index = 0; index < conversationIds.length; index += 500) {
+    const chunk = conversationIds.slice(index, index + 500);
+    const messages = await prisma.whatsAppMessage.findMany({
+      where: { conversationId: { in: chunk } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        conversationId: true,
+        direction: true,
+        body: true,
+        sentAt: true,
+        receivedAt: true,
+        createdAt: true
+      }
+    });
+    for (const message of messages) {
+      const trackedConversation = trackedByConversation.get(message.conversationId);
+      if (!trackedConversation || new Date(message.receivedAt || message.sentAt || message.createdAt) < new Date(trackedConversation.sentAt)) continue;
+      if (!messagesByConversation.has(message.conversationId)) messagesByConversation.set(message.conversationId, []);
+      messagesByConversation.get(message.conversationId).push(message);
+    }
+  }
+
+  let responses = 0;
+  const conversionDeliveries = [];
+  for (const [conversationId, trackedConversation] of trackedByConversation) {
+    const messages = messagesByConversation.get(conversationId) || [];
+    if (messages.some((message) => message.direction === 'INBOUND')) responses += 1;
+    const lead = leadsById.get(trackedConversation.leadId);
+    const dashboardRecord = dashboardRecordsById.get(String(trackedConversation.externalLeadId || lead?.externalId || ''));
+    const delivery = summarizeAnaDelivery({
+      externalLeadId: trackedConversation.externalLeadId || lead?.externalId,
+      lead: lead || (dashboardRecord ? { address: dashboardRecord.addr || dashboardRecord.end } : null),
+      messages
+    }, dashboardRecordsById);
+    if (delivery.accepted) {
+      conversionDeliveries.push({
+        id: conversationId,
+        phone: trackedConversation.phone,
+        leadName: trackedConversation.leadName || lead?.name || dashboardRecord?.n || 'Contato sem nome',
+        district: trackedConversation.district || lead?.district?.name || dashboardRecord?.d || 'Distrito não vinculado',
+        delivery
+      });
+    }
+  }
+
+  const percentage = (value, total) => total > 0 ? Number(((value / total) * 100).toFixed(1)) : 0;
+  const conversions = conversionDeliveries.length;
+  const ageCounts = new Map(ANA_REQUEST_AGE_BUCKETS.map((item) => [item.id, 0]));
+  let unknownRequestDates = 0;
+  for (const conversation of conversionDeliveries) {
+    const delivery = conversation.delivery;
+    if (delivery.requestAgeBucket && ageCounts.has(delivery.requestAgeBucket)) {
+      ageCounts.set(delivery.requestAgeBucket, ageCounts.get(delivery.requestAgeBucket) + 1);
+    } else {
+      unknownRequestDates += 1;
+    }
+  }
+  const requestAgeBuckets = ANA_REQUEST_AGE_BUCKETS.map((item) => ({
+    id: item.id,
+    label: item.label,
+    count: ageCounts.get(item.id) || 0,
+    percentage: percentage(ageCounts.get(item.id) || 0, conversions)
+  }));
+  if (unknownRequestDates > 0) {
+    requestAgeBuckets.push({
+      id: 'unknown',
+      label: 'Data não informada',
+      count: unknownRequestDates,
+      percentage: percentage(unknownRequestDates, conversions)
+    });
+  }
+
+  const value = {
+    funnel: {
+      dispatches: recipients.length,
+      responses,
+      conversions,
+      responseRate: percentage(responses, recipients.length),
+      conversionRate: percentage(conversions, responses),
+      overallConversionRate: percentage(conversions, recipients.length)
+    },
+    requestAgeBuckets,
+    acceptedConversations: conversionDeliveries.sort((left, right) => (
+      new Date(right.delivery?.acceptedAt || 0) - new Date(left.delivery?.acceptedAt || 0)
+    ))
+  };
+  anaFunnelReportCache = { expiresAt: Date.now() + 30_000, value };
+  return value;
+}
+
+function summarizeAnaConversation(conversation, dashboardRecordsById = new Map()) {
   const messages = conversation.messages || [];
   const inboundMessages = messages.filter((message) => message.direction === 'INBOUND');
   const aiMessages = messages.filter((message) => message.senderType === 'AI');
@@ -2095,7 +2294,7 @@ function summarizeAnaConversation(conversation) {
   const classification = gptMakerClassification(messages);
   const qualificationMessage = [...messages].reverse().find((message) => message?.metadata?.gptMakerSummary);
   const gptMakerSummary = String(qualificationMessage?.metadata?.gptMakerSummary || '').trim();
-  const delivery = summarizeAnaDelivery(conversation);
+  const delivery = summarizeAnaDelivery(conversation, dashboardRecordsById);
 
   return {
     id: conversation.id,
@@ -3945,12 +4144,23 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
         agent: gptMakerConfig(),
         training,
         metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
+        funnel: { dispatches: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
+        requestAgeBuckets: ANA_REQUEST_AGE_BUCKETS.map((item) => ({ id: item.id, label: item.label, count: 0, percentage: 0 })),
+        acceptedConversations: [],
         conversations: []
       });
       return;
     }
 
-    const limit = Math.min(Math.max(Number(request.query?.limit) || 80, 1), 200);
+    const limit = Math.min(Math.max(Number(request.query?.limit) || 200, 1), 500);
+    let dashboardRecordsById = new Map();
+    try {
+      dashboardRecordsById = new Map(
+        (getDashboardData()?.records || []).map((record) => [String(record.id), record])
+      );
+    } catch (error) {
+      console.warn('[ai:ana:material-request-dates:error]', error.message);
+    }
     const conversations = await prisma.whatsAppConversation.findMany({
       orderBy: { updatedAt: 'desc' },
       take: limit,
@@ -3964,21 +4174,99 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
     });
 
     const summarized = conversations
-      .map(summarizeAnaConversation)
+      .map((conversation) => summarizeAnaConversation(conversation, dashboardRecordsById))
       .filter((conversation) => conversation.hasLeadReply || conversation.aiCount > 0);
+
+    const successfulBatchMessages = conversations.flatMap((conversation) => (
+      (conversation.messages || [])
+        .filter((message) => message.direction === 'OUTBOUND' && message.metadata?.batch && !message.metadata?.failure && !String(message.providerStatus || '').toUpperCase().startsWith('FAILED'))
+        .map((message) => ({ conversationId: conversation.id, createdAt: message.sentAt || message.createdAt }))
+    ));
+    const firstDispatchByConversation = new Map();
+    for (const dispatch of successfulBatchMessages) {
+      const previous = firstDispatchByConversation.get(dispatch.conversationId);
+      if (!previous || new Date(dispatch.createdAt) < new Date(previous)) {
+        firstDispatchByConversation.set(dispatch.conversationId, dispatch.createdAt);
+      }
+    }
+    const hasTrackedDispatches = successfulBatchMessages.length > 0;
+    const contactedConversations = conversations.filter((conversation) => (
+      (conversation.messages || []).some((message) => message.direction === 'OUTBOUND')
+    ));
+    const responseConversations = conversations.filter((conversation) => {
+      const firstDispatchAt = firstDispatchByConversation.get(conversation.id);
+      if (hasTrackedDispatches && !firstDispatchAt) return false;
+      return (conversation.messages || []).some((message) => (
+        message.direction === 'INBOUND'
+        && (!firstDispatchAt || new Date(message.receivedAt || message.createdAt) >= new Date(firstDispatchAt))
+      ));
+    });
+    const conversionConversations = summarized.filter((conversation) => (
+      conversation.delivery?.accepted && (!hasTrackedDispatches || firstDispatchByConversation.has(conversation.id))
+    ));
+    const dispatches = hasTrackedDispatches ? successfulBatchMessages.length : contactedConversations.length;
+    const responses = responseConversations.length;
+    const conversions = conversionConversations.length;
+    const percentage = (value, total) => total > 0 ? Number(((value / total) * 100).toFixed(1)) : 0;
+    const ageCounts = new Map(ANA_REQUEST_AGE_BUCKETS.map((item) => [item.id, 0]));
+    let unknownRequestDates = 0;
+    for (const conversation of conversionConversations) {
+      const bucketId = conversation.delivery?.requestAgeBucket;
+      if (bucketId && ageCounts.has(bucketId)) {
+        ageCounts.set(bucketId, ageCounts.get(bucketId) + 1);
+      } else {
+        unknownRequestDates += 1;
+      }
+    }
+    let requestAgeBuckets = ANA_REQUEST_AGE_BUCKETS.map((item) => ({
+      id: item.id,
+      label: item.label,
+      count: ageCounts.get(item.id) || 0,
+      percentage: percentage(ageCounts.get(item.id) || 0, conversions)
+    }));
+    if (unknownRequestDates > 0) {
+      requestAgeBuckets.push({
+        id: 'unknown',
+        label: 'Data não informada',
+        count: unknownRequestDates,
+        percentage: percentage(unknownRequestDates, conversions)
+      });
+    }
+    let funnel = {
+      dispatches,
+      responses,
+      conversions,
+      responseRate: percentage(responses, dispatches),
+      conversionRate: percentage(conversions, responses),
+      overallConversionRate: percentage(conversions, dispatches)
+    };
+    let acceptedConversations = conversionConversations;
+    try {
+      const trackedReport = await trackedAnaFunnelReport(dashboardRecordsById);
+      if (trackedReport) {
+        funnel = trackedReport.funnel;
+        requestAgeBuckets = trackedReport.requestAgeBuckets;
+        acceptedConversations = trackedReport.acceptedConversations;
+      }
+    } catch (error) {
+      console.warn('[ai:ana:tracked-funnel:error]', error.message);
+    }
 
     response.json({
       agent: gptMakerConfig(),
       training,
       metrics: {
         conversations: summarized.length,
-        contacted: conversations.filter((conversation) => (conversation.messages || []).some((message) => message.direction === 'OUTBOUND')).length,
+        contacted: contactedConversations.length,
         leadReplies: summarized.filter((conversation) => conversation.hasLeadReply).length,
         aiReplies: summarized.filter((conversation) => conversation.aiCount > 0).length,
-        acceptedVisits: summarized.filter((conversation) => conversation.delivery?.accepted).length,
+        acceptedVisits: funnel.conversions,
         needsHuman: summarized.filter((conversation) => conversation.classification?.label === 'Encaminhar humano').length,
         optOut: summarized.filter((conversation) => conversation.classification?.label === 'Opt-out').length
       },
+      funnel,
+      requestAgeBuckets,
+      acceptedConversations,
       conversations: summarized
     });
   } catch (error) {
@@ -3987,6 +4275,9 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       agent: gptMakerConfig(),
       training: gptMakerTrainingStatus(),
       metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
+      funnel: { dispatches: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
+      requestAgeBuckets: ANA_REQUEST_AGE_BUCKETS.map((item) => ({ id: item.id, label: item.label, count: 0, percentage: 0 })),
+      acceptedConversations: [],
       conversations: [],
       message: 'Nao foi possivel carregar o resumo da Ana.'
     });
