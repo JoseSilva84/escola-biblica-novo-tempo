@@ -1910,6 +1910,42 @@ function normalizeMessageSignature(value) {
     .slice(0, 220);
 }
 
+function whatsappMessageDate(message) {
+  return new Date(message?.sentAt || message?.receivedAt || message?.createdAt || 0);
+}
+
+function broadcastPhoneMatches(left, right) {
+  const leftPhone = normalizePhone(left);
+  const rightPhone = normalizePhone(right);
+  if (!leftPhone || !rightPhone) return false;
+  return leftPhone === rightPhone || leftPhone.slice(-8) === rightPhone.slice(-8);
+}
+
+function findBroadcastRecipientMessage(messages = [], recipient = {}, broadcast = {}, nextBroadcastAt = null) {
+  const directMessage = recipient.messageId
+    ? messages.find((message) => message.id === recipient.messageId)
+    : null;
+  if (directMessage) return directMessage;
+
+  const startAt = new Date(broadcast.createdAt || 0);
+  const endAt = nextBroadcastAt
+    ? new Date(nextBroadcastAt)
+    : new Date(startAt.getTime() + (12 * 60 * 60 * 1000));
+  const recipientPhone = normalizePhone(recipient.phone);
+  const expectedSignature = normalizeMessageSignature(recipient.personalizedMessage || '');
+  const candidates = messages.filter((message) => {
+    const occurredAt = whatsappMessageDate(message);
+    if (occurredAt < new Date(startAt.getTime() - 60_000) || occurredAt >= endAt) return false;
+    const sameConversation = Boolean(recipient.conversationId && message.conversationId === recipient.conversationId);
+    const messagePhone = normalizePhone(message.conversation?.phone);
+    const samePhone = Boolean(recipientPhone && messagePhone && broadcastPhoneMatches(recipientPhone, messagePhone));
+    return sameConversation || samePhone;
+  });
+  return candidates.find((message) => String(message.metadata?.broadcastId || '') === String(broadcast.broadcastKey || ''))
+    || candidates.find((message) => expectedSignature && normalizeMessageSignature(message.body) === expectedSignature)
+    || null;
+}
+
 function dedupeWhatsAppMessageList(messages = []) {
   const result = [];
   for (const message of messages) {
@@ -2066,6 +2102,19 @@ function anaRequestAge(requestedAt, acceptedAt) {
   };
 }
 
+function dashboardRecordForConversation(dashboardRecordsById, conversation = {}) {
+  const externalLeadId = conversation.externalLeadId || conversation.lead?.externalId;
+  const byId = dashboardRecordsById.get(String(externalLeadId || ''));
+  if (byId) return byId;
+  for (const phone of normalizedPhonesFromValue(conversation.phone || conversation.lead?.phone)) {
+    const byPhone = dashboardRecordsById.get(`phone:${phone}`);
+    if (byPhone) return byPhone;
+    const bySuffix = dashboardRecordsById.get(`phone8:${phone.slice(-8)}`);
+    if (bySuffix) return bySuffix;
+  }
+  return null;
+}
+
 function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
   const messages = conversation?.messages || [];
   let pendingQuestion = null;
@@ -2126,8 +2175,7 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     : address
       ? 'Cadastro do lead'
       : 'Não informado';
-  const externalLeadId = conversation?.externalLeadId || conversation?.lead?.externalId;
-  const dashboardRecord = dashboardRecordsById.get(String(externalLeadId || ''));
+  const dashboardRecord = dashboardRecordForConversation(dashboardRecordsById, conversation);
   const requestAge = giftAccepted ? anaRequestAge(dashboardRecord?.requestDate, acceptedAt) : null;
 
   return {
@@ -2167,6 +2215,8 @@ async function trackedAnaFunnelReport(dashboardRecordsById) {
       district: true,
       status: true,
       deliveryStatus: true,
+      messageId: true,
+      personalizedMessage: true,
       sentAt: true,
       createdAt: true,
       broadcast: { select: { broadcastKey: true, name: true, createdAt: true } }
@@ -2175,8 +2225,16 @@ async function trackedAnaFunnelReport(dashboardRecordsById) {
   const chronologicalBroadcasts = Array.from(new Map(recipients.map((recipient) => [recipient.broadcast.broadcastKey, recipient.broadcast])).values())
     .sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
   const requestedCutoff = chronologicalBroadcasts.find((broadcast) => normalizedIntentName(broadcast.name) === 'teste disparo');
+  const cutoffAt = requestedCutoff ? new Date(requestedCutoff.createdAt) : null;
+  const relevantChronologicalBroadcasts = chronologicalBroadcasts.filter((broadcast) => (
+    !cutoffAt || new Date(broadcast.createdAt) >= cutoffAt
+  ));
+  const nextBroadcastAtByKey = new Map(relevantChronologicalBroadcasts.map((broadcast, index) => [
+    broadcast.broadcastKey,
+    relevantChronologicalBroadcasts[index + 1]?.createdAt || null
+  ]));
   const relevantRecipients = requestedCutoff
-    ? recipients.filter((recipient) => new Date(recipient.broadcast.createdAt) >= new Date(requestedCutoff.createdAt))
+    ? recipients.filter((recipient) => new Date(recipient.broadcast.createdAt) >= cutoffAt)
     : recipients;
   if (!relevantRecipients.length) {
     anaFunnelReportCache = { expiresAt: Date.now() + 30_000, value: null };
@@ -2188,13 +2246,14 @@ async function trackedAnaFunnelReport(dashboardRecordsById) {
   ), new Date(relevantRecipients[0].broadcast.createdAt));
   const relevantBroadcastIds = new Set(relevantRecipients.map((recipient) => recipient.broadcast.broadcastKey));
   const actualBroadcastMessages = await prisma.whatsAppMessage.findMany({
-    where: { direction: 'OUTBOUND', createdAt: { gte: earliestBroadcastAt } },
+    where: { direction: 'OUTBOUND', createdAt: { gte: new Date(earliestBroadcastAt.getTime() - 60_000) } },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: {
       id: true,
       conversationId: true,
       leadId: true,
       externalLeadId: true,
+      body: true,
       providerStatus: true,
       metadata: true,
       sentAt: true,
@@ -2207,6 +2266,7 @@ async function trackedAnaFunnelReport(dashboardRecordsById) {
     recipient
   ]));
   const successfulDispatches = new Map();
+  const successfulMessageIds = new Set();
   for (const messageItem of actualBroadcastMessages) {
     const broadcastId = String(messageItem.metadata?.broadcastId || '');
     const providerStatus = String(messageItem.providerStatus || '').toUpperCase();
@@ -2214,11 +2274,22 @@ async function trackedAnaFunnelReport(dashboardRecordsById) {
     const phone = normalizePhone(messageItem.conversation?.phone);
     const recipient = recipientsByBroadcastPhone.get(`${broadcastId}:${phone}`);
     successfulDispatches.set(`${broadcastId}:${phone || messageItem.conversationId}`, { messageItem, recipient });
+    successfulMessageIds.add(messageItem.id);
   }
   for (const recipient of relevantRecipients) {
     const key = `${recipient.broadcast.broadcastKey}:${normalizePhone(recipient.phone)}`;
-    if (successfulDispatches.has(key) || recipient.status !== 'ENVIADO' || String(recipient.deliveryStatus || '').toUpperCase().startsWith('FAILED')) continue;
-    successfulDispatches.set(key, { messageItem: null, recipient });
+    if (successfulDispatches.has(key)) continue;
+    const messageItem = findBroadcastRecipientMessage(
+      actualBroadcastMessages,
+      recipient,
+      recipient.broadcast,
+      nextBroadcastAtByKey.get(recipient.broadcast.broadcastKey)
+    );
+    const providerStatus = String(messageItem?.providerStatus || recipient.deliveryStatus || '').toUpperCase();
+    const failed = Boolean(messageItem?.metadata?.failure) || providerStatus.startsWith('FAILED') || (!messageItem && recipient.status === 'FALHA');
+    if (failed || successfulMessageIds.has(messageItem?.id) || (!messageItem && recipient.status !== 'ENVIADO')) continue;
+    successfulDispatches.set(key, { messageItem, recipient });
+    if (messageItem?.id) successfulMessageIds.add(messageItem.id);
   }
 
   const trackedByConversation = new Map();
@@ -2288,7 +2359,11 @@ async function trackedAnaFunnelReport(dashboardRecordsById) {
     const messages = messagesByConversation.get(conversationId) || [];
     if (messages.some((message) => message.direction === 'INBOUND')) responses += 1;
     const lead = leadsById.get(trackedConversation.leadId);
-    const dashboardRecord = dashboardRecordsById.get(String(trackedConversation.externalLeadId || lead?.externalId || ''));
+    const dashboardRecord = dashboardRecordForConversation(dashboardRecordsById, {
+      externalLeadId: trackedConversation.externalLeadId || lead?.externalId,
+      phone: trackedConversation.phone,
+      lead
+    });
     const delivery = summarizeAnaDelivery({
       externalLeadId: trackedConversation.externalLeadId || lead?.externalId,
       lead: (lead || dashboardRecord) ? {
@@ -2337,7 +2412,9 @@ async function trackedAnaFunnelReport(dashboardRecordsById) {
 
   const value = {
     funnel: {
+      transmissions: relevantChronologicalBroadcasts.length,
       dispatches: successfulDispatches.size,
+      messagesSent: successfulDispatches.size,
       responses,
       conversions,
       responseRate: percentage(responses, successfulDispatches.size),
@@ -2345,6 +2422,7 @@ async function trackedAnaFunnelReport(dashboardRecordsById) {
       overallConversionRate: percentage(conversions, successfulDispatches.size)
     },
     requestAgeBuckets,
+    conversationIds: Array.from(trackedByConversation.keys()),
     acceptedConversations: conversionDeliveries.sort((left, right) => (
       new Date(right.delivery?.acceptedAt || 0) - new Date(left.delivery?.acceptedAt || 0)
     ))
@@ -4214,7 +4292,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
         agent: gptMakerConfig(),
         training,
         metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
-        funnel: { dispatches: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
+        funnel: { transmissions: 0, dispatches: 0, messagesSent: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
         requestAgeBuckets: ANA_REQUEST_AGE_BUCKETS.map((item) => ({ id: item.id, label: item.label, count: 0, percentage: 0 })),
         acceptedConversations: [],
         conversations: []
@@ -4225,13 +4303,29 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
     const limit = Math.min(Math.max(Number(request.query?.limit) || 200, 1), 500);
     let dashboardRecordsById = new Map();
     try {
-      dashboardRecordsById = new Map(
-        (getDashboardData()?.records || []).map((record) => [String(record.id), record])
-      );
+      const dashboardRecords = getDashboardData()?.records || [];
+      dashboardRecordsById = new Map(dashboardRecords.map((record) => [String(record.id), record]));
+      for (const record of dashboardRecords) {
+        for (const phone of normalizedPhonesFromValue(record.tel)) {
+          dashboardRecordsById.set(`phone:${phone}`, record);
+          const suffixKey = `phone8:${phone.slice(-8)}`;
+          const existingSuffix = dashboardRecordsById.get(suffixKey);
+          if (!dashboardRecordsById.has(suffixKey)) dashboardRecordsById.set(suffixKey, record);
+          else if (existingSuffix?.id !== record.id) dashboardRecordsById.set(suffixKey, null);
+        }
+      }
     } catch (error) {
       console.warn('[ai:ana:material-request-dates:error]', error.message);
     }
+    let trackedReport = null;
+    try {
+      trackedReport = await trackedAnaFunnelReport(dashboardRecordsById);
+    } catch (error) {
+      console.warn('[ai:ana:tracked-funnel:error]', error.message);
+    }
+    const trackedConversationIds = trackedReport?.conversationIds || [];
     const conversations = await prisma.whatsAppConversation.findMany({
+      where: trackedConversationIds.length ? { id: { in: trackedConversationIds } } : undefined,
       orderBy: { updatedAt: 'desc' },
       take: limit,
       include: {
@@ -4243,14 +4337,19 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       }
     });
 
-    const summarized = conversations
-      .map((conversation) => summarizeAnaConversation(conversation, dashboardRecordsById))
+    const allSummarized = conversations
+      .map((conversation) => summarizeAnaConversation(conversation, dashboardRecordsById));
+    const summarized = allSummarized
       .filter((conversation) => conversation.hasLeadReply || conversation.aiCount > 0);
 
     const successfulBatchMessages = conversations.flatMap((conversation) => (
       (conversation.messages || [])
         .filter((message) => message.direction === 'OUTBOUND' && message.metadata?.batch && !message.metadata?.failure && !String(message.providerStatus || '').toUpperCase().startsWith('FAILED'))
-        .map((message) => ({ conversationId: conversation.id, createdAt: message.sentAt || message.createdAt }))
+        .map((message) => ({
+          conversationId: conversation.id,
+          createdAt: message.sentAt || message.createdAt,
+          broadcastId: String(message.metadata?.broadcastId || message.metadata?.listName || message.id)
+        }))
     ));
     const firstDispatchByConversation = new Map();
     for (const dispatch of successfulBatchMessages) {
@@ -4303,7 +4402,9 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       });
     }
     let funnel = {
+      transmissions: new Set(successfulBatchMessages.map((message) => message.broadcastId)).size,
       dispatches,
+      messagesSent: dispatches,
       responses,
       conversions,
       responseRate: percentage(responses, dispatches),
@@ -4311,33 +4412,30 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       overallConversionRate: percentage(conversions, dispatches)
     };
     let acceptedConversations = conversionConversations;
-    try {
-      const trackedReport = await trackedAnaFunnelReport(dashboardRecordsById);
-      if (trackedReport) {
-        funnel = trackedReport.funnel;
-        requestAgeBuckets = trackedReport.requestAgeBuckets;
-        acceptedConversations = trackedReport.acceptedConversations;
-      }
-    } catch (error) {
-      console.warn('[ai:ana:tracked-funnel:error]', error.message);
+    let reportConversations = summarized;
+    if (trackedReport) {
+      funnel = trackedReport.funnel;
+      requestAgeBuckets = trackedReport.requestAgeBuckets;
+      acceptedConversations = trackedReport.acceptedConversations;
+      reportConversations = allSummarized;
     }
 
     response.json({
       agent: gptMakerConfig(),
       training,
       metrics: {
-        conversations: summarized.length,
+        conversations: reportConversations.length,
         contacted: contactedConversations.length,
-        leadReplies: summarized.filter((conversation) => conversation.hasLeadReply).length,
-        aiReplies: summarized.filter((conversation) => conversation.aiCount > 0).length,
+        leadReplies: reportConversations.filter((conversation) => conversation.hasLeadReply).length,
+        aiReplies: reportConversations.filter((conversation) => conversation.aiCount > 0).length,
         acceptedVisits: funnel.conversions,
-        needsHuman: summarized.filter((conversation) => conversation.classification?.label === 'Encaminhar humano').length,
-        optOut: summarized.filter((conversation) => conversation.classification?.label === 'Opt-out').length
+        needsHuman: reportConversations.filter((conversation) => conversation.classification?.label === 'Encaminhar humano').length,
+        optOut: reportConversations.filter((conversation) => conversation.classification?.label === 'Opt-out').length
       },
       funnel,
       requestAgeBuckets,
       acceptedConversations,
-      conversations: summarized
+      conversations: reportConversations
     });
   } catch (error) {
     console.error('[ai:ana:summary:error]', error.message);
@@ -5165,13 +5263,18 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
       const relevantBroadcasts = requestedCutoff
         ? savedBroadcasts.filter((broadcast) => new Date(broadcast.createdAt) >= new Date(requestedCutoff.createdAt))
         : savedBroadcasts;
+      const relevantChronological = [...relevantBroadcasts].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
+      const nextBroadcastAtByKey = new Map(relevantChronological.map((broadcast, index) => [
+        broadcast.broadcastKey,
+        relevantChronological[index + 1]?.createdAt || null
+      ]));
       const earliestCreatedAt = relevantBroadcasts.reduce((earliest, broadcast) => (
         new Date(broadcast.createdAt) < earliest ? new Date(broadcast.createdAt) : earliest
       ), new Date(relevantBroadcasts[0].createdAt));
       const actualOutboundMessages = await prisma.whatsAppMessage.findMany({
         where: {
           direction: 'OUTBOUND',
-          createdAt: { gte: earliestCreatedAt }
+          createdAt: { gte: new Date(earliestCreatedAt.getTime() - 60_000) }
         },
         orderBy: { createdAt: 'asc' },
         select: {
@@ -5202,7 +5305,7 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
         ...relevantBroadcasts.flatMap((broadcast) => (
         broadcast.recipients.map((recipient) => recipient.conversationId).filter(Boolean)
         )),
-        ...relevantOutboundMessages.map((messageItem) => messageItem.conversationId).filter(Boolean)
+        ...actualOutboundMessages.map((messageItem) => messageItem.conversationId).filter(Boolean)
       ]));
       const inboundMessages = conversationIds.length ? await prisma.whatsAppMessage.findMany({
         where: {
@@ -5224,11 +5327,12 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
           const broadcastMessages = outboundByBroadcast.get(broadcast.broadcastKey) || [];
           const matchedMessageIds = new Set();
           const recipients = broadcast.recipients.map((recipient) => {
-            const recipientPhone = normalizePhone(recipient.phone);
-            const outgoingMessage = broadcastMessages.find((messageItem) => messageItem.id === recipient.messageId)
-              || broadcastMessages.find((messageItem) => recipient.conversationId && messageItem.conversationId === recipient.conversationId)
-              || broadcastMessages.find((messageItem) => normalizePhone(messageItem.conversation?.phone) === recipientPhone)
-              || null;
+            const outgoingMessage = findBroadcastRecipientMessage(
+              actualOutboundMessages,
+              recipient,
+              broadcast,
+              nextBroadcastAtByKey.get(broadcast.broadcastKey)
+            );
             if (outgoingMessage?.id) matchedMessageIds.add(outgoingMessage.id);
             const conversationId = outgoingMessage?.conversationId || recipient.conversationId;
             const sentAt = outgoingMessage?.sentAt || outgoingMessage?.createdAt || recipient.sentAt || broadcast.createdAt;

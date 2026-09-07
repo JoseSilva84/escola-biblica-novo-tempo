@@ -1040,6 +1040,14 @@ html[data-crm-theme='light'] .campaign-briefing-modal .campaign-submit {
     color: rgb(51 65 85) !important;
   }
 
+  .agent-funnel-value {
+    color: rgb(248 250 252);
+  }
+
+  .app-light .agent-funnel-value {
+    color: rgb(15 23 42) !important;
+  }
+
   .app-light .bg-slate-950\/50,
   .app-light .bg-slate-950\/60,
   .app-light .bg-slate-950\/70,

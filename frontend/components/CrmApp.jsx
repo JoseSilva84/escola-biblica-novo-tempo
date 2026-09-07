@@ -9348,6 +9348,9 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const [tab, setTab] = useState('overview');
   const [selectedReviewLead, setSelectedReviewLead] = useState(null);
   const [selectedAcceptedConversation, setSelectedAcceptedConversation] = useState(null);
+  const [selectedConversationGroup, setSelectedConversationGroup] = useState(null);
+  const [selectedGroupConversation, setSelectedGroupConversation] = useState(null);
+  const [exportingGroupKey, setExportingGroupKey] = useState('');
   const [anaSummary, setAnaSummary] = useState(null);
   const [anaLoading, setAnaLoading] = useState(true);
   const hotWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
@@ -9358,6 +9361,49 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const requestAgeBuckets = anaSummary?.requestAgeBuckets || [];
   const anaConversations = anaSummary?.conversations || [];
   const acceptedConversations = anaSummary?.acceptedConversations || anaConversations.filter((conversation) => conversation.delivery?.accepted);
+  const anaConversationGroups = useMemo(() => {
+    const preferredOrder = [
+      'Visita marcada',
+      'Aceitou a visita',
+      'Não aceitou a visita',
+      'Enviar material',
+      'Acompanhar estudo',
+      'Visita/igreja',
+      'Triagem',
+      'Encaminhar humano',
+      'Opt-out',
+      'Sem resposta'
+    ];
+    const groups = new Map();
+    for (const conversation of anaConversations) {
+      const label = conversation.classification?.label || 'Triagem';
+      if (!groups.has(label)) {
+        groups.set(label, {
+          key: label,
+          label,
+          tone: conversation.classification?.tone || 'slate',
+          conversations: [],
+          districts: []
+        });
+      }
+      groups.get(label).conversations.push(conversation);
+    }
+    for (const group of groups.values()) {
+      const districtCounts = new Map();
+      for (const conversation of group.conversations) {
+        const district = conversation.district || 'Distrito não vinculado';
+        districtCounts.set(district, (districtCounts.get(district) || 0) + 1);
+      }
+      group.districts = Array.from(districtCounts, ([name, count]) => ({ name, count }))
+        .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, 'pt-BR'));
+    }
+    return Array.from(groups.values()).sort((left, right) => {
+      const leftIndex = preferredOrder.indexOf(left.label);
+      const rightIndex = preferredOrder.indexOf(right.label);
+      return (leftIndex < 0 ? 999 : leftIndex) - (rightIndex < 0 ? 999 : rightIndex)
+        || right.conversations.length - left.conversations.length;
+    });
+  }, [anaConversations]);
   const largestRequestAgeBucket = Math.max(1, ...requestAgeBuckets.map((bucket) => Number(bucket.count) || 0));
   const anaTraining = anaSummary?.training || null;
   const anaAgent = anaSummary?.agent || null;
@@ -9410,10 +9456,70 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
     onNavigate?.('conversations');
   }
 
+  async function exportAnaConversationGroup(group) {
+    if (!group?.conversations?.length || exportingGroupKey) return;
+    setExportingGroupKey(group.key);
+    const exportToast = toast.loading(`Preparando PDF: ${group.label}`);
+    try {
+      const { jsPDF } = await import('jspdf');
+      const pdf = new jsPDF({ format: 'a4', orientation: 'portrait', unit: 'mm', compress: true });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 16;
+      const contentWidth = pageWidth - (margin * 2);
+      let y = 18;
+
+      const ensureSpace = (height = 16) => {
+        if (y + height <= pageHeight - 16) return;
+        pdf.addPage();
+        y = 18;
+      };
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(17);
+      pdf.text(`Atendimentos da Ana - ${group.label}`, margin, y);
+      y += 8;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.text(`${group.conversations.length} pessoa(s) | Gerado em ${new Date().toLocaleString('pt-BR')}`, margin, y);
+      y += 7;
+      pdf.text(`Distritos: ${group.districts.map((district) => `${district.name} (${district.count})`).join(', ')}`, margin, y, { maxWidth: contentWidth });
+      y += 10;
+
+      group.conversations.forEach((conversation, index) => {
+        const detailLines = [
+          `${index + 1}. ${conversation.leadName || 'Contato sem nome'}`,
+          `Distrito: ${conversation.district || 'Distrito não vinculado'} | Telefone: ${conversation.phone || 'Não informado'}`,
+          `Situação: ${conversation.classification?.label || group.label}`,
+          `Endereço: ${conversation.delivery?.address || 'Não informado'}`,
+          `Última resposta: ${conversation.lastLeadMessage || 'Sem resposta registrada'}`
+        ];
+        const wrappedLines = detailLines.flatMap((line) => pdf.splitTextToSize(line, contentWidth));
+        ensureSpace((wrappedLines.length * 5) + 8);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(wrappedLines[0], margin, y);
+        y += 5;
+        pdf.setFont('helvetica', 'normal');
+        wrappedLines.slice(1).forEach((line) => {
+          pdf.text(line, margin, y);
+          y += 5;
+        });
+        y += 4;
+      });
+
+      const safeName = group.label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+      pdf.save(`atendimentos-ana-${safeName || 'grupo'}.pdf`);
+      toast.success('PDF gerado', { id: exportToast, description: `${group.conversations.length} pessoa(s) incluída(s).` });
+    } catch {
+      toast.error('Não foi possível gerar o PDF', { id: exportToast, description: 'Tente novamente em alguns instantes.' });
+    } finally {
+      setExportingGroupKey('');
+    }
+  }
+
   async function loadAnaSummary(options = {}) {
     const { silent = false, activeRequest = () => true } = options;
     if (!silent) setAnaLoading(true);
-    apiFetch('/api/ai/ana/summary?limit=120')
+    apiFetch('/api/ai/ana/summary?limit=500')
       .then((response) => response.ok ? response.json() : null)
       .then((payload) => {
         if (activeRequest() && payload) {
@@ -9464,8 +9570,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
 
       <section className="grid grid-cols-6 gap-4 max-2xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
         <MetricCard detail={anaAgent?.configured ? 'agente do GPT Maker' : 'configure o GPT Maker'} icon={WandSparkles} label="Ana" tone={anaAgent?.configured ? 'green' : 'violet'} value={anaAgent?.configured ? 'Pronta' : 'Pendente'} />
-        <MetricCard detail="mensagens iniciais enviadas" icon={Send} label="Disparos" tone="blue" value={anaLoading ? '...' : formatNumber(anaFunnel.dispatches || 0)} />
-        <MetricCard detail={`${anaFunnel.responseRate || 0}% dos disparos`} icon={MessageCircle} label="Respostas" tone="orange" value={anaLoading ? '...' : formatNumber(anaFunnel.responses || 0)} />
+        <MetricCard detail={`${formatNumber(anaFunnel.messagesSent || anaFunnel.dispatches || 0)} mensagens enviadas`} icon={Send} label="Disparos" tone="blue" value={anaLoading ? '...' : formatNumber(anaFunnel.transmissions || 0)} />
+        <MetricCard detail={`${anaFunnel.responseRate || 0}% das mensagens enviadas`} icon={MessageCircle} label="Respostas" tone="orange" value={anaLoading ? '...' : formatNumber(anaFunnel.responses || 0)} />
         <MetricCard detail={`${anaFunnel.conversionRate || 0}% das respostas`} icon={CheckCircle2} label="Conversões" tone="green" value={anaLoading ? '...' : formatNumber(anaFunnel.conversions || 0)} />
         <MetricCard detail="mensagens da Ana" icon={Sparkles} label="IA respondeu" tone="violet" value={anaLoading ? '...' : formatNumber(anaMetrics.aiReplies || 0)} />
         <MetricCard detail="gerenciado no GPT Maker" icon={ShieldCheck} label="Treinamento" value={anaTraining?.loaded ? 'Conectado' : 'Pendente'} />
@@ -9494,8 +9600,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
               <h2 className="mt-2 text-2xl font-black text-slate-50">Funil dos atendimentos</h2>
               <div className="mt-6 divide-y divide-white/10 border-y border-white/10">
                 {[
-                  ['Disparos realizados', anaFunnel.dispatches, 'Mensagens iniciais enviadas', Send],
-                  ['Pessoas que responderam', anaFunnel.responses, `${anaFunnel.responseRate || 0}% dos disparos`, MessageCircle],
+                  ['Disparos realizados', anaFunnel.transmissions, `${formatNumber(anaFunnel.messagesSent || anaFunnel.dispatches || 0)} mensagens enviadas`, Send],
+                  ['Pessoas que responderam', anaFunnel.responses, `${anaFunnel.responseRate || 0}% das mensagens enviadas`, MessageCircle],
                   ['Pessoas que aceitaram', anaFunnel.conversions, `${anaFunnel.conversionRate || 0}% das respostas`, CheckCircle2]
                 ].map(([label, value, detail, Icon]) => (
                   <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-4" key={label}>
@@ -9504,15 +9610,15 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                       <strong className="block text-sm text-slate-100">{label}</strong>
                       <span className="mt-1 block text-xs font-semibold text-slate-400">{detail}</span>
                     </span>
-                    <strong className="text-2xl font-black text-white">{anaLoading ? '...' : formatNumber(value || 0)}</strong>
+                    <strong className="agent-funnel-value text-2xl font-black">{anaLoading ? '...' : formatNumber(value || 0)}</strong>
                   </div>
                 ))}
               </div>
               <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 text-center max-sm:grid-cols-1 max-sm:divide-x-0 max-sm:divide-y">
                 {[
-                  ['Resposta', anaFunnel.responseRate, 'respostas / disparos'],
+                  ['Resposta', anaFunnel.responseRate, 'respostas / mensagens enviadas'],
                   ['Conversão', anaFunnel.conversionRate, 'conversões / respostas'],
-                  ['Conversão geral', anaFunnel.overallConversionRate, 'conversões / disparos']
+                  ['Conversão geral', anaFunnel.overallConversionRate, 'conversões / mensagens enviadas']
                 ].map(([label, value, detail]) => (
                   <div className="px-3 py-2" key={label}>
                     <span className="block text-[11px] font-black uppercase text-slate-400">{label}</span>
@@ -9524,9 +9630,9 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             </article>
 
             <article className={`${panelClass} p-6`}>
-              <span className={labelClass}>Tempo desde a solicitação</span>
-              <h2 className="mt-2 text-2xl font-black text-slate-50">Quando o material foi solicitado</h2>
-              <p className="mt-2 text-sm font-semibold text-slate-400">Somente entre as pessoas que aceitaram receber o brinde.</p>
+              <span className={labelClass}>Tempo entre solicitação e aceite</span>
+              <h2 className="mt-2 text-2xl font-black text-slate-50">Da solicitação do material até a visita aceita</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-400">Quantidade e percentual das pessoas que aceitaram, separados pelo tempo desde o pedido do material.</p>
               <div className="mt-5 divide-y divide-white/10 border-y border-white/10">
                 {requestAgeBuckets.map((bucket) => (
                   <div className="grid grid-cols-[minmax(150px,1fr)_minmax(100px,1.2fr)_auto] items-center gap-3 py-2.5 max-sm:grid-cols-[1fr_auto]" key={bucket.id}>
@@ -9587,33 +9693,49 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-bold text-slate-600 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
                   Carregando conversas da Ana...
                 </div>
-              ) : anaConversations.length ? anaConversations.slice(0, 8).map((conversation) => {
-                const badgeClass = toneClasses[conversation.classification?.tone] || toneClasses.slate;
+              ) : anaConversationGroups.length ? anaConversationGroups.map((group) => {
+                const badgeClass = toneClasses[group.tone] || toneClasses.slate;
                 return (
-                  <article className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={conversation.id}>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <strong className="block text-base text-slate-950">{conversation.leadName}</strong>
-                        <span className="mt-1 block text-xs font-semibold text-slate-500">{conversation.district} · {conversation.phone}</span>
+                  <article className="rounded-lg border border-slate-200 bg-white p-4 text-slate-900 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={group.key}>
+                    <div className="flex items-start justify-between gap-3">
+                      <button className="min-w-0 flex-1 text-left" onClick={() => setSelectedConversationGroup(group)} type="button">
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-wide ${badgeClass}`}>
+                          {group.label}
+                        </span>
+                        <strong className="mt-3 block text-3xl font-black text-slate-950">{formatNumber(group.conversations.length)}</strong>
+                        <span className="mt-1 block text-xs font-semibold text-slate-500">pessoa(s) nesta situação</span>
+                      </button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          aria-label={`Exportar ${group.label} em PDF`}
+                          className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                          disabled={Boolean(exportingGroupKey)}
+                          onClick={() => exportAnaConversationGroup(group)}
+                          title="Exportar este grupo em PDF"
+                          type="button"
+                        >
+                          <FileDown size={18} />
+                        </button>
+                        <button
+                          aria-label={`Ver pessoas em ${group.label}`}
+                          className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 text-slate-700 transition hover:bg-slate-100"
+                          onClick={() => setSelectedConversationGroup(group)}
+                          type="button"
+                        >
+                          <ChevronRight size={19} />
+                        </button>
                       </div>
-                      <span className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-wide ${badgeClass}`}>
-                        {conversation.classification?.label || 'Triagem'}
-                      </span>
                     </div>
-                    <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-700">{conversation.summary}</p>
-                    <div className="mt-3 grid gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-600">
-                      <span><strong className="text-slate-900">Pessoa:</strong> {conversation.lastLeadMessage}</span>
-                      <span><strong className="text-slate-900">Ana:</strong> {conversation.lastAnaMessage}</span>
-                      <span><strong className="text-slate-900">Proxima acao:</strong> {conversation.classification?.action}</span>
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                      {group.districts.slice(0, 4).map((district) => (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700" key={district.name}>
+                          {district.name}: {district.count}
+                        </span>
+                      ))}
+                      {group.districts.length > 4 ? (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">+{group.districts.length - 4} distritos</span>
+                      ) : null}
                     </div>
-                    <button
-                      className={`${primaryButtonClass} mt-3 h-10 px-4 text-xs`}
-                      onClick={() => openAnaConversation(conversation)}
-                      type="button"
-                    >
-                      <MessageCircle size={16} />
-                      Abrir conversa completa
-                    </button>
                   </article>
                 );
               }) : (
@@ -9773,6 +9895,96 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             </article>
           ))}
         </section>
+      ) : null}
+
+      {selectedConversationGroup ? createPortal(
+        <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="ana-group-title">
+          <button aria-label="Fechar grupo" className="absolute inset-0 cursor-default" onClick={() => setSelectedConversationGroup(null)} type="button" />
+          <section className="relative flex max-h-[84vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-950 shadow-[0_28px_80px_rgba(0,0,0,0.35)]">
+            <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div className="min-w-0">
+                <span className="text-[11px] font-black uppercase tracking-[0.14em] text-blue-700">Resumo dos atendimentos</span>
+                <h2 className="mt-1 text-xl font-black" id="ana-group-title">{selectedConversationGroup.label}</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-600">{selectedConversationGroup.conversations.length} pessoa(s)</p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  aria-label="Exportar grupo em PDF"
+                  className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                  disabled={Boolean(exportingGroupKey)}
+                  onClick={() => exportAnaConversationGroup(selectedConversationGroup)}
+                  title="Exportar este grupo em PDF"
+                  type="button"
+                ><FileDown size={18} /></button>
+                <button aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100" onClick={() => setSelectedConversationGroup(null)} type="button"><X size={18} /></button>
+              </div>
+            </header>
+            <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+              <div className="flex flex-wrap gap-2">
+                {selectedConversationGroup.districts.map((district) => (
+                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700" key={district.name}>
+                    {district.name}: {district.count}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="conversation-tools-scroll min-h-0 flex-1 divide-y divide-slate-200 overflow-y-auto">
+              {selectedConversationGroup.conversations.map((conversation) => (
+                <button
+                  className="grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left transition hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
+                  key={conversation.id}
+                  onClick={() => {
+                    setSelectedConversationGroup(null);
+                    setSelectedGroupConversation(conversation);
+                  }}
+                  type="button"
+                >
+                  <span className="min-w-0">
+                    <strong className="block truncate text-sm font-black text-slate-950">{conversation.leadName}</strong>
+                    <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{conversation.district || 'Distrito não vinculado'} · {conversation.phone}</span>
+                    <span className="mt-1 block truncate text-xs text-slate-500">{conversation.lastLeadMessage}</span>
+                  </span>
+                  <ChevronRight className="text-blue-700" size={18} />
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>,
+        document.body
+      ) : null}
+
+      {selectedGroupConversation ? createPortal(
+        <div className="fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="ana-conversation-detail-title">
+          <button aria-label="Fechar detalhes" className="absolute inset-0 cursor-default" onClick={() => setSelectedGroupConversation(null)} type="button" />
+          <section className="relative w-full max-w-xl overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-950 shadow-[0_28px_80px_rgba(0,0,0,0.35)]">
+            <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div className="min-w-0">
+                <span className="text-[11px] font-black uppercase tracking-[0.14em] text-blue-700">{selectedGroupConversation.classification?.label || 'Triagem'}</span>
+                <h2 className="mt-1 truncate text-xl font-black" id="ana-conversation-detail-title">{selectedGroupConversation.leadName}</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-600">{selectedGroupConversation.district || 'Distrito não vinculado'} · {selectedGroupConversation.phone}</p>
+              </div>
+              <button aria-label="Fechar" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100" onClick={() => setSelectedGroupConversation(null)} type="button"><X size={18} /></button>
+            </header>
+            <div className="grid gap-4 p-5">
+              <div className="rounded-lg bg-slate-50 p-4 text-sm font-semibold leading-relaxed text-slate-700">
+                <span className="block text-[11px] font-black uppercase text-slate-500">Resumo</span>
+                <p className="mt-1">{selectedGroupConversation.summary}</p>
+              </div>
+              <div className="grid gap-3 text-sm">
+                <div><strong className="text-slate-950">Pessoa:</strong> <span className="text-slate-600">{selectedGroupConversation.lastLeadMessage}</span></div>
+                <div><strong className="text-slate-950">Ana:</strong> <span className="text-slate-600">{selectedGroupConversation.lastAnaMessage}</span></div>
+                <div><strong className="text-slate-950">Próxima ação:</strong> <span className="text-slate-600">{selectedGroupConversation.classification?.action}</span></div>
+                <div><strong className="text-slate-950">Endereço:</strong> <span className="text-slate-600">{selectedGroupConversation.delivery?.address || 'Não informado'}</span></div>
+              </div>
+              <button className={primaryButtonClass} onClick={() => {
+                const conversation = selectedGroupConversation;
+                setSelectedGroupConversation(null);
+                openAnaConversation(conversation);
+              }} type="button"><MessageCircle size={17} /> Abrir conversa completa</button>
+            </div>
+          </section>
+        </div>,
+        document.body
       ) : null}
 
       {selectedAcceptedConversation ? createPortal(
