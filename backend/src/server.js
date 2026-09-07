@@ -4470,16 +4470,12 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       include: {
         lead: { select: whatsappLeadSelect },
         messages: {
-          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-          take: 200
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
         }
       }
     });
 
-    const chronologicalConversations = conversations.map((conversation) => ({
-      ...conversation,
-      messages: [...(conversation.messages || [])].reverse()
-    }));
+    const chronologicalConversations = conversations;
     const managedConversations = chronologicalConversations.filter((conversation) => (
       !isAnaTestConversation(conversation)
       && (conversation.messages || []).some(isGptMakerManagedMessage)
