@@ -4478,7 +4478,13 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
     const chronologicalConversations = conversations;
     const managedConversations = chronologicalConversations.filter((conversation) => (
       !isAnaTestConversation(conversation)
-      && (conversation.messages || []).some(isGptMakerManagedMessage)
+      && (
+        (conversation.messages || []).some(isGptMakerManagedMessage)
+        || (conversation.messages || []).some((message) =>
+          message.direction === 'OUTBOUND'
+          && /(brinde|presente)/i.test(String(message.body || ''))
+        )
+      )
     ));
     const allSummarized = managedConversations
       .map((conversation) => summarizeAnaConversation(conversation, dashboardRecordsById));
