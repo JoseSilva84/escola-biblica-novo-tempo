@@ -9412,6 +9412,24 @@ function ConversationsView({ records = [] }) {
   );
 }
 
+function anaMaterialStatusLabel(value) {
+  return {
+    RECEIVED: 'Recebeu o material',
+    NOT_RECEIVED: 'Não recebeu o material',
+    PENDING: 'Aguardando resposta',
+    NOT_ASKED: 'Ainda não verificado'
+  }[value] || 'Ainda não verificado';
+}
+
+function anaGiftDecisionLabel(value) {
+  return {
+    ACCEPTED: 'Aceitou receber o brinde',
+    DECLINED: 'Não aceitou receber o brinde',
+    PENDING: 'Aguardando decisão',
+    NOT_OFFERED: 'Brinde ainda não oferecido'
+  }[value] || 'Brinde ainda não oferecido';
+}
+
 function AIAgentView({ associations = [], campaigns = [], data, records = [], onNavigate }) {
   const [tab, setTab] = useState('overview');
   const [selectedReviewLead, setSelectedReviewLead] = useState(null);
@@ -9426,6 +9444,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const vipWhatsapp = records.filter((lead) => lead.t && lead.v).length;
   const anaMetrics = anaSummary?.metrics || {};
   const anaFunnel = anaSummary?.funnel || {};
+  const anaAnalysis = anaSummary?.analysis || {};
   const requestAgeBuckets = anaSummary?.requestAgeBuckets || [];
   const anaConversations = anaSummary?.conversations || [];
   const acceptedConversations = anaSummary?.acceptedConversations || anaConversations.filter((conversation) => conversation.delivery?.accepted);
@@ -9434,6 +9453,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
       'Visita marcada',
       'Aceitou a visita',
       'Não aceitou a visita',
+      'Aguardando decisão do brinde',
       'Enviar material',
       'Acompanhar estudo',
       'Visita/igreja',
@@ -9470,6 +9490,46 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
       const rightIndex = preferredOrder.indexOf(right.label);
       return (leftIndex < 0 ? 999 : leftIndex) - (rightIndex < 0 ? 999 : rightIndex)
         || right.conversations.length - left.conversations.length;
+    });
+  }, [anaConversations]);
+  const anaAnalysisGroups = useMemo(() => {
+    const definitions = [
+      {
+        key: 'material-received',
+        label: 'Material recebido',
+        tone: 'green',
+        conversations: anaConversations.filter((conversation) => conversation.delivery?.materialStatus === 'RECEIVED')
+      },
+      {
+        key: 'material-not-received',
+        label: 'Material não recebido',
+        tone: 'red',
+        conversations: anaConversations.filter((conversation) => conversation.delivery?.materialStatus === 'NOT_RECEIVED')
+      },
+      {
+        key: 'material-pending',
+        label: 'Resposta do material pendente',
+        tone: 'orange',
+        conversations: anaConversations.filter((conversation) => conversation.delivery?.materialStatus === 'PENDING')
+      },
+      {
+        key: 'gift-pending',
+        label: 'Decisão do brinde pendente',
+        tone: 'orange',
+        conversations: anaConversations.filter((conversation) => conversation.delivery?.pendingGiftDecision)
+      }
+    ];
+    return definitions.map((group) => {
+      const districtCounts = new Map();
+      for (const conversation of group.conversations) {
+        const district = conversation.district || 'Distrito não vinculado';
+        districtCounts.set(district, (districtCounts.get(district) || 0) + 1);
+      }
+      return {
+        ...group,
+        districts: Array.from(districtCounts, ([name, count]) => ({ name, count }))
+          .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, 'pt-BR'))
+      };
     });
   }, [anaConversations]);
   const largestRequestAgeBucket = Math.max(1, ...requestAgeBuckets.map((bucket) => Number(bucket.count) || 0));
@@ -9562,6 +9622,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
           `${index + 1}. ${conversation.leadName || 'Contato sem nome'}`,
           `Distrito: ${conversation.district || 'Distrito não vinculado'} | Telefone: ${conversation.phone || 'Não informado'}`,
           `Situação: ${conversation.classification?.label || group.label}`,
+          `Material: ${anaMaterialStatusLabel(conversation.delivery?.materialStatus)}`,
+          `Brinde: ${anaGiftDecisionLabel(conversation.delivery?.giftDecisionStatus)}`,
           `Endereço: ${conversation.delivery?.address || 'Não informado'}`,
           `Última resposta: ${conversation.lastLeadMessage || 'Sem resposta registrada'}`
         ];
@@ -9652,6 +9714,43 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
         <MetricCard detail="aguardando qualificação" icon={Sparkles} label="Triagens" tone="violet" value={anaLoading ? '...' : formatNumber(anaGroupCounts.Triagem || 0)} />
         <MetricCard detail="recusaram o recebimento" icon={X} label="Não aceitaram" tone="orange" value={anaLoading ? '...' : formatNumber(anaGroupCounts['Não aceitou a visita'] || 0)} />
         <MetricCard detail="precisam receber ou reenviar" icon={ClipboardList} label="Enviar material" value={anaLoading ? '...' : formatNumber(anaGroupCounts['Enviar material'] || 0)} />
+      </section>
+
+      <section className={`${panelClass} p-6`}>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <span className={labelClass}>Situação do acompanhamento</span>
+            <h2 className="mt-2 text-2xl font-black text-slate-50">Resultado das conversas</h2>
+          </div>
+          <span className="text-xs font-bold text-slate-400">{formatNumber(anaMetrics.conversations || 0)} conversas analisadas</span>
+        </div>
+        <div className="mt-5 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
+          {anaAnalysisGroups.map((group, index) => {
+            const Icon = index === 0 ? CheckCheck : index === 1 ? AlertTriangle : index === 2 ? MessageCircle : Gauge;
+            const storedCounts = [anaAnalysis.materialReceived, anaAnalysis.materialNotReceived, anaAnalysis.materialPending, anaAnalysis.giftPending];
+            const count = Number(storedCounts[index]);
+            const materialTotal = Number(anaAnalysis.materialReceived || 0)
+              + Number(anaAnalysis.materialNotReceived || 0)
+              + Number(anaAnalysis.materialPending || 0);
+            const denominator = index < 3 ? materialTotal : Number(anaAnalysis.giftOffered || 0);
+            const rate = denominator > 0 ? Number((((Number.isFinite(count) ? count : group.conversations.length) / denominator) * 100).toFixed(1)) : 0;
+            return (
+              <button
+                className="grid min-h-32 grid-cols-[auto_1fr_auto] items-start gap-3 rounded-lg border border-white/10 bg-white/[0.06] p-4 text-left transition hover:border-emerald-400/40 hover:bg-white/[0.1] focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+                key={group.key}
+                onClick={() => setSelectedConversationGroup(group)}
+                type="button"
+              >
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-white/10 text-slate-100"><Icon size={19} /></span>
+                <span className="min-w-0">
+                  <strong className="block text-sm text-slate-100">{group.label}</strong>
+                  <span className="mt-2 block text-xs font-semibold text-slate-400">{rate}% do respectivo acompanhamento</span>
+                </span>
+                <strong className="text-2xl font-black text-white">{anaLoading ? '...' : formatNumber(Number.isFinite(count) ? count : group.conversations.length)}</strong>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       <section className={`${panelClass} p-3`}>
@@ -10051,6 +10150,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 <div><strong className="text-slate-950">Pessoa:</strong> <span className="text-slate-600">{selectedGroupConversation.lastLeadMessage}</span></div>
                 <div><strong className="text-slate-950">Ana:</strong> <span className="text-slate-600">{selectedGroupConversation.lastAnaMessage}</span></div>
                 <div><strong className="text-slate-950">Próxima ação:</strong> <span className="text-slate-600">{selectedGroupConversation.classification?.action}</span></div>
+                <div><strong className="text-slate-950">Situação do material:</strong> <span className="text-slate-600">{anaMaterialStatusLabel(selectedGroupConversation.delivery?.materialStatus)}</span></div>
+                <div><strong className="text-slate-950">Decisão sobre o brinde:</strong> <span className="text-slate-600">{anaGiftDecisionLabel(selectedGroupConversation.delivery?.giftDecisionStatus)}</span></div>
                 <div><strong className="text-slate-950">Endereço:</strong> <span className="text-slate-600">{selectedGroupConversation.delivery?.address || 'Não informado'}</span></div>
               </div>
               <button className={primaryButtonClass} onClick={() => {

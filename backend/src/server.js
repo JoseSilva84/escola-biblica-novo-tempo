@@ -1032,6 +1032,9 @@ function anaDeliveryQuestion(value) {
   if (/(brinde|presente|material especial)/.test(text) && /(gostaria|podera|pode|quer|aceita|receber)/.test(text)) {
     return 'GIFT_ACCEPTANCE';
   }
+  if (/(brinde|presente)/.test(text) && /receb/.test(text)) {
+    return 'GIFT_ACCEPTANCE';
+  }
   if (/receb/.test(text)
     && /(gostaria|podera|pode|quer|aceita|ainda gostaria)/.test(text)
     && /(representante|equipe|entrega|entregar|brinde|presente|19 de setembro|sabado|sua casa)/.test(text)
@@ -2023,6 +2026,13 @@ function isGptMakerManagedMessage(message = {}) {
     || Boolean(metadata.gptMakerQualification || metadata.gptMakerAction || metadata.gptMakerSummary);
 }
 
+function isAnaTestConversation(conversation = {}) {
+  const names = [conversation.leadName, conversation.lead?.name]
+    .map((value) => normalizedIntentName(value).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  return names.some((name) => /^(natana|nyanata|jessio)(\s|$)/i.test(name));
+}
+
 function gptMakerClassification(messages = [], delivery = null) {
   if (delivery?.deliveryConfirmed || (delivery?.accepted && delivery?.address)) {
     return { label: 'Visita marcada', tone: 'green', action: 'Brinde aceito e endereço disponível para a entrega.', source: 'conversation' };
@@ -2032,6 +2042,9 @@ function gptMakerClassification(messages = [], delivery = null) {
   }
   if (delivery?.declined) {
     return { label: 'Não aceitou a visita', tone: 'red', action: 'Respeitar a recusa e encerrar a oferta.', source: 'conversation' };
+  }
+  if (delivery?.pendingGiftDecision) {
+    return { label: 'Aguardando decisão do brinde', tone: 'orange', action: 'Aguardar a pessoa confirmar se deseja receber o brinde.', source: 'conversation' };
   }
   const qualificationMessage = [...messages].reverse().find((message) => {
     const metadata = message?.metadata;
@@ -2134,6 +2147,9 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
   let typedAddress = '';
   let addressConfirmed = false;
   let deliveryConfirmed = false;
+  let giftOffered = false;
+  let materialReceiptAsked = false;
+  let materialReceived = null;
 
   for (const message of messages) {
     const body = String(message.body || '').trim();
@@ -2148,7 +2164,9 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
       deliveryConfirmed = /(confirm gift delivery|delivery already confirmed)/i.test(metadataAction) || deliveryConfirmed;
       acceptedAt ||= metadataOccurredAt;
     } else if (/(request new address|offer gift)/i.test(metadataAction)) {
+      if (metadataAction.includes('offer gift')) giftOffered = true;
       if (metadataAction.includes('request new address')) {
+        giftOffered = true;
         giftAccepted = true;
         acceptedAt ||= metadataOccurredAt;
       }
@@ -2159,11 +2177,24 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     if (message.direction === 'OUTBOUND') {
       const question = anaDeliveryQuestion(body);
       if (question) pendingQuestion = question;
+      if (question === 'GIFT_ACCEPTANCE') giftOffered = true;
+      if (question === 'MATERIAL_RECEIVED') materialReceiptAsked = true;
       if (anaDeliveryWasConfirmed(body)) {
         deliveryConfirmed = true;
       }
       continue;
     }
+
+    const normalizedBody = normalizedIntentName(body);
+    const materialContext = pendingQuestion === 'MATERIAL_RECEIVED'
+      || /\b(material|estudo|livro|revista|curso)\b/i.test(normalizedBody);
+    const explicitlyDidNotReceiveMaterial = materialContext
+      && /(nao recebi|nao chegou|ainda nao chegou|nao chegou nenhum|material nao chegou)/i.test(normalizedBody);
+    const explicitlyReceivedMaterial = materialContext
+      && !explicitlyDidNotReceiveMaterial
+      && /\b(recebi|chegou)\b/i.test(normalizedBody);
+    if (explicitlyDidNotReceiveMaterial) materialReceived = false;
+    else if (explicitlyReceivedMaterial) materialReceived = true;
 
     const informedAddress = plausibleNewAddress(body);
     if (informedAddress) {
@@ -2186,6 +2217,8 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
       giftAccepted = true;
       acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
     }
+    if (pendingQuestion === 'MATERIAL_RECEIVED' && isAffirmativeReply(body)) materialReceived = true;
+    if (pendingQuestion === 'MATERIAL_RECEIVED' && isNegativeReply(body)) materialReceived = false;
     if (pendingQuestion === 'GIFT_ACCEPTANCE' && isNegativeReply(body)) {
       giftDeclined = true;
     }
@@ -2205,6 +2238,7 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
       : 'Não informado';
   const dashboardRecord = dashboardRecordForConversation(dashboardRecordsById, conversation);
   const requestAge = giftAccepted ? anaRequestAge(dashboardRecord?.requestDate, acceptedAt) : null;
+  const giftWasOffered = giftOffered || giftAccepted || giftDeclined;
 
   return {
     accepted: giftAccepted,
@@ -2215,6 +2249,17 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     addressProvided: Boolean(typedAddress || leadUpdatedAddress),
     addressConfirmed: addressConfirmed || Boolean(leadUpdatedAddress),
     deliveryConfirmed,
+    giftOffered: giftWasOffered,
+    giftDecisionStatus: giftAccepted ? 'ACCEPTED' : giftDeclined ? 'DECLINED' : giftWasOffered ? 'PENDING' : 'NOT_OFFERED',
+    pendingGiftDecision: giftWasOffered && !giftAccepted && !giftDeclined,
+    materialReceiptAsked,
+    materialStatus: materialReceived === true
+      ? 'RECEIVED'
+      : materialReceived === false
+        ? 'NOT_RECEIVED'
+        : materialReceiptAsked
+          ? 'PENDING'
+          : 'NOT_ASKED',
     materialRequestedAt: requestAge?.requestedAt || null,
     requestAgeDays: requestAge?.days ?? null,
     requestAgeBucket: requestAge?.bucketId || null,
@@ -4321,6 +4366,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
         training,
         metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, gptMakerEvents: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
         funnel: { transmissions: 0, dispatches: 0, messagesSent: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
+        analysis: { materialReceived: 0, materialNotReceived: 0, materialPending: 0, giftOffered: 0, giftPending: 0, withoutReply: 0 },
         requestAgeBuckets: ANA_REQUEST_AGE_BUCKETS.map((item) => ({ id: item.id, label: item.label, count: 0, percentage: 0 })),
         acceptedConversations: [],
         conversations: []
@@ -4364,7 +4410,8 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
     });
 
     const managedConversations = conversations.filter((conversation) => (
-      (conversation.messages || []).some(isGptMakerManagedMessage)
+      !isAnaTestConversation(conversation)
+      && (conversation.messages || []).some(isGptMakerManagedMessage)
     ));
     const allSummarized = managedConversations
       .map((conversation) => summarizeAnaConversation(conversation, dashboardRecordsById));
@@ -4432,6 +4479,14 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       new Date(right.delivery?.acceptedAt || 0) - new Date(left.delivery?.acceptedAt || 0)
     ));
     const reportConversations = allSummarized;
+    const analysis = {
+      materialReceived: reportConversations.filter((conversation) => conversation.delivery?.materialStatus === 'RECEIVED').length,
+      materialNotReceived: reportConversations.filter((conversation) => conversation.delivery?.materialStatus === 'NOT_RECEIVED').length,
+      materialPending: reportConversations.filter((conversation) => conversation.delivery?.materialStatus === 'PENDING').length,
+      giftOffered: reportConversations.filter((conversation) => conversation.delivery?.giftOffered).length,
+      giftPending: reportConversations.filter((conversation) => conversation.delivery?.pendingGiftDecision).length,
+      withoutReply: reportConversations.filter((conversation) => !conversation.hasLeadReply).length
+    };
     const gptMakerEvents = managedConversations.filter((conversation) => (
       (conversation.messages || []).some((message) => {
         const metadata = message?.metadata && typeof message.metadata === 'object' ? message.metadata : {};
@@ -4455,6 +4510,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
         optOut: reportConversations.filter((conversation) => conversation.classification?.label === 'Opt-out').length
       },
       funnel,
+      analysis,
       requestAgeBuckets,
       acceptedConversations,
       conversations: reportConversations
@@ -4466,6 +4522,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       training: gptMakerTrainingStatus(),
       metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, gptMakerEvents: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
       funnel: { transmissions: 0, dispatches: 0, messagesSent: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
+      analysis: { materialReceived: 0, materialNotReceived: 0, materialPending: 0, giftOffered: 0, giftPending: 0, withoutReply: 0 },
       requestAgeBuckets: ANA_REQUEST_AGE_BUCKETS.map((item) => ({ id: item.id, label: item.label, count: 0, percentage: 0 })),
       acceptedConversations: [],
       conversations: [],
