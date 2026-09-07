@@ -2646,10 +2646,22 @@ async function addGptMakerContext({ phone, message, role = 'assistant' }) {
   return sendGptMakerRequest('/add-message', { contextId, prompt, role });
 }
 
+function optionalBoolean(value) {
+  if (value === true || String(value).toLowerCase() === 'true') return true;
+  if (value === false || String(value).toLowerCase() === 'false') return false;
+  return null;
+}
+
+function conversationAiReplySetting(messages = []) {
+  const controlMessage = [...messages].reverse().find((message) => (
+    typeof message?.metadata?.aiReplyEnabled === 'boolean'
+  ));
+  return controlMessage ? controlMessage.metadata.aiReplyEnabled : null;
+}
+
 async function maybeReplyWithGptMaker(saved, inboundMessage) {
   if (!saved?.conversation?.id || !inboundMessage?.body) return null;
   const config = gptMakerConfig();
-  if (!config.autoReplyEnabled) return null;
   if (!config.configured) {
     console.warn('[gptmaker:auto-reply:skipped] GPT Maker nao configurado');
     return null;
@@ -2668,6 +2680,9 @@ async function maybeReplyWithGptMaker(saved, inboundMessage) {
   if (conversation?.messages) {
     conversation.messages = [...conversation.messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   }
+  const conversationSetting = conversationAiReplySetting(conversation?.messages || []);
+  const shouldReply = conversationSetting === null ? config.autoReplyEnabled : conversationSetting;
+  if (!shouldReply) return null;
   const recentAgentReply = (conversation?.messages || []).find((message) => (
     message.senderType === 'AI'
     && message.direction === 'OUTBOUND'
@@ -2724,6 +2739,7 @@ async function maybeReplyWithGptMaker(saved, inboundMessage) {
         autoReply: true,
         replyToMessageId: inboundMessage.id,
         source: 'gpt-maker-conversation',
+        aiReplyEnabled: true,
         gptMakerAgentId: config.agentId,
         gptMakerContextId: agentReply.contextId,
         gptMakerResponse: agentReply.providerResponse,
@@ -2756,6 +2772,7 @@ async function maybeReplyWithGptMaker(saved, inboundMessage) {
       autoReply: true,
       replyToMessageId: inboundMessage.id,
       source: 'gpt-maker-conversation',
+      aiReplyEnabled: true,
       gptMakerAgentId: config.agentId,
       gptMakerContextId: agentReply.contextId,
       gptMakerResponse: agentReply.providerResponse,
@@ -4118,6 +4135,7 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
 app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
   try {
     const sentAt = new Date();
+    const aiReplyEnabled = optionalBoolean(request.body?.aiReplyEnabled);
     const result = await sendWhatsAppTextMessage({
       phone: request.body?.phone,
       message: request.body?.message,
@@ -4138,7 +4156,11 @@ app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
       providerResponse: result.providerResponse,
       providerMessageId: providerMessageId(result.providerResponse),
       occurredAt: sentAt,
-      metadata: { templateId: request.body?.templateId || null, attempts: result.attempts || [] }
+      metadata: {
+        templateId: request.body?.templateId || null,
+        attempts: result.attempts || [],
+        ...(aiReplyEnabled === null ? {} : { aiReplyEnabled })
+      }
     });
     await addGptMakerContext({
       phone: result.phone,
@@ -4191,6 +4213,7 @@ app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
   const savedBody = String(request.body?.message || '').trim() || `[${mediaLabel}] ${request.body?.fileName || 'anexo'}`;
   try {
     const sentAt = new Date();
+    const aiReplyEnabled = optionalBoolean(request.body?.aiReplyEnabled);
     const result = await sendWhatsAppMediaMessage({
       phone: request.body?.phone,
       message: request.body?.message,
@@ -4213,7 +4236,10 @@ app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
       providerResponse: result.providerResponse,
       providerMessageId: providerMessageId(result.providerResponse),
       occurredAt: sentAt,
-      metadata: { media: result.media }
+      metadata: {
+        media: result.media,
+        ...(aiReplyEnabled === null ? {} : { aiReplyEnabled })
+      }
     });
     await addGptMakerContext({
       phone: result.phone,
@@ -4256,6 +4282,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
   const listName = String(request.body?.listName || '').trim().slice(0, 120);
   const broadcastId = String(request.body?.broadcastId || '').trim().slice(0, 120) || randomUUID();
   const recipientTotal = Math.max(Number(request.body?.recipientTotal) || recipients.length, recipients.length);
+  const aiReplyEnabled = optionalBoolean(request.body?.aiReplyEnabled);
   if (!recipients.length) {
     response.status(400).json({ ok: false, message: 'Informe ao menos um destinatario.' });
     return;
@@ -4417,6 +4444,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
             material: recipient.material || recipient.theme || null,
             theme: recipient.theme || recipient.material || null,
             leadAddress: recipient.address || null,
+            ...(aiReplyEnabled === null ? {} : { aiReplyEnabled }),
             attempts: result.attempts || []
           }
         });

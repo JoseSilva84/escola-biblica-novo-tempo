@@ -6106,6 +6106,7 @@ function AdminGeneralView({
   });
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
   const [batchPhonesText, setBatchPhonesText] = useState('');
+  const [batchAiReplyEnabled, setBatchAiReplyEnabled] = useState(false);
 
   useEffect(() => {
     setSection(initialSection);
@@ -6522,7 +6523,8 @@ function AdminGeneralView({
             message,
             listName,
             broadcastId,
-            recipientTotal: recipients.length
+            recipientTotal: recipients.length,
+            aiReplyEnabled: batchAiReplyEnabled
           })
         });
         const payload = await response.json();
@@ -7108,6 +7110,10 @@ function AdminGeneralView({
             <label className="grid gap-2 text-sm font-medium text-slate-300">
               Mensagem do lote
               <textarea className="min-h-28 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 py-3 text-slate-100 outline-none" name="batchMessage" defaultValue="Ola! Aqui e da Escola Biblica Novo Tempo. Estamos felizes pelo seu interesse e queremos ajudar voce a continuar seus estudos." />
+            </label>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-black text-slate-200">
+              <input checked={batchAiReplyEnabled} className="h-4 w-4 accent-emerald-500" onChange={(event) => setBatchAiReplyEnabled(event.target.checked)} type="checkbox" />
+              <WandSparkles size={17} /> Deixar IA responder
             </label>
             <button className={primaryButtonClass} disabled={batchLoading} type="submit">
               <ClipboardList size={18} />
@@ -7802,9 +7808,11 @@ function WhatsAppLeadPickerModal({
 }
 
 function WhatsAppBroadcastModal({
+  aiReplyEnabled,
   listName,
   message,
   onClose,
+  onAiReplyEnabledChange,
   onListNameChange,
   onMessageChange,
   onRemove,
@@ -7848,6 +7856,18 @@ function WhatsAppBroadcastModal({
           <label className="mt-4 grid gap-1.5">
             <span className="text-xs font-black uppercase tracking-wide text-slate-600">Mensagem *</span>
             <textarea autoFocus className="min-h-36 resize-y rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onMessageChange(event.target.value)} placeholder="Digite a mensagem que todos receberão" required value={message} />
+          </label>
+          <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <span className="min-w-0">
+              <strong className="flex items-center gap-2 text-sm font-black text-slate-900"><WandSparkles size={17} /> Deixar IA responder</strong>
+              <span className="mt-1 block text-xs font-semibold text-slate-500">A Ana assume somente quando o contato responder a esta transmissão.</span>
+            </span>
+            <input
+              checked={aiReplyEnabled}
+              className="h-5 w-5 shrink-0 accent-[#00a884]"
+              onChange={(event) => onAiReplyEnabledChange(event.target.checked)}
+              type="checkbox"
+            />
           </label>
           <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
             <span className="text-[11px] font-black uppercase tracking-wide text-emerald-800">Variáveis disponíveis</span>
@@ -8131,6 +8151,7 @@ function ConversationsView({ records = [] }) {
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
   const [broadcastListName, setBroadcastListName] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState(defaultBroadcastMessage);
+  const [broadcastAiReplyEnabled, setBroadcastAiReplyEnabled] = useState(false);
   const [broadcastSending, setBroadcastSending] = useState(false);
   const [broadcastAnalytics, setBroadcastAnalytics] = useState([]);
   const [broadcastAnalyticsLoading, setBroadcastAnalyticsLoading] = useState(true);
@@ -8140,6 +8161,7 @@ function ConversationsView({ records = [] }) {
   const [newContact, setNewContact] = useState({ name: '', phone: '', district: '', priority: '' });
   const [messageText, setMessageText] = useState('Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?');
   const [messageAttachment, setMessageAttachment] = useState(null);
+  const [messageAiReplyEnabled, setMessageAiReplyEnabled] = useState(false);
   const chatEndRef = useRef(null);
   const attachmentInputRef = useRef(null);
   const activePhoneRef = useRef('');
@@ -8306,7 +8328,8 @@ function ConversationsView({ records = [] }) {
             message: broadcastMessage.trim(),
             listName: broadcastListName.trim(),
             broadcastId,
-            recipientTotal: recipients.length
+            recipientTotal: recipients.length,
+            aiReplyEnabled: broadcastAiReplyEnabled
           })
         });
         const payload = await response.json();
@@ -8330,6 +8353,7 @@ function ConversationsView({ records = [] }) {
       setBroadcastSelectedLeads([]);
       setBroadcastListName('');
       setBroadcastMessage(defaultBroadcastMessage);
+      setBroadcastAiReplyEnabled(false);
       await loadConversations('', { silent: true });
       await loadBroadcastAnalytics({ silent: true });
     } catch (error) {
@@ -8692,6 +8716,10 @@ function ConversationsView({ records = [] }) {
   const selectedConversation = searchedPhone ? searchedConversation : selectedById || displayedConversations[0] || null;
   const activePhone = searchedPhone || selectedConversation?.phone || '';
   const messages = selectedConversation?.messages || [];
+  const conversationAiControl = [...messages].reverse().find((message) => (
+    typeof message?.metadata?.aiReplyEnabled === 'boolean'
+  ));
+  const conversationAiReplyEnabled = conversationAiControl?.metadata?.aiReplyEnabled === true;
   const lastMessage = messages[messages.length - 1];
   const activePhoneSuffix = String(activePhone).slice(-10);
   const recordLead = records.find((lead) => activePhoneSuffix && phoneDigits(lead.tel).includes(activePhoneSuffix));
@@ -8716,6 +8744,9 @@ function ConversationsView({ records = [] }) {
     ['IA', 'Preparar sugestao de resposta antes do envio.'],
     ['Pausa', 'Registrar pedido para nao receber novas mensagens.']
   ];
+  useEffect(() => {
+    setMessageAiReplyEnabled(conversationAiReplyEnabled);
+  }, [conversationAiReplyEnabled, selectedConversation?.id]);
   const visibleConversations = useMemo(() => {
     const term = conversationListSearch.trim().toLocaleLowerCase('pt-BR');
     if (!term) return displayedConversations;
@@ -8813,6 +8844,9 @@ function ConversationsView({ records = [] }) {
       senderName: payload.sentBy || 'Sistema',
       provider: payload.provider || 'waha-gows',
       providerStatus: payload.deliveryStatus || 'ACCEPTED',
+      metadata: typeof payload.aiReplyEnabled === 'boolean'
+        ? { aiReplyEnabled: payload.aiReplyEnabled }
+        : undefined,
       sentAt: now,
       createdAt: now
     };
@@ -8875,7 +8909,8 @@ function ConversationsView({ records = [] }) {
           ...(mediaPayload || {}),
           leadId: activeLead?.id || activeLead?.externalId || selectedConversation?.externalLeadId || null,
           name: activeLeadName,
-          district: activeLeadDistrict
+          district: activeLeadDistrict,
+          aiReplyEnabled: messageAiReplyEnabled
         })
       });
       const payload = await response.json();
@@ -8884,7 +8919,7 @@ function ConversationsView({ records = [] }) {
         error.payload = payload;
         throw error;
       }
-      appendOptimisticOutboundMessage(payload, phone, message || mediaPayload?.fileName || '[anexo]');
+      appendOptimisticOutboundMessage({ ...payload, aiReplyEnabled: messageAiReplyEnabled }, phone, message || mediaPayload?.fileName || '[anexo]');
       setMessageText('');
       setMessageAttachment(null);
       if (attachmentInputRef.current) attachmentInputRef.current.value = '';
@@ -9134,6 +9169,15 @@ function ConversationsView({ records = [] }) {
                 }} type="button"><X size={16} /></button>
               </div>
             ) : null}
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-black text-[#54656f]">
+              <input
+                checked={messageAiReplyEnabled}
+                className="h-4 w-4 accent-[#00a884]"
+                onChange={(event) => setMessageAiReplyEnabled(event.target.checked)}
+                type="checkbox"
+              />
+              <WandSparkles size={16} /> Deixar IA responder
+            </label>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <input accept="image/*,video/*" className="hidden" onChange={selectMessageAttachment} ref={attachmentInputRef} type="file" />
@@ -9229,9 +9273,11 @@ function ConversationsView({ records = [] }) {
       ) : null}
       {broadcastModalOpen ? (
         <WhatsAppBroadcastModal
+          aiReplyEnabled={broadcastAiReplyEnabled}
           listName={broadcastListName}
           message={broadcastMessage}
           onClose={() => setBroadcastModalOpen(false)}
+          onAiReplyEnabledChange={setBroadcastAiReplyEnabled}
           onListNameChange={setBroadcastListName}
           onMessageChange={setBroadcastMessage}
           onRemove={toggleBroadcastLead}

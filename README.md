@@ -126,6 +126,11 @@ O WAHA recebe e envia as mensagens, e o backend grava o historico completo. Quan
 
 Quando `GPTMAKER_AUTO_REPLY="true"`, o backend conversa com o agente usando `GPTMAKER_AGENT_ID` e `GPTMAKER_API_TOKEN`. Use o mesmo telefone como contexto da conversa para que o agente mantenha o historico do interessado. Nao ative essa opcao ao mesmo tempo que uma automacao do GPT Maker que ja envia respostas diretamente ao WhatsApp.
 
+Com `GPTMAKER_AUTO_REPLY="false"`, a interface permite ativar a Ana manualmente pela opcao
+`Deixar IA responder` em cada mensagem ou transmissao. A escolha fica vinculada ao historico
+do contato: marcada, a proxima resposta recebida chama o GPT Maker; desmarcada, a conversa
+permanece para atendimento humano. A escolha mais recente prevalece e nao exige migracao.
+
 As intenções e qualificações configuradas no GPT Maker devem chamar:
 
 ```text
