@@ -2013,6 +2013,16 @@ function classifyAnaConversation(messages = []) {
   return { label: 'Triagem', tone: 'slate', action: 'Classificar intenção antes da próxima resposta.' };
 }
 
+function isGptMakerManagedMessage(message = {}) {
+  const metadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+  return message.provider === 'gpt-maker'
+    || message.senderType === 'AI'
+    || metadata.source === 'gpt-maker-intention'
+    || metadata.aiProvider === 'gpt-maker'
+    || metadata.batch === true
+    || Boolean(metadata.gptMakerQualification || metadata.gptMakerAction || metadata.gptMakerSummary);
+}
+
 function gptMakerClassification(messages = [], delivery = null) {
   if (delivery?.deliveryConfirmed || (delivery?.accepted && delivery?.address)) {
     return { label: 'Visita marcada', tone: 'green', action: 'Brinde aceito e endereço disponível para a entrega.', source: 'conversation' };
@@ -2035,9 +2045,9 @@ function gptMakerClassification(messages = [], delivery = null) {
   const metadata = qualificationMessage?.metadata || {};
   const rawLabel = String(metadata.gptMakerQualification || metadata.intent || '').trim();
   const actionCode = String(metadata.gptMakerAction || '').trim();
-  const normalized = normalizedIntentName(`${rawLabel} ${actionCode}`);
+  const normalized = normalizedIntentName(`${rawLabel} ${actionCode}`).replace(/[_-]+/g, ' ');
 
-  if ((!rawLabel && !actionCode) || /aguardando gpt maker/i.test(normalized)) {
+  if ((!rawLabel && !actionCode) || /(aguardando gpt maker|intencao da ana)/i.test(normalized)) {
     return { ...classifyAnaConversation(messages), source: 'conversation' };
   }
   if (/(opt.?out|encerrar contato|finalizar contato|end_contact)/i.test(normalized)) {
@@ -2127,6 +2137,24 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
 
   for (const message of messages) {
     const body = String(message.body || '').trim();
+    const metadata = message?.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+    const metadataIntent = normalizedIntentName(`${metadata.gptMakerQualification || ''} ${metadata.intent || ''}`);
+    const metadataAction = normalizedIntentName(metadata.gptMakerAction || '').replace(/[_-]+/g, ' ');
+    const metadataOccurredAt = metadata.gptMakerReceivedAt || message.receivedAt || message.sentAt || message.createdAt || null;
+    if (/(confirm gift delivery|delivery already confirmed)/i.test(metadataAction)
+      || metadataIntent.includes('registrar endereco')) {
+      giftAccepted = true;
+      addressConfirmed = true;
+      deliveryConfirmed = /(confirm gift delivery|delivery already confirmed)/i.test(metadataAction) || deliveryConfirmed;
+      acceptedAt ||= metadataOccurredAt;
+    } else if (/(request new address|offer gift)/i.test(metadataAction)) {
+      if (metadataAction.includes('request new address')) {
+        giftAccepted = true;
+        acceptedAt ||= metadataOccurredAt;
+      }
+    } else if (metadataAction.includes('gift declined')) {
+      giftDeclined = true;
+    }
     if (!body) continue;
     if (message.direction === 'OUTBOUND') {
       const question = anaDeliveryQuestion(body);
@@ -4291,7 +4319,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       response.json({
         agent: gptMakerConfig(),
         training,
-        metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
+        metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, gptMakerEvents: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
         funnel: { transmissions: 0, dispatches: 0, messagesSent: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
         requestAgeBuckets: ANA_REQUEST_AGE_BUCKETS.map((item) => ({ id: item.id, label: item.label, count: 0, percentage: 0 })),
         acceptedConversations: [],
@@ -4323,9 +4351,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
     } catch (error) {
       console.warn('[ai:ana:tracked-funnel:error]', error.message);
     }
-    const trackedConversationIds = trackedReport?.conversationIds || [];
     const conversations = await prisma.whatsAppConversation.findMany({
-      where: trackedConversationIds.length ? { id: { in: trackedConversationIds } } : undefined,
       orderBy: { updatedAt: 'desc' },
       take: limit,
       include: {
@@ -4337,12 +4363,13 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       }
     });
 
-    const allSummarized = conversations
+    const managedConversations = conversations.filter((conversation) => (
+      (conversation.messages || []).some(isGptMakerManagedMessage)
+    ));
+    const allSummarized = managedConversations
       .map((conversation) => summarizeAnaConversation(conversation, dashboardRecordsById));
-    const summarized = allSummarized
-      .filter((conversation) => conversation.hasLeadReply || conversation.aiCount > 0);
 
-    const successfulBatchMessages = conversations.flatMap((conversation) => (
+    const successfulBatchMessages = managedConversations.flatMap((conversation) => (
       (conversation.messages || [])
         .filter((message) => message.direction === 'OUTBOUND' && message.metadata?.batch && !message.metadata?.failure && !String(message.providerStatus || '').toUpperCase().startsWith('FAILED'))
         .map((message) => ({
@@ -4351,29 +4378,18 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
           broadcastId: String(message.metadata?.broadcastId || message.metadata?.listName || message.id)
         }))
     ));
-    const firstDispatchByConversation = new Map();
-    for (const dispatch of successfulBatchMessages) {
-      const previous = firstDispatchByConversation.get(dispatch.conversationId);
-      if (!previous || new Date(dispatch.createdAt) < new Date(previous)) {
-        firstDispatchByConversation.set(dispatch.conversationId, dispatch.createdAt);
-      }
-    }
-    const hasTrackedDispatches = successfulBatchMessages.length > 0;
-    const contactedConversations = conversations.filter((conversation) => (
-      (conversation.messages || []).some((message) => message.direction === 'OUTBOUND')
+    const contactedConversations = managedConversations.filter((conversation) => (
+      (conversation.messages || []).some((message) => (
+        message.direction === 'OUTBOUND'
+        && !message.metadata?.failure
+        && !String(message.providerStatus || '').toUpperCase().startsWith('FAILED')
+      ))
     ));
-    const responseConversations = conversations.filter((conversation) => {
-      const firstDispatchAt = firstDispatchByConversation.get(conversation.id);
-      if (hasTrackedDispatches && !firstDispatchAt) return false;
-      return (conversation.messages || []).some((message) => (
-        message.direction === 'INBOUND'
-        && (!firstDispatchAt || new Date(message.receivedAt || message.createdAt) >= new Date(firstDispatchAt))
-      ));
-    });
-    const conversionConversations = summarized.filter((conversation) => (
-      conversation.delivery?.accepted && (!hasTrackedDispatches || firstDispatchByConversation.has(conversation.id))
+    const responseConversations = managedConversations.filter((conversation) => (
+      (conversation.messages || []).some((message) => message.direction === 'INBOUND')
     ));
-    const dispatches = hasTrackedDispatches ? successfulBatchMessages.length : contactedConversations.length;
+    const conversionConversations = allSummarized.filter((conversation) => conversation.delivery?.accepted);
+    const dispatches = contactedConversations.length;
     const responses = responseConversations.length;
     const conversions = conversionConversations.length;
     const percentage = (value, total) => total > 0 ? Number(((value / total) * 100).toFixed(1)) : 0;
@@ -4401,8 +4417,9 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
         percentage: percentage(unknownRequestDates, conversions)
       });
     }
-    let funnel = {
-      transmissions: new Set(successfulBatchMessages.map((message) => message.broadcastId)).size,
+    const funnel = {
+      transmissions: trackedReport?.funnel?.transmissions
+        || new Set(successfulBatchMessages.map((message) => message.broadcastId)).size,
       dispatches,
       messagesSent: dispatches,
       responses,
@@ -4411,14 +4428,18 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       conversionRate: percentage(conversions, responses),
       overallConversionRate: percentage(conversions, dispatches)
     };
-    let acceptedConversations = conversionConversations;
-    let reportConversations = summarized;
-    if (trackedReport) {
-      funnel = trackedReport.funnel;
-      requestAgeBuckets = trackedReport.requestAgeBuckets;
-      acceptedConversations = trackedReport.acceptedConversations;
-      reportConversations = allSummarized;
-    }
+    const acceptedConversations = [...conversionConversations].sort((left, right) => (
+      new Date(right.delivery?.acceptedAt || 0) - new Date(left.delivery?.acceptedAt || 0)
+    ));
+    const reportConversations = allSummarized;
+    const gptMakerEvents = managedConversations.filter((conversation) => (
+      (conversation.messages || []).some((message) => {
+        const metadata = message?.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+        return message.provider === 'gpt-maker'
+          || metadata.source === 'gpt-maker-intention'
+          || metadata.aiProvider === 'gpt-maker';
+      })
+    )).length;
 
     response.json({
       agent: gptMakerConfig(),
@@ -4428,6 +4449,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
         contacted: contactedConversations.length,
         leadReplies: reportConversations.filter((conversation) => conversation.hasLeadReply).length,
         aiReplies: reportConversations.filter((conversation) => conversation.aiCount > 0).length,
+        gptMakerEvents,
         acceptedVisits: funnel.conversions,
         needsHuman: reportConversations.filter((conversation) => conversation.classification?.label === 'Encaminhar humano').length,
         optOut: reportConversations.filter((conversation) => conversation.classification?.label === 'Opt-out').length
@@ -4442,8 +4464,8 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
     response.status(500).json({
       agent: gptMakerConfig(),
       training: gptMakerTrainingStatus(),
-      metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
-      funnel: { dispatches: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
+      metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, gptMakerEvents: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
+      funnel: { transmissions: 0, dispatches: 0, messagesSent: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
       requestAgeBuckets: ANA_REQUEST_AGE_BUCKETS.map((item) => ({ id: item.id, label: item.label, count: 0, percentage: 0 })),
       acceptedConversations: [],
       conversations: [],

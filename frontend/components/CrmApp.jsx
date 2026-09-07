@@ -193,6 +193,45 @@ function dashboardLeadToWhatsAppLead(lead) {
   };
 }
 
+function whatsappLeadToDetailRecord(lead, records = []) {
+  if (!lead) return null;
+  const phone = phoneDigits(lead.phone || lead.tel);
+  const externalId = Number(lead.externalId || lead.id) || null;
+  const dashboardLead = records.find((record) => (
+    (externalId && Number(record.id) === externalId)
+    || (phone && phoneDigits(record.tel).endsWith(phone.slice(-10)))
+  ));
+  if (dashboardLead) return dashboardLead;
+
+  const priority = whatsappPriorityBadgeKey(lead.priority || lead.p);
+  return {
+    id: lead.id || externalId || phone,
+    n: lead.name || lead.n || `Contato ${phone.slice(-4)}`,
+    tel: phone,
+    em: lead.email || lead.em || '',
+    d: lead.district || lead.d || 'Distrito não vinculado',
+    end: lead.newAddress || lead.address || lead.end || '',
+    addr: lead.newAddress || lead.address || lead.addr || '',
+    a: lead.age || lead.a || null,
+    birthDate: lead.birthDate || null,
+    g: lead.gender || lead.g || 'N',
+    r: lead.religion || lead.r || 'Não informado',
+    v: Boolean(lead.isVip ?? lead.v),
+    e: Boolean(lead.hasActiveStudy ?? lead.e),
+    tm: lead.material || lead.materialName || lead.tm || 'Não informado',
+    materialName: lead.materialName || lead.material || lead.tm || 'Não informado',
+    m: Number(lead.materialCount || lead.m || 0),
+    desc: lead.description || lead.desc || 'N/I',
+    p: priority,
+    s: Number(lead.score ?? lead.s ?? 0),
+    sim: Number(lead.similarity ?? lead.sim ?? 0),
+    faixa: lead.band || lead.faixa || 'Não informada',
+    c: lead.daysSinceLastContact ?? lead.c ?? null,
+    lastContactDate: lead.lastContactDate || null,
+    t: Boolean(phone)
+  };
+}
+
 function meaningfulContactName(phone, ...values) {
   const normalizedPhone = phoneDigits(phone);
   const name = values.find((value) => {
@@ -7560,6 +7599,7 @@ function WhatsAppLeadPickerModal({
   onClearSelected,
   onClose,
   onFilterChange,
+  onLeadDetails,
   onNewContactSubmit,
   onOpenBroadcast,
   onSearch,
@@ -7792,7 +7832,10 @@ function WhatsAppLeadPickerModal({
                       </span>
                       <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border ${selected ? 'border-[#008069] bg-[#008069] text-white' : 'border-slate-300 bg-white text-slate-400'}`}>{selected ? <Check size={16} /> : <Plus size={16} />}</span>
                     </button>
-                    <button className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-black text-[#008069] transition hover:border-[#00a884] hover:bg-emerald-50" onClick={() => onSelect(lead)} type="button">Conversar <ChevronRight size={15} /></button>
+                    <div className="grid shrink-0 gap-1.5">
+                      <button className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-black text-[#008069] transition hover:border-[#00a884] hover:bg-emerald-50" onClick={() => onSelect(lead)} type="button">Conversar <ChevronRight size={15} /></button>
+                      <button className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-black text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => onLeadDetails(lead)} type="button"><Eye size={14} /> Detalhes</button>
+                    </div>
                   </div>
                 );
               })}
@@ -8207,6 +8250,7 @@ function ConversationsView({ records = [] }) {
   const [broadcastAnalytics, setBroadcastAnalytics] = useState([]);
   const [broadcastAnalyticsLoading, setBroadcastAnalyticsLoading] = useState(true);
   const [selectedRecipientLead, setSelectedRecipientLead] = useState(null);
+  const [selectedLeadDetails, setSelectedLeadDetails] = useState(null);
   const [newContactMode, setNewContactMode] = useState(false);
   const [newContactSaving, setNewContactSaving] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', phone: '', district: '', priority: '' });
@@ -8309,6 +8353,15 @@ function ConversationsView({ records = [] }) {
     setLeadPickerOpen(true);
     setConversationExpanded(false);
     loadLeadDirectory();
+  }
+
+  function openLeadDetails(lead) {
+    const detailLead = whatsappLeadToDetailRecord(lead, records);
+    if (!detailLead) {
+      toast.error('Detalhes indisponíveis', { description: 'Não foi possível localizar os dados deste lead.' });
+      return;
+    }
+    setSelectedLeadDetails(detailLead);
   }
 
   async function submitLeadSearch(event) {
@@ -9157,6 +9210,19 @@ function ConversationsView({ records = [] }) {
                 <span className="rounded-full bg-[#00a884] px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
                   {lastMessage?.direction === 'INBOUND' ? 'Responder' : 'Em acompanhamento'}
                 </span>
+                {activePhone ? (
+                  <button
+                    className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#d1d7db] bg-white px-3 text-xs font-black text-[#54656f] shadow-sm transition hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
+                    onClick={() => openLeadDetails(activeLead || {
+                      name: activeLeadName,
+                      phone: activePhone,
+                      district: activeLeadDistrict
+                    })}
+                    type="button"
+                  >
+                    <Eye size={17} /> Detalhes
+                  </button>
+                ) : null}
                 <button
                   aria-label={conversationExpanded ? 'Reduzir conversa' : 'Ampliar conversa'}
                   className="grid h-10 w-10 place-items-center rounded-xl border border-[#d1d7db] bg-white text-[#54656f] shadow-sm transition hover:-translate-y-0.5 hover:border-[#00a884] hover:bg-[#d9fdd3] hover:text-[#006c5b] focus:outline-none focus:ring-4 focus:ring-[#00a884]/15"
@@ -9317,6 +9383,7 @@ function ConversationsView({ records = [] }) {
           onClearSelected={() => setBroadcastSelectedLeads([])}
           onClose={() => setLeadPickerOpen(false)}
           onFilterChange={setContactFilter}
+          onLeadDetails={openLeadDetails}
           onNewContactSubmit={submitNewContact}
           onOpenBroadcast={() => setBroadcastModalOpen(true)}
           onSearch={submitLeadSearch}
@@ -9340,6 +9407,7 @@ function ConversationsView({ records = [] }) {
           sending={broadcastSending}
         />
       ) : null}
+      <LeadDetailModal lead={selectedLeadDetails} onClose={() => setSelectedLeadDetails(null)} />
     </div>
   );
 }
@@ -9408,6 +9476,10 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const anaTraining = anaSummary?.training || null;
   const anaAgent = anaSummary?.agent || null;
   const active = Boolean(anaAgent?.configured && anaAgent?.autoReplyEnabled);
+  const gptMakerSynchronized = Boolean(anaMetrics.gptMakerEvents || anaAgent?.configured);
+  const anaGroupCounts = useMemo(() => Object.fromEntries(
+    anaConversationGroups.map((group) => [group.label, group.conversations.length])
+  ), [anaConversationGroups]);
   const toneClasses = {
     blue: 'bg-blue-50 text-blue-700 border-blue-100',
     green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -9561,20 +9633,25 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
               O agente Ana do GPT Maker responde às mensagens recebidas pelo WAHA, qualifica os atendimentos e sinaliza quando precisa de revisão humana.
             </p>
           </div>
-          <div className={`inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-black ${active ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
-            <WandSparkles size={18} />
-            {active ? 'GPT Maker conectado' : 'GPT Maker pendente'}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className={`inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-black ${gptMakerSynchronized ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+              <WandSparkles size={18} />
+              {gptMakerSynchronized ? 'Dados do GPT Maker sincronizados' : 'Aguardando dados do GPT Maker'}
+            </div>
+            <button className={`${ghostButtonClass} h-11 px-3`} disabled={anaLoading} onClick={() => loadAnaSummary()} title="Atualizar dados do GPT Maker" type="button">
+              <RefreshCw className={anaLoading ? 'animate-spin' : ''} size={17} /> Atualizar
+            </button>
           </div>
         </div>
       </section>
 
       <section className="grid grid-cols-6 gap-4 max-2xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
-        <MetricCard detail={anaAgent?.configured ? 'agente do GPT Maker' : 'configure o GPT Maker'} icon={WandSparkles} label="Ana" tone={anaAgent?.configured ? 'green' : 'violet'} value={anaAgent?.configured ? 'Pronta' : 'Pendente'} />
-        <MetricCard detail={`${formatNumber(anaFunnel.messagesSent || anaFunnel.dispatches || 0)} mensagens enviadas`} icon={Send} label="Disparos" tone="blue" value={anaLoading ? '...' : formatNumber(anaFunnel.transmissions || 0)} />
-        <MetricCard detail={`${anaFunnel.responseRate || 0}% das mensagens enviadas`} icon={MessageCircle} label="Respostas" tone="orange" value={anaLoading ? '...' : formatNumber(anaFunnel.responses || 0)} />
-        <MetricCard detail={`${anaFunnel.conversionRate || 0}% das respostas`} icon={CheckCircle2} label="Conversões" tone="green" value={anaLoading ? '...' : formatNumber(anaFunnel.conversions || 0)} />
-        <MetricCard detail="mensagens da Ana" icon={Sparkles} label="IA respondeu" tone="violet" value={anaLoading ? '...' : formatNumber(anaMetrics.aiReplies || 0)} />
-        <MetricCard detail="gerenciado no GPT Maker" icon={ShieldCheck} label="Treinamento" value={anaTraining?.loaded ? 'Conectado' : 'Pendente'} />
+        <MetricCard detail={`${formatNumber(anaFunnel.transmissions || 0)} transmissão(ões) registrada(s)`} icon={Send} label="Receberam contato" tone="blue" value={anaLoading ? '...' : formatNumber(anaFunnel.dispatches || 0)} />
+        <MetricCard detail={`${anaFunnel.responseRate || 0}% dos contatos abordados`} icon={MessageCircle} label="Responderam" tone="orange" value={anaLoading ? '...' : formatNumber(anaFunnel.responses || 0)} />
+        <MetricCard detail={`${anaFunnel.conversionRate || 0}% das respostas`} icon={CheckCircle2} label="Aceitaram a visita" tone="green" value={anaLoading ? '...' : formatNumber(anaFunnel.conversions || 0)} />
+        <MetricCard detail="aguardando qualificação" icon={Sparkles} label="Triagens" tone="violet" value={anaLoading ? '...' : formatNumber(anaGroupCounts.Triagem || 0)} />
+        <MetricCard detail="recusaram o recebimento" icon={X} label="Não aceitaram" tone="orange" value={anaLoading ? '...' : formatNumber(anaGroupCounts['Não aceitou a visita'] || 0)} />
+        <MetricCard detail="precisam receber ou reenviar" icon={ClipboardList} label="Enviar material" value={anaLoading ? '...' : formatNumber(anaGroupCounts['Enviar material'] || 0)} />
       </section>
 
       <section className={`${panelClass} p-3`}>
@@ -9600,8 +9677,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
               <h2 className="mt-2 text-2xl font-black text-slate-50">Funil dos atendimentos</h2>
               <div className="mt-6 divide-y divide-white/10 border-y border-white/10">
                 {[
-                  ['Disparos realizados', anaFunnel.transmissions, `${formatNumber(anaFunnel.messagesSent || anaFunnel.dispatches || 0)} mensagens enviadas`, Send],
-                  ['Pessoas que responderam', anaFunnel.responses, `${anaFunnel.responseRate || 0}% das mensagens enviadas`, MessageCircle],
+                  ['Contatos abordados', anaFunnel.dispatches, `${formatNumber(anaFunnel.transmissions || 0)} transmissão(ões) registrada(s)`, Send],
+                  ['Pessoas que responderam', anaFunnel.responses, `${anaFunnel.responseRate || 0}% dos contatos abordados`, MessageCircle],
                   ['Pessoas que aceitaram', anaFunnel.conversions, `${anaFunnel.conversionRate || 0}% das respostas`, CheckCircle2]
                 ].map(([label, value, detail, Icon]) => (
                   <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-4" key={label}>
@@ -9616,9 +9693,9 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
               </div>
               <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 text-center max-sm:grid-cols-1 max-sm:divide-x-0 max-sm:divide-y">
                 {[
-                  ['Resposta', anaFunnel.responseRate, 'respostas / mensagens enviadas'],
+                  ['Resposta', anaFunnel.responseRate, 'respostas / contatos abordados'],
                   ['Conversão', anaFunnel.conversionRate, 'conversões / respostas'],
-                  ['Conversão geral', anaFunnel.overallConversionRate, 'conversões / mensagens enviadas']
+                  ['Conversão geral', anaFunnel.overallConversionRate, 'conversões / contatos abordados']
                 ].map(([label, value, detail]) => (
                   <div className="px-3 py-2" key={label}>
                     <span className="block text-[11px] font-black uppercase text-slate-400">{label}</span>
@@ -10017,6 +10094,24 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                       : 'Data não informada'}
                   </strong>
                   <span className="mt-1 block text-xs font-semibold text-slate-500">{selectedAcceptedConversation.delivery?.requestAgeLabel}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 border-b border-slate-200 pb-4 max-sm:grid-cols-1">
+                <div>
+                  <span className="block text-xs font-black uppercase text-slate-500">Aceite da visita</span>
+                  <strong className="mt-1 block text-sm text-slate-900">
+                    {selectedAcceptedConversation.delivery?.acceptedAt
+                      ? new Date(selectedAcceptedConversation.delivery.acceptedAt).toLocaleString('pt-BR')
+                      : 'Data não informada'}
+                  </strong>
+                </div>
+                <div>
+                  <span className="block text-xs font-black uppercase text-slate-500">Último contato</span>
+                  <strong className="mt-1 block text-sm text-slate-900">
+                    {selectedAcceptedConversation.lastMessageAt
+                      ? new Date(selectedAcceptedConversation.lastMessageAt).toLocaleString('pt-BR')
+                      : 'Data não informada'}
+                  </strong>
                 </div>
               </div>
               <div className="text-sm font-semibold text-slate-600">
