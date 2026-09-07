@@ -1032,6 +1032,11 @@ function anaDeliveryQuestion(value) {
   if (/(brinde|presente|material especial)/.test(text) && /(gostaria|podera|pode|quer|aceita|receber)/.test(text)) {
     return 'GIFT_ACCEPTANCE';
   }
+  if (/receb/.test(text)
+    && /(gostaria|podera|pode|quer|aceita|ainda gostaria)/.test(text)
+    && !/(chegou|ja recebeu|já recebeu|chegou a receber)/.test(text)) {
+    return 'GIFT_ACCEPTANCE';
+  }
   if (/material/.test(text) && /(chegou|recebeu|receber)/.test(text)) return 'MATERIAL_RECEIVED';
   if (/(material|estudo)/.test(text) && /(olhada|leu|ler|entendeu|atencao)/.test(text)) return 'MATERIAL_READ';
   return null;
@@ -2019,6 +2024,66 @@ function gptMakerClassification(messages = []) {
   };
 }
 
+function summarizeAnaDelivery(conversation) {
+  const messages = conversation?.messages || [];
+  let pendingQuestion = null;
+  let giftAccepted = false;
+  let typedAddress = '';
+  let addressConfirmed = false;
+  let deliveryConfirmed = false;
+
+  for (const message of messages) {
+    const body = String(message.body || '').trim();
+    if (!body) continue;
+    if (message.direction === 'OUTBOUND') {
+      const question = anaDeliveryQuestion(body);
+      if (question) pendingQuestion = question;
+      if (anaDeliveryWasConfirmed(body)) {
+        deliveryConfirmed = true;
+      }
+      continue;
+    }
+
+    const informedAddress = plausibleNewAddress(body);
+    if (informedAddress) {
+      typedAddress = informedAddress;
+      addressConfirmed = true;
+      pendingQuestion = null;
+      continue;
+    }
+    if (/(quero receber|pode entregar|aceito|gostaria de receber|pode trazer)/i.test(body)) {
+      giftAccepted = true;
+    } else if (pendingQuestion === 'GIFT_ACCEPTANCE' && isAffirmativeReply(body)) {
+      giftAccepted = true;
+    }
+    if (pendingQuestion === 'ADDRESS_CONFIRMATION' && isAffirmativeReply(body)) {
+      addressConfirmed = true;
+    }
+    pendingQuestion = null;
+  }
+
+  const leadUpdatedAddress = String(conversation?.lead?.newAddress || '').replace(/\s+/g, ' ').trim();
+  const metadataAddress = [...messages].reverse()
+    .map((message) => String(message?.metadata?.leadAddress || message?.metadata?.address || '').replace(/\s+/g, ' ').trim())
+    .find(Boolean) || '';
+  const bankAddress = String(conversation?.lead?.address || '').replace(/\s+/g, ' ').trim();
+  const address = typedAddress || leadUpdatedAddress || metadataAddress || bankAddress;
+  const addressSource = typedAddress || leadUpdatedAddress
+    ? 'Informado na conversa'
+    : address
+      ? 'Cadastro do lead'
+      : 'Não informado';
+
+  return {
+    accepted: giftAccepted,
+    address: address || null,
+    addressSource,
+    addressProvided: Boolean(typedAddress || leadUpdatedAddress),
+    addressConfirmed: addressConfirmed || Boolean(leadUpdatedAddress),
+    deliveryConfirmed
+  };
+}
+
 function summarizeAnaConversation(conversation) {
   const messages = conversation.messages || [];
   const inboundMessages = messages.filter((message) => message.direction === 'INBOUND');
@@ -2030,6 +2095,7 @@ function summarizeAnaConversation(conversation) {
   const classification = gptMakerClassification(messages);
   const qualificationMessage = [...messages].reverse().find((message) => message?.metadata?.gptMakerSummary);
   const gptMakerSummary = String(qualificationMessage?.metadata?.gptMakerSummary || '').trim();
+  const delivery = summarizeAnaDelivery(conversation);
 
   return {
     id: conversation.id,
@@ -2048,6 +2114,7 @@ function summarizeAnaConversation(conversation) {
     lastAnaMessage: compactText(lastAi?.body || outboundMessages[outboundMessages.length - 1]?.body),
     summary: gptMakerSummary || `${classification.label}: ${compactText(lastInbound?.body || lastMessage?.body)}`,
     classification,
+    delivery,
     messages: messages.map((message) => ({
       id: message.id,
       conversationId: message.conversationId,
@@ -2347,6 +2414,91 @@ function validateAnaReply(message, { conversation, inboundMessage }) {
     clean = clean.slice(0, firstQuestionEnd + 1).trim();
   }
   return clean;
+}
+
+async function guardGptMakerReply(message, { conversation, inboundMessage }) {
+  let clean = String(message || '').replace(/\r/g, '').replace(/\*\*/g, '').replace(/^\s*Ana:\s*/i, '').trim();
+  if (!clean) clean = buildAnaFallbackReply({ conversation, inboundMessage });
+
+  const lead = conversation?.lead || null;
+  const addressState = await registeredAddressState(lead);
+  const deliveryState = await inferAnaDeliveryState({
+    phone: conversation?.phone,
+    inboundText: inboundMessage?.body
+  }, lead, addressState);
+  const messages = conversation?.messages || [];
+  const proposedQuestion = anaDeliveryQuestion(clean);
+  const addressInLastReply = plausibleNewAddress(inboundMessage?.body);
+  const addressReady = Boolean(addressInLastReply || deliveryState.addressProvided || addressState.hasAddress || addressFromConversation(conversation));
+  const giftAccepted = deliveryState.giftAccepted === 'sim'
+    || /(quero receber|pode entregar|aceito|gostaria de receber|pode trazer)/i.test(String(inboundMessage?.body || ''));
+  const askedAddress = messages.some((item) => item.direction === 'OUTBOUND'
+    && ['ADDRESS_REQUEST', 'ADDRESS_CONFIRMATION'].includes(anaDeliveryQuestion(item.body)));
+  const askedGift = messages.some((item) => item.direction === 'OUTBOUND'
+    && anaDeliveryQuestion(item.body) === 'GIFT_ACCEPTANCE');
+  const normalizedClean = normalizeMessageSignature(clean);
+  const repeatsPreviousReply = messages.some((item) => item.direction === 'OUTBOUND'
+    && normalizeMessageSignature(item.body) === normalizedClean);
+  const firstName = leadFirstName(conversation?.leadName || lead?.name);
+  const nameSuffix = firstName ? `, ${firstName}` : '';
+  const finalDeliveryReply = deliveryState.deliveryConfirmed
+    ? `Tudo certo${nameSuffix}. Sua entrega já está confirmada para sábado, dia 19 de setembro, pela parte da tarde.`
+    : `Perfeito${nameSuffix}. No sábado, dia 19 de setembro, pela parte da tarde, um representante da Novo Tempo irá até sua casa para entregar o seu brinde em mãos. Deus abençoe você e sua família.`;
+
+  if (giftAccepted && addressReady && (
+    proposedQuestion === 'GIFT_ACCEPTANCE'
+    || proposedQuestion === 'ADDRESS_REQUEST'
+    || proposedQuestion === 'ADDRESS_CONFIRMATION'
+    || repeatsPreviousReply
+  )) {
+    return { message: finalDeliveryReply, guarded: true, reason: 'delivery-ready' };
+  }
+
+  if (proposedQuestion === 'GIFT_ACCEPTANCE' && (giftAccepted || askedGift)) {
+    if (!addressReady && !askedAddress) {
+      return {
+        message: `Que bom${nameSuffix}! Para organizarmos a entrega do brinde, pode me informar seu endereço completo?`,
+        guarded: true,
+        reason: 'gift-already-accepted'
+      };
+    }
+    return {
+      message: `Obrigado pelo retorno${nameSuffix}. A equipe seguirá com o atendimento usando as informações que você já forneceu.`,
+      guarded: true,
+      reason: 'gift-question-already-asked'
+    };
+  }
+
+  if (['ADDRESS_REQUEST', 'ADDRESS_CONFIRMATION'].includes(proposedQuestion)) {
+    if (addressReady) {
+      return {
+        message: giftAccepted
+          ? finalDeliveryReply
+          : `Obrigado${nameSuffix}. Seu endereço já está registrado para o acompanhamento da equipe.`,
+        guarded: true,
+        reason: 'address-already-ready'
+      };
+    }
+    if (askedAddress) {
+      return {
+        message: `Obrigado pelo retorno${nameSuffix}. Assim que o endereço completo estiver disponível, a equipe poderá organizar a entrega.`,
+        guarded: true,
+        reason: 'address-question-already-asked'
+      };
+    }
+  }
+
+  if (repeatsPreviousReply) {
+    return {
+      message: `Obrigado por responder${nameSuffix}. Sua informação já foi registrada e a equipe seguirá com o acompanhamento.`,
+      guarded: true,
+      reason: 'duplicate-reply'
+    };
+  }
+
+  const questionCount = (clean.match(/\?/g) || []).length;
+  if (questionCount > 1) clean = clean.slice(0, clean.indexOf('?') + 1).trim();
+  return { message: clean, guarded: false, reason: null };
 }
 
 async function buildAnaReply({ conversation, inboundMessage, config }) {
@@ -2659,7 +2811,7 @@ function conversationAiReplySetting(messages = []) {
   return controlMessage ? controlMessage.metadata.aiReplyEnabled : null;
 }
 
-async function maybeReplyWithGptMaker(saved, inboundMessage) {
+async function processGptMakerReply(saved, inboundMessage) {
   if (!saved?.conversation?.id || !inboundMessage?.body) return null;
   const config = gptMakerConfig();
   if (!config.configured) {
@@ -2709,7 +2861,8 @@ async function maybeReplyWithGptMaker(saved, inboundMessage) {
     throw error;
   }
 
-  const message = agentReply.message;
+  const guardedReply = await guardGptMakerReply(agentReply.message, { conversation, inboundMessage });
+  const message = guardedReply.message;
   let result;
   try {
     result = await sendWhatsAppTextMessage({
@@ -2743,6 +2896,8 @@ async function maybeReplyWithGptMaker(saved, inboundMessage) {
         gptMakerAgentId: config.agentId,
         gptMakerContextId: agentReply.contextId,
         gptMakerResponse: agentReply.providerResponse,
+        replyGuarded: guardedReply.guarded,
+        replyGuardReason: guardedReply.reason,
         typing,
         failure: true,
         providerHttpStatus: error.providerStatus || error.status || null,
@@ -2776,10 +2931,31 @@ async function maybeReplyWithGptMaker(saved, inboundMessage) {
       gptMakerAgentId: config.agentId,
       gptMakerContextId: agentReply.contextId,
       gptMakerResponse: agentReply.providerResponse,
+      replyGuarded: guardedReply.guarded,
+      replyGuardReason: guardedReply.reason,
       typing,
       attempts: result.attempts || []
     }
   });
+}
+
+const gptMakerReplyInFlight = new Map();
+
+async function maybeReplyWithGptMaker(saved, inboundMessage) {
+  const conversationId = saved?.conversation?.id;
+  if (!conversationId) return null;
+  const current = gptMakerReplyInFlight.get(conversationId);
+  if (current) return current;
+
+  const task = processGptMakerReply(saved, inboundMessage);
+  gptMakerReplyInFlight.set(conversationId, task);
+  try {
+    return await task;
+  } finally {
+    if (gptMakerReplyInFlight.get(conversationId) === task) {
+      gptMakerReplyInFlight.delete(conversationId);
+    }
+  }
 }
 
 function firstNameFromName(value) {
@@ -3768,7 +3944,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       response.json({
         agent: gptMakerConfig(),
         training,
-        metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, needsHuman: 0, optOut: 0 },
+        metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
         conversations: []
       });
       return;
@@ -3799,6 +3975,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
         contacted: conversations.filter((conversation) => (conversation.messages || []).some((message) => message.direction === 'OUTBOUND')).length,
         leadReplies: summarized.filter((conversation) => conversation.hasLeadReply).length,
         aiReplies: summarized.filter((conversation) => conversation.aiCount > 0).length,
+        acceptedVisits: summarized.filter((conversation) => conversation.delivery?.accepted).length,
         needsHuman: summarized.filter((conversation) => conversation.classification?.label === 'Encaminhar humano').length,
         optOut: summarized.filter((conversation) => conversation.classification?.label === 'Opt-out').length
       },
@@ -3809,7 +3986,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
     response.status(500).json({
       agent: gptMakerConfig(),
       training: gptMakerTrainingStatus(),
-      metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, needsHuman: 0, optOut: 0 },
+      metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
       conversations: [],
       message: 'Nao foi possivel carregar o resumo da Ana.'
     });

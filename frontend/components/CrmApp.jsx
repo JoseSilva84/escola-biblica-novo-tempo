@@ -8159,10 +8159,10 @@ function ConversationsView({ records = [] }) {
   const [newContactMode, setNewContactMode] = useState(false);
   const [newContactSaving, setNewContactSaving] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', phone: '', district: '', priority: '' });
-  const [messageText, setMessageText] = useState('Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?');
   const [messageAttachment, setMessageAttachment] = useState(null);
   const [messageAiReplyEnabled, setMessageAiReplyEnabled] = useState(false);
   const chatEndRef = useRef(null);
+  const messageTextRef = useRef(null);
   const attachmentInputRef = useRef(null);
   const activePhoneRef = useRef('');
   const lastSeenMessageIdRef = useRef(null);
@@ -8890,7 +8890,7 @@ function ConversationsView({ records = [] }) {
   async function submitMessage(event) {
     event.preventDefault();
     const phone = activePhone;
-    const message = messageText.trim();
+    const message = String(messageTextRef.current?.value || '').trim();
     if (!phone || (!message && !messageAttachment)) {
       toast.error('Informe o destinatário e digite um texto ou anexe uma mídia');
       return;
@@ -8923,7 +8923,7 @@ function ConversationsView({ records = [] }) {
         throw error;
       }
       appendOptimisticOutboundMessage({ ...payload, aiReplyEnabled: messageAiReplyEnabled }, phone, message || mediaPayload?.fileName || '[anexo]');
-      setMessageText('');
+      if (messageTextRef.current) messageTextRef.current.value = '';
       setMessageAttachment(null);
       if (attachmentInputRef.current) attachmentInputRef.current.value = '';
       setSending(false);
@@ -9153,15 +9153,15 @@ function ConversationsView({ records = [] }) {
           <form className={`whatsapp-composer grid gap-3 border-t border-[#d1d7db] bg-[#f0f2f5] p-4 ${conversationExpanded ? 'px-7 py-5 shadow-[0_-16px_50px_rgba(11,20,26,0.10)] max-md:px-4' : ''}`} onSubmit={submitMessage}>
             <textarea
               className="min-h-20 resize-none rounded-2xl border border-[#d1d7db] bg-white px-4 py-3 text-sm font-semibold leading-relaxed text-[#111b21] outline-none placeholder:text-[#667781] focus:border-[#00a884] focus:ring-4 focus:ring-[#00a884]/10"
+              defaultValue="Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?"
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();
-                  if (!sending && activePhone && (messageText.trim() || messageAttachment)) event.currentTarget.form?.requestSubmit();
+                  if (!sending && activePhone && (event.currentTarget.value.trim() || messageAttachment)) event.currentTarget.form?.requestSubmit();
                 }
               }}
-              onChange={(event) => setMessageText(event.target.value)}
               placeholder="Digite o texto"
-              value={messageText}
+              ref={messageTextRef}
             />
             {messageAttachment ? (
               <div className="flex items-center justify-between gap-3 rounded-xl border border-[#00a884]/25 bg-[#d9fdd3] px-3 py-2 text-xs font-bold text-[#006c5b]">
@@ -9189,7 +9189,7 @@ function ConversationsView({ records = [] }) {
                 </button>
                 <span className="text-[11px] font-semibold text-slate-500 max-md:hidden">Enter envia · Shift+Enter quebra a linha</span>
               </div>
-              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#25d366,#00a884,#075e54)] px-5 text-sm font-black text-white shadow-[0_14px_34px_rgba(0,168,132,0.26)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60" disabled={sending || !activePhone || (!messageText.trim() && !messageAttachment)} type="submit">
+              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#25d366,#00a884,#075e54)] px-5 text-sm font-black text-white shadow-[0_14px_34px_rgba(0,168,132,0.26)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60" disabled={sending || !activePhone} type="submit">
                 <Send size={18} />
                 {sending ? 'Enviando...' : 'Enviar'}
               </button>
@@ -9296,6 +9296,7 @@ function ConversationsView({ records = [] }) {
 function AIAgentView({ associations = [], campaigns = [], data, records = [], onNavigate }) {
   const [tab, setTab] = useState('overview');
   const [selectedReviewLead, setSelectedReviewLead] = useState(null);
+  const [selectedAcceptedConversation, setSelectedAcceptedConversation] = useState(null);
   const [anaSummary, setAnaSummary] = useState(null);
   const [anaLoading, setAnaLoading] = useState(true);
   const hotWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
@@ -9303,6 +9304,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const vipWhatsapp = records.filter((lead) => lead.t && lead.v).length;
   const anaMetrics = anaSummary?.metrics || {};
   const anaConversations = anaSummary?.conversations || [];
+  const acceptedConversations = anaConversations.filter((conversation) => conversation.delivery?.accepted);
   const anaTraining = anaSummary?.training || null;
   const anaAgent = anaSummary?.agent || null;
   const active = Boolean(anaAgent?.configured && anaAgent?.autoReplyEnabled);
@@ -9406,11 +9408,12 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
         </div>
       </section>
 
-      <section className="grid grid-cols-5 gap-4 max-xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
+      <section className="grid grid-cols-6 gap-4 max-2xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
         <MetricCard detail={anaAgent?.configured ? 'agente do GPT Maker' : 'configure o GPT Maker'} icon={WandSparkles} label="Ana" tone={anaAgent?.configured ? 'green' : 'violet'} value={anaAgent?.configured ? 'Pronta' : 'Pendente'} />
         <MetricCard detail="com resposta ou IA" icon={MessageCircle} label="Conversas" tone="green" value={anaLoading ? '...' : formatNumber(anaMetrics.conversations || 0)} />
         <MetricCard detail="entraram em contato" icon={ClipboardList} label="Respostas" tone="orange" value={anaLoading ? '...' : formatNumber(anaMetrics.leadReplies || 0)} />
         <MetricCard detail="mensagens da Ana" icon={Sparkles} label="IA respondeu" tone="violet" value={anaLoading ? '...' : formatNumber(anaMetrics.aiReplies || 0)} />
+        <MetricCard detail="confirmaram o recebimento" icon={CheckCircle2} label="Aceitaram visita" tone="green" value={anaLoading ? '...' : formatNumber(anaMetrics.acceptedVisits || 0)} />
         <MetricCard detail="gerenciado no GPT Maker" icon={ShieldCheck} label="Treinamento" value={anaTraining?.loaded ? 'Conectado' : 'Pendente'} />
       </section>
 
@@ -9430,7 +9433,38 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
       </section>
 
       {tab === 'overview' ? (
-        <section className="grid grid-cols-[1fr_0.85fr] gap-4 max-xl:grid-cols-1">
+        <div className="grid gap-4">
+          <section className={`${panelClass} p-6`}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className={labelClass}>Visitas confirmadas</span>
+                <h2 className="mt-2 text-2xl font-black text-slate-50">Pessoas que aceitaram</h2>
+              </div>
+              <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-lg bg-emerald-600 px-3 text-lg font-black text-white">
+                {formatNumber(acceptedConversations.length)}
+              </span>
+            </div>
+            <div className="mt-5 max-h-80 divide-y divide-slate-200 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+              {acceptedConversations.length ? acceptedConversations.map((conversation) => (
+                <button
+                  className="grid w-full grid-cols-[1fr_auto] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-emerald-50 focus:bg-emerald-50 focus:outline-none"
+                  key={conversation.id}
+                  onClick={() => setSelectedAcceptedConversation(conversation)}
+                  type="button"
+                >
+                  <span className="min-w-0">
+                    <strong className="block truncate text-sm font-black text-slate-950">{conversation.leadName}</strong>
+                    <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{conversation.delivery?.address || 'Endereço não informado'}</span>
+                  </span>
+                  <ChevronRight className="text-emerald-700" size={18} />
+                </button>
+              )) : (
+                <p className="p-5 text-sm font-semibold text-slate-600">Nenhuma visita confirmada até o momento.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="grid grid-cols-[1fr_0.85fr] gap-4 max-xl:grid-cols-1">
           <article className={`${panelClass} p-6`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -9490,7 +9524,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
               </div>
             </div>
           </article>
-        </section>
+          </section>
+        </div>
       ) : null}
 
       {tab === 'agent' ? (
@@ -9631,6 +9666,39 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             </article>
           ))}
         </section>
+      ) : null}
+
+      {selectedAcceptedConversation ? createPortal(
+        <div className="fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="accepted-visit-title">
+          <button aria-label="Fechar detalhes" className="absolute inset-0 cursor-default" onClick={() => setSelectedAcceptedConversation(null)} type="button" />
+          <section className="relative w-full max-w-lg overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-950 shadow-[0_28px_80px_rgba(0,0,0,0.35)]">
+            <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Visita aceita</span>
+                <h2 className="mt-1 text-xl font-black" id="accepted-visit-title">{selectedAcceptedConversation.leadName}</h2>
+              </div>
+              <button aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100" onClick={() => setSelectedAcceptedConversation(null)} type="button"><X size={18} /></button>
+            </header>
+            <div className="grid gap-4 p-5">
+              <div className="grid grid-cols-[auto_1fr] gap-3 border-b border-slate-200 pb-4">
+                <MapPin className="mt-0.5 text-emerald-700" size={20} />
+                <div>
+                  <span className="block text-xs font-black uppercase text-slate-500">Endereço para a visita</span>
+                  <strong className="mt-1 block text-base leading-relaxed">{selectedAcceptedConversation.delivery?.address || 'Endereço ainda não informado'}</strong>
+                  <span className="mt-1 block text-xs font-semibold text-slate-500">{selectedAcceptedConversation.delivery?.addressSource}</span>
+                </div>
+              </div>
+              <div className="text-sm font-semibold text-slate-600">
+                {selectedAcceptedConversation.district} · {selectedAcceptedConversation.phone}
+              </div>
+              <button className={primaryButtonClass} onClick={() => {
+                setSelectedAcceptedConversation(null);
+                openAnaConversation(selectedAcceptedConversation);
+              }} type="button"><MessageCircle size={17} /> Abrir conversa</button>
+            </div>
+          </section>
+        </div>,
+        document.body
       ) : null}
     </div>
   );
@@ -10525,7 +10593,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
       user={user}
     >
       {viewTransitionPending ? (
-        <div className="fixed left-1/2 top-3 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-full border border-blue-200/70 bg-white/95 px-4 py-2 text-xs font-black text-blue-800 shadow-[0_14px_34px_rgba(15,23,42,0.18)] backdrop-blur" role="status" aria-live="polite">
+        <div className="fixed left-1/2 top-1/2 z-[2147483647] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-lg border border-blue-200 bg-white px-5 py-3 text-sm font-black text-blue-800 shadow-[0_20px_60px_rgba(15,23,42,0.24)]" role="status" aria-live="polite">
           <span className="h-2 w-2 animate-pulse rounded-full bg-blue-600" />
           Abrindo página…
         </div>

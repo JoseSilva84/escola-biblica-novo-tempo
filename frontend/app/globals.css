@@ -1944,4 +1944,24 @@ html[data-crm-theme='light'] .campaign-briefing-modal .campaign-submit {
       transition: none;
     }
   }
+
+  /* Keep the operational CRM responsive on machines with integrated graphics. */
+  .silver-stage::before,
+  .silver-stage::after {
+    animation: none !important;
+  }
+
+  .app-light .premium-panel,
+  .app-dark .premium-panel,
+  .app-light .sidebar-shell,
+  .app-dark .sidebar-shell,
+  .app-light .app-header-glass,
+  .app-dark .app-header-glass,
+  .app-light .app-header-control,
+  .app-dark .app-header-control,
+  .theme-modal-backdrop,
+  .theme-modal-surface {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 }
