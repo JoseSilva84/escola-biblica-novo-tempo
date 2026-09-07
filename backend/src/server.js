@@ -4252,7 +4252,7 @@ app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
 
 app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
   const recipients = Array.isArray(request.body?.recipients) ? request.body.recipients.slice(0, 50) : [];
-  const message = request.body?.message;
+  const message = String(request.body?.message || '').trim();
   const listName = String(request.body?.listName || '').trim().slice(0, 120);
   const broadcastId = String(request.body?.broadcastId || '').trim().slice(0, 120) || randomUUID();
   const recipientTotal = Math.max(Number(request.body?.recipientTotal) || recipients.length, recipients.length);
@@ -4264,113 +4264,87 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
     response.status(400).json({ ok: false, message: 'Informe o nome da transmissao.' });
     return;
   }
+  if (message.length < 2) {
+    response.status(400).json({ ok: false, message: 'Informe a mensagem da transmissao.' });
+    return;
+  }
 
   const results = [];
-  const broadcast = await prisma.whatsAppBroadcast.upsert({
-    where: { broadcastKey: broadcastId },
-    create: {
-      broadcastKey: broadcastId,
-      name: listName,
-      messageTemplate: String(message || '').trim(),
-      recipientTotal,
-      createdById: request.user?.sub || null,
-      createdByName: request.user?.email || request.user?.name || request.user?.sub || 'Sistema'
-    },
-    update: {
-      name: listName,
-      messageTemplate: String(message || '').trim(),
-      recipientTotal: Math.max(recipientTotal, recipients.length)
-    }
-  });
+  const warnings = [];
+  const configuredDelay = Number(process.env.WAHA_BROADCAST_DELAY_MS);
+  const broadcastDelayMs = Number.isFinite(configuredDelay)
+    ? Math.min(Math.max(configuredDelay, 250), 10000)
+    : 1200;
+  let broadcast = null;
+  try {
+    broadcast = await prisma.whatsAppBroadcast.upsert({
+      where: { broadcastKey: broadcastId },
+      create: {
+        broadcastKey: broadcastId,
+        name: listName,
+        messageTemplate: message,
+        recipientTotal,
+        createdById: request.user?.sub || null,
+        createdByName: request.user?.email || request.user?.name || request.user?.sub || 'Sistema'
+      },
+      update: {
+        name: listName,
+        messageTemplate: message,
+        recipientTotal: Math.max(recipientTotal, recipients.length)
+      }
+    });
+  } catch (error) {
+    warnings.push('O envio continuou, mas o historico da lista nao pode ser criado.');
+    console.warn('[whatsapp:broadcast:tracking:error]', error.message);
+  }
 
-  for (const recipient of recipients) {
+  for (let index = 0; index < recipients.length; index += 1) {
+    const recipient = recipients[index];
     const phone = recipient.phone || recipient.tel || recipient;
     const normalizedPhone = normalizePhone(phone);
     const personalizedMessage = renderWhatsAppTemplate(message, recipient);
-    const recipientRecord = await prisma.whatsAppBroadcastRecipient.upsert({
-      where: { broadcastId_phone: { broadcastId: broadcast.id, phone: normalizedPhone || String(phone) } },
-      create: {
-        broadcastId: broadcast.id,
-        leadId: recipient.leadId || recipient.id || null,
-        externalLeadId: Number.isFinite(Number(recipient.externalLeadId)) ? Number(recipient.externalLeadId) : null,
-        leadName: recipient.name || null,
-        phone: normalizedPhone || String(phone),
-        district: recipient.district || null,
-        material: recipient.material || recipient.theme || null,
-        personalizedMessage,
-        status: 'PENDENTE'
-      },
-      update: {
-        leadId: recipient.leadId || recipient.id || null,
-        externalLeadId: Number.isFinite(Number(recipient.externalLeadId)) ? Number(recipient.externalLeadId) : null,
-        leadName: recipient.name || null,
-        district: recipient.district || null,
-        material: recipient.material || recipient.theme || null,
-        personalizedMessage,
-        status: 'PENDENTE',
-        error: null
-      }
-    });
+    let recipientRecord = null;
+    if (broadcast) {
+      recipientRecord = await prisma.whatsAppBroadcastRecipient.upsert({
+        where: { broadcastId_phone: { broadcastId: broadcast.id, phone: normalizedPhone || String(phone) } },
+        create: {
+          broadcastId: broadcast.id,
+          leadId: recipient.leadId || recipient.id || null,
+          externalLeadId: Number.isFinite(Number(recipient.externalLeadId)) ? Number(recipient.externalLeadId) : null,
+          leadName: recipient.name || null,
+          phone: normalizedPhone || String(phone),
+          district: recipient.district || null,
+          material: recipient.material || recipient.theme || null,
+          personalizedMessage,
+          status: 'PENDENTE'
+        },
+        update: {
+          leadId: recipient.leadId || recipient.id || null,
+          externalLeadId: Number.isFinite(Number(recipient.externalLeadId)) ? Number(recipient.externalLeadId) : null,
+          leadName: recipient.name || null,
+          district: recipient.district || null,
+          material: recipient.material || recipient.theme || null,
+          personalizedMessage,
+          status: 'PENDENTE',
+          error: null
+        }
+      }).catch((error) => {
+        console.warn('[whatsapp:broadcast:recipient-tracking:error]', error.message);
+        return null;
+      });
+    }
+
+    let result = null;
     try {
-      const result = await sendWhatsAppTextMessage({
+      result = await sendWhatsAppTextMessage({
         phone,
         message: personalizedMessage,
         leadId: recipient.leadId || recipient.id || null,
         templateId: request.body?.templateId || null
       });
-      const saved = await recordWhatsAppMessage({
-        phone: result.phone,
-        body: personalizedMessage,
-        direction: 'OUTBOUND',
-        senderType: request.body?.senderType || 'USER',
-        senderName: request.user?.email || request.user?.sub || 'Sistema',
-        leadId: recipient.leadId || recipient.id || null,
-        leadName: recipient.name || null,
-        district: recipient.district || null,
-        provider: result.provider,
-        providerStatus: result.deliveryStatus,
-        providerResponse: result.providerResponse,
-        providerMessageId: providerMessageId(result.providerResponse),
-        metadata: {
-          templateId: request.body?.templateId || null,
-          batch: true,
-          broadcastId,
-          listName,
-          recipientTotal,
-          templateMessage: message,
-          material: recipient.material || recipient.theme || null,
-          theme: recipient.theme || recipient.material || null,
-          leadAddress: recipient.address || null,
-          attempts: result.attempts || []
-        }
-      });
-      await addGptMakerContext({
-        phone: result.phone,
-        message: personalizedMessage,
-        role: 'assistant'
-      }).catch((error) => console.warn('[gptmaker:add-context:error]', error.message));
-      await prisma.whatsAppBroadcastRecipient.update({
-        where: { id: recipientRecord.id },
-        data: {
-          status: 'ENVIADO',
-          deliveryStatus: result.deliveryStatus,
-          conversationId: saved?.conversation?.id || null,
-          messageId: saved?.message?.id || null,
-          sentAt: new Date(),
-          error: null
-        }
-      });
-      results.push({
-        ok: true,
-        phone: result.phone,
-        leadId: recipient.leadId || recipient.id || null,
-        deliveryStatus: result.deliveryStatus,
-        conversationId: saved?.conversation?.id || null,
-        messageId: saved?.message?.id || null
-      });
     } catch (error) {
       const failed = await recordWhatsAppMessage({
-        phone: recipient.phone || recipient.tel || recipient,
+        phone,
         body: personalizedMessage,
         direction: 'OUTBOUND',
         senderType: request.body?.senderType || 'USER',
@@ -4378,7 +4352,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         leadId: recipient.leadId || recipient.id || null,
         leadName: recipient.name || null,
         district: recipient.district || null,
-        provider: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
+        provider: 'waha-gows',
         providerStatus: error.deliveryStatus || 'FAILED',
         providerResponse: error.providerResponse || null,
         metadata: {
@@ -4394,25 +4368,93 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
           attempts: error.providerAttempts || []
         }
       }).catch(() => null);
-      await prisma.whatsAppBroadcastRecipient.update({
-        where: { id: recipientRecord.id },
-        data: {
-          status: 'FALHA',
-          deliveryStatus: error.deliveryStatus || 'FAILED',
-          conversationId: failed?.conversation?.id || null,
-          messageId: failed?.message?.id || null,
-          error: error.message || 'Falha no envio'
-        }
-      });
+      if (recipientRecord) {
+        await prisma.whatsAppBroadcastRecipient.update({
+          where: { id: recipientRecord.id },
+          data: {
+            status: 'FALHA',
+            deliveryStatus: error.deliveryStatus || 'FAILED',
+            conversationId: failed?.conversation?.id || null,
+            messageId: failed?.message?.id || null,
+            error: error.message || 'Falha no envio'
+          }
+        }).catch(() => null);
+      }
       results.push({
         ok: false,
-        phone,
+        phone: normalizedPhone || String(phone),
         leadId: recipient.leadId || recipient.id || null,
         message: error.message,
         deliveryStatus: error.deliveryStatus || 'FAILED',
         conversationId: failed?.conversation?.id || null,
         messageId: failed?.message?.id || null
       });
+    }
+
+    if (result) {
+      let saved = null;
+      try {
+        saved = await recordWhatsAppMessage({
+          phone: result.phone,
+          body: personalizedMessage,
+          direction: 'OUTBOUND',
+          senderType: request.body?.senderType || 'USER',
+          senderName: request.user?.email || request.user?.sub || 'Sistema',
+          leadId: recipient.leadId || recipient.id || null,
+          leadName: recipient.name || null,
+          district: recipient.district || null,
+          provider: result.provider,
+          providerStatus: result.deliveryStatus,
+          providerResponse: result.providerResponse,
+          providerMessageId: providerMessageId(result.providerResponse),
+          metadata: {
+            templateId: request.body?.templateId || null,
+            batch: true,
+            broadcastId,
+            listName,
+            recipientTotal,
+            templateMessage: message,
+            material: recipient.material || recipient.theme || null,
+            theme: recipient.theme || recipient.material || null,
+            leadAddress: recipient.address || null,
+            attempts: result.attempts || []
+          }
+        });
+      } catch (error) {
+        warnings.push('Algumas mensagens foram enviadas, mas nao puderam ser salvas no historico.');
+        console.warn('[whatsapp:broadcast:message-tracking:error]', error.message);
+      }
+      await addGptMakerContext({
+        phone: result.phone,
+        message: personalizedMessage,
+        role: 'assistant'
+      }).catch((error) => console.warn('[gptmaker:add-context:error]', error.message));
+      if (recipientRecord) {
+        await prisma.whatsAppBroadcastRecipient.update({
+          where: { id: recipientRecord.id },
+          data: {
+            status: 'ENVIADO',
+            deliveryStatus: result.deliveryStatus,
+            conversationId: saved?.conversation?.id || null,
+            messageId: saved?.message?.id || null,
+            sentAt: new Date(),
+            error: null
+          }
+        }).catch((error) => console.warn('[whatsapp:broadcast:recipient-update:error]', error.message));
+      }
+      results.push({
+        ok: true,
+        phone: result.phone,
+        leadId: recipient.leadId || recipient.id || null,
+        deliveryStatus: result.deliveryStatus,
+        conversationId: saved?.conversation?.id || null,
+        messageId: saved?.message?.id || null
+      });
+    }
+
+    if (index < recipients.length - 1) {
+      const jitterMs = Math.floor(Math.random() * 350);
+      await sleep(broadcastDelayMs + jitterMs);
     }
   }
 
@@ -4431,6 +4473,9 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
     total: results.length,
     sent,
     failed,
+    delayMs: broadcastDelayMs,
+    trackingSaved: Boolean(broadcast),
+    warnings: Array.from(new Set(warnings)),
     results
   });
 });

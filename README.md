@@ -140,6 +140,11 @@ Rotas internas do Amigos NT para disparo:
 - `POST /api/whatsapp/send`
 - `POST /api/whatsapp/send-batch`
 
+O disparo em massa usa a mesma rota de envio individual do WAHA. A interface divide
+listas grandes em grupos de 10 e o backend aguarda entre os destinatarios para evitar
+rajadas. O intervalo pode ser ajustado por `WAHA_BROADCAST_DELAY_MS` (padrao: 1200 ms).
+Uma falha ao salvar o historico da transmissao nao cancela mensagens ja aceitas pelo WAHA.
+
 ## Frontend
 
 Entre na pasta do frontend:

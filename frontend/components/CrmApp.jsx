@@ -6509,25 +6509,45 @@ function AdminGeneralView({
     setBatchLoading(true);
     setLastBatch(null);
     try {
-      const response = await apiFetch('/api/whatsapp/send-batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipients,
-          message,
-          listName: `Lote WhatsApp ${new Date().toLocaleDateString('pt-BR')}`,
-          broadcastId: globalThis.crypto?.randomUUID?.() || `batch-${Date.now()}`,
-          recipientTotal: recipients.length
-        })
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.message || 'Nao foi possivel enviar o lote.');
+      const listName = `Lote WhatsApp ${new Date().toLocaleDateString('pt-BR')}`;
+      const broadcastId = globalThis.crypto?.randomUUID?.() || `batch-${Date.now()}`;
+      const totals = { sent: 0, failed: 0, results: [], warnings: [] };
+      for (let index = 0; index < recipients.length; index += 10) {
+        const chunk = recipients.slice(index, index + 10);
+        const response = await apiFetch('/api/whatsapp/send-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipients: chunk,
+            message,
+            listName,
+            broadcastId,
+            recipientTotal: recipients.length
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok || payload.ok === false) {
+          const firstFailure = Array.isArray(payload.results)
+            ? payload.results.find((item) => !item.ok)
+            : null;
+          throw new Error(payload.message || firstFailure?.message || 'Nao foi possivel enviar o lote.');
+        }
+        totals.sent += payload.sent || 0;
+        totals.failed += payload.failed || 0;
+        totals.results.push(...(payload.results || []));
+        totals.warnings.push(...(payload.warnings || []));
       }
-      setLastBatch(payload);
+      setLastBatch({
+        ok: totals.sent > 0,
+        total: totals.results.length,
+        sent: totals.sent,
+        failed: totals.failed,
+        results: totals.results,
+        warnings: Array.from(new Set(totals.warnings))
+      });
       await refreshWhatsappConversations({ sync: true });
       toast.success('Lote enviado', {
-        description: `${payload.sent || 0} mensagens aceitas pelo provedor.`
+        description: `${totals.sent} mensagens aceitas pelo provedor${totals.failed ? ` e ${totals.failed} com falha` : ''}.`
       });
     } catch (error) {
       toast.error('Falha no lote', {
@@ -8276,8 +8296,8 @@ function ConversationsView({ records = [] }) {
       const totals = { sent: 0, failed: 0 };
       const broadcastId = globalThis.crypto?.randomUUID?.()
         || `broadcast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      for (let index = 0; index < recipients.length; index += 50) {
-        const chunk = recipients.slice(index, index + 50);
+      for (let index = 0; index < recipients.length; index += 10) {
+        const chunk = recipients.slice(index, index + 10);
         const response = await apiFetch('/api/whatsapp/send-batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
