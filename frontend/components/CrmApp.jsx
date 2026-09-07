@@ -9438,6 +9438,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const [selectedGroupConversation, setSelectedGroupConversation] = useState(null);
   const [exportingGroupKey, setExportingGroupKey] = useState('');
   const [anaSummary, setAnaSummary] = useState(null);
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
   const [anaLoading, setAnaLoading] = useState(true);
   const hotWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
   const studyWhatsapp = records.filter((lead) => lead.t && lead.e).length;
@@ -9532,7 +9533,82 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
       };
     });
   }, [anaConversations]);
-  const largestRequestAgeBucket = Math.max(1, ...requestAgeBuckets.map((bucket) => Number(bucket.count) || 0));
+
+  // ── District filter computed values ──────────────────────────────────────
+  const districtNames = useMemo(() => {
+    const ds = new Set();
+    for (const c of anaConversations) {
+      if (c.district && c.district !== 'Distrito não vinculado') ds.add(c.district);
+    }
+    return Array.from(ds).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [anaConversations]);
+
+  const districtStats = useMemo(() => districtNames.map((district) => {
+    const dc = anaConversations.filter((c) => c.district === district);
+    const responded = dc.filter((c) => c.hasLeadReply).length;
+    const accepted = dc.filter((c) => c.delivery?.accepted).length;
+    const pct = (a, b) => (b > 0 ? Number(((a / b) * 100).toFixed(1)) : 0);
+    return { name: district, total: dc.length, responded, accepted, responseRate: pct(responded, dc.length), conversionRate: pct(accepted, responded) };
+  }), [districtNames, anaConversations]);
+
+  const filteredConversations = useMemo(() => (
+    selectedDistrict ? anaConversations.filter((c) => c.district === selectedDistrict) : anaConversations
+  ), [anaConversations, selectedDistrict]);
+
+  const filteredAcceptedConversations = useMemo(() => (
+    selectedDistrict ? acceptedConversations.filter((c) => c.district === selectedDistrict) : acceptedConversations
+  ), [acceptedConversations, selectedDistrict]);
+
+  const filteredFunnel = useMemo(() => {
+    if (!selectedDistrict) return anaFunnel;
+    const dc = filteredConversations;
+    const total = dc.length;
+    const responded = dc.filter((c) => c.hasLeadReply).length;
+    const converted = dc.filter((c) => c.delivery?.accepted).length;
+    const pct = (a, b) => (b > 0 ? Number(((a / b) * 100).toFixed(1)) : 0);
+    return { ...anaFunnel, dispatches: total, responses: responded, conversions: converted, responseRate: pct(responded, total), conversionRate: pct(converted, responded), overallConversionRate: pct(converted, total) };
+  }, [anaFunnel, filteredConversations, selectedDistrict]);
+
+  const filteredRequestAgeBuckets = useMemo(() => {
+    if (!selectedDistrict) return requestAgeBuckets;
+    const dc = filteredAcceptedConversations;
+    const counts = {};
+    let unknown = 0;
+    for (const c of dc) {
+      const bid = c.delivery?.requestAgeBucket;
+      if (bid) counts[bid] = (counts[bid] || 0) + 1;
+      else unknown++;
+    }
+    const total = dc.length;
+    const pct = (v) => (total > 0 ? Number(((v / total) * 100).toFixed(1)) : 0);
+    const base = requestAgeBuckets
+      .filter((b) => b.id !== 'unknown')
+      .map((b) => ({ ...b, count: counts[b.id] || 0, percentage: pct(counts[b.id] || 0) }));
+    if (unknown > 0) base.push({ id: 'unknown', label: 'Data não informada', count: unknown, percentage: pct(unknown) });
+    return base;
+  }, [requestAgeBuckets, filteredAcceptedConversations, selectedDistrict]);
+
+  const filteredConversationGroups = useMemo(() => {
+    if (!selectedDistrict) return anaConversationGroups;
+    return anaConversationGroups
+      .map((group) => ({ ...group, conversations: group.conversations.filter((c) => c.district === selectedDistrict) }))
+      .filter((group) => group.conversations.length > 0)
+      .map((group) => {
+        const districtCounts = new Map();
+        for (const c of group.conversations) {
+          const d = c.district || 'Distrito não vinculado';
+          districtCounts.set(d, (districtCounts.get(d) || 0) + 1);
+        }
+        return {
+          ...group,
+          districts: Array.from(districtCounts, ([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'pt-BR'))
+        };
+      });
+  }, [anaConversationGroups, selectedDistrict]);
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const largestRequestAgeBucket = Math.max(1, ...filteredRequestAgeBuckets.map((bucket) => Number(bucket.count) || 0));
   const anaTraining = anaSummary?.training || null;
   const anaAgent = anaSummary?.agent || null;
   const active = Boolean(anaAgent?.configured && anaAgent?.autoReplyEnabled);
@@ -9776,15 +9852,57 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
 
       {tab === 'overview' ? (
         <div className="grid gap-4">
+          {districtNames.length > 1 ? (
+            <section className={`${panelClass} p-6`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <span className={labelClass}>Filtrar por distrito</span>
+                  <h2 className="mt-1 text-xl font-black text-slate-50">
+                    {selectedDistrict ? `Distrito: ${selectedDistrict}` : 'Todos os distritos'}
+                  </h2>
+                </div>
+                {selectedDistrict ? (
+                  <button
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/20 px-4 text-xs font-black text-slate-300 transition hover:border-white/40 hover:text-white"
+                    onClick={() => setSelectedDistrict(null)}
+                    type="button"
+                  >
+                    <X size={13} /> Ver todos
+                  </button>
+                ) : null}
+              </div>
+              <div className="mt-4 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
+                {districtStats.map((stat) => {
+                  const isActive = selectedDistrict === stat.name;
+                  return (
+                    <button
+                      className={`grid items-start gap-1 rounded-xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${isActive ? 'border-blue-500 bg-blue-600 text-white shadow-[0_0_0_2px_rgba(37,99,235,0.4)]' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+                      key={stat.name}
+                      onClick={() => setSelectedDistrict(isActive ? null : stat.name)}
+                      type="button"
+                    >
+                      <strong className="block truncate text-sm font-black">{stat.name}</strong>
+                      <span className={`mt-2 block text-2xl font-black ${isActive ? 'text-white' : 'text-emerald-400'}`}>{formatNumber(stat.accepted)}</span>
+                      <span className={`text-[11px] font-bold ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>aceitaram a visita</span>
+                      <div className={`mt-3 grid grid-cols-2 gap-2 border-t pt-3 text-[11px] font-semibold ${isActive ? 'border-blue-400/30 text-blue-100' : 'border-white/10 text-slate-400'}`}>
+                        <span>{formatNumber(stat.responded)} responderam</span>
+                        <span>{formatNumber(stat.total)} abordados</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
           <section className="grid grid-cols-[0.9fr_1.1fr] gap-4 max-xl:grid-cols-1">
             <article className={`${panelClass} p-6`}>
               <span className={labelClass}>Desempenho do agente</span>
               <h2 className="mt-2 text-2xl font-black text-slate-50">Funil dos atendimentos</h2>
               <div className="mt-6 divide-y divide-white/10 border-y border-white/10">
                 {[
-                  ['Contatos abordados', anaFunnel.dispatches, `${formatNumber(anaFunnel.transmissions || 0)} transmissão(ões) registrada(s)`, Send],
-                  ['Pessoas que responderam', anaFunnel.responses, `${anaFunnel.responseRate || 0}% dos contatos abordados`, MessageCircle],
-                  ['Pessoas que aceitaram', anaFunnel.conversions, `${anaFunnel.conversionRate || 0}% das respostas`, CheckCircle2]
+                  ['Contatos abordados', filteredFunnel.dispatches, selectedDistrict ? `${formatNumber(filteredFunnel.dispatches || 0)} conversa(s) neste distrito` : `${formatNumber(anaFunnel.transmissions || 0)} transmissão(ões) registrada(s)`, Send],
+                  ['Pessoas que responderam', filteredFunnel.responses, `${filteredFunnel.responseRate || 0}% dos contatos abordados`, MessageCircle],
+                  ['Pessoas que aceitaram', filteredFunnel.conversions, `${filteredFunnel.conversionRate || 0}% das respostas`, CheckCircle2]
                 ].map(([label, value, detail, Icon]) => (
                   <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-4" key={label}>
                     <span className="grid h-10 w-10 place-items-center rounded-lg bg-white/10 text-slate-100"><Icon size={19} /></span>
@@ -9798,9 +9916,9 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
               </div>
               <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 text-center max-sm:grid-cols-1 max-sm:divide-x-0 max-sm:divide-y">
                 {[
-                  ['Resposta', anaFunnel.responseRate, 'respostas / contatos abordados'],
-                  ['Conversão', anaFunnel.conversionRate, 'conversões / respostas'],
-                  ['Conversão geral', anaFunnel.overallConversionRate, 'conversões / contatos abordados']
+                  ['Resposta', filteredFunnel.responseRate, 'respostas / contatos abordados'],
+                  ['Conversão', filteredFunnel.conversionRate, 'conversões / respostas'],
+                  ['Conversão geral', filteredFunnel.overallConversionRate, 'conversões / contatos abordados']
                 ].map(([label, value, detail]) => (
                   <div className="px-3 py-2" key={label}>
                     <span className="block text-[11px] font-black uppercase text-slate-400">{label}</span>
@@ -9816,7 +9934,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
               <h2 className="mt-2 text-2xl font-black text-slate-50">Da solicitação do material até a visita aceita</h2>
               <p className="mt-2 text-sm font-semibold text-slate-400">Quantidade e percentual das pessoas que aceitaram, separados pelo tempo desde o pedido do material.</p>
               <div className="mt-5 divide-y divide-white/10 border-y border-white/10">
-                {requestAgeBuckets.map((bucket) => (
+                {filteredRequestAgeBuckets.map((bucket) => (
                   <div className="grid grid-cols-[minmax(150px,1fr)_minmax(100px,1.2fr)_auto] items-center gap-3 py-2.5 max-sm:grid-cols-[1fr_auto]" key={bucket.id}>
                     <span className="text-xs font-bold text-slate-200">{bucket.label}</span>
                     <span className="h-2 overflow-hidden rounded-full bg-white/10 max-sm:col-span-2 max-sm:row-start-2">
@@ -9836,11 +9954,11 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 <h2 className="mt-2 text-2xl font-black text-slate-50">Pessoas que aceitaram</h2>
               </div>
               <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-lg bg-emerald-600 px-3 text-lg font-black text-white">
-                {formatNumber(acceptedConversations.length)}
+                {formatNumber(filteredAcceptedConversations.length)}
               </span>
             </div>
             <div className="mt-5 max-h-80 divide-y divide-slate-200 overflow-y-auto rounded-lg border border-slate-200 bg-white">
-              {acceptedConversations.length ? acceptedConversations.map((conversation) => (
+              {filteredAcceptedConversations.length ? filteredAcceptedConversations.map((conversation) => (
                 <button
                   className="grid w-full grid-cols-[1fr_auto] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-emerald-50 focus:bg-emerald-50 focus:outline-none"
                   key={conversation.id}
@@ -9882,7 +10000,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-bold text-slate-600 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
                   Carregando conversas da Ana...
                 </div>
-              ) : anaConversationGroups.length ? anaConversationGroups.map((group) => {
+              ) : filteredConversationGroups.length ? filteredConversationGroups.map((group) => {
                 const badgeClass = toneClasses[group.tone] || toneClasses.slate;
                 return (
                   <article className="rounded-lg border border-slate-200 bg-white p-4 text-slate-900 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={group.key}>
