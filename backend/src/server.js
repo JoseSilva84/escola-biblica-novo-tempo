@@ -2037,11 +2037,15 @@ function isAnaTestConversation(conversation = {}) {
 }
 
 function gptMakerClassification(messages = [], delivery = null) {
-  if (delivery?.deliveryConfirmed || (delivery?.accepted && delivery?.address)) {
-    return { label: 'Visita marcada', tone: 'green', action: 'Brinde aceito e endereço disponível para a entrega.', source: 'conversation' };
-  }
   if (delivery?.accepted) {
-    return { label: 'Aceitou a visita', tone: 'green', action: 'Solicitar o endereço uma única vez para concluir.', source: 'conversation' };
+    return {
+      label: 'Visita marcada',
+      tone: 'green',
+      action: delivery?.address
+        ? 'Brinde aceito e endereço disponível para a entrega.'
+        : 'Brinde aceito; obter ou confirmar o endereço para concluir a entrega.',
+      source: 'conversation'
+    };
   }
   if (delivery?.declined) {
     return { label: 'Não aceitou a visita', tone: 'red', action: 'Respeitar a recusa e encerrar a oferta.', source: 'conversation' };
@@ -2229,7 +2233,8 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
       pendingQuestion = null;
       continue;
     }
-    if (/(quero receber|pode entregar|aceito|gostaria de receber|pode trazer)/i.test(body)) {
+    const directlyAcceptedGift = /(quero receber|pode entregar|aceito|gostaria de receber|pode trazer|pode enviar|pode mandar|envie por favor)/i.test(body);
+    if (giftOffered && directlyAcceptedGift) {
       giftAccepted = true;
       acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
     } else if (pendingQuestion === 'GIFT_ACCEPTANCE' && isAffirmativeReply(body)) {
@@ -2247,6 +2252,37 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
       giftDeclined = true;
     }
     pendingQuestion = null;
+  }
+
+  // Provider events can arrive with identical timestamps or extra messages between
+  // a gift offer and its answer. Reconcile the dialogue in both directions so a
+  // contextual "sim", "ok" or "provavelmente sim" is not lost.
+  for (let index = 0; index < messages.length && !giftAccepted; index += 1) {
+    const message = messages[index];
+    if (message?.direction !== 'INBOUND') continue;
+    const body = String(message.body || '').trim();
+    if (!body || !isAffirmativeReply(body) || isNegativeReply(body)) continue;
+
+    const previousOutbound = messages
+      .slice(Math.max(0, index - 8), index)
+      .reverse()
+      .find((candidate) => candidate?.direction === 'OUTBOUND' && String(candidate.body || '').trim());
+    const nextOutbound = messages
+      .slice(index + 1, index + 5)
+      .find((candidate) => candidate?.direction === 'OUTBOUND' && String(candidate.body || '').trim());
+    const previousQuestion = anaDeliveryQuestion(previousOutbound?.body);
+    const nextQuestion = anaDeliveryQuestion(nextOutbound?.body);
+    const directlyReferencesGift = /(brinde|presente)/i.test(normalizedIntentName(body))
+      && /(quero receber|pode entregar|aceito|gostaria de receber|pode trazer|pode enviar|pode mandar|envie por favor)/i.test(body);
+    const followsGiftOffer = previousQuestion === 'GIFT_ACCEPTANCE';
+    const promptedAddressOrConfirmation = ['ADDRESS_REQUEST', 'ADDRESS_CONFIRMATION'].includes(nextQuestion)
+      || anaDeliveryWasConfirmed(nextOutbound?.body);
+
+    if (followsGiftOffer || promptedAddressOrConfirmation || directlyReferencesGift) {
+      giftAccepted = true;
+      giftOffered = true;
+      acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
+    }
   }
 
   const cleanStoredAddress = (value) => {
@@ -4434,13 +4470,17 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       include: {
         lead: { select: whatsappLeadSelect },
         messages: {
-          orderBy: { createdAt: 'asc' },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           take: 200
         }
       }
     });
 
-    const managedConversations = conversations.filter((conversation) => (
+    const chronologicalConversations = conversations.map((conversation) => ({
+      ...conversation,
+      messages: [...(conversation.messages || [])].reverse()
+    }));
+    const managedConversations = chronologicalConversations.filter((conversation) => (
       !isAnaTestConversation(conversation)
       && (conversation.messages || []).some(isGptMakerManagedMessage)
     ));
