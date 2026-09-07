@@ -1534,6 +1534,7 @@ async function recordWhatsAppMessage({
     where: { id: conversation.id },
     data: { updatedAt: occurredAt }
   }).catch(() => null);
+  invalidateAnaFunnelReportCache();
 
   if (!reconciled.created) {
     return { conversation, message, created: false };
@@ -1949,37 +1950,43 @@ function dedupeWhatsAppMessageList(messages = []) {
 }
 
 function classifyAnaConversation(messages = []) {
-  const inboundText = messages
-    .filter((message) => message.direction === 'INBOUND')
+  const inboundMessages = messages.filter((message) => message.direction === 'INBOUND');
+  const inboundText = inboundMessages
     .map((message) => message.body)
     .join(' ')
     .toLowerCase();
-  const outboundText = messages
-    .filter((message) => message.direction === 'OUTBOUND')
-    .map((message) => message.body)
-    .join(' ')
-    .toLowerCase();
-  const fullText = `${inboundText} ${outboundText}`;
 
-  if (/(parar|remover|cancelar|não quero|nao quero|sem interesse|sair)/i.test(fullText)) {
+  if (!inboundMessages.length) {
+    return { label: 'Sem resposta', tone: 'slate', action: 'Aguardar a resposta da pessoa.' };
+  }
+  if (/(parar|remover|cancelar|não quero|nao quero|sem interesse|sair)/i.test(inboundText)) {
     return { label: 'Opt-out', tone: 'red', action: 'Respeitar pedido e encerrar contato.' };
   }
-  if (/(suicid|me matar|morrer|desespero|abuso|violência|violencia|ameaça|ameaca|urgente)/i.test(fullText)) {
+  if (/(suicid|me matar|morrer|desespero|abuso|violência|violencia|ameaça|ameaca|urgente)/i.test(inboundText)) {
     return { label: 'Encaminhar humano', tone: 'red', action: 'Acionar responsável humano imediatamente.' };
   }
-  if (/(visita|igreja|endereço|endereco|pastor|missionário|missionario|voluntário|voluntario)/i.test(fullText)) {
+  if (/(visita|igreja|endereço|endereco|pastor|missionário|missionario|voluntário|voluntario)/i.test(inboundText)) {
     return { label: 'Visita/igreja', tone: 'green', action: 'Encaminhar para gestor ou voluntário.' };
   }
-  if (/(não recebi|nao recebi|ainda não|ainda nao|não chegou|nao chegou|mandar|envia|enviar)/i.test(fullText)) {
+  if (/(não recebi|nao recebi|ainda não|ainda nao|não chegou|nao chegou|mandar|envia|enviar)/i.test(inboundText)) {
     return { label: 'Enviar material', tone: 'orange', action: 'Oferecer ou reenviar o material solicitado.' };
   }
-  if (/(recebi|li|gostei|estudo|material|bíblia|biblia|oração|oracao|dúvida|duvida)/i.test(fullText)) {
+  if (/(recebi|li|gostei|estudo|material|bíblia|biblia|oração|oracao|dúvida|duvida)/i.test(inboundText)) {
     return { label: 'Acompanhar estudo', tone: 'blue', action: 'Continuar conversa acolhedora com base no tema.' };
   }
   return { label: 'Triagem', tone: 'slate', action: 'Classificar intenção antes da próxima resposta.' };
 }
 
-function gptMakerClassification(messages = []) {
+function gptMakerClassification(messages = [], delivery = null) {
+  if (delivery?.deliveryConfirmed || (delivery?.accepted && delivery?.address)) {
+    return { label: 'Visita marcada', tone: 'green', action: 'Brinde aceito e endereço disponível para a entrega.', source: 'conversation' };
+  }
+  if (delivery?.accepted) {
+    return { label: 'Aceitou a visita', tone: 'green', action: 'Solicitar o endereço uma única vez para concluir.', source: 'conversation' };
+  }
+  if (delivery?.declined) {
+    return { label: 'Não aceitou a visita', tone: 'red', action: 'Respeitar a recusa e encerrar a oferta.', source: 'conversation' };
+  }
   const qualificationMessage = [...messages].reverse().find((message) => {
     const metadata = message?.metadata;
     return metadata && typeof metadata === 'object' && (
@@ -1994,13 +2001,8 @@ function gptMakerClassification(messages = []) {
   const actionCode = String(metadata.gptMakerAction || '').trim();
   const normalized = normalizedIntentName(`${rawLabel} ${actionCode}`);
 
-  if (!rawLabel && !actionCode) {
-    return {
-      label: 'Aguardando GPT Maker',
-      tone: 'slate',
-      action: 'Aguardar a qualificacao enviada pelo agente do GPT Maker.',
-      source: 'gpt-maker'
-    };
+  if ((!rawLabel && !actionCode) || /aguardando gpt maker/i.test(normalized)) {
+    return { ...classifyAnaConversation(messages), source: 'conversation' };
   }
   if (/(opt.?out|encerrar contato|finalizar contato|end_contact)/i.test(normalized)) {
     return { label: 'Opt-out', tone: 'red', action: 'Respeitar pedido e encerrar contato.', source: 'gpt-maker' };
@@ -2068,6 +2070,7 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
   const messages = conversation?.messages || [];
   let pendingQuestion = null;
   let giftAccepted = false;
+  let giftDeclined = false;
   let acceptedAt = null;
   let typedAddress = '';
   let addressConfirmed = false;
@@ -2089,6 +2092,8 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     if (informedAddress) {
       typedAddress = informedAddress;
       addressConfirmed = true;
+      giftAccepted = true;
+      acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
       pendingQuestion = null;
       continue;
     }
@@ -2101,6 +2106,11 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     }
     if (pendingQuestion === 'ADDRESS_CONFIRMATION' && isAffirmativeReply(body)) {
       addressConfirmed = true;
+      giftAccepted = true;
+      acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
+    }
+    if (pendingQuestion === 'GIFT_ACCEPTANCE' && isNegativeReply(body)) {
+      giftDeclined = true;
     }
     pendingQuestion = null;
   }
@@ -2122,6 +2132,7 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
 
   return {
     accepted: giftAccepted,
+    declined: giftDeclined && !giftAccepted,
     acceptedAt,
     address: address || null,
     addressSource,
@@ -2137,43 +2148,99 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
 
 let anaFunnelReportCache = { expiresAt: 0, value: null };
 
+function invalidateAnaFunnelReportCache() {
+  anaFunnelReportCache = { expiresAt: 0, value: null };
+}
+
 async function trackedAnaFunnelReport(dashboardRecordsById) {
   if (anaFunnelReportCache.expiresAt > Date.now()) return anaFunnelReportCache.value;
 
   const recipients = await prisma.whatsAppBroadcastRecipient.findMany({
-    where: { status: 'ENVIADO' },
     orderBy: { createdAt: 'asc' },
     select: {
+      id: true,
       conversationId: true,
       leadId: true,
       externalLeadId: true,
       leadName: true,
       phone: true,
       district: true,
+      status: true,
+      deliveryStatus: true,
       sentAt: true,
-      createdAt: true
+      createdAt: true,
+      broadcast: { select: { broadcastKey: true, name: true, createdAt: true } }
     }
   });
-  const tracked = recipients.filter((recipient) => recipient.conversationId);
-  if (!recipients.length || !tracked.length) {
+  const chronologicalBroadcasts = Array.from(new Map(recipients.map((recipient) => [recipient.broadcast.broadcastKey, recipient.broadcast])).values())
+    .sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
+  const requestedCutoff = chronologicalBroadcasts.find((broadcast) => normalizedIntentName(broadcast.name) === 'teste disparo');
+  const relevantRecipients = requestedCutoff
+    ? recipients.filter((recipient) => new Date(recipient.broadcast.createdAt) >= new Date(requestedCutoff.createdAt))
+    : recipients;
+  if (!relevantRecipients.length) {
     anaFunnelReportCache = { expiresAt: Date.now() + 30_000, value: null };
     return null;
   }
 
+  const earliestBroadcastAt = relevantRecipients.reduce((earliest, recipient) => (
+    new Date(recipient.broadcast.createdAt) < earliest ? new Date(recipient.broadcast.createdAt) : earliest
+  ), new Date(relevantRecipients[0].broadcast.createdAt));
+  const relevantBroadcastIds = new Set(relevantRecipients.map((recipient) => recipient.broadcast.broadcastKey));
+  const actualBroadcastMessages = await prisma.whatsAppMessage.findMany({
+    where: { direction: 'OUTBOUND', createdAt: { gte: earliestBroadcastAt } },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      conversationId: true,
+      leadId: true,
+      externalLeadId: true,
+      providerStatus: true,
+      metadata: true,
+      sentAt: true,
+      createdAt: true,
+      conversation: { select: { phone: true, leadName: true, district: true } }
+    }
+  });
+  const recipientsByBroadcastPhone = new Map(relevantRecipients.map((recipient) => [
+    `${recipient.broadcast.broadcastKey}:${normalizePhone(recipient.phone)}`,
+    recipient
+  ]));
+  const successfulDispatches = new Map();
+  for (const messageItem of actualBroadcastMessages) {
+    const broadcastId = String(messageItem.metadata?.broadcastId || '');
+    const providerStatus = String(messageItem.providerStatus || '').toUpperCase();
+    if (!messageItem.metadata?.batch || !relevantBroadcastIds.has(broadcastId) || messageItem.metadata?.failure || providerStatus.startsWith('FAILED')) continue;
+    const phone = normalizePhone(messageItem.conversation?.phone);
+    const recipient = recipientsByBroadcastPhone.get(`${broadcastId}:${phone}`);
+    successfulDispatches.set(`${broadcastId}:${phone || messageItem.conversationId}`, { messageItem, recipient });
+  }
+  for (const recipient of relevantRecipients) {
+    const key = `${recipient.broadcast.broadcastKey}:${normalizePhone(recipient.phone)}`;
+    if (successfulDispatches.has(key) || recipient.status !== 'ENVIADO' || String(recipient.deliveryStatus || '').toUpperCase().startsWith('FAILED')) continue;
+    successfulDispatches.set(key, { messageItem: null, recipient });
+  }
+
   const trackedByConversation = new Map();
-  for (const recipient of tracked) {
-    const sentAt = recipient.sentAt || recipient.createdAt;
-    const current = trackedByConversation.get(recipient.conversationId);
+  for (const { messageItem, recipient } of successfulDispatches.values()) {
+    const conversationId = messageItem?.conversationId || recipient?.conversationId;
+    if (!conversationId) continue;
+    const sentAt = messageItem?.sentAt || messageItem?.createdAt || recipient?.sentAt || recipient?.createdAt;
+    const current = trackedByConversation.get(conversationId);
     if (!current || new Date(sentAt) < new Date(current.sentAt)) {
-      trackedByConversation.set(recipient.conversationId, {
+      trackedByConversation.set(conversationId, {
         sentAt,
-        leadId: recipient.leadId || current?.leadId || null,
-        externalLeadId: recipient.externalLeadId || current?.externalLeadId || null,
-        leadName: recipient.leadName || current?.leadName || null,
-        phone: recipient.phone || current?.phone || null,
-        district: recipient.district || current?.district || null
+        leadId: recipient?.leadId || messageItem?.leadId || current?.leadId || null,
+        externalLeadId: recipient?.externalLeadId || messageItem?.externalLeadId || current?.externalLeadId || null,
+        leadName: recipient?.leadName || messageItem?.conversation?.leadName || current?.leadName || null,
+        phone: recipient?.phone || messageItem?.conversation?.phone || current?.phone || null,
+        district: recipient?.district || messageItem?.conversation?.district || current?.district || null
       });
     }
+  }
+  if (!successfulDispatches.size || !trackedByConversation.size) {
+    anaFunnelReportCache = { expiresAt: Date.now() + 30_000, value: null };
+    return null;
   }
 
   const leadIds = Array.from(new Set(Array.from(trackedByConversation.values()).map((item) => item.leadId).filter(Boolean)));
@@ -2224,7 +2291,10 @@ async function trackedAnaFunnelReport(dashboardRecordsById) {
     const dashboardRecord = dashboardRecordsById.get(String(trackedConversation.externalLeadId || lead?.externalId || ''));
     const delivery = summarizeAnaDelivery({
       externalLeadId: trackedConversation.externalLeadId || lead?.externalId,
-      lead: lead || (dashboardRecord ? { address: dashboardRecord.addr || dashboardRecord.end } : null),
+      lead: (lead || dashboardRecord) ? {
+        ...(lead || {}),
+        address: lead?.address || dashboardRecord?.addr || dashboardRecord?.end || null
+      } : null,
       messages
     }, dashboardRecordsById);
     if (delivery.accepted) {
@@ -2267,12 +2337,12 @@ async function trackedAnaFunnelReport(dashboardRecordsById) {
 
   const value = {
     funnel: {
-      dispatches: recipients.length,
+      dispatches: successfulDispatches.size,
       responses,
       conversions,
-      responseRate: percentage(responses, recipients.length),
+      responseRate: percentage(responses, successfulDispatches.size),
       conversionRate: percentage(conversions, responses),
-      overallConversionRate: percentage(conversions, recipients.length)
+      overallConversionRate: percentage(conversions, successfulDispatches.size)
     },
     requestAgeBuckets,
     acceptedConversations: conversionDeliveries.sort((left, right) => (
@@ -2291,10 +2361,10 @@ function summarizeAnaConversation(conversation, dashboardRecordsById = new Map()
   const lastMessage = messages[messages.length - 1] || null;
   const lastInbound = inboundMessages[inboundMessages.length - 1] || null;
   const lastAi = aiMessages[aiMessages.length - 1] || null;
-  const classification = gptMakerClassification(messages);
   const qualificationMessage = [...messages].reverse().find((message) => message?.metadata?.gptMakerSummary);
   const gptMakerSummary = String(qualificationMessage?.metadata?.gptMakerSummary || '').trim();
   const delivery = summarizeAnaDelivery(conversation, dashboardRecordsById);
+  const classification = gptMakerClassification(messages, delivery);
 
   return {
     id: conversation.id,
@@ -2373,7 +2443,7 @@ function detectAnaReplyIntent(messageText) {
 }
 
 function isAffirmativeReply(value) {
-  return /\b(sim|s|claro|pode|quero|aceito|gostaria|isso|correto|certo|esse mesmo|essa mesma|ta certo|tá certo|esta certo|está certo|confirmo|ok)\b/i.test(String(value || ''));
+  return /\b(sim|s|claro|pode|quero|aceito|gostaria|isso|correto|certo|esse mesmo|essa mesma|ta certo|tá certo|esta certo|está certo|confirmo|ok|envie|enviem|mande|mandem|pode deixar)\b/i.test(String(value || ''));
 }
 
 function looksLikeAddress(value) {
@@ -5081,7 +5151,7 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
   try {
     const savedBroadcasts = await prisma.whatsAppBroadcast.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 12,
+      take: 50,
       include: {
         recipients: {
           orderBy: { createdAt: 'asc' }
@@ -5090,12 +5160,50 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
     });
 
     if (savedBroadcasts.length) {
-      const conversationIds = Array.from(new Set(savedBroadcasts.flatMap((broadcast) => (
-        broadcast.recipients.map((recipient) => recipient.conversationId).filter(Boolean)
-      ))));
-      const earliestCreatedAt = savedBroadcasts.reduce((earliest, broadcast) => (
+      const chronological = [...savedBroadcasts].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
+      const requestedCutoff = chronological.find((broadcast) => normalizedIntentName(broadcast.name) === 'teste disparo');
+      const relevantBroadcasts = requestedCutoff
+        ? savedBroadcasts.filter((broadcast) => new Date(broadcast.createdAt) >= new Date(requestedCutoff.createdAt))
+        : savedBroadcasts;
+      const earliestCreatedAt = relevantBroadcasts.reduce((earliest, broadcast) => (
         new Date(broadcast.createdAt) < earliest ? new Date(broadcast.createdAt) : earliest
-      ), new Date(savedBroadcasts[0].createdAt));
+      ), new Date(relevantBroadcasts[0].createdAt));
+      const actualOutboundMessages = await prisma.whatsAppMessage.findMany({
+        where: {
+          direction: 'OUTBOUND',
+          createdAt: { gte: earliestCreatedAt }
+        },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          conversationId: true,
+          leadId: true,
+          externalLeadId: true,
+          body: true,
+          providerStatus: true,
+          metadata: true,
+          sentAt: true,
+          createdAt: true,
+          conversation: { select: { phone: true, leadName: true, district: true } }
+        }
+      });
+      const relevantBroadcastIds = new Set(relevantBroadcasts.map((broadcast) => broadcast.broadcastKey));
+      const outboundByBroadcast = new Map();
+      const relevantOutboundMessages = actualOutboundMessages.filter((messageItem) => {
+        const broadcastId = String(messageItem.metadata?.broadcastId || '');
+        return Boolean(messageItem.metadata?.batch && relevantBroadcastIds.has(broadcastId));
+      });
+      for (const messageItem of relevantOutboundMessages) {
+        const broadcastId = String(messageItem.metadata?.broadcastId || '');
+        if (!outboundByBroadcast.has(broadcastId)) outboundByBroadcast.set(broadcastId, []);
+        outboundByBroadcast.get(broadcastId).push(messageItem);
+      }
+      const conversationIds = Array.from(new Set([
+        ...relevantBroadcasts.flatMap((broadcast) => (
+        broadcast.recipients.map((recipient) => recipient.conversationId).filter(Boolean)
+        )),
+        ...relevantOutboundMessages.map((messageItem) => messageItem.conversationId).filter(Boolean)
+      ]));
       const inboundMessages = conversationIds.length ? await prisma.whatsAppMessage.findMany({
         where: {
           direction: 'INBOUND',
@@ -5112,14 +5220,25 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
       }
 
       response.json({
-        transmissions: savedBroadcasts.map((broadcast) => {
+        transmissions: relevantBroadcasts.map((broadcast) => {
+          const broadcastMessages = outboundByBroadcast.get(broadcast.broadcastKey) || [];
+          const matchedMessageIds = new Set();
           const recipients = broadcast.recipients.map((recipient) => {
-            const replies = inboundByConversation.get(recipient.conversationId) || [];
+            const recipientPhone = normalizePhone(recipient.phone);
+            const outgoingMessage = broadcastMessages.find((messageItem) => messageItem.id === recipient.messageId)
+              || broadcastMessages.find((messageItem) => recipient.conversationId && messageItem.conversationId === recipient.conversationId)
+              || broadcastMessages.find((messageItem) => normalizePhone(messageItem.conversation?.phone) === recipientPhone)
+              || null;
+            if (outgoingMessage?.id) matchedMessageIds.add(outgoingMessage.id);
+            const conversationId = outgoingMessage?.conversationId || recipient.conversationId;
+            const sentAt = outgoingMessage?.sentAt || outgoingMessage?.createdAt || recipient.sentAt || broadcast.createdAt;
+            const replies = inboundByConversation.get(conversationId) || [];
             const repliedAt = replies.find((createdAt) => (
-              new Date(createdAt) >= new Date(recipient.sentAt || broadcast.createdAt)
+              new Date(createdAt) >= new Date(sentAt)
             )) || recipient.repliedAt || null;
-            const deliveryStatus = String(recipient.deliveryStatus || '').toUpperCase();
-            const failed = recipient.status === 'FALHA' || deliveryStatus.startsWith('FAILED');
+            const deliveryStatus = String(outgoingMessage?.providerStatus || recipient.deliveryStatus || '').toUpperCase();
+            const failed = deliveryStatus.startsWith('FAILED') || (!outgoingMessage && recipient.status === 'FALHA');
+            const sent = Boolean(outgoingMessage && !failed) || (recipient.status === 'ENVIADO' && !failed);
             const delivered = Boolean(repliedAt) || ['DELIVERED', 'READ', 'PLAYED', 'DELIVERED_BY_REPLY'].includes(deliveryStatus);
             return {
               id: recipient.id,
@@ -5128,21 +5247,49 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
               phone: recipient.phone,
               district: recipient.district,
               material: recipient.material,
-              status: failed ? 'FALHA' : recipient.status,
-              deliveryStatus: recipient.deliveryStatus,
-              sentAt: recipient.sentAt,
+              status: failed ? 'FALHA' : sent ? 'ENVIADO' : 'PENDENTE',
+              deliveryStatus: outgoingMessage?.providerStatus || recipient.deliveryStatus,
+              sentAt,
               repliedAt,
               error: recipient.error,
-              delivered
+              delivered,
+              sent
             };
           });
+          for (const outgoingMessage of broadcastMessages) {
+            if (matchedMessageIds.has(outgoingMessage.id)) continue;
+            const conversationId = outgoingMessage.conversationId;
+            const sentAt = outgoingMessage.sentAt || outgoingMessage.createdAt || broadcast.createdAt;
+            const repliedAt = (inboundByConversation.get(conversationId) || []).find((createdAt) => (
+              new Date(createdAt) >= new Date(sentAt)
+            )) || null;
+            const deliveryStatus = String(outgoingMessage.providerStatus || '').toUpperCase();
+            const failed = Boolean(outgoingMessage.metadata?.failure) || deliveryStatus.startsWith('FAILED');
+            const sent = !failed;
+            recipients.push({
+              id: outgoingMessage.id,
+              leadId: outgoingMessage.leadId,
+              externalLeadId: outgoingMessage.externalLeadId,
+              name: outgoingMessage.conversation?.leadName || 'Contato sem nome',
+              phone: outgoingMessage.conversation?.phone || '',
+              district: outgoingMessage.conversation?.district || null,
+              material: outgoingMessage.metadata?.material || outgoingMessage.metadata?.theme || null,
+              status: failed ? 'FALHA' : 'ENVIADO',
+              deliveryStatus: outgoingMessage.providerStatus,
+              sentAt,
+              repliedAt,
+              error: failed ? 'Falha registrada pelo provedor do WhatsApp.' : null,
+              delivered: Boolean(repliedAt) || ['DELIVERED', 'READ', 'PLAYED', 'DELIVERED_BY_REPLY'].includes(deliveryStatus),
+              sent
+            });
+          }
           return {
             id: broadcast.broadcastKey,
             name: broadcast.name,
             message: broadcast.messageTemplate,
             createdAt: broadcast.createdAt,
             targeted: Math.max(Number(broadcast.recipientTotal) || 0, recipients.length),
-            sent: recipients.filter((recipient) => recipient.status === 'ENVIADO').length,
+            sent: recipients.filter((recipient) => recipient.sent).length,
             delivered: recipients.filter((recipient) => recipient.delivered).length,
             responded: recipients.filter((recipient) => recipient.repliedAt).length,
             failed: recipients.filter((recipient) => recipient.status === 'FALHA').length,

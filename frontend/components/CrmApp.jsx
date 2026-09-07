@@ -7903,6 +7903,7 @@ function WhatsAppBroadcastModal({
 }
 
 function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
+  const [selectedBreakdown, setSelectedBreakdown] = useState(null);
   const metricDefinitions = [
     { key: 'sent', label: 'Enviados', icon: Send, color: '#00a884', track: '#d9fdd3' },
     { key: 'delivered', label: 'Receberam', icon: CheckCheck, color: '#0284c7', track: '#e0f2fe' },
@@ -7910,7 +7911,19 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
     { key: 'failed', label: 'Falharam', icon: AlertTriangle, color: '#dc2626', track: '#fee2e2' }
   ];
 
+  const selectedMetric = metricDefinitions.find((metric) => metric.key === selectedBreakdown?.metricKey);
+  const selectedRecipients = Array.isArray(selectedBreakdown?.transmission?.recipients)
+    ? selectedBreakdown.transmission.recipients.filter((recipient) => {
+      if (selectedBreakdown.metricKey === 'sent') return Boolean(recipient.sent) || recipient.status === 'ENVIADO';
+      if (selectedBreakdown.metricKey === 'delivered') return Boolean(recipient.delivered);
+      if (selectedBreakdown.metricKey === 'responded') return Boolean(recipient.repliedAt);
+      if (selectedBreakdown.metricKey === 'failed') return recipient.status === 'FALHA';
+      return false;
+    })
+    : [];
+
   return (
+    <>
     <section className={`${panelClass} overflow-hidden p-6`}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -7954,7 +7967,13 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
                     const value = Number(transmission[metric.key]) || 0;
                     const percentage = Math.min(100, Math.round((value / target) * 100));
                     return (
-                      <div className="rounded-xl border border-[#e9edef] p-3" key={metric.key}>
+                      <button
+                        aria-label={`Ver ${metric.label.toLowerCase()} da transmissão ${transmission.name}`}
+                        className="rounded-xl border border-[#e9edef] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#00a884]/50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#00a884]/30"
+                        key={metric.key}
+                        onClick={() => setSelectedBreakdown({ transmission, metricKey: metric.key })}
+                        type="button"
+                      >
                         <div className="flex items-center gap-2">
                           <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ backgroundColor: metric.track, color: metric.color }}>
                             <Icon size={16} />
@@ -7966,49 +7985,10 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
                           <span className="block h-full rounded-full transition-all" style={{ backgroundColor: metric.color, width: `${percentage}%` }} />
                         </div>
                         <span className="mt-1.5 block text-[11px] font-bold text-[#667781]">{percentage}% dos destinatários</span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
-                {Array.isArray(transmission.recipients) && transmission.recipients.length ? (
-                  <div className="border-t border-[#e9edef] px-5 pb-5">
-                    <div className="mb-3 mt-4 flex items-center justify-between gap-3">
-                      <span className="text-[11px] font-black uppercase tracking-wide text-[#667781]">Destinatários deste disparo</span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-[#3b4a54]">
-                        {formatNumber(transmission.recipients.length)}
-                      </span>
-                    </div>
-                    <div className="conversation-tools-scroll max-h-52 overflow-y-auto rounded-xl border border-[#e9edef]">
-                      {transmission.recipients.slice(0, 120).map((recipient) => {
-                        const failed = recipient.status === 'FALHA';
-                        const replied = Boolean(recipient.repliedAt);
-                        const statusLabel = failed ? 'Falha' : replied ? 'Respondeu' : 'Enviado';
-                        const statusClass = failed
-                          ? 'bg-red-50 text-red-700'
-                          : replied ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700';
-                        return (
-                          <div className="grid gap-2 border-b border-[#e9edef] px-3 py-3 last:border-b-0 sm:grid-cols-[1fr_auto]" key={recipient.id || `${transmission.id}-${recipient.phone}`}>
-                            <span className="min-w-0">
-                              <strong className="block truncate text-sm font-black text-[#111b21]">{recipient.name || 'Contato sem nome'}</strong>
-                              <span className="mt-1 block truncate text-xs font-semibold text-[#667781]">
-                                {recipient.phone} · {recipient.district || 'Distrito não vinculado'}
-                              </span>
-                              {recipient.material ? <span className="mt-1 block truncate text-xs font-semibold text-[#667781]">Material: {recipient.material}</span> : null}
-                            </span>
-                            <span className={`inline-flex h-7 items-center justify-center rounded-full px-3 text-[11px] font-black ${statusClass}`}>
-                              {statusLabel}
-                            </span>
-                          </div>
-                        );
-                      })}
-                      {transmission.recipients.length > 120 ? (
-                        <div className="px-3 py-3 text-xs font-bold text-[#667781]">
-                          + {formatNumber(transmission.recipients.length - 120)} destinatários nesta transmissão
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
                 {transmission.failed ? (
                   <div className="border-t border-red-100 bg-red-50 px-5 py-3 text-xs font-bold text-red-700">
                     {formatNumber(transmission.failed)} envio(s) com falha.
@@ -8026,6 +8006,77 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
         </div>
       )}
     </section>
+    {selectedBreakdown && selectedMetric ? createPortal(
+      <div
+        className="fixed inset-0 z-[180] grid place-items-center bg-[#111b21]/70 p-4 backdrop-blur-sm"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setSelectedBreakdown(null);
+        }}
+        role="presentation"
+      >
+        <section
+          aria-labelledby="broadcast-breakdown-title"
+          aria-modal="true"
+          className="flex max-h-[82vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#d1d7db] bg-white shadow-2xl"
+          role="dialog"
+        >
+          <header className="flex items-start justify-between gap-4 border-b border-[#e9edef] bg-[linear-gradient(135deg,#f7fffb,#edfdf7)] px-5 py-4">
+            <div className="min-w-0">
+              <span className="text-[11px] font-black uppercase tracking-wide text-[#667781]">{selectedMetric.label}</span>
+              <h3 className="mt-1 truncate text-xl font-black text-[#111b21]" id="broadcast-breakdown-title">
+                {selectedBreakdown.transmission.name}
+              </h3>
+              <p className="mt-1 text-sm font-semibold text-[#54656f]">
+                {formatNumber(selectedRecipients.length)} pessoa(s) nesta situação
+              </p>
+            </div>
+            <button
+              aria-label="Fechar detalhes"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#d1d7db] bg-white text-[#3b4a54] transition hover:bg-[#f0f2f5]"
+              onClick={() => setSelectedBreakdown(null)}
+              type="button"
+            >
+              <X size={20} />
+            </button>
+          </header>
+          <div className="conversation-tools-scroll min-h-0 flex-1 overflow-y-auto p-4">
+            {selectedRecipients.length ? selectedRecipients.map((recipient) => {
+              const statusLabel = selectedBreakdown.metricKey === 'failed'
+                ? 'Falha no envio'
+                : selectedBreakdown.metricKey === 'responded'
+                  ? 'Respondeu'
+                  : selectedBreakdown.metricKey === 'delivered' ? 'Recebeu' : 'Enviado';
+              return (
+                <div className="grid gap-3 border-b border-[#e9edef] px-2 py-3 last:border-b-0 sm:grid-cols-[1fr_auto]" key={recipient.id || `${selectedBreakdown.transmission.id}-${recipient.phone}`}>
+                  <span className="min-w-0">
+                    <strong className="block text-sm font-black text-[#111b21]">{recipient.name || 'Contato sem nome'}</strong>
+                    <span className="mt-1 block text-xs font-semibold text-[#667781]">
+                      {recipient.phone || 'Telefone não informado'} · {recipient.district || 'Distrito não vinculado'}
+                    </span>
+                    {recipient.material ? <span className="mt-1 block text-xs font-semibold text-[#667781]">Material: {recipient.material}</span> : null}
+                    {selectedBreakdown.metricKey === 'failed' && recipient.error ? (
+                      <span className="mt-1 block text-xs font-bold text-red-700">Motivo: {recipient.error}</span>
+                    ) : null}
+                  </span>
+                  <span
+                    className="inline-flex h-8 items-center justify-center self-center rounded-full px-3 text-[11px] font-black"
+                    style={{ backgroundColor: selectedMetric.track, color: selectedMetric.color }}
+                  >
+                    {statusLabel}
+                  </span>
+                </div>
+              );
+            }) : (
+              <div className="rounded-xl border border-dashed border-[#d1d7db] p-8 text-center text-sm font-bold text-[#667781]">
+                Nenhuma pessoa nesta situação.
+              </div>
+            )}
+          </div>
+        </section>
+      </div>,
+      document.body
+    ) : null}
+    </>
   );
 }
 
@@ -8976,7 +9027,7 @@ function ConversationsView({ records = [] }) {
           </div>
           <button className="inline-flex h-12 min-w-[16rem] items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#25d366,#00a884,#075e54)] px-5 text-sm font-black text-white shadow-[0_18px_46px_rgba(0,168,132,0.28)] transition hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_24px_64px_rgba(0,168,132,0.34)]" onClick={openLeadPicker} type="button">
             <Search size={18} />
-            Buscar e selecionar lead
+            Buscar lead
           </button>
         </div>
       </section>
