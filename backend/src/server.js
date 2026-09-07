@@ -2030,7 +2030,10 @@ function isAnaTestConversation(conversation = {}) {
   const names = [conversation.leadName, conversation.lead?.name]
     .map((value) => normalizedIntentName(value).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim())
     .filter(Boolean);
-  return names.some((name) => /^(natana|nyanata|jessio)(\s|$)/i.test(name));
+  return names.some((name) => (
+    /^(natana|nyanata|jessio)(\s|$)/i.test(name)
+    || /^jose silva(?:$|\s+desenv web)/i.test(name)
+  ));
 }
 
 function gptMakerClassification(messages = [], delivery = null) {
@@ -2150,6 +2153,8 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
   let giftOffered = false;
   let materialReceiptAsked = false;
   let materialReceived = null;
+  let lastInboundBody = '';
+  let lastInboundAt = null;
 
   for (const message of messages) {
     const body = String(message.body || '').trim();
@@ -2175,16 +2180,35 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     }
     if (!body) continue;
     if (message.direction === 'OUTBOUND') {
-      const question = anaDeliveryQuestion(body);
+      const mentionsGift = /(brinde|presente)/i.test(normalizedIntentName(body));
+      if (mentionsGift) giftOffered = true;
+      const question = anaDeliveryQuestion(body) || (
+        giftOffered
+        && body.includes('?')
+        && /receb/i.test(normalizedIntentName(body))
+        && !/(chegou|ja recebeu|chegou a receber)/i.test(normalizedIntentName(body))
+          ? 'GIFT_ACCEPTANCE'
+          : null
+      );
       if (question) pendingQuestion = question;
       if (question === 'GIFT_ACCEPTANCE') giftOffered = true;
       if (question === 'MATERIAL_RECEIVED') materialReceiptAsked = true;
+      if (question === 'ADDRESS_REQUEST' && isAffirmativeReply(lastInboundBody)) {
+        giftOffered = true;
+        giftAccepted = true;
+        acceptedAt ||= lastInboundAt;
+      }
       if (anaDeliveryWasConfirmed(body)) {
+        giftOffered = true;
+        giftAccepted = true;
+        acceptedAt ||= lastInboundAt || message.sentAt || message.createdAt || null;
         deliveryConfirmed = true;
       }
       continue;
     }
 
+    lastInboundBody = body;
+    lastInboundAt = message.receivedAt || message.sentAt || message.createdAt || null;
     const normalizedBody = normalizedIntentName(body);
     const materialContext = pendingQuestion === 'MATERIAL_RECEIVED'
       || /\b(material|estudo|livro|revista|curso)\b/i.test(normalizedBody);
@@ -2225,11 +2249,18 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     pendingQuestion = null;
   }
 
-  const leadUpdatedAddress = String(conversation?.lead?.newAddress || '').replace(/\s+/g, ' ').trim();
+  const cleanStoredAddress = (value) => {
+    const candidate = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!candidate || /^n\/?i$|^nao informado$|^não informado$/i.test(candidate)) return '';
+    if (isAffirmativeReply(candidate) && !looksLikeAddress(candidate)) return '';
+    if (isNegativeReply(candidate) && !looksLikeAddress(candidate)) return '';
+    return candidate;
+  };
+  const leadUpdatedAddress = cleanStoredAddress(conversation?.lead?.newAddress);
   const metadataAddress = [...messages].reverse()
-    .map((message) => String(message?.metadata?.leadAddress || message?.metadata?.address || '').replace(/\s+/g, ' ').trim())
+    .map((message) => cleanStoredAddress(message?.metadata?.leadAddress || message?.metadata?.address))
     .find(Boolean) || '';
-  const bankAddress = String(conversation?.lead?.address || '').replace(/\s+/g, ' ').trim();
+  const bankAddress = cleanStoredAddress(conversation?.lead?.address);
   const address = typedAddress || leadUpdatedAddress || metadataAddress || bankAddress;
   const addressSource = typedAddress || leadUpdatedAddress
     ? 'Informado na conversa'

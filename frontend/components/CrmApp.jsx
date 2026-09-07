@@ -9727,6 +9727,12 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
         <div className="mt-5 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
           {anaAnalysisGroups.map((group, index) => {
             const Icon = index === 0 ? CheckCheck : index === 1 ? AlertTriangle : index === 2 ? MessageCircle : Gauge;
+            const colorClasses = [
+              'border-emerald-300 bg-emerald-100 text-emerald-950 hover:bg-emerald-200 focus:ring-emerald-500/40',
+              'border-rose-300 bg-rose-100 text-rose-950 hover:bg-rose-200 focus:ring-rose-500/40',
+              'border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-200 focus:ring-amber-500/40',
+              'border-blue-300 bg-blue-100 text-blue-950 hover:bg-blue-200 focus:ring-blue-500/40'
+            ];
             const storedCounts = [anaAnalysis.materialReceived, anaAnalysis.materialNotReceived, anaAnalysis.materialPending, anaAnalysis.giftPending];
             const count = Number(storedCounts[index]);
             const materialTotal = Number(anaAnalysis.materialReceived || 0)
@@ -9736,17 +9742,17 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             const rate = denominator > 0 ? Number((((Number.isFinite(count) ? count : group.conversations.length) / denominator) * 100).toFixed(1)) : 0;
             return (
               <button
-                className="grid min-h-32 grid-cols-[auto_1fr_auto] items-start gap-3 rounded-lg border border-white/10 bg-white/[0.06] p-4 text-left transition hover:border-emerald-400/40 hover:bg-white/[0.1] focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+                className={`grid min-h-32 grid-cols-[auto_1fr_auto] items-start gap-3 rounded-lg border p-4 text-left transition focus:outline-none focus:ring-2 ${colorClasses[index]}`}
                 key={group.key}
                 onClick={() => setSelectedConversationGroup(group)}
                 type="button"
               >
-                <span className="grid h-10 w-10 place-items-center rounded-lg bg-white/10 text-slate-100"><Icon size={19} /></span>
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-white/70"><Icon size={19} /></span>
                 <span className="min-w-0">
-                  <strong className="block text-sm text-slate-100">{group.label}</strong>
-                  <span className="mt-2 block text-xs font-semibold text-slate-400">{rate}% do respectivo acompanhamento</span>
+                  <strong className="block text-sm">{group.label}</strong>
+                  <span className="mt-2 block text-xs font-semibold opacity-75">{rate}% do respectivo acompanhamento</span>
                 </span>
-                <strong className="text-2xl font-black text-white">{anaLoading ? '...' : formatNumber(Number.isFinite(count) ? count : group.conversations.length)}</strong>
+                <strong className="text-2xl font-black">{anaLoading ? '...' : formatNumber(Number.isFinite(count) ? count : group.conversations.length)}</strong>
               </button>
             );
           })}
@@ -9843,7 +9849,14 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 >
                   <span className="min-w-0">
                     <strong className="block truncate text-sm font-black text-slate-950">{conversation.leadName}</strong>
-                    <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{conversation.delivery?.address || 'Endereço não informado'}</span>
+                    <span className="mt-1 block truncate text-xs font-bold uppercase text-slate-500">{conversation.district || 'Distrito não vinculado'}</span>
+                    <span className={`mt-2 flex items-start gap-2 rounded-md px-2.5 py-2 text-xs font-semibold ${conversation.delivery?.address ? 'bg-emerald-100 text-emerald-950' : 'bg-amber-100 text-amber-950'}`}>
+                      <MapPin className="mt-0.5 shrink-0" size={14} />
+                      <span>
+                        <span className="block">{conversation.delivery?.address || 'Endereço ainda não informado'}</span>
+                        {conversation.delivery?.address ? <span className="mt-0.5 block text-[10px] font-black uppercase opacity-70">{conversation.delivery?.addressSource}</span> : null}
+                      </span>
+                    </span>
                   </span>
                   <ChevronRight className="text-emerald-700" size={18} />
                 </button>
@@ -9910,6 +9923,33 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                       ))}
                       {group.districts.length > 4 ? (
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">+{group.districts.length - 4} distritos</span>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 divide-y divide-slate-100 overflow-hidden rounded-md border border-slate-100 bg-slate-50">
+                      {group.conversations.slice(0, 6).map((conversation) => (
+                        <button
+                          className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-3 py-2.5 text-left transition hover:bg-blue-50"
+                          key={conversation.id}
+                          onClick={() => setSelectedGroupConversation(conversation)}
+                          type="button"
+                        >
+                          <span className="min-w-0">
+                            <strong className="block truncate text-xs font-black text-slate-950">{conversation.leadName}</strong>
+                            <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-600">{conversation.district || 'Distrito não vinculado'}</span>
+                            {conversation.delivery?.accepted ? (
+                              <span className={`mt-1.5 flex items-start gap-1.5 rounded px-2 py-1.5 text-[11px] font-semibold ${conversation.delivery?.address ? 'bg-emerald-100 text-emerald-950' : 'bg-amber-100 text-amber-950'}`}>
+                                <MapPin className="mt-0.5 shrink-0" size={12} />
+                                <span className="line-clamp-2">{conversation.delivery?.address || 'Endereço ainda não informado'}</span>
+                              </span>
+                            ) : null}
+                          </span>
+                          <ChevronRight className="text-slate-500" size={15} />
+                        </button>
+                      ))}
+                      {group.conversations.length > 6 ? (
+                        <button className="w-full px-3 py-2 text-left text-[11px] font-black text-blue-700 hover:bg-blue-50" onClick={() => setSelectedConversationGroup(group)} type="button">
+                          Ver mais {group.conversations.length - 6} pessoa(s)
+                        </button>
                       ) : null}
                     </div>
                   </article>
