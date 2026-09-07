@@ -8315,7 +8315,7 @@ function ConversationsView({ records = [] }) {
         priority: lead.priority || null,
         phone: phoneDigits(lead.phone)
       }));
-      const totals = { sent: 0, failed: 0 };
+      const totals = { sent: 0, failed: 0, failures: [] };
       const broadcastId = globalThis.crypto?.randomUUID?.()
         || `broadcast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       for (let index = 0; index < recipients.length; index += 10) {
@@ -8341,12 +8341,15 @@ function ConversationsView({ records = [] }) {
         }
         totals.sent += payload.sent || 0;
         totals.failed += payload.failed || 0;
+        if (Array.isArray(payload.results)) {
+          totals.failures.push(...payload.results.filter((item) => !item.ok && item.message));
+        }
       }
       if (!totals.sent) {
         throw new Error('Nenhuma mensagem foi aceita pelo WAHA. Confira o painel para ver o motivo da falha.');
       }
       toast.success('Transmissão concluída', {
-        description: `${totals.sent} enviadas${totals.failed ? ` e ${totals.failed} com falha` : ''}.`
+        description: `${totals.sent} enviadas${totals.failed ? ` e ${totals.failed} com falha. Motivo: ${totals.failures[0]?.message || 'consulte os detalhes da transmissão'}` : '.'}`
       });
       setBroadcastModalOpen(false);
       setLeadPickerOpen(false);

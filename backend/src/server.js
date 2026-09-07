@@ -2883,6 +2883,93 @@ async function sendWahaRequest(pathValue, body) {
   return data;
 }
 
+async function getWahaRequest(pathValue, query = {}) {
+  const config = wahaConfig();
+  if (!config.baseUrl || !config.apiKey) {
+    const missing = [
+      !config.baseUrl && 'WAHA_API_URL',
+      !config.apiKey && 'WAHA_API_KEY'
+    ].filter(Boolean);
+    const error = new Error(`Configuracao WAHA incompleta: ${missing.join(', ')}`);
+    error.status = 500;
+    throw error;
+  }
+
+  const url = new URL(`${config.baseUrl}${pathValue}`);
+  Object.entries(query).forEach(([key, value]) => url.searchParams.set(key, String(value)));
+  const providerResponse = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Api-Key': config.apiKey,
+      Accept: 'application/json'
+    }
+  });
+  const data = await parseProviderResponse(providerResponse);
+  if (!providerResponse.ok) {
+    const error = new Error(data?.message || data?.error || `WAHA respondeu com status ${providerResponse.status}`);
+    error.status = 502;
+    error.providerStatus = providerResponse.status;
+    error.deliveryStatus = providerFailureStatus(providerResponse.status, data);
+    error.providerResponse = data;
+    throw error;
+  }
+  return data;
+}
+
+const wahaChatIdCache = new Map();
+const WAHA_CHAT_ID_CACHE_MS = 15 * 60 * 1000;
+
+function wahaPhoneCandidates(phone) {
+  const candidates = [phone];
+  if (phone.startsWith('55') && phone.length === 12) {
+    candidates.push(`${phone.slice(0, 4)}9${phone.slice(4)}`);
+  } else if (phone.startsWith('55') && phone.length === 13 && phone[4] === '9') {
+    candidates.push(`${phone.slice(0, 4)}${phone.slice(5)}`);
+  }
+  return Array.from(new Set(candidates));
+}
+
+async function resolveWahaRecipient(phone) {
+  const cached = wahaChatIdCache.get(phone);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (cached) wahaChatIdCache.delete(phone);
+
+  const config = wahaConfig();
+  const attempts = [];
+  for (const candidate of wahaPhoneCandidates(phone)) {
+    let data;
+    try {
+      data = await getWahaRequest('/api/contacts/check-exists', {
+        session: config.session,
+        phone: candidate
+      });
+    } catch (error) {
+      error.providerAttempts = attempts;
+      throw error;
+    }
+
+    attempts.push({ phone: candidate, numberExists: Boolean(data?.numberExists) });
+    if (!data?.numberExists || !data?.chatId) continue;
+
+    const resolvedPhone = normalizePhone(data?.pn) || candidate;
+    const value = {
+      chatId: String(data.chatId),
+      phone: resolvedPhone,
+      requestedPhone: phone,
+      attempts
+    };
+    wahaChatIdCache.set(phone, { value, expiresAt: Date.now() + WAHA_CHAT_ID_CACHE_MS });
+    wahaChatIdCache.set(resolvedPhone, { value, expiresAt: Date.now() + WAHA_CHAT_ID_CACHE_MS });
+    return value;
+  }
+
+  const error = new Error('Numero nao encontrado no WhatsApp. Confira o DDD e o numero do celular.');
+  error.status = 400;
+  error.deliveryStatus = 'FAILED';
+  error.providerAttempts = attempts;
+  throw error;
+}
+
 async function sendWahaTextMessage({ phone, message }) {
   const normalizedPhone = normalizePhone(phone);
   if (!normalizedPhone) {
@@ -2898,18 +2985,21 @@ async function sendWahaTextMessage({ phone, message }) {
   }
 
   const config = wahaConfig();
+  const recipient = await resolveWahaRecipient(normalizedPhone);
   const data = await sendWahaRequest('/api/sendText', {
     session: config.session,
-    chatId: `${normalizedPhone}@c.us`,
+    chatId: recipient.chatId,
     text: cleanMessage
   });
   return {
     ok: true,
     provider: 'waha-gows',
     deliveryStatus: providerResponseDeliveryStatus(data),
-    phone: normalizedPhone,
+    phone: recipient.phone,
     providerResponse: data,
-    attempts: []
+    attempts: recipient.attempts,
+    requestedPhone: recipient.requestedPhone,
+    chatId: recipient.chatId
   };
 }
 
@@ -2939,9 +3029,10 @@ async function sendWahaMediaMessage({ phone, message = '', fileName, mimeType, b
   const safeFileName = path.basename(String(fileName || (cleanMimeType.startsWith('video/') ? 'video' : 'imagem')))
     .replace(/[^\w .()\-À-ÿ]/g, '_');
   const config = wahaConfig();
+  const recipient = await resolveWahaRecipient(normalizedPhone);
   const data = await sendWahaRequest(cleanMimeType.startsWith('video/') ? '/api/sendVideo' : '/api/sendImage', {
     session: config.session,
-    chatId: `${normalizedPhone}@c.us`,
+    chatId: recipient.chatId,
     file: {
       mimetype: cleanMimeType,
       filename: safeFileName,
@@ -2954,9 +3045,12 @@ async function sendWahaMediaMessage({ phone, message = '', fileName, mimeType, b
     ok: true,
     provider: 'waha-gows',
     deliveryStatus: providerResponseDeliveryStatus(data),
-    phone: normalizedPhone,
+    phone: recipient.phone,
     providerResponse: data,
-    media: { fileName: safeFileName, mimeType: cleanMimeType }
+    media: { fileName: safeFileName, mimeType: cleanMimeType },
+    attempts: recipient.attempts,
+    requestedPhone: recipient.requestedPhone,
+    chatId: recipient.chatId
   };
 }
 
