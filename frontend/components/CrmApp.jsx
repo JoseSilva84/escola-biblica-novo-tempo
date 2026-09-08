@@ -9852,7 +9852,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
 
       {tab === 'overview' ? (
         <div className="grid gap-4">
-          {districtNames.length > 1 ? (
+          {districtNames.length > 0 ? (
             <section className={`${panelClass} p-6`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
