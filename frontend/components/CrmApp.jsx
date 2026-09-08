@@ -9876,15 +9876,15 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                   const isActive = selectedDistrict === stat.name;
                   return (
                     <button
-                      className={`grid items-start gap-1 rounded-xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${isActive ? 'border-blue-500 bg-blue-600 text-white shadow-[0_0_0_2px_rgba(37,99,235,0.4)]' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+                      className={`group grid items-start gap-1 rounded-xl border p-4 text-left transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${isActive ? 'border-blue-500 bg-blue-600 text-white shadow-[0_8px_30px_rgba(37,99,235,0.4)] hover:-translate-y-1' : 'border-white/20 bg-white/10 text-slate-100 shadow-sm hover:-translate-y-1 hover:border-white/40 hover:bg-white/20 hover:shadow-[0_10px_40px_rgba(0,0,0,0.1)]'}`}
                       key={stat.name}
                       onClick={() => setSelectedDistrict(isActive ? null : stat.name)}
                       type="button"
                     >
-                      <strong className="block truncate text-sm font-black">{stat.name}</strong>
-                      <span className={`mt-2 block text-2xl font-black ${isActive ? 'text-white' : 'text-emerald-400'}`}>{formatNumber(stat.accepted)}</span>
-                      <span className={`text-[11px] font-bold ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>aceitaram a visita</span>
-                      <div className={`mt-3 grid grid-cols-2 gap-2 border-t pt-3 text-[11px] font-semibold ${isActive ? 'border-blue-400/30 text-blue-100' : 'border-white/10 text-slate-400'}`}>
+                      <strong className={`block truncate text-sm font-black transition-colors ${isActive ? 'text-white' : 'text-slate-50 group-hover:text-white'}`}>{stat.name}</strong>
+                      <span className={`mt-2 block text-2xl font-black transition-colors ${isActive ? 'text-white' : 'text-emerald-400 group-hover:text-emerald-300'}`}>{formatNumber(stat.accepted)}</span>
+                      <span className={`text-[11px] font-bold uppercase tracking-wide transition-colors ${isActive ? 'text-blue-200' : 'text-slate-400 group-hover:text-slate-300'}`}>aceitaram a visita</span>
+                      <div className={`mt-4 grid grid-cols-2 gap-2 border-t pt-3 text-[11px] font-semibold transition-colors ${isActive ? 'border-blue-500/50 text-blue-100' : 'border-white/10 text-slate-400 group-hover:border-white/20 group-hover:text-slate-200'}`}>
                         <span>{formatNumber(stat.responded)} responderam</span>
                         <span>{formatNumber(stat.total)} abordados</span>
                       </div>
