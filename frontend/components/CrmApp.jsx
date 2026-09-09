@@ -747,7 +747,7 @@ function LoginScreen({ onLogin }) {
   }
 
   return (
-    <main className="silver-stage app-light grid min-h-screen place-items-center overflow-hidden px-5 py-10 text-slate-100">
+    <main className="login-screen silver-stage app-light grid min-h-[100svh] place-items-center overflow-x-hidden overflow-y-auto px-5 py-10 text-slate-100">
       <AppToaster />
       {loading ? (
         <div className="login-loading-overlay" role="status" aria-live="polite">
@@ -767,9 +767,9 @@ function LoginScreen({ onLogin }) {
         </div>
       ) : null}
 
-      <div className={`relative grid w-full max-w-6xl gap-4 ${splashState === 'visible' ? 'opacity-0' : 'stagger-in'}`}>
-        <section className="grid grid-cols-[1.1fr_0.9fr] gap-5 max-lg:grid-cols-1">
-        <div className={`${panelClass} flex min-h-[34rem] flex-col justify-between p-8 max-sm:p-5`}>
+      <div className={`login-layout relative grid w-full max-w-[90rem] gap-4 ${splashState === 'visible' ? 'opacity-0' : 'stagger-in'}`}>
+        <section className="login-grid grid grid-cols-[minmax(0,1.1fr)_minmax(22rem,0.9fr)] gap-5 max-lg:grid-cols-1">
+        <div className={`${panelClass} login-intro flex min-h-[34rem] flex-col justify-between p-8 max-sm:p-5`}>
           <div>
 
             <h1 className="silver-title max-w-2xl text-6xl font-black leading-tight tracking-normal max-md:text-4xl text-center">
@@ -797,7 +797,7 @@ function LoginScreen({ onLogin }) {
           </div>
         </div>
 
-        <form className={`${panelClass} grid content-center gap-5 p-8 max-sm:p-5`} onSubmit={submitLogin}>
+        <form className={`${panelClass} login-form grid min-w-0 content-center gap-5 p-8 max-sm:p-5`} onSubmit={submitLogin}>
           <div className="flex flex-col items-center justify-center">
             <img src="/logo.png" alt="Novo Tempo" className="animate-logo-float mb-4 h-28 object-contain drop-shadow-md" />
             <h2 className="mt-2 text-2xl font-black text-slate-50 text-center">Acesso aos Amigos NT</h2>
@@ -1972,9 +1972,9 @@ function LastDatasetUpdateCard({ update }) {
   const date = formatDatasetDate(update?.atualizado_em);
 
   return (
-    <section className={`${panelClass} overflow-hidden p-6`}>
-      <div className="grid grid-cols-[0.9fr_1.1fr] gap-6 max-xl:grid-cols-1">
-        <div>
+    <section className={`${panelClass} dataset-update-card overflow-hidden p-6`}>
+      <div className="dataset-update-grid grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-6 max-xl:grid-cols-1">
+        <div className="min-w-0">
           <span className={labelClass}>Ultima entrada na base</span>
           <h2 className="mt-2 text-3xl font-black text-slate-50">
             {hasUpdate ? `${formatNumber(consolidation.alunos_novos)} novos alunos` : 'Nenhum upload registrado'}
@@ -1984,9 +1984,9 @@ function LastDatasetUpdateCard({ update }) {
               ? `Processado em ${date}. A base foi de ${formatNumber(consolidation.linhas_antes)} para ${formatNumber(consolidation.linhas_depois)} registros.`
               : 'Quando um Excel for enviado pelo painel, este card mostrara o resumo da entrada mais recente.'}
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="dataset-file-list mt-4 flex min-w-0 flex-wrap gap-2">
             {(consolidation?.arquivos || []).map((file) => (
-              <span className="rounded-full border border-slate-300 bg-slate-200 px-3 py-1 text-xs font-bold text-slate-950" key={file.arquivo}>
+              <span className="dataset-file-chip max-w-full truncate rounded-full border border-slate-300 bg-slate-200 px-3 py-1 text-xs font-bold text-slate-950" key={file.arquivo} title={`${file.arquivo}: ${formatNumber(file.novos)} novos`}>
                 {file.arquivo}: {formatNumber(file.novos)} novos
               </span>
             ))}
@@ -2002,7 +2002,7 @@ function LastDatasetUpdateCard({ update }) {
             ) : null}
           </div>
         </div>
-        <div className="grid gap-2">
+        <div className="grid min-w-0 gap-2">
           <div className="flex items-center justify-between gap-3">
             <span className={labelClass}>Distritos dos novos alunos</span>
             <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
@@ -2072,7 +2072,7 @@ function DatasetHistoryView({ history = [], onBack }) {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="dataset-history-view grid min-w-0 gap-6">
       <section className={`${panelClass} overflow-hidden p-6`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -5676,7 +5676,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="leads-view grid min-w-0 gap-6">
       <section className={`${panelClass} overflow-hidden p-6`}>
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
@@ -10526,20 +10526,20 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
   const title = isAdminUser(user) ? 'Administração Geral' : accessLabelForUser(user);
 
   return (
-    <div className={`silver-stage ${isLight ? 'app-light' : 'app-dark'} min-h-screen text-slate-100`}>
+    <div className={`crm-app-shell silver-stage ${isLight ? 'app-light' : 'app-dark'} min-h-screen min-w-0 text-slate-100`}>
       <AppToaster theme={theme} />
-      <div className="flex min-h-screen gap-4 p-4 max-lg:flex-col max-lg:p-0">
+      <div className="crm-app-layout flex min-h-screen min-w-0 gap-4 p-4 max-lg:flex-col max-lg:p-0">
       <Sidebar compact={sidebarCompact} current={current} onLogout={onLogout} onNavigate={onNavigate} onToggleCompact={() => setSidebarCompact((value) => !value)} user={user} />
-      <div className="flex min-h-[calc(100vh-2rem)] min-w-0 flex-1 flex-col overflow-visible rounded-[1.75rem] max-lg:min-h-screen max-lg:rounded-none">
-        <header className="app-header-glass sticky top-4 z-50 shrink-0 rounded-t-[1.75rem] border-b border-white/[0.07] bg-slate-950/40 px-8 py-4 backdrop-blur-2xl max-lg:top-0 max-lg:rounded-none max-md:px-4">
-          <div className="flex items-center justify-between gap-4">
+      <div className="crm-app-content flex min-h-[calc(100vh-2rem)] min-w-0 flex-1 flex-col overflow-visible rounded-[1.75rem] max-lg:min-h-screen max-lg:rounded-none">
+        <header className="crm-app-header app-header-glass sticky top-4 z-50 shrink-0 rounded-t-[1.75rem] border-b border-white/[0.07] bg-slate-950/40 px-8 py-4 backdrop-blur-2xl max-lg:top-0 max-lg:rounded-none max-md:px-4">
+          <div className="crm-app-header-inner flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <div>
               <span className={labelClass}>Amigos NT</span>
               <h2 className="text-xl font-black text-slate-50">{title}</h2>
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="crm-app-header-actions flex min-w-0 flex-wrap items-center justify-end gap-3">
               {isAdminUser(user) && associations.length ? (
                 <label className="relative hidden min-w-64 md:inline-flex">
                   <select
@@ -10635,7 +10635,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
             </div>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1500px] px-8 pb-6 pt-6 max-lg:pb-28 max-md:px-4">
+        <main className="crm-main mx-auto w-full max-w-[1920px] min-w-0 px-8 pb-6 pt-6 max-lg:pb-28 max-md:px-4">
           {children}
         </main>
       </div>
