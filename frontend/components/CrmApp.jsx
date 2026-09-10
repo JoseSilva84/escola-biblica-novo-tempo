@@ -1240,10 +1240,10 @@ function LeadDetailOsmMap({ captureRef, churches = [], lead }) {
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: priorityStyle.color }} />
             {priorityStyle.label}
           </span>
-          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+          <span className="leads-map-churches inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
             <Church size={14} />
             Igrejas
-            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] text-emerald-700">{formatNumber(visibleChurches.length)}</span>
+            <span className="leads-map-church-count rounded-full bg-white px-2 py-0.5 text-[10px] text-emerald-700">{formatNumber(visibleChurches.length)}</span>
           </span>
           <a className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-800 transition hover:border-blue-300 hover:bg-blue-50" href={openStreetMapSearchUrl(lead)} rel="noreferrer" target="_blank">
             <MapPin size={15} />
@@ -1478,9 +1478,9 @@ function LeadDetailModal({ churches = [], lead, onClose }) {
                 <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-700">{item.detail}</p>
               </article>
             ))}
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-[0_10px_28px_rgba(37,99,235,0.08)]">
+            <div className="lead-operational-summary rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-[0_10px_28px_rgba(37,99,235,0.08)]">
               <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-800">Resumo operacional</span>
-              <p className="mt-2 text-sm leading-relaxed text-slate-800">{operationalSummary}</p>
+              <p className="lead-operational-summary-text mt-2 text-sm leading-relaxed text-slate-800">{operationalSummary}</p>
             </div>
             <LeadDetailOsmMap captureRef={detailMapCaptureRef} churches={churches} lead={lead} />
           </section>
@@ -4444,11 +4444,11 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
   }, [churchPoints, mappableLeads, onLeadDetails]);
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)]">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-white via-blue-50/70 to-emerald-50/70 p-5">
+    <section className="leads-map-card overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)]">
+      <div className="leads-map-header flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-white via-blue-50/70 to-emerald-50/70 p-5">
         <div>
           <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Mapa dos leads filtrados</span>
-          <h3 className="mt-1 text-2xl font-black text-slate-950">Pontos com Leads</h3>
+          <h3 className="leads-map-title mt-1 text-2xl font-black text-slate-950">Pontos com Leads</h3>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {Object.entries(leadMapPriorityStyles).map(([key, item]) => (
@@ -4471,10 +4471,10 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
               </span>
             </button>
           ))}
-          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 shadow-sm">
+          <span className="leads-map-churches inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 shadow-sm">
             <Church size={14} />
             Igrejas
-            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] text-emerald-700">{formatNumber(churchPoints.length)}</span>
+            <span className="leads-map-church-count rounded-full bg-white px-2 py-0.5 text-[10px] text-emerald-700">{formatNumber(churchPoints.length)}</span>
           </span>
         </div>
         {sampleLead ? (
@@ -5878,7 +5878,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
             </div>
             <div className="flex flex-wrap items-end justify-end gap-3">
               <button
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-black px-4 text-sm font-black text-white shadow-sm transition hover:bg-emerald-50 hover:text-white"
+                className="leads-geolocation-link inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-slate-950 px-4 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 hover:text-white"
                 onClick={() => onNavigate('geolocation')}
                 type="button"
               >

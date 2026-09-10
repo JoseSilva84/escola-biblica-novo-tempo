@@ -247,6 +247,88 @@
   color: rgb(209 250 229) !important;
 }
 
+.app-light .leads-map-card {
+  border-color: rgba(203, 213, 225, 0.88) !important;
+  background: #ffffff !important;
+}
+
+.app-light .leads-map-header {
+  border-color: rgb(226 232 240) !important;
+  background: linear-gradient(90deg, #ffffff 0%, #eff6ff 52%, #ecfdf5 100%) !important;
+}
+
+.app-light .leads-map-title {
+  color: #0f172a !important;
+}
+
+.app-dark .leads-map-card {
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  background: #07121f !important;
+}
+
+.app-dark .leads-map-header {
+  border-color: rgba(148, 163, 184, 0.18) !important;
+  background: linear-gradient(105deg, #101d2d 0%, #10243a 52%, #092d2a 100%) !important;
+}
+
+.app-dark .leads-map-header > div:first-child > span {
+  color: rgb(147 197 253) !important;
+}
+
+.app-dark .leads-map-title {
+  color: rgb(248 250 252) !important;
+  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.34);
+}
+
+.app-light .leads-map-churches,
+html[data-crm-theme="light"] [role="dialog"] .leads-map-churches {
+  border-color: rgb(167 243 208) !important;
+  background: rgb(236 253 245) !important;
+  color: rgb(4 120 87) !important;
+}
+
+.app-light .leads-map-church-count,
+html[data-crm-theme="light"] [role="dialog"] .leads-map-church-count {
+  background: #ffffff !important;
+  color: rgb(4 120 87) !important;
+}
+
+.app-dark .leads-map-churches,
+html[data-crm-theme="dark"] [role="dialog"] .leads-map-churches {
+  border-color: rgba(52, 211, 153, 0.36) !important;
+  background: rgba(6, 78, 59, 0.72) !important;
+  color: rgb(209 250 229) !important;
+}
+
+.app-dark .leads-map-church-count,
+html[data-crm-theme="dark"] [role="dialog"] .leads-map-church-count {
+  background: rgb(2 44 34) !important;
+  color: rgb(167 243 208) !important;
+}
+
+.app-light .leads-geolocation-link {
+  border-color: #0f172a !important;
+  background: #0f172a !important;
+  color: #ffffff !important;
+}
+
+.app-dark .leads-geolocation-link {
+  border-color: rgba(52, 211, 153, 0.34) !important;
+  background: #132033 !important;
+  color: #ffffff !important;
+}
+
+.app-light .leads-geolocation-link:hover,
+.app-dark .leads-geolocation-link:hover {
+  border-color: #059669 !important;
+  background: #047857 !important;
+  color: #ffffff !important;
+}
+
+.leads-geolocation-link :is(svg, span) {
+  color: inherit !important;
+}
+
 /* Neutral utility surfaces inside dashboard panels inherit the active theme.
    This covers cards, tables and forms shared by pages that do not have a
    page-specific theme class yet. */
@@ -399,6 +481,10 @@ html[data-crm-theme="dark"] [role="dialog"] option {
   color: rgb(241 245 249);
 }
 
+html[data-crm-theme="dark"] .lead-operational-summary .lead-operational-summary-text {
+  color: #0f172a !important;
+}
+
 html[data-crm-theme="dark"] :is(.whatsapp-picker-modal, .whatsapp-broadcast-modal) [class~="bg-white"],
 html[data-crm-theme="dark"] :is(.whatsapp-picker-modal, .whatsapp-broadcast-modal) [class~="bg-slate-50"],
 html[data-crm-theme="dark"] :is(.whatsapp-picker-modal, .whatsapp-broadcast-modal) [class~="bg-slate-100"] {
@@ -475,6 +561,12 @@ html[data-crm-theme="dark"] .whatsapp-broadcast-modal .broadcast-recipient-chip 
 html[data-crm-theme="dark"] .whatsapp-broadcast-modal > div:last-child {
   border-color: rgba(148, 163, 184, 0.18) !important;
   background: #0c1826 !important;
+}
+
+.app-dark .premium-panel .leads-map-church-count,
+html[data-crm-theme="dark"] [role="dialog"] .leads-map-church-count {
+  background: rgb(2 44 34) !important;
+  color: rgb(167 243 208) !important;
 }
 
 @media (max-width: 900px) {
