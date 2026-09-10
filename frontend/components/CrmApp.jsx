@@ -67,9 +67,10 @@ import DashboardClient from './DashboardClient';
 
 const labelClass = 'text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500';
 const primaryButtonClass = 'primary-button-glow group relative inline-flex h-11 items-center justify-center gap-2 overflow-hidden rounded-xl bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_52%,#0f172a_100%)] px-4 text-sm font-bold text-white shadow-[0_18px_46px_rgba(37,99,235,0.34)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_24px_70px_rgba(37,99,235,0.30)] focus:outline-none focus:ring-4 focus:ring-blue-500/25 disabled:cursor-not-allowed disabled:opacity-70';
-const ghostButtonClass = 'group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-semibold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
+const ghostButtonClass = 'theme-ghost-button group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-900/10 bg-white/60 px-4 text-sm font-semibold text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_10px_28px_rgba(15,23,42,0.07)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-900/20 hover:bg-white hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-400/15';
 const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slate-950/60 shadow-[0_28px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.035] backdrop-blur-2xl';
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+const CRM_THEME_STORAGE_KEY = 'amigos-nt-theme';
 const GEOCODE_CHURCHES_VALUE = '__churches__';
 const adminNavItems = [
   ['admin', 'Dashboard', LayoutDashboard],
@@ -282,7 +283,7 @@ function defaultViewForUser(user) {
 
 function accessLabelForUser(user) {
   if (isAdminUser(user)) return 'Admin Geral';
-  return user?.associationName || user?.name || 'Associacao';
+  return user?.associationName || user?.name || 'Associação';
 }
 
 function allowedViewsForUser(user) {
@@ -353,6 +354,16 @@ function AppToaster({ theme = 'light' }) {
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString('pt-BR');
+}
+
+function initialCrmTheme() {
+  if (typeof window === 'undefined') return 'light';
+  try {
+    const savedTheme = window.localStorage.getItem(CRM_THEME_STORAGE_KEY);
+    return savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : 'light';
+  } catch {
+    return 'light';
+  }
 }
 
 function hexToRgb(hex) {
@@ -442,24 +453,24 @@ function formatDatasetDate(value) {
 
 function formatBrDateOnly(value) {
   const text = String(value || '').trim();
-  return /^\d{2}\/\d{2}\/\d{4}$/.test(text) ? text : 'data nao informada';
+  return /^\d{2}\/\d{2}\/\d{4}$/.test(text) ? text : 'data não informada';
 }
 
 function formatElapsedContactTime(days) {
   const totalDays = Number(days);
-  if (!Number.isFinite(totalDays)) return 'tempo nao informado';
+  if (!Number.isFinite(totalDays)) return 'tempo não informado';
   if (totalDays < 30) return `${formatNumber(totalDays)} dia${totalDays === 1 ? '' : 's'}`;
   if (totalDays < 365) {
     const months = Math.floor(totalDays / 30);
     const remainingDays = totalDays % 30;
     return remainingDays
-      ? `${formatNumber(months)} mes${months === 1 ? '' : 'es'} e ${formatNumber(remainingDays)} dia${remainingDays === 1 ? '' : 's'}`
-      : `${formatNumber(months)} mes${months === 1 ? '' : 'es'}`;
+      ? `${formatNumber(months)} ${months === 1 ? 'mês' : 'meses'} e ${formatNumber(remainingDays)} dia${remainingDays === 1 ? '' : 's'}`
+      : `${formatNumber(months)} ${months === 1 ? 'mês' : 'meses'}`;
   }
   const years = Math.floor(totalDays / 365);
   const remainingMonths = Math.floor((totalDays % 365) / 30);
   return remainingMonths
-    ? `${formatNumber(years)} ano${years === 1 ? '' : 's'} e ${formatNumber(remainingMonths)} mes${remainingMonths === 1 ? '' : 'es'}`
+    ? `${formatNumber(years)} ano${years === 1 ? '' : 's'} e ${formatNumber(remainingMonths)} ${remainingMonths === 1 ? 'mês' : 'meses'}`
     : `${formatNumber(years)} ano${years === 1 ? '' : 's'}`;
 }
 
@@ -616,8 +627,8 @@ function scopedAssociationsForUser(associations, user) {
     || associations.find((item) => item.name === user?.associationName)
     || {
       id: slug,
-      name: user?.associationName || user?.name || 'Associacao',
-      region: 'Territorio da associacao',
+      name: user?.associationName || user?.name || 'Associação',
+      region: 'Território da associação',
       status: 'Ativa',
       campaigns: 0,
       leads: 0,
@@ -680,7 +691,7 @@ function BibleStudyAnimation() {
   );
 }
 
-function LoginScreen({ onLogin }) {
+function LoginScreen({ onLogin, theme = 'light' }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [splashState, setSplashState] = useState('visible');
@@ -712,8 +723,8 @@ function LoginScreen({ onLogin }) {
       ]);
     } catch {
       setLoading(false);
-      toast.error('Nao foi possivel conectar', {
-        description: 'A API nao respondeu. Verifique a conexao e tente novamente.'
+      toast.error('Não foi possível conectar', {
+        description: 'A API não respondeu. Verifique a conexão e tente novamente.'
       });
       return;
     }
@@ -721,7 +732,7 @@ function LoginScreen({ onLogin }) {
     if (!response.ok) {
       setLoading(false);
       toast.error('Não foi possível entrar', {
-        description: 'Confira o email e a senha informados.'
+        description: 'Confira o e-mail e a senha informados.'
       });
       return;
     }
@@ -740,15 +751,15 @@ function LoginScreen({ onLogin }) {
     } catch {
       window.localStorage.removeItem('sevenflow_token');
       setLoading(false);
-      toast.error('Backend nao foi lido', {
-        description: 'A autenticacao funcionou, mas os dados do dashboard nao foram carregados.'
+      toast.error('Backend não foi lido', {
+        description: 'A autenticação funcionou, mas os dados do dashboard não foram carregados.'
       });
     }
   }
 
   return (
-    <main className="login-screen silver-stage app-light grid min-h-[100svh] place-items-center overflow-x-hidden overflow-y-auto px-5 py-10 text-slate-100">
-      <AppToaster />
+    <main className={`login-screen silver-stage ${theme === 'light' ? 'app-light' : 'app-dark'} grid min-h-[100svh] place-items-center overflow-x-hidden overflow-y-auto px-5 py-10 text-slate-100`}>
+      <AppToaster theme={theme} />
       {loading ? (
         <div className="login-loading-overlay" role="status" aria-live="polite">
           <div className="login-loading-card">
@@ -762,7 +773,7 @@ function LoginScreen({ onLogin }) {
       ) : null}
       
       {splashState !== 'hidden' ? (
-        <div className={`!fixed inset-0 z-[100] flex items-center justify-center bg-slate-50 transition-opacity duration-700 ease-in-out ${splashState === 'fading' ? 'opacity-0' : 'opacity-100'}`}>
+        <div className={`!fixed inset-0 z-[100] flex items-center justify-center transition-opacity duration-700 ease-in-out ${theme === 'dark' ? 'bg-slate-950' : 'bg-slate-50'} ${splashState === 'fading' ? 'opacity-0' : 'opacity-100'}`}>
           <img src="/logo.png" alt="Logo Novo Tempo" className="h-64 object-contain splash-logo-anim" />
         </div>
       ) : null}
@@ -803,7 +814,7 @@ function LoginScreen({ onLogin }) {
             <h2 className="mt-2 text-2xl font-black text-slate-50 text-center">Acesso aos Amigos NT</h2>
           </div>
           <label className="grid gap-2 text-sm font-bold text-slate-300 text-center">
-            Email
+            E-mail
             <input autoComplete="email" className="h-12 rounded-xl border border-white/[0.08] bg-slate-950/70 px-4 text-slate-100 outline-none transition focus:border-slate-200/40 focus:ring-4 focus:ring-slate-400/10 text-center" name="email" type="email" />
           </label>
           <label className="grid gap-2 text-sm font-bold text-slate-300 text-center">
@@ -827,7 +838,7 @@ function LoginScreen({ onLogin }) {
         </form>
         </section>
 
-        <p className="mt-8 text-center text-[11px] font-medium text-slate-500/85">
+        <p className="login-credit mt-8 text-center text-[11px] font-medium text-slate-500/85">
           Sistema desenvolvido por{' '}
           <span className="font-bold text-slate-700">@Seven Flow Tecnologia</span>
         </p>
@@ -1026,8 +1037,8 @@ function whatsappHistoryForLead(lead) {
   }
   if (lead.c !== null && lead.c !== undefined) {
     history.push({
-      title: 'Ultimo contato',
-      detail: `Contato em ${formatBrDateOnly(lead.lastContactDate)}. Decorrido ate hoje: ${formatElapsedContactTime(lead.c)} (${formatNumber(lead.c)} dias).`,
+      title: 'Último contato',
+      detail: `Contato em ${formatBrDateOnly(lead.lastContactDate)}. Decorrido até hoje: ${formatElapsedContactTime(lead.c)} (${formatNumber(lead.c)} dias).`,
       tone: 'bg-blue-500/10 border-blue-400/20 text-blue-100'
     });
   }
@@ -1041,7 +1052,7 @@ function whatsappHistoryForLead(lead) {
   if (!history.length) {
     history.push({
       title: 'Sem conversa importada',
-      detail: 'Este lead ainda nao possui texto de conversa do WhatsApp nos dados carregados.',
+      detail: 'Este lead ainda não possui texto de conversa do WhatsApp nos dados carregados.',
       tone: 'bg-slate-500/10 border-slate-400/20 text-slate-200'
     });
   }
@@ -1059,7 +1070,7 @@ function priorityBadgeClasses(priority) {
 }
 
 function inboxPhone(item) {
-  return item?.conversation?.phone || item?.tel || item?.sourceLead?.tel || item?.n || 'Numero nao informado';
+  return item?.conversation?.phone || item?.tel || item?.sourceLead?.tel || item?.n || 'Número não informado';
 }
 
 function InboxConversationModal({ item, question, answer, onClose }) {
@@ -1120,7 +1131,7 @@ function InboxConversationModal({ item, question, answer, onClose }) {
             <div className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
               <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Resposta ligada</span>
               <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">
-                {answer?.body || 'Ainda nao ha resposta salva para esta pergunta. Ao responder pela tela Conversas, ela ficara gravada no historico deste numero.'}
+                {answer?.body || 'Ainda não há resposta salva para esta pergunta. Ao responder pela tela Conversas, ela ficará gravada no histórico deste número.'}
               </p>
             </div>
           </section>
@@ -1186,7 +1197,7 @@ function LeadDetailOsmMap({ captureRef, churches = [], lead }) {
         `);
 
       for (const { church, point: churchPoint } of visibleChurches) {
-        const precisionLabel = churchPoint.precision === 'Endereco' ? 'Endereco exato' : 'Distrito aproximado';
+        const precisionLabel = churchPoint.precision === 'Endereco' ? 'Endereço exato' : 'Distrito aproximado';
         const churchIcon = L.divIcon({
           className: 'church-map-marker',
           html: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v4"/><path d="M10 5h4"/><path d="M5 22V10l7-4 7 4v12"/><path d="M2 22h20"/><path d="M10 22v-5a2 2 0 0 1 4 0v5"/><path d="M9 13h6"/></svg>',
@@ -1257,26 +1268,26 @@ function LeadDetailModal({ churches = [], lead, onClose }) {
 
   const fields = [
     ['Nome', lead.n],
-    ['WhatsApp', lead.tel || 'Nao informado'],
-    ['E-mail', lead.em || 'Nao informado'],
+    ['WhatsApp', lead.tel || 'Não informado'],
+    ['E-mail', lead.em || 'Não informado'],
     ['Distrito', lead.d],
-    ['Endereco completo', `${leadStreetAndNumber(lead)} - Bairro: ${leadNeighborhood(lead)}`],
-    ['Idade', lead.a || 'Nao informada'],
-    ['Data de aniversario', lead.birthDate || 'Nao informada'],
-    ['Genero', lead.g === 'M' ? 'Masculino' : lead.g === 'F' ? 'Feminino' : 'Nao informado'],
-    ['Religiao', lead.r],
-    ['VIP', lead.v ? 'Sim' : 'Nao'],
-    ['Estudo ativo', lead.e ? 'Sim' : 'Nao'],
+    ['Endereço completo', `${leadStreetAndNumber(lead)} - Bairro: ${leadNeighborhood(lead)}`],
+    ['Idade', lead.a || 'Não informada'],
+    ['Data de aniversário', lead.birthDate || 'Não informada'],
+    ['Gênero', lead.g === 'M' ? 'Masculino' : lead.g === 'F' ? 'Feminino' : 'Não informado'],
+    ['Religião', lead.r],
+    ['VIP', lead.v ? 'Sim' : 'Não'],
+    ['Estudo ativo', lead.e ? 'Sim' : 'Não'],
     ['Material principal', lead.tm],
-    ['Material recebido', lead.materialName || 'Nao informado'],
+    ['Material recebido', lead.materialName || 'Não informado'],
     ['Materiais recebidos', formatNumber(lead.m)],
-    ['Descricao', lead.desc && lead.desc !== 'N/I' ? lead.desc : 'Nao informada'],
+    ['Descrição', lead.desc && lead.desc !== 'N/I' ? lead.desc : 'Não informada'],
     ['Prioridade ML', crmPriorityLabels[lead.p] || lead.p],
     ['Score operacional', lead.s],
     ['Similaridade VIP', `${Math.round((lead.sim || 0) * 100)}%`],
-    ['Faixa', lead.faixa || 'Nao informada']
+    ['Faixa', lead.faixa || 'Não informada']
   ];
-  const operationalSummary = `${lead.t ? 'Contato apto para WhatsApp.' : 'Contato sem WhatsApp valido.'} ${lead.v ? 'Marcado como VIP. ' : ''}${lead.e ? 'Possui estudo ativo para acompanhamento.' : 'Sem estudo ativo registrado.'}`;
+  const operationalSummary = `${lead.t ? 'Contato apto para WhatsApp.' : 'Contato sem WhatsApp válido.'} ${lead.v ? 'Marcado como VIP. ' : ''}${lead.e ? 'Possui estudo ativo para acompanhamento.' : 'Sem estudo ativo registrado.'}`;
   const whatsappHistory = whatsappHistoryForLead(lead);
 
   async function exportLeadDetailPdf() {
@@ -1454,7 +1465,7 @@ function LeadDetailModal({ churches = [], lead, onClose }) {
               {fields.map(([label, value]) => (
                 <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.05)]" key={label}>
                   <span className="block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
-                  <strong className="mt-1 block break-words text-sm leading-relaxed text-slate-950">{String(value ?? 'Nao informado')}</strong>
+                  <strong className="mt-1 block break-words text-sm leading-relaxed text-slate-950">{String(value ?? 'Não informado')}</strong>
                 </div>
               ))}
             </div>
@@ -1508,10 +1519,10 @@ function AssociationLeadExplorer({ association, records, district = '', onDistri
     <section className={`${panelClass} p-6`}>
       <div className="mb-5 flex items-start justify-between gap-4 max-lg:flex-col">
         <div>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Leads da associacao selecionada</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Leads da associação selecionada</span>
           <h2 className="mt-1 text-2xl font-black tracking-normal text-slate-950">Buscar leads por distrito</h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
-            Clique em qualquer lead para abrir todos os dados cadastrados e o historico de WhatsApp importado.
+            Clique em qualquer lead para abrir todos os dados cadastrados e o histórico de WhatsApp importado.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 text-right max-sm:w-full max-sm:text-left">
@@ -1563,7 +1574,7 @@ function AssociationLeadExplorer({ association, records, district = '', onDistri
         </div>
       ) : (
         <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5 text-sm text-slate-400">
-          Os leads completos ainda estao carregados apenas para a Associacao Paulistana.
+          Os leads completos ainda estão carregados apenas para a Associação Paulistana.
         </div>
       )}
       <LeadDetailModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
@@ -1823,10 +1834,10 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
       setProgressLabel('Consolidando Excel, JSON e ranking ML...');
       result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(result?.message || 'Nao foi possivel atualizar a base.');
+        throw new Error(result?.message || 'Não foi possível atualizar a base.');
       }
       setProgress(82);
-      setProgressLabel('Atualizacao concluida. Recarregando painel...');
+      setProgressLabel('Atualização concluída. Recarregando painel...');
       setLastResult(result);
       setFiles([]);
       form.reset();
@@ -1835,14 +1846,14 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
         description: `${formatNumber(novos)} aluno(s) novo(s) inseridos e ML recalculado.`
       });
       if (result?.historyWarning) {
-        toast.warning('Historico pendente', {
-          description: 'A base foi atualizada, mas o historico no banco precisa ser verificado.'
+        toast.warning('Histórico pendente', {
+          description: 'A base foi atualizada, mas o histórico no banco precisa ser verificado.'
         });
       }
     } catch (error) {
       setProgress(0);
       setProgressLabel('');
-      toast.error('Atualizacao falhou', {
+      toast.error('Atualização falhou', {
         description: error.message || 'Confira os arquivos e tente novamente.'
       });
       setUploading(false);
@@ -1855,7 +1866,7 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
       setProgressLabel('Painel atualizado.');
     } catch {
       toast.warning('Base atualizada', {
-        description: 'Os arquivos foram processados. Recarregue a pagina se os numeros nao mudarem de imediato.'
+        description: 'Os arquivos foram processados. Recarregue a página se os números não mudarem de imediato.'
       });
     } finally {
       window.setTimeout(() => {
@@ -1877,7 +1888,7 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
           <span className={labelClass}>Base de dados</span>
           <h2 className="mt-1 text-xl font-black text-slate-50">Atualizar interessados de {association.name}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
-            Envie um ou mais Excels. O sistema compara com a base atual, adiciona apenas alunos novos e recalcula a priorizacao ML.
+            Envie um ou mais arquivos Excel. O sistema compara com a base atual, adiciona apenas alunos novos e recalcula a priorização ML.
           </p>
         </div>
         <span className="inline-flex items-center gap-2 rounded-full bg-blue-500 px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
@@ -1922,7 +1933,7 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
             <Database size={17} />
             {uploading ? 'Atualizando...' : 'Atualizar base e recalcular ML'}
           </button>
-          {!canUpdate && <span className="text-sm text-slate-400">Disponivel apenas para Admin Geral.</span>}
+          {!canUpdate && <span className="text-sm text-slate-400">Disponível apenas para Admin Geral.</span>}
           {uploading && <span className="text-sm font-semibold !text-slate-900">{progressLabel || 'Processando Excel, JSON e ranking ML...'}</span>}
         </div>
         {uploading && (
@@ -1943,7 +1954,7 @@ function DatasetUploadPanel({ association, onUpdated, user }) {
           <div className="mt-5 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
             <MetricCard detail="antes do upload" icon={UsersRound} label="Base anterior" value={formatNumber(consolidation.linhas_antes)} />
             <MetricCard detail="inseridos agora" icon={BadgePlus} label="Novos alunos" tone="green" value={formatNumber(consolidation.alunos_novos)} />
-            <MetricCard detail="apos consolidar" icon={CheckCircle2} label="Base final" value={formatNumber(consolidation.linhas_depois)} />
+            <MetricCard detail="após consolidar" icon={CheckCircle2} label="Base final" value={formatNumber(consolidation.linhas_depois)} />
             <MetricCard detail={`${formatNumber(ml?.vips || 0)} VIPs historicos`} icon={Sparkles} label="ML registros" tone="orange" value={formatNumber(ml?.registros || 0)} />
           </div>
           <div className="mt-5">
@@ -1975,14 +1986,14 @@ function LastDatasetUpdateCard({ update }) {
     <section className={`${panelClass} dataset-update-card overflow-hidden p-6`}>
       <div className="dataset-update-grid grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-6 max-xl:grid-cols-1">
         <div className="min-w-0">
-          <span className={labelClass}>Ultima entrada na base</span>
+          <span className={labelClass}>Última entrada na base</span>
           <h2 className="mt-2 text-3xl font-black text-slate-50">
             {hasUpdate ? `${formatNumber(consolidation.alunos_novos)} novos alunos` : 'Nenhum upload registrado'}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-400">
             {hasUpdate
               ? `Processado em ${date}. A base foi de ${formatNumber(consolidation.linhas_antes)} para ${formatNumber(consolidation.linhas_depois)} registros.`
-              : 'Quando um Excel for enviado pelo painel, este card mostrara o resumo da entrada mais recente.'}
+              : 'Quando um Excel for enviado pelo painel, este card mostrará o resumo da entrada mais recente.'}
           </p>
           <div className="dataset-file-list mt-4 flex min-w-0 flex-wrap gap-2">
             {(consolidation?.arquivos || []).map((file) => (
@@ -2019,7 +2030,7 @@ function LastDatasetUpdateCard({ update }) {
               </div>
             )) : (
               <div className="rounded-xl border border-white/[0.07] bg-slate-950/42 px-4 py-3 text-sm font-semibold text-slate-400">
-                Nenhum distrito novo registrado nesta atualizacao.
+                Nenhum distrito novo registrado nesta atualização.
               </div>
             )}
           </div>
@@ -2047,8 +2058,8 @@ function DatasetHistoryView({ history = [], onBack }) {
         }
       } catch {
         if (active) {
-          toast.warning('Historico indisponivel', {
-            description: 'Nao foi possivel consultar o historico no banco agora.'
+          toast.warning('Histórico indisponível', {
+            description: 'Não foi possível consultar o histórico no banco agora.'
           });
         }
       } finally {
@@ -2076,10 +2087,10 @@ function DatasetHistoryView({ history = [], onBack }) {
       <section className={`${panelClass} overflow-hidden p-6`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <span className={labelClass}>Historico do dataset</span>
-            <h1 className="silver-title mt-2 text-4xl font-extrabold leading-tight tracking-normal max-md:text-3xl">Excels processados</h1>
+            <span className={labelClass}>Histórico do dataset</span>
+            <h1 className="silver-title mt-2 text-4xl font-extrabold leading-tight tracking-normal max-md:text-3xl">Arquivos Excel processados</h1>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
-              Cada atualizacao manual fica registrada aqui com arquivos enviados, novos leads, duplicidades e resumo por distrito.
+              Cada atualização manual fica registrada aqui com arquivos enviados, novos leads, duplicidades e resumo por distrito.
             </p>
           </div>
           <button className={ghostButtonClass} onClick={onBack} type="button">
@@ -2091,7 +2102,7 @@ function DatasetHistoryView({ history = [], onBack }) {
 
       <section className="history-dark-surface grid gap-4">
         {loading ? (
-          <div className={`${panelClass} p-6 text-sm font-semibold text-slate-400`}>Carregando historico salvo no banco...</div>
+          <div className={`${panelClass} p-6 text-sm font-semibold text-slate-400`}>Carregando histórico salvo no banco...</div>
         ) : null}
         {safeHistory.length ? (
           safeHistory.map((entry, index) => {
@@ -2163,7 +2174,7 @@ function DatasetHistoryView({ history = [], onBack }) {
                           <strong className="block text-sm !text-white">{file.arquivo || file.name}</strong>
                           {'lidos' in file ? (
                             <span className="text-xs font-semibold !text-slate-300">
-                              {formatNumber(file.lidos)} lidos | {formatNumber(file.novos)} novos | {formatNumber(file.ja_existiam)} ja existiam | {formatNumber(file.duplicados_upload)} duplicados no upload
+                              {formatNumber(file.lidos)} lidos | {formatNumber(file.novos)} novos | {formatNumber(file.ja_existiam)} já existiam | {formatNumber(file.duplicados_upload)} duplicados no upload
                             </span>
                           ) : (
                             <span className="text-xs font-semibold !text-slate-300">{file.size ? `${(Number(file.size) / 1024 / 1024).toFixed(1)} MB` : 'Arquivo registrado'}</span>
@@ -2180,8 +2191,8 @@ function DatasetHistoryView({ history = [], onBack }) {
                         <span>Horario Brasil: {mlDate}</span>
                         <span>Registros: {formatMlDelta(mlSummary, 'registros', mlMetrics.registros)}</span>
                         <span>VIPs historicos: {formatMlDelta(mlSummary, 'vips', mlMetrics.vips)}</span>
-                        <span>Ranking nao VIP: {formatMlDelta(mlSummary, 'ranking_nao_vip', mlMetrics.ranking_nao_vip)}</span>
-                        <span>Arquivos: {(mlStatus.arquivos_atualizados || []).join(', ') || 'metricas e rankings atualizados'}</span>
+                        <span>Ranking não VIP: {formatMlDelta(mlSummary, 'ranking_nao_vip', mlMetrics.ranking_nao_vip)}</span>
+                        <span>Arquivos: {(mlStatus.arquivos_atualizados || []).join(', ') || 'métricas e rankings atualizados'}</span>
                       </div>
                     </div>
                   </div>
@@ -2205,11 +2216,11 @@ function DatasetHistoryView({ history = [], onBack }) {
                                   {districtLeads.length ? districtLeads.map((lead) => (
                                     <div className="rounded-lg bg-slate-950/70 px-3 py-2" key={`${lead.id}-${lead.email}-${lead.nome}`}>
                                       <strong className="block text-sm !text-white">{lead.nome}</strong>
-                                      <span className="block text-xs font-semibold !text-slate-300">ID {lead.id || 'sem ID'} | {lead.telefone || 'sem telefone'} | {lead.email || 'sem email'}</span>
-                                      <span className="block text-xs font-semibold !text-slate-400">{lead.cidade || 'cidade nao informada'} | {lead.bairro || 'bairro nao informado'} | {lead.arquivo}</span>
+                                      <span className="block text-xs font-semibold !text-slate-300">ID {lead.id || 'sem ID'} | {lead.telefone || 'sem telefone'} | {lead.email || 'sem e-mail'}</span>
+                                      <span className="block text-xs font-semibold !text-slate-400">{lead.cidade || 'cidade não informada'} | {lead.bairro || 'bairro não informado'} | {lead.arquivo}</span>
                                     </div>
                                   )) : (
-                                    <span className="block px-2 pb-2 text-xs font-semibold !text-slate-300">Este upload antigo nao tem a lista nominal salva.</span>
+                                    <span className="block px-2 pb-2 text-xs font-semibold !text-slate-300">Este upload antigo não tem a lista nominal salva.</span>
                                   )}
                                 </div>
                               ) : null}
@@ -2261,10 +2272,10 @@ function DatasetHistoryModal({ history = [], onClose }) {
       <div className="theme-modal-surface max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/[0.10] bg-slate-950 text-slate-100 shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
         <div className="theme-modal-header flex items-start justify-between gap-4 border-b border-white/[0.08] p-6">
           <div>
-            <span className={labelClass}>Historico do dataset</span>
-            <h2 className="mt-1 text-2xl font-black">Excels processados</h2>
+            <span className={labelClass}>Histórico do dataset</span>
+            <h2 className="mt-1 text-2xl font-black">Arquivos Excel processados</h2>
           </div>
-          <button className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] bg-white/10 text-white" onClick={onClose} type="button" aria-label="Fechar historico">
+          <button className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] bg-white/10 text-white" onClick={onClose} type="button" aria-label="Fechar histórico">
             <X size={18} />
           </button>
         </div>
@@ -2299,7 +2310,7 @@ function DatasetHistoryModal({ history = [], onClose }) {
                             <div className="theme-modal-card rounded-xl bg-slate-900/70 px-3 py-2 text-sm" key={file.arquivo}>
                               <strong>{file.arquivo}</strong>
                               <span className="block text-xs text-slate-400">
-                                {formatNumber(file.lidos)} lidos · {formatNumber(file.novos)} novos · {formatNumber(file.ja_existiam)} ja existiam · {formatNumber(file.duplicados_upload)} duplicados no upload
+                                {formatNumber(file.lidos)} lidos · {formatNumber(file.novos)} novos · {formatNumber(file.ja_existiam)} já existiam · {formatNumber(file.duplicados_upload)} duplicados no upload
                               </span>
                             </div>
                           ))}
@@ -2315,7 +2326,7 @@ function DatasetHistoryModal({ history = [], onClose }) {
                           ))}
                           {alertCount ? (
                             <span className="rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold text-red-200">
-                              {formatNumber(alertCount)} alerta(s) de ID/email/nome repetido
+                              {formatNumber(alertCount)} alerta(s) de ID/e-mail/nome repetido
                             </span>
                           ) : null}
                         </div>
@@ -2889,8 +2900,8 @@ function LeadAnalyticsSection({ data: allData, records: allRecords = [], interes
         ],
         contactQuality: pilotValidContactGroups,
         description: [
-          leadGroup('Com descrição', interestRecords.filter((lead) => lead.temDescricao)),
-          leadGroup('Sem descrição', interestRecords.filter((lead) => !lead.temDescricao))
+          leadGroup('Com descrição', interestRecords.filter((lead) => lead.temDescrição)),
+          leadGroup('Sem descrição', interestRecords.filter((lead) => !lead.temDescrição))
         ],
         vipHistory: [
           leadGroup('VIP histórico', interestRecords.filter((lead) => lead.vipHistorico)),
@@ -3963,7 +3974,7 @@ function AssociationDashboard({ association, data, records = [], interestRecords
               </button>
               <button className={ghostButtonClass} onClick={onOpenHistory} type="button">
                 <ClipboardList size={18} />
-                Historico das atualizacoes
+                Histórico das atualizações
               </button>
             </div>
           </div>
@@ -4017,7 +4028,7 @@ function AssociationDashboard({ association, data, records = [], interestRecords
           <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5">
             <span className={labelClass}>Campanhas cadastradas</span>
             <strong className="mt-2 block text-3xl font-black text-slate-50">0</strong>
-            <span className="mt-2 block text-sm leading-relaxed text-slate-400">Nenhuma campanha real cadastrada para esta associacao.</span>
+            <span className="mt-2 block text-sm leading-relaxed text-slate-400">Nenhuma campanha real cadastrada para esta associação.</span>
           </div>
         </article>
 
@@ -4050,11 +4061,11 @@ function AssociationDashboard({ association, data, records = [], interestRecords
 
 function leadNeighborhood(lead) {
   const parts = String(lead?.end || '').split(' - ').map((part) => part.trim()).filter(Boolean);
-  return parts[1] || 'Nao informado';
+  return parts[1] || 'Não informado';
 }
 
 function leadMaterial(lead) {
-  return lead?.material || lead?.materialName || lead?.materialPrincipal || lead?.tm || 'Nao informado';
+  return lead?.material || lead?.materialName || lead?.materialPrincipal || lead?.tm || 'Não informado';
 }
 
 function renderPreviewTemplate(message, lead = {}) {
@@ -4074,7 +4085,7 @@ function renderPreviewTemplate(message, lead = {}) {
 function leadAgeGroup(lead) {
   const age = Number(lead?.a);
   if (!Number.isFinite(age) || age <= 0) return 'Sem idade';
-  if (age <= 17) return 'Ate 17';
+  if (age <= 17) return 'Até 17';
   if (age <= 29) return '18 a 29';
   if (age <= 44) return '30 a 44';
   if (age <= 59) return '45 a 59';
@@ -4122,7 +4133,7 @@ function leadContactTimeRange(lead) {
 function leadGenderLabel(value) {
   if (value === 'F') return 'Feminino';
   if (value === 'M') return 'Masculino';
-  return 'Nao informado';
+  return 'Não informado';
 }
 
 function escapeMapHtml(value) {
@@ -4177,7 +4188,7 @@ function cityFromAddress(lead) {
   const stateIndex = parts.findIndex((part) => /^[A-Z]{2}$/.test(part));
   if (stateIndex > 0) return parts[stateIndex - 1];
   const compactParts = String(lead?.end || '').split(' - ').map((part) => part.trim()).filter(Boolean);
-  return compactParts[0] || lead?.d || 'Sao Paulo';
+  return compactParts[0] || lead?.d || 'São Paulo';
 }
 
 function fullLeadAddress(lead) {
@@ -4190,7 +4201,7 @@ function fullLeadAddress(lead) {
       const value = String(part || '').trim();
       return value && value !== 'N/I' && list.findIndex((item) => String(item || '').trim() === value) === index;
     });
-  return parts.join(' - ') || 'Endereco nao informado';
+  return parts.join(' - ') || 'Endereço não informado';
 }
 
 function leadStreetAndNumber(lead) {
@@ -4350,11 +4361,11 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
 
         for (const { lead, point } of mappableLeads) {
           const fullAddress = fullLeadAddress(lead);
-          const precisionLabel = point.precision === 'Endereco' ? 'Endereco exato' : 'Ponto aproximado';
+          const precisionLabel = point.precision === 'Endereco' ? 'Endereço exato' : 'Ponto aproximado';
           const needsGoogleCheck = point.precision !== 'Endereco' || lead.geoNotFound;
           const precisionWarning = lead.geoNotFound
-            ? 'Coordenada nao encontrada no OSM. Conferir ou corrigir endereco pelo Google Maps.'
-            : 'Coordenada aproximada. Conferir precisao no Google Maps.';
+            ? 'Coordenada não encontrada no OSM. Conferir ou corrigir endereço pelo Google Maps.'
+            : 'Coordenada aproximada. Conferir precisão no Google Maps.';
           const priorityStyle = leadMapPriorityStyle(lead.p);
           const markerSize = lead.p === 'Hot' ? 20 : 18;
           const leadIcon = L.divIcon({
@@ -4374,8 +4385,8 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
             ${escapeMapHtml(lead.tel || 'sem telefone')}<br>
             <small>${escapeMapHtml(precisionLabel)}</small><br>
             ${needsGoogleCheck ? `<small style="display:block;color:#b45309;font-weight:700;max-width:260px">${escapeMapHtml(precisionWarning)}</small>` : ''}
-            <a href="${openStreetMapSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no OSM</a><br>
-            <a href="${googleMapsSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereco no Google Maps (precisao)</a><br>
+            <a href="${openStreetMapSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereço no OSM</a><br>
+            <a href="${googleMapsSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereço no Google Maps (precisão)</a><br>
             <button type="button" data-lead-details style="width:100%;margin-top:10px;padding:9px 12px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(37,99,235,.25)">
               Detalhes do Lead
             </button>
@@ -4393,7 +4404,7 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
         }
 
         for (const { church, point } of churchPoints) {
-          const precisionLabel = point.precision === 'Endereco' ? 'Endereco exato' : 'Distrito aproximado';
+          const precisionLabel = point.precision === 'Endereco' ? 'Endereço exato' : 'Distrito aproximado';
           const churchIcon = L.divIcon({
             className: 'church-map-marker',
             html: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v4"/><path d="M10 5h4"/><path d="M5 22V10l7-4 7 4v12"/><path d="M2 22h20"/><path d="M10 22v-5a2 2 0 0 1 4 0v5"/><path d="M9 13h6"/></svg>',
@@ -4409,7 +4420,7 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
             ${church.address ? `${escapeMapHtml(church.address)}<br>` : ''}
             <small>${escapeMapHtml(precisionLabel)}</small><br>
             <a href="${churchMapSearchUrl(church, 'osm')}" target="_blank" rel="noreferrer">Abrir igreja no OSM</a><br>
-            <a href="${churchMapSearchUrl(church, 'google')}" target="_blank" rel="noreferrer">Abrir igreja no Google Maps (precisao)</a>
+            <a href="${churchMapSearchUrl(church, 'google')}" target="_blank" rel="noreferrer">Abrir igreja no Google Maps (precisão)</a>
           `);
           markersRef.current.push(churchMarker);
           bounds.extend([point.lat, point.lng]);
@@ -4482,11 +4493,11 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
         ) : null}
         {status === 'error' ? (
           <div className="absolute inset-x-4 top-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800 shadow-lg">
-            Nao foi possivel carregar o mapa. Verifique a conexao com os blocos do OpenStreetMap.
+            Não foi possível carregar o mapa. Verifique a conexão com os blocos do OpenStreetMap.
           </div>
         ) : null}
         <div className="absolute bottom-4 left-4 max-w-xl rounded-2xl border border-amber-200 bg-amber-50/95 px-4 py-3 text-xs font-bold leading-relaxed text-amber-900 shadow-lg backdrop-blur">
-          Sem geocodificacao paga: pontos aproximados por cidade, distrito e bairro. Quando houver latitude/longitude real importada, o mapa usa a posicao exata.
+          Sem geocodificação paga: pontos aproximados por cidade, distrito e bairro. Quando houver latitude/longitude real importada, o mapa usa a posição exata.
         </div>
       </div>
     </section>
@@ -4495,7 +4506,7 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
 
 function topOptions(records, getValue, limit = null) {
   const counts = records.reduce((map, lead) => {
-    const value = getValue(lead) || 'Nao informado';
+    const value = getValue(lead) || 'Não informado';
     map.set(value, (map.get(value) || 0) + 1);
     return map;
   }, new Map());
@@ -4640,7 +4651,7 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
   }, [activeStatus, normalizedSearch, selectedDistrict]);
   const overviewCards = [
     ['Leads geocodificados', totals.exact + totals.approximate, 'com latitude e longitude', MapPin, 'border-blue-500 bg-blue-600 text-white'],
-    ['Exatos', totals.exact, 'precisao de endereco', CheckCircle2, 'border-emerald-500 bg-emerald-600 text-white'],
+    ['Exatos', totals.exact, 'precisão de endereço', CheckCircle2, 'border-emerald-500 bg-emerald-600 text-white'],
     ['Aproximados', totals.approximate, 'usar com conferencia', Bell, 'border-orange-500 bg-orange-600 text-white'],
     ['Pendentes', totals.pending, `${formatNumber(totals.notFound)} sem resultado anterior`, X, 'border-fuchsia-500 bg-fuchsia-600 text-white']
   ];
@@ -4661,13 +4672,13 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
         body: JSON.stringify({ leadId: lead.id, limit: 1, force: true })
       });
       if (response.ok) {
-        toast.success('Geocodificacao iniciada', { description: `Atualizando ${lead.n || `lead ${lead.id}`}.` });
+        toast.success('Geocodificação iniciada', { description: `Atualizando ${lead.n || `lead ${lead.id}`}.` });
         window.setTimeout(() => onDatasetUpdated?.().catch(() => {}), 4500);
       } else {
-        toast.info('Geocodificacao em andamento', { description: 'Aguarde a rotina atual terminar para atualizar este lead.' });
+        toast.info('Geocodificação em andamento', { description: 'Aguarde a rotina atual terminar para atualizar este lead.' });
       }
     } catch {
-      toast.error('Nao foi possivel iniciar a atualizacao deste lead.');
+      toast.error('Não foi possível iniciar a atualização deste lead.');
     } finally {
       setUpdatingLeadId(null);
     }
@@ -4678,7 +4689,7 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Geolocalizacao</span>
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Geolocalização</span>
             <h1 className="mt-2 text-4xl font-black tracking-normal text-slate-950">Painel de coordenadas</h1>
             <p className="mt-3 max-w-3xl text-sm font-semibold leading-relaxed text-slate-600">
               Acompanhe por distrito quais leads e igrejas tem coordenada exata, aproximada ou ainda precisam ser atualizados.
@@ -4801,7 +4812,7 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="bg-slate-950/90 text-left">
-                      {['Nome', 'Status', 'Endereco', 'WhatsApp', 'Acao'].map((head) => (
+                      {['Nome', 'Status', 'Endereço', 'WhatsApp', 'Ação'].map((head) => (
                         <th className="sticky top-0 z-[1] border-b border-white/[0.1] bg-slate-950 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white/75" key={head}>{head}</th>
                       ))}
                     </tr>
@@ -4848,7 +4859,7 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
                           {statusLabel(church.geoStatus)}
                         </span>
                       </div>
-                      <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-600">{church.address || 'Endereco nao informado'}</p>
+                      <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-600">{church.address || 'Endereço não informado'}</p>
                     </div>
                   ))}
                   {!selectedDistrict.churches.length ? <p className="text-sm font-semibold text-slate-600">Nenhuma igreja cadastrada neste distrito.</p> : null}
@@ -4856,7 +4867,7 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
               </div>
             </>
           ) : (
-            <p className="text-sm font-semibold text-slate-400">Nenhum distrito disponivel.</p>
+            <p className="text-sm font-semibold text-slate-400">Nenhum distrito disponível.</p>
           )}
         </div>
       </section>
@@ -4914,7 +4925,7 @@ function isAdventistReligion(value) {
 }
 
 function leadReligionValue(lead) {
-  return String(lead?.r || 'Nao informado').trim() || 'Nao informado';
+  return String(lead?.r || 'Não informado').trim() || 'Não informado';
 }
 
 function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear, compact = false }) {
@@ -4932,7 +4943,7 @@ function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear,
   }, [compact, options, query, selected]);
 
   return (
-    <div className="min-w-0 rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-[0_14px_34px_rgba(15,23,42,0.07)] ring-1 ring-white/70">
+    <div className="leads-filter-group min-w-0 rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-[0_14px_34px_rgba(15,23,42,0.07)] ring-1 ring-white/70">
       <div className="mb-2 flex items-center justify-between gap-3">
         <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">{title}</span>
         {selected.length ? (
@@ -4958,6 +4969,7 @@ function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear,
           return (
             <button
               className={`inline-flex min-h-9 max-w-full items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition ${active ? 'border-blue-500 bg-blue-600 text-white shadow-[0_12px_26px_rgba(37,99,235,0.24)]' : 'border-slate-200 bg-slate-50 text-slate-700 shadow-sm hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800'}`}
+              data-active={active ? 'true' : 'false'}
               key={option.value}
               onClick={() => onToggle(option.value)}
               type="button"
@@ -4967,7 +4979,7 @@ function AdvancedFilterGroup({ title, options, selected = [], onToggle, onClear,
             </button>
           );
         })}
-        {!visibleOptions.length ? <span className="text-xs font-bold text-slate-500">Nenhuma opcao encontrada.</span> : null}
+        {!visibleOptions.length ? <span className="text-xs font-bold text-slate-500">Nenhuma opção encontrada.</span> : null}
       </div>
     </div>
   );
@@ -5069,7 +5081,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   );
   const neighborhoodOptions = useMemo(() => topOptions(recordsForNeighborhoodOptions, leadNeighborhood), [recordsForNeighborhoodOptions]);
   const materialOptions = useMemo(() => topOptions(recordsForMaterialOptions, leadMaterial), [recordsForMaterialOptions]);
-  const ageOptions = useMemo(() => ['Ate 17', '18 a 29', '30 a 44', '45 a 59', '60+', 'Sem idade'].map((value) => ({
+  const ageOptions = useMemo(() => ['Até 17', '18 a 29', '30 a 44', '45 a 59', '60+', 'Sem idade'].map((value) => ({
     value,
     label: value,
     count: recordsForAgeOptions.filter((lead) => leadAgeGroup(lead) === value).length
@@ -5111,12 +5123,12 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
     vip: [
       ['all', `Todos (${formatNumber(recordsForToggleOptions.vip.length)})`],
       ['with', `VIP (${formatNumber(recordsForToggleOptions.vip.filter((lead) => lead.v).length)})`],
-      ['without', `Nao VIP (${formatNumber(recordsForToggleOptions.vip.filter((lead) => !lead.v).length)})`]
+      ['without', `Não VIP (${formatNumber(recordsForToggleOptions.vip.filter((lead) => !lead.v).length)})`]
     ],
     religion: [
       ['all', `Todos (${formatNumber(recordsForToggleOptions.religion.length)})`],
       ['adventist', `Adventista (${formatNumber(recordsForToggleOptions.religion.filter((lead) => isAdventistReligion(lead.r)).length)})`],
-      ['non-adventist', `Nao Adventista (${formatNumber(recordsForToggleOptions.religion.filter((lead) => !isAdventistReligion(lead.r)).length)})`],
+      ['non-adventist', `Não adventista (${formatNumber(recordsForToggleOptions.religion.filter((lead) => !isAdventistReligion(lead.r)).length)})`],
       ...topOptions(
         recordsForToggleOptions.religion.filter((lead) => !isAdventistReligion(lead.r)),
         leadReligionValue
@@ -5195,18 +5207,18 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       if (info) setGeocodeInfo(info);
       if (response.ok) {
         geocodeWasRunningRef.current = true;
-        toast.success('Geocodificacao iniciada', {
+        toast.success('Geocodificação iniciada', {
           description: geocodeChurchesSelected
-            ? 'O backend vai salvar coordenadas das igrejas usando os enderecos oficiais.'
+            ? 'O backend vai salvar coordenadas das igrejas usando os endereços oficiais.'
             : geocodeDistrict
             ? `O backend vai salvar coordenadas de ${geocodeDistrict} aos poucos, sem travar o sistema.`
             : 'O backend vai salvar coordenadas aos poucos, sem travar o sistema.'
         });
       } else {
-        toast.info('Geocodificacao ja esta em andamento.');
+        toast.info('Geocodificação já está em andamento.');
       }
     } catch {
-      toast.error('Nao foi possivel iniciar a geocodificacao.');
+      toast.error('Não foi possível iniciar a geocodificação.');
     } finally {
       setGeocodeLoading(false);
     }
@@ -5683,7 +5695,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
             <span className={labelClass}>CRM de leads</span>
             <h1 className="silver-title mt-2 text-5xl font-extrabold leading-tight tracking-normal max-md:text-4xl">Leads</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
-              Consulte a base, priorize contatos, abra detalhes e encaminhe grupos para WhatsApp ou Conversas sem perder os fluxos ja existentes.
+              Consulte a base, priorize contatos, abra detalhes e encaminhe grupos para WhatsApp ou Conversas sem perder os fluxos já existentes.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -5711,7 +5723,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       <div className="flex justify-end">
         <button className={ghostButtonClass} onClick={() => onNavigate('dataset-history')} type="button">
           <ClipboardList size={18} />
-          Historico dos Excels
+          Histórico dos arquivos Excel
         </button>
       </div>
 
@@ -5727,13 +5739,13 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-slate-50 to-blue-50/55 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.10)] ring-1 ring-white/80">
+        <div className="leads-filter-surface rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-slate-50 to-blue-50/55 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.10)] ring-1 ring-white/80">
           <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
             <div>
-              <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Filtragem avancada</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Filtragem avançada</span>
               <h3 className="mt-1 text-2xl font-black text-slate-950">Encontrar leads certos</h3>
             </div>
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right">
+            <div className="leads-filter-result rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right">
               <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Resultado</span>
               <strong className="block text-2xl font-black text-emerald-950">{formatNumber(filteredLeads.length)}</strong>
             </div>
@@ -5741,9 +5753,9 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
 
         <div className="grid grid-cols-[1fr_1.6fr] gap-3 max-xl:grid-cols-1">
           <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">
-            Associacao
+            Associação
             <select className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setFilter('association', event.target.value)} value={filters.association}>
-              <option value="paulistana">Associacao Paulistana</option>
+              <option value="paulistana">Associação Paulistana</option>
               {associations.filter((association) => association.id !== 'paulistana').map((association) => (
                 <option disabled key={association.id} value={association.id}>{association.name}</option>
               ))}
@@ -5751,7 +5763,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
           </label>
           <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">
             Buscar
-            <input className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setFilter('search', event.target.value)} placeholder="Nome, email, distrito ou WhatsApp" value={filters.search} />
+            <input className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setFilter('search', event.target.value)} placeholder="Nome, e-mail, distrito ou WhatsApp" value={filters.search} />
           </label>
         </div>
 
@@ -5800,7 +5812,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                 />
                 <AdvancedFilterGroup
                   compact
-                  title="Genero"
+                  title="Gênero"
                   options={genderOptions}
                   selected={filters.genders}
                   onToggle={(value) => toggleArrayFilter('genders', value)}
@@ -5815,10 +5827,10 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
               ['email', 'E-mail', selectFilterOptions.email],
               ['study', 'Estudos', selectFilterOptions.study],
               ['vip', 'VIP', selectFilterOptions.vip],
-              ['religion', 'Religiao', selectFilterOptions.religion],
+              ['religion', 'Religião', selectFilterOptions.religion],
               ['recency', 'Tempo', selectFilterOptions.recency]
             ].map(([key, label, options]) => (
-              <label className="grid min-w-0 gap-2 rounded-2xl border border-slate-200 bg-white/80 p-4 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 shadow-[0_14px_34px_rgba(15,23,42,0.07)] ring-1 ring-white/70" key={key}>
+              <label className="leads-filter-select-card grid min-w-0 gap-2 rounded-2xl border border-slate-200 bg-white/80 p-4 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 shadow-[0_14px_34px_rgba(15,23,42,0.07)] ring-1 ring-white/70" key={key}>
                 {label}
                 <select className="h-11 w-full min-w-0 max-w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-8 text-sm font-bold text-slate-800 shadow-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" onChange={(event) => setFilter(key, event.target.value)} value={filters[key]}>
                   {options.map(([value, optionLabel]) => <option key={value} value={value}>{optionLabel}</option>)}
@@ -5845,9 +5857,9 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         </div>
 
         {canRunGeocode ? (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/85 p-4 text-sm shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
+          <div className="leads-geocode-status mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/85 p-4 text-sm shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
             <div className="min-w-[18rem] flex-1">
-              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Precisao do mapa</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Precisão do mapa</span>
               <p className="mt-1 font-bold text-emerald-950">
                 {geocodeInfo
                   ? `${formatNumber(geocodeInfo.leadsWithCoordinates)} leads com coordenada. ${formatNumber(geocodeInfo.leadsWithApproximateCoordinates || 0)} aproximada(s). ${formatNumber(geocodeInfo.pendingEstimate)} ainda pendente(s). ${formatNumber(geocodeInfo.churchesWithCoordinates)} igrejas geocodificada(s). ${formatNumber(geocodeInfo.churchPendingEstimate)} igreja(s) pendente(s).`
@@ -5858,7 +5870,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                   {geocodeInfo.message}
                   {geocodeInfo.notFoundItems?.length ? (
                     <button className="ml-2 font-black text-emerald-950 underline decoration-emerald-500/50 underline-offset-2" onClick={() => setShowGeocodeMisses(true)} type="button">
-                      Ver historico de {formatNumber(geocodeInfo.notFoundItems.length)} sem resultado
+                      Ver histórico de {formatNumber(geocodeInfo.notFoundItems.length)} sem resultado
                     </button>
                   ) : null}
                 </p>
@@ -5871,7 +5883,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                 type="button"
               >
                 <ClipboardList size={18} />
-                Ver geolocalizacao
+                Ver geolocalização
               </button>
               <label className="grid min-w-[14rem] gap-1 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-800">
                 Distrito
@@ -5917,9 +5929,9 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
             </button>
             <button className={ghostButtonClass} onClick={selectVisibleLeads} type="button">
               <CheckCircle2 size={18} />
-              Selecionar visiveis
+              Selecionar visíveis
             </button>
-            <button className={ghostButtonClass} onClick={clearSelection} type="button">Limpar selecao</button>
+            <button className={ghostButtonClass} onClick={clearSelection} type="button">Limpar seleção</button>
             <button className={ghostButtonClass} onClick={() => setShowLeadPdfExport(true)} type="button">
               <FileDown size={18} />
               Exportar leads em PDF
@@ -5932,10 +5944,10 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
             <thead
               className="cursor-pointer"
               onClick={() => setSelectedLead(selectedLeads[0] || visibleLeads[0] || null)}
-              title="Abrir detalhes do primeiro lead visivel ou selecionado"
+              title="Abrir detalhes do primeiro lead visível ou selecionado"
             >
               <tr className="bg-slate-950/85 text-left transition hover:bg-slate-900">
-                {['Selecionar', 'Nome', 'WhatsApp', 'Distrito', 'Bairro', 'Material', 'Religiao', 'Idade', 'Genero', 'Prioridade ML', 'Status', 'Score', 'Acoes'].map((head) => (
+                {['Selecionar', 'Nome', 'WhatsApp', 'Distrito', 'Bairro', 'Material', 'Religião', 'Idade', 'Gênero', 'Prioridade ML', 'Status', 'Score', 'Ações'].map((head) => (
                   <th className="sticky top-0 z-[1] whitespace-nowrap border-b border-white/[0.12] bg-slate-950/95 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white/80" key={head}>{head}</th>
                 ))}
               </tr>
@@ -5951,14 +5963,14 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                     <td className="min-w-[15rem] border-b border-white/[0.04] px-4 py-3">
                       <button className="text-left" onClick={(event) => { event.stopPropagation(); selectLeadOnMap(lead); }} title={`Mostrar somente ${lead.n} no mapa`} type="button">
                         <strong className="block text-slate-50">{lead.n}</strong>
-                        <span className="text-xs font-semibold text-slate-500">ID {lead.id} · {lead.em || 'sem email'}</span>
+                        <span className="text-xs font-semibold text-slate-500">ID {lead.id} · {lead.em || 'sem e-mail'}</span>
                       </button>
                     </td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black tabular-nums text-emerald-400">{phoneDigits(lead.tel) || 'sem telefone'}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-bold text-slate-300">{lead.d}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-400">{leadNeighborhood(lead)}</td>
                     <td className="max-w-[16rem] truncate border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-400">{leadMaterial(lead)}</td>
-                    <td className="max-w-[12rem] truncate border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-300">{lead.r || 'Nao informado'}</td>
+                    <td className="max-w-[12rem] truncate border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-300">{lead.r || 'Não informado'}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-300">{lead.a || 'sem idade'}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-300">{leadGenderLabel(lead.g || 'N')}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3">
@@ -6082,8 +6094,8 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
           <div className="max-h-[86vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_34px_110px_rgba(0,0,0,0.35)]">
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 p-5">
               <div>
-                <span className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Geocodificacao</span>
-                <h3 className="mt-1 text-xl font-black text-slate-950">Historico sem coordenadas</h3>
+                <span className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Geocodificação</span>
+                <h3 className="mt-1 text-xl font-black text-slate-950">Histórico sem coordenadas</h3>
               </div>
               <button className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100" onClick={() => setShowGeocodeMisses(false)} type="button">
                 <X size={18} />
@@ -6101,7 +6113,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                   ) : null}
                 </article>
               ))}
-              {!geocodeInfo?.notFoundItems?.length ? <p className="text-sm font-semibold text-slate-600">Nenhum endereco sem resultado registrado.</p> : null}
+              {!geocodeInfo?.notFoundItems?.length ? <p className="text-sm font-semibold text-slate-600">Nenhum endereço sem resultado registrado.</p> : null}
             </div>
           </div>
         </div>
@@ -6293,7 +6305,7 @@ function AdminGeneralView({
     { name: 'Quentes com WhatsApp', goal: 'Prioridade alta', count: hotWithWhatsapp, filter: { prioridade: 'Hot' } },
     { name: 'VIPs com WhatsApp', goal: 'Relacionamento', count: vipWithWhatsapp, filter: { prioridade: 'all' } },
     { name: 'Estudos ativos', goal: 'Acompanhamento', count: studiesWithWhatsapp, filter: { prioridade: 'all' } },
-    { name: 'Sem contato 5+ anos', goal: 'Recuperacao', count: leadsWithoutFiveYears, filter: { prioridade: 'all' } }
+    { name: 'Sem contato 5+ anos', goal: 'Recuperação', count: leadsWithoutFiveYears, filter: { prioridade: 'all' } }
   ];
   const whatsappRules = [
     ['Priorizar quentes com WhatsApp', `${formatNumber(hotWithWhatsapp)} leads`, 'Base real'],
@@ -6309,7 +6321,7 @@ function AdminGeneralView({
   ];
   const whatsappAlerts = [
     ['Leads quentes com WhatsApp', `${formatNumber(hotWithWhatsapp)} contatos reais na base`, 'Alta'],
-    ['Estudos ativos', `${formatNumber(data.studies)} leads com estudo em andamento`, 'Media'],
+    ['Estudos ativos', `${formatNumber(data.studies)} leads com estudo em andamento`, 'Média'],
     ['Sem contato há 5+ anos', `${formatNumber(leadsWithoutFiveYears)} contatos com WhatsApp`, 'Alta']
   ];
   const timelineConversation = selectedInboxItem?.conversation || whatsappConversations[0] || null;
@@ -6458,7 +6470,7 @@ function AdminGeneralView({
     onAddCampaign({
       id: `campaign-${Date.now()}`,
       name,
-      association: String(form.get('association') || associations[0]?.name || 'Todas as associacoes'),
+      association: String(form.get('association') || associations[0]?.name || 'Todas as associações'),
       status: String(form.get('status') || 'Planejada'),
       owner: String(form.get('owner') || 'Admin geral'),
       goal: Number(form.get('goal') || 0),
@@ -6501,7 +6513,7 @@ function AdminGeneralView({
       const payload = await response.json();
       if (!response.ok) {
         setSendError(payload);
-        throw new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
+        throw new Error(payload.message || 'Não foi possível enviar a mensagem.');
       }
       setLastSend(payload);
       await refreshWhatsappConversations({ sync: true });
@@ -6540,8 +6552,8 @@ function AdminGeneralView({
     });
 
     if (!recipients.length) {
-      toast.error('Informe os numeros', {
-        description: 'Selecione leads ou cole ao menos um WhatsApp no campo de numeros do lote.'
+      toast.error('Informe os números', {
+        description: 'Selecione leads ou cole ao menos um WhatsApp no campo de números do lote.'
       });
       return;
     }
@@ -6571,7 +6583,7 @@ function AdminGeneralView({
           const firstFailure = Array.isArray(payload.results)
             ? payload.results.find((item) => !item.ok)
             : null;
-          throw new Error(payload.message || firstFailure?.message || 'Nao foi possivel enviar o lote.');
+          throw new Error(payload.message || firstFailure?.message || 'Não foi possível enviar o lote.');
         }
         totals.sent += payload.sent || 0;
         totals.failed += payload.failed || 0;
@@ -6879,7 +6891,7 @@ function AdminGeneralView({
                   <div className="rounded-2xl border border-emerald-200 bg-white p-4">
                     <span className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">Resposta ligada</span>
                     <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">
-                      {selectedAnswer?.body || 'Ainda nao ha resposta salva para esta pergunta. Ao responder pela tela Conversas, ela ficara gravada no historico deste numero.'}
+                      {selectedAnswer?.body || 'Ainda não há resposta salva para esta pergunta. Ao responder pela tela Conversas, ela ficará gravada no histórico deste número.'}
                     </p>
                   </div>
                 </div>
@@ -7121,7 +7133,7 @@ function AdminGeneralView({
             ) : null}
             {sendError ? (
               <div className="grid gap-3 rounded-2xl border border-red-400/35 bg-red-500/10 p-4 text-sm text-red-100">
-                <strong className="text-red-50">DiagnÃ³stico do envio</strong>
+                <strong className="text-red-50">Diagnóstico do envio</strong>
                 <span>{sendError.message || 'O provedor recusou o disparo.'}</span>
                 {sendError.providerAttempts?.length ? (
                   <div className="grid gap-2 text-xs text-red-100/85">
@@ -7139,12 +7151,12 @@ function AdminGeneralView({
           <form className={`${panelClass} grid content-start gap-5 p-6`} onSubmit={submitWhatsAppBatch}>
             <span className={labelClass}>Envio em lote WhatsApp</span>
             <label className="grid gap-2 text-sm font-medium text-slate-300">
-              Quantidade de WhatsApps
+              Quantidade de contatos no WhatsApp
               <input className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-slate-100 outline-none" max={50} min="1" onChange={(event) => setLeadBatch(Math.min(Math.max(Number(event.target.value || 1), 1), 50))} type="number" value={leadBatch} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-slate-300">
-              Numeros do lote
-              <textarea className="min-h-28 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 py-3 text-slate-100 outline-none" name="batchPhones" onChange={(event) => setBatchPhonesText(event.target.value)} placeholder={`Um numero por linha. Ex.:\n75992456130\n5511999999999`} value={batchPhonesText} />
+              Números do lote
+              <textarea className="min-h-28 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 py-3 text-slate-100 outline-none" name="batchPhones" onChange={(event) => setBatchPhonesText(event.target.value)} placeholder={`Um número por linha. Ex.:\n75992456130\n5511999999999`} value={batchPhonesText} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-slate-300">
               Mensagem do lote
@@ -7170,7 +7182,7 @@ function AdminGeneralView({
                 <span className={labelClass}>Leads para WhatsApp</span>
                 <h2 className="mt-2 text-2xl font-extrabold text-slate-50">Selecionar contatos por distrito e ML</h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                  Filtre os leads da Associacao Paulistana, escolha quentes ou potenciais, marque contatos e envie os WhatsApps para o lote.
+                  Filtre os leads da Associação Paulistana, escolha quentes ou potenciais, marque contatos e envie-os pelo WhatsApp em lote.
                 </p>
               </div>
               <div className="grid min-w-[12rem] gap-1 rounded-2xl border border-blue-300/40 bg-gradient-to-br from-blue-600 to-slate-950 px-4 py-3 text-right shadow-[0_18px_42px_rgba(37,99,235,0.22)]">
@@ -7181,9 +7193,9 @@ function AdminGeneralView({
 
             <div className="grid grid-cols-[1.1fr_1.1fr_1fr_1.4fr_auto] gap-3 max-xl:grid-cols-2 max-md:grid-cols-1">
               <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-                Associacao
+                Associação
                 <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setLeadFilter('association', event.target.value)} value={leadFilters.association}>
-                  <option value="paulistana">Associacao Paulistana</option>
+                  <option value="paulistana">Associação Paulistana</option>
                   {associations.filter((association) => association.id !== 'paulistana').map((association) => (
                     <option disabled key={association.id} value={association.id}>{association.name}</option>
                   ))}
@@ -7221,7 +7233,7 @@ function AdminGeneralView({
                 {formatNumber(filteredWhatsappLeads.length)} leads encontrados com WhatsApp. Exibindo {formatNumber(visibleWhatsappLeads.length)}.
               </span>
               <div className="flex flex-wrap gap-2">
-                <button className={ghostButtonClass} onClick={clearLeadSelection} type="button">Limpar selecao</button>
+                <button className={ghostButtonClass} onClick={clearLeadSelection} type="button">Limpar seleção</button>
                 <button className={ghostButtonClass} onClick={exportSelectedLeads} type="button">Exportar contatos</button>
               </div>
             </div>
@@ -7231,7 +7243,7 @@ function AdminGeneralView({
                 <thead
                   className="cursor-pointer"
                   onClick={() => setSelectedAdminLead(selectedWhatsappLeads[0] || visibleWhatsappLeads[0] || null)}
-                  title="Abrir detalhes do primeiro lead visivel ou selecionado"
+                  title="Abrir detalhes do primeiro lead visível ou selecionado"
                 >
                   <tr className="bg-slate-950/85 text-left transition hover:bg-slate-900">
                     {['Enviar', 'Nome', 'WhatsApp', 'Distrito', 'Prioridade ML', 'Score'].map((head) => (
@@ -8737,7 +8749,7 @@ function ConversationsView({ records = [] }) {
       districts: topOptions(districtRows, (lead) => lead.d),
       neighborhoods: topOptions(neighborhoodRows, leadNeighborhood),
       materials: topOptions(materialRows, leadMaterial),
-      ageGroups: optionWithCount(ageRows, ['Ate 17', '18 a 29', '30 a 44', '45 a 59', '60+', 'Sem idade'], leadAgeGroup),
+      ageGroups: optionWithCount(ageRows, ['Até 17', '18 a 29', '30 a 44', '45 a 59', '60+', 'Sem idade'], leadAgeGroup),
       genders: optionWithCount(genderRows, ['F', 'M', 'N'], (lead) => lead.g || 'N', leadGenderLabel),
       priorities: optionWithCount(priorityRows, ['Hot', 'Warm', 'Cool', 'Cold'], (lead) => lead.p, (value) => crmPriorityLabels[value]),
       whatsapp: [
@@ -8848,8 +8860,8 @@ function ConversationsView({ records = [] }) {
   const quickActions = [
     ['Resumo', 'Gerar resumo da conversa para o coordenador.'],
     ['Visita', 'Marcar como candidato para visita ou estudo presencial.'],
-    ['IA', 'Preparar sugestao de resposta antes do envio.'],
-    ['Pausa', 'Registrar pedido para nao receber novas mensagens.']
+    ['IA', 'Preparar sugestão de resposta antes do envio.'],
+    ['Pausa', 'Registrar pedido para não receber novas mensagens.']
   ];
   useEffect(() => {
     setMessageAiReplyEnabled(conversationAiReplyEnabled);
@@ -9022,7 +9034,7 @@ function ConversationsView({ records = [] }) {
       });
       const payload = await response.json();
       if (!response.ok) {
-        const error = new Error(payload.message || 'Nao foi possivel enviar a mensagem.');
+        const error = new Error(payload.message || 'Não foi possível enviar a mensagem.');
         error.payload = payload;
         throw error;
       }
@@ -9260,7 +9272,7 @@ function ConversationsView({ records = [] }) {
                 );
               }) : (
                 <div className="grid min-h-[20rem] place-items-center rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-700">
-                  A conversa deste numero ainda nao tem mensagens salvas.
+                  A conversa deste número ainda não tem mensagens salvas.
                 </div>
               )}
               <span ref={chatEndRef} />
@@ -9317,7 +9329,7 @@ function ConversationsView({ records = [] }) {
         <aside className={`${panelClass} whatsapp-tools flex h-full min-h-0 flex-col overflow-hidden p-5 max-2xl:col-span-2 max-2xl:h-[46rem] max-lg:col-span-1`}>
           <div className="shrink-0">
             <span className={labelClass}>Ferramentas</span>
-            <h2 className="mt-1 text-xl font-black text-slate-50">Proximas acoes</h2>
+            <h2 className="mt-1 text-xl font-black text-slate-50">Próximas ações</h2>
           </div>
           <div className="conversation-tools-scroll whatsapp-tools-scroll mt-4 grid min-h-0 flex-1 auto-rows-max content-start gap-4 overflow-x-hidden overflow-y-scroll pr-3">
             {quickActions.map(([title, detail]) => (
@@ -9334,7 +9346,7 @@ function ConversationsView({ records = [] }) {
             <div className="rounded-2xl border border-[#25d366]/40 bg-[#d9fdd3] p-4">
               <span className="text-[11px] font-black uppercase tracking-[0.14em] text-[#008069]">Poderiamos implementar mais</span>
               <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-800">
-                etiquetas por assunto, status de atendimento, responsavel, resposta sugerida por IA, resumo automatico, opt-out e tarefas de visita ligadas a conversa.
+                etiquetas por assunto, status de atendimento, responsável, resposta sugerida por IA, resumo automático, opt-out e tarefas de visita ligadas a conversa.
               </p>
             </div>
           </div>
@@ -9629,7 +9641,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
     .slice(0, 6);
   const knowledgeItems = [
     ['Campanha ativa', campaigns.find((campaign) => campaign.status === 'Ativa')?.name || 'Nenhuma campanha ativa'],
-    ['Associacao padrao', associations[0]?.name || 'Associacao Paulistana'],
+    ['Associação padrão', associations[0]?.name || 'Associação Paulistana'],
     ['Leads com WhatsApp', formatNumber(data.phone)],
     ['Estudos ativos', formatNumber(data.studies)]
   ];
@@ -9639,15 +9651,15 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
     ['campaigns', 'Campanhas'],
     ['knowledge', 'Base'],
     ['flows', 'Fluxos'],
-    ['review', 'Revisao'],
-    ['safety', 'Seguranca'],
-    ['metrics', 'Metricas']
+    ['review', 'Revisão'],
+    ['safety', 'Segurança'],
+    ['metrics', 'Métricas']
   ];
   const flowSteps = [
     ['Entrada', 'Lead responde no WhatsApp ou entra em campanha autorizada.'],
     ['Triagem', 'IA identifica interesse, duvida, pedido de visita ou opt-out.'],
-    ['Resposta assistida', 'IA prepara resposta para aprovacao humana.'],
-    ['Encaminhamento', 'Quando necessario, envia para gestor, coordenador ou voluntario.']
+    ['Resposta assistida', 'IA prepara resposta para aprovação humana.'],
+    ['Encaminhamento', 'Quando necessário, envia para gestor, coordenador ou voluntário.']
   ];
 
   function openAnaConversation(conversation) {
@@ -9738,8 +9750,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
       })
       .catch(() => {
         if (activeRequest() && !silent) {
-          toast.error('Resumo da Ana indisponivel', {
-            description: 'Nao foi possivel carregar as conversas da IA agora.'
+          toast.error('Resumo da Ana indisponível', {
+            description: 'Não foi possível carregar as conversas da IA agora.'
           });
         }
       })
@@ -10074,7 +10086,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 );
               }) : (
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-bold text-slate-600 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
-                  Ainda nao ha respostas registradas depois dos disparos. Quando alguem entrar em contato, o resumo aparece aqui.
+                  Ainda não há respostas registradas depois dos disparos. Quando alguém entrar em contato, o resumo aparece aqui.
                 </div>
               )}
             </div>
@@ -10150,8 +10162,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             </div>
           </article>
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Conteudo aprovado</span>
-            <textarea className="mt-5 min-h-64 w-full rounded-2xl border border-white/[0.08] bg-slate-950/70 px-4 py-4 text-sm leading-relaxed text-slate-100 outline-none" defaultValue="Perguntas frequentes, links oficiais, materiais disponiveis, horarios de atendimento, orientacoes pastorais e mensagens aprovadas devem ser cadastrados aqui antes do modo automatico." />
+            <span className={labelClass}>Conteúdo aprovado</span>
+            <textarea className="mt-5 min-h-64 w-full rounded-2xl border border-white/[0.08] bg-slate-950/70 px-4 py-4 text-sm leading-relaxed text-slate-100 outline-none" defaultValue="Perguntas frequentes, links oficiais, materiais disponíveis, horários de atendimento, orientações pastorais e mensagens aprovadas devem ser cadastrados aqui antes do modo automático." />
           </article>
         </section>
       ) : null}
@@ -10179,7 +10191,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             title="Abrir detalhes do primeiro lead da fila"
             type="button"
           >
-            <span className="font-white text-slate-50">Revisao assistida</span>
+            <span className="font-white text-slate-50">Revisão assistida</span>
             <h2 className="mt-1 text-2xl font-white text-slate-50">Leads para a IA sugerir resposta</h2>
           </button>
           <div className="mt-5 grid gap-3">
@@ -10189,7 +10201,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                   <strong className="text-slate-950">{lead.n}</strong>
                   <span className="mt-1 block text-sm font-semibold text-slate-600">{lead.d} · {lead.tel || 'sem telefone'} · score {lead.s}</span>
                 </div>
-                <button className={ghostButtonClass} onClick={(event) => { event.stopPropagation(); toast.info('Sugestao preparada', { description: `IA prepararia uma resposta assistida para ${lead.n}.` }); }} type="button">Gerar sugestao</button>
+                <button className={ghostButtonClass} onClick={(event) => { event.stopPropagation(); toast.info('Sugestão preparada', { description: `IA prepararia uma resposta assistida para ${lead.n}.` }); }} type="button">Gerar sugestão</button>
               </div>
             ))}
           </div>
@@ -10200,13 +10212,13 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
       {tab === 'safety' ? (
         <section className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
           {[
-            ['Bloqueios sensiveis', 'luto, saude, abuso, crise emocional, reclamacao grave, pedido pastoral profundo'],
-            ['Opt-out', 'parar, remover, nao quero, cancelar, sair'],
-            ['Limites', 'maximo de mensagens por lead, horario permitido e pausa manual imediata'],
+            ['Bloqueios sensíveis', 'luto, saúde, abuso, crise emocional, reclamação grave, pedido pastoral profundo'],
+            ['Opt-out', 'parar, remover, não quero, cancelar, sair'],
+            ['Limites', 'máximo de mensagens por lead, horário permitido e pausa manual imediata'],
             ['Auditoria', 'salvar prompt, resposta sugerida, resposta enviada, custo e aprovador']
           ].map(([title, detail]) => (
             <article className={`${panelClass} p-6`} key={title}>
-              <span className={labelClass}>Seguranca</span>
+              <span className={labelClass}>Segurança</span>
               <h2 className="mt-2 text-xl font-black text-slate-50">{title}</h2>
               <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-500">{detail}</p>
             </article>
@@ -10579,8 +10591,8 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
               </button>
               <button
                 className="app-header-control interactive-card relative grid h-10 w-10 place-items-center rounded-xl border border-slate-900/10 bg-white/55 text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
-                onClick={() => toast('0 notificacoes operacionais', {
-                  description: '0 leads sem resposta, 0 visitas pendentes e 0 automacoes prontas para revisao.',
+                onClick={() => toast('0 notificações operacionais', {
+                  description: '0 leads sem resposta, 0 visitas pendentes e 0 automações prontas para revisão.',
                   action: {
                     label: 'Ver',
                     onClick: () => setTimeout(() => toast.info('Central de notificações será aberta na próxima etapa.'), 0)
@@ -10603,7 +10615,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
                   {user?.name || 'Admin'}
                 </button>
                 <div className="absolute right-0 top-full z-50 invisible pt-3 opacity-0 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-                  <div className="w-[260px] rounded-2xl border border-slate-200/80 bg-white/90 p-2 shadow-[0_30px_60px_-15px_rgba(15,23,42,0.15)] ring-1 ring-slate-900/5 backdrop-blur-2xl">
+                  <div className="theme-user-menu w-[260px] rounded-2xl border border-slate-200/80 bg-white/90 p-2 shadow-[0_30px_60px_-15px_rgba(15,23,42,0.15)] ring-1 ring-slate-900/5 backdrop-blur-2xl">
                     <div className="px-3 pb-2 pt-1.5">
                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Configurações</span>
                     </div>
@@ -10611,6 +10623,7 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
                       {headerNavItems.map(([id, label, Icon]) => (
                         <button
                           className={`group/item flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold transition-all hover:bg-slate-100 hover:text-slate-900 ${current === id ? 'bg-blue-50 text-blue-700' : 'text-slate-600'}`}
+                          data-active={current === id ? 'true' : 'false'}
                           key={id}
                           onClick={() => onNavigate(id)}
                           type="button"
@@ -10644,12 +10657,13 @@ function AppShell({ children, current, onBack, canGoBack = false, onNavigate, on
   );
 }
 
-function DetailsShell({ payload, onBack, onLogout, onNavigate, onOpenDistrict, user }) {
+function DetailsShell({ payload, onBack, onLogout, onNavigate, onOpenDistrict, theme, user }) {
   const [sidebarCompact, setSidebarCompact] = useState(true);
+  const isLight = theme === 'light';
 
   return (
-    <div className="silver-stage app-light min-h-screen text-slate-100">
-      <AppToaster theme="light" />
+    <div className={`silver-stage ${isLight ? 'app-light' : 'app-dark'} min-h-screen text-slate-100`}>
+      <AppToaster theme={theme} />
       <div className="flex min-h-screen gap-4 p-4 max-lg:flex-col max-lg:p-0">
         <Sidebar
           compact={sidebarCompact}
@@ -10660,7 +10674,7 @@ function DetailsShell({ payload, onBack, onLogout, onNavigate, onOpenDistrict, u
           user={user}
         />
         <div className="min-w-0 flex-1 overflow-hidden rounded-[1.75rem] max-lg:rounded-none max-lg:pb-24">
-          <DashboardClient onBack={onBack} onOpenDistrict={onOpenDistrict} payload={payload} />
+          <DashboardClient onBack={onBack} onOpenDistrict={onOpenDistrict} payload={payload} theme={theme} />
         </div>
       </div>
     </div>
@@ -10836,7 +10850,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const deferredView = useDeferredValue(view);
   const [authReady, setAuthReady] = useState(true);
   const [restoringSession, setRestoringSession] = useState(false);
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState(initialCrmTheme);
   const [selectedAssociationId, setSelectedAssociationId] = useState('paulistana');
   const [selectedDistrictName, setSelectedDistrictName] = useState('Alphaville');
   const [payload, setPayload] = useState(initialPayload);
@@ -10855,6 +10869,11 @@ export default function CrmApp({ payload: initialPayload = null }) {
 
   useEffect(() => {
     document.documentElement.dataset.crmTheme = theme;
+    try {
+      window.localStorage.setItem(CRM_THEME_STORAGE_KEY, theme);
+    } catch {
+      // The selected theme still works for the current session if storage is blocked.
+    }
     return () => {
       delete document.documentElement.dataset.crmTheme;
     };
@@ -10938,8 +10957,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
         setView(defaultViewForUser(session.user));
         loadDashboard().catch(() => {
           if (active) {
-            toast.error('Backend nao foi lido', {
-              description: 'Sua sessao foi restaurada, mas os dados do dashboard ainda nao carregaram.'
+            toast.error('Backend não foi lido', {
+              description: 'Sua sessão foi restaurada, mas os dados do dashboard ainda não carregaram.'
             });
           }
         });
@@ -10963,7 +10982,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
     try {
       const response = await apiFetch('/api/dashboard');
       if (!response.ok) {
-        throw new Error('Nao foi possivel carregar os dados do backend.');
+        throw new Error('Não foi possível carregar os dados do backend.');
       }
       const nextPayload = await response.json();
       const nextAssociations = buildInitialAssociations(nextPayload.records);
@@ -10989,14 +11008,14 @@ export default function CrmApp({ payload: initialPayload = null }) {
     setLoadingDistrictSlug(slug);
     try {
       const response = await apiFetch(`/api/dashboard/district-interest/${encodeURIComponent(slug)}`);
-      if (!response.ok) throw new Error('Nao foi possivel carregar o distrito.');
+      if (!response.ok) throw new Error('Não foi possível carregar o distrito.');
       const result = await response.json();
       setDistrictInterestBySlug((current) => ({
         ...current,
         [slug]: result.records || []
       }));
     } catch {
-      toast.error('Distrito nao foi carregado', {
+      toast.error('Distrito não foi carregado', {
         description: 'Tente abrir este distrito novamente em alguns instantes.'
       });
     } finally {
@@ -11040,7 +11059,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
 
   if (!authReady && restoringSession) {
     return (
-      <div className="silver-stage min-h-screen">
+      <div className={`silver-stage ${theme === 'light' ? 'app-light' : 'app-dark'} min-h-screen`}>
         <AppToaster theme={theme} />
         <div className="login-loading-overlay" role="status" aria-live="polite">
           <div className="login-loading-card">
@@ -11048,7 +11067,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
               <Gauge size={22} />
             </div>
             <strong>Restaurando acesso</strong>
-            <span>Verificando sua sessao administrativa...</span>
+            <span>Verificando sua sessão administrativa...</span>
           </div>
         </div>
       </div>
@@ -11056,12 +11075,12 @@ export default function CrmApp({ payload: initialPayload = null }) {
   }
 
   if (view === 'login') {
-    return <LoginScreen onLogin={async (loggedUser) => {
+    return <LoginScreen theme={theme} onLogin={async (loggedUser) => {
       setUser(loggedUser);
       setView(defaultViewForUser(loggedUser));
       loadDashboard().catch(() => {
-        toast.error('Backend nao foi lido', {
-          description: 'A autenticacao funcionou, mas os dados do dashboard nao foram carregados.'
+        toast.error('Backend não foi lido', {
+          description: 'A autenticação funcionou, mas os dados do dashboard não foram carregados.'
         });
       });
     }} />;
@@ -11097,6 +11116,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
         }}
         onNavigate={navigateView}
         payload={payload}
+        theme={theme}
         user={user}
       />
     );

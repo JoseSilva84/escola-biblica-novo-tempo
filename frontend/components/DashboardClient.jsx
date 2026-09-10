@@ -26,20 +26,20 @@ const activeSelectClass = 'border-blue-400/45 bg-blue-500/[0.08] text-blue-100 s
 const rules = {
   total: 'Total de interessados que permanecem depois dos filtros aplicados nesta tela.',
   telefone: 'Conta os interessados com telefone/WhatsApp cadastrado. O percentual usa o total filtrado como base.',
-  hot: 'Contatos classificados como Quente pelo modelo de prioridade ML. Sao os leads com maior urgencia operacional.',
+  hot: 'Contatos classificados como Quente pelo modelo de prioridade ML. São os leads com maior urgência operacional.',
   vip: 'Interessados marcados como VIP na base filtrada. O percentual usa o total filtrado como base.',
   estudos: 'Interessados com estudo ativo/em andamento na base filtrada.',
   actionHot: 'Seleciona o distrito com maior quantidade de contatos Quentes entre os dados filtrados.',
   actionWarm: 'Seleciona o distrito com maior quantidade de contatos Potenciais entre os dados filtrados.',
   actionVip: 'Seleciona o distrito com maior quantidade de VIPs entre os dados filtrados.',
-  actionRecovery: 'Seleciona o distrito com mais contatos ha mais de 5 anos sem contato registrado.',
-  topDistricts: 'Ranking dos 15 distritos com maior total de interessados apos os filtros. Ao passar o mouse em uma barra, aparecem os indicadores que formam a leitura do distrito.',
+  actionRecovery: 'Seleciona o distrito com mais contatos há mais de 5 anos sem contato registrado.',
+  topDistricts: 'Ranking dos 15 distritos com maior total de interessados após os filtros. Ao passar o mouse em uma barra, aparecem os indicadores que formam a leitura do distrito.',
   priority: 'Distribui os interessados filtrados nas faixas do modelo ML: Quente, Potencial, Morno e Frio.',
-  religion: 'Mostra as 10 religioes mais frequentes entre os interessados filtrados.',
-  recency: 'Agrupa os interessados pelo tempo desde o ultimo contato. Quanto maior a faixa, maior a chance de recuperacao operacional.',
+  religion: 'Mostra as 10 religiões mais frequentes entre os interessados filtrados.',
+  recency: 'Agrupa os interessados pelo tempo desde o último contato. Quanto maior a faixa, maior a chance de recuperação operacional.',
   table: 'Tabela consolidada por distrito, sempre respeitando os filtros ativos.',
-  score: 'Pontuacao media = soma das pontuacoes ML individuais do distrito dividida pelo total de interessados do distrito. Quanto maior, maior a prioridade media.',
-  district: 'Abre a analise detalhada do distrito selecionado.'
+  score: 'Pontuação média = soma das pontuações ML individuais do distrito dividida pelo total de interessados do distrito. Quanto maior, maior a prioridade média.',
+  district: 'Abre a análise detalhada do distrito selecionado.'
 };
 
 function RulesModal({ onClose }) {
@@ -140,7 +140,7 @@ function InfoHint({ text, side = 'top' }) {
   return (
     <span className="group/tip relative inline-flex align-middle">
       <span
-        aria-label="Ver regra da analise"
+        aria-label="Ver regra da análise"
         role="img"
         className="grid h-6 w-6 place-items-center rounded-full border border-slate-900/10 bg-white/70 text-slate-500 shadow-sm transition hover:border-blue-400/40 hover:bg-blue-50 hover:text-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-500/10"
       >
@@ -609,7 +609,7 @@ function aggregate(records, filters) {
   return { filtered, kpis, districtList, religionList, tempo };
 }
 
-export default function DashboardClient({ payload, onBack, onOpenDistrict }) {
+export default function DashboardClient({ payload, onBack, onOpenDistrict, theme = 'light' }) {
   const { records, meta } = payload;
   const districts = useMemo(() => Array.from(new Set(records.map((row) => row.d))).sort((a, b) => a.localeCompare(b)), [records]);
   const [filters, setFilters] = useState({ distrito: 'all', prioridade: 'all', vip: 'all', telefone: 'all', estudos: 'all', genero: 'all', search: '' });
@@ -720,12 +720,14 @@ export default function DashboardClient({ payload, onBack, onOpenDistrict }) {
   }));
 
   return (
-    <div className="relative flex h-screen w-full flex-col overflow-y-auto overflow-x-hidden silver-stage app-light details-light text-slate-100" onPointerMove={onPointerMove} onScroll={handleScroll}>
+    <div className={`relative flex h-screen w-full flex-col overflow-y-auto overflow-x-hidden silver-stage ${theme === 'light' ? 'app-light details-light' : 'app-dark'} text-slate-100`} onPointerMove={onPointerMove} onScroll={handleScroll}>
       <div ref={topAnchorRef} className="absolute top-0 h-1 w-full" />
       <div
         className="pointer-events-none fixed inset-0 -z-10 transition duration-300"
         style={{
-          background: `radial-gradient(circle at ${pointer.x}% ${pointer.y}%, rgba(255,255,255,0.72), transparent 26%), linear-gradient(145deg, #f8fafc 0%, #e4e8ee 42%, #cfd6df 100%)`
+          background: theme === 'dark'
+            ? `radial-gradient(circle at ${pointer.x}% ${pointer.y}%, rgba(59,130,246,0.12), transparent 28%), linear-gradient(145deg, #050914 0%, #0a1425 48%, #07161d 100%)`
+            : `radial-gradient(circle at ${pointer.x}% ${pointer.y}%, rgba(255,255,255,0.72), transparent 26%), linear-gradient(145deg, #f8fafc 0%, #e4e8ee 42%, #cfd6df 100%)`
         }}
       />
 
@@ -907,7 +909,7 @@ export default function DashboardClient({ payload, onBack, onOpenDistrict }) {
                     ['telefone', 'WhatsApp', rules.telefone],
                     ['hot', 'Quente', rules.hot],
                     ['warm', 'Potencial', 'Contatos classificados como Potencial pelo modelo ML. Boa chance de abordagem, mas abaixo da prioridade Quente.'],
-                    ['cool', 'Morno', 'Contatos classificados como Morno pelo modelo ML. Prioridade intermediaria para acompanhamento.'],
+                    ['cool', 'Morno', 'Contatos classificados como Morno pelo modelo ML. Prioridade intermediária para acompanhamento.'],
                     ['cold', 'Frio', 'Contatos classificados como Frio pelo modelo ML. Menor prioridade operacional no momento.'],
                     ['vips', 'VIPs', rules.vip],
                     ['score_medio', 'Pontuação Média', rules.score]
