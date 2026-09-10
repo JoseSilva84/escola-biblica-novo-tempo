@@ -1528,11 +1528,11 @@ function AssociationLeadExplorer({ association, records, district = '', onDistri
         <div className="grid grid-cols-2 gap-3 text-right max-sm:w-full max-sm:text-left">
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-[0_12px_30px_rgba(37,99,235,0.08)]">
             <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-800">Encontrados</span>
-            <strong className="block text-xl text-slate-950">{formatNumber(filtered.length)}</strong>
+            <strong className="block text-xl text-white">{formatNumber(filtered.length)}</strong>
           </div>
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 shadow-[0_12px_30px_rgba(16,185,129,0.08)]">
             <span className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-800">WhatsApp</span>
-            <strong className="block text-xl text-slate-950">{formatNumber(phoneCount)}</strong>
+            <strong className="block text-xl text-white">{formatNumber(phoneCount)}</strong>
           </div>
         </div>
       </div>
@@ -5878,7 +5878,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
             </div>
             <div className="flex flex-wrap items-end justify-end gap-3">
               <button
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-black px-4 text-sm font-black text-white shadow-sm transition hover:bg-emerald-50"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-black px-4 text-sm font-black text-white shadow-sm transition hover:bg-emerald-50 hover:text-white"
                 onClick={() => onNavigate('geolocation')}
                 type="button"
               >
