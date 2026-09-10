@@ -1478,6 +1478,35 @@ html[data-crm-theme='light'] .campaign-briefing-modal .campaign-submit {
     color: rgb(236 253 245) !important;
   }
 
+  .app-dark .leads-geocode-status select {
+    border-color: rgba(52, 211, 153, 0.34) !important;
+    background: rgb(8 28 34) !important;
+    color: rgb(236 253 245) !important;
+    color-scheme: dark;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 22px rgba(0,0,0,0.18) !important;
+  }
+
+  .app-dark .leads-geocode-status select:hover,
+  .app-dark .leads-geocode-status select:focus {
+    border-color: rgba(52, 211, 153, 0.62) !important;
+    background: rgb(10 40 43) !important;
+  }
+
+  .app-dark .leads-geocode-status select:disabled {
+    color: rgb(148 163 184) !important;
+    opacity: 0.72;
+  }
+
+  .app-dark .leads-geocode-status select option {
+    background: rgb(8 28 34) !important;
+    color: rgb(236 253 245) !important;
+  }
+
+  .app-dark .leads-geocode-status select option:checked {
+    background: rgb(5 150 105) !important;
+    color: #ffffff !important;
+  }
+
   .app-dark .sidebar-brand,
   .app-dark .sidebar-toggle {
     border-color: rgba(226,232,240,0.10) !important;
