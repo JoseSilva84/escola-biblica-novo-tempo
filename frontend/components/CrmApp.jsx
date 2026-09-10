@@ -1519,9 +1519,9 @@ function AssociationLeadExplorer({ association, records, district = '', onDistri
     <section className={`${panelClass} p-6`}>
       <div className="mb-5 flex items-start justify-between gap-4 max-lg:flex-col">
         <div>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Leads da associação selecionada</span>
-          <h2 className="mt-1 text-2xl font-black tracking-normal text-slate-950">Buscar leads por distrito</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white">Leads da associação selecionada</span>
+          <h2 className="mt-1 text-2xl font-black tracking-normal text-white">Buscar leads por distrito</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-white">
             Clique em qualquer lead para abrir todos os dados cadastrados e o histórico de WhatsApp importado.
           </p>
         </div>
@@ -7656,8 +7656,8 @@ function WhatsAppLeadPickerModal({
     }))
   ];
   return createPortal(
-    <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-lead-picker-title">
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/12 bg-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.56)]">
+    <div className="whatsapp-picker-modal-backdrop fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-lead-picker-title">
+      <div className="whatsapp-picker-modal flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/12 bg-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.56)]">
         <div className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_52%,#0f172a_100%)] p-6 text-white">
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">Destinatário do WhatsApp</span>
@@ -7682,7 +7682,7 @@ function WhatsAppLeadPickerModal({
         {newContactMode ? (
           <WhatsAppNewContactForm districts={districts} initialContact={newContact} onSubmit={onNewContactSubmit} saving={newContactSaving} />
         ) : (
-        <form className="conversation-tools-scroll grid max-h-[55vh] shrink-0 gap-3 overflow-y-auto overscroll-contain border-b border-slate-200 bg-white p-4 pr-3" onSubmit={onSearch}>
+        <form className="whatsapp-picker-filters conversation-tools-scroll grid max-h-[55vh] shrink-0 gap-3 overflow-y-auto overscroll-contain border-b border-slate-200 bg-white p-4 pr-3" onSubmit={onSearch}>
           <div className="grid gap-3 md:grid-cols-[1fr_auto]">
             <label className="grid gap-1.5">
               <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">Buscar contato</span>
@@ -7796,8 +7796,8 @@ function WhatsAppLeadPickerModal({
         </form>
         )}
 
-        {!newContactMode ? <div className="min-h-0 flex-1 overflow-y-auto bg-slate-100 p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-white p-3 shadow-sm">
+        {!newContactMode ? <div className="whatsapp-picker-results min-h-0 flex-1 overflow-y-auto bg-slate-100 p-5">
+          <div className="whatsapp-picker-summary mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-white p-3 shadow-sm">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">Lista de transmissão</span>
@@ -7828,7 +7828,7 @@ function WhatsAppLeadPickerModal({
               {leads.map((lead) => {
                 const selected = selectedPhones.has(phoneDigits(lead.phone).slice(-10));
                 return (
-                  <div className={`interactive-card flex items-center gap-2 rounded-2xl border p-2 shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition ${selected ? 'border-[#00a884] bg-[#d9fdd3] ring-2 ring-[#00a884]/20' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-emerald-400'}`} key={`${lead.id}-${lead.phone}`}>
+                  <div className={`whatsapp-picker-card interactive-card flex items-center gap-2 rounded-2xl border p-2 shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition ${selected ? 'border-[#00a884] bg-[#d9fdd3] ring-2 ring-[#00a884]/20' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-emerald-400'}`} data-selected={selected} key={`${lead.id}-${lead.phone}`}>
                     <button className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 text-left" onClick={() => onToggleSelect(lead)} type="button">
                       <ContactAvatar name={lead.name} phone={lead.phone} />
                       <span className="min-w-0 flex-1">
@@ -7878,8 +7878,8 @@ function WhatsAppBroadcastModal({
   const previewLead = recipients[0] || null;
   const previewMessage = renderPreviewTemplate(message || defaultBroadcastMessage, previewLead || {});
   return createPortal(
-    <div className="fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-broadcast-title">
-      <form className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#f0f2f5] shadow-[0_34px_110px_rgba(0,0,0,0.6)]" onSubmit={onSubmit}>
+    <div className="whatsapp-broadcast-modal-backdrop fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-broadcast-title">
+      <form className="whatsapp-broadcast-modal flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#f0f2f5] shadow-[0_34px_110px_rgba(0,0,0,0.6)]" onSubmit={onSubmit}>
         <div className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,#075e54,#008069,#00a884)] p-6 text-white">
           <div>
             <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">WhatsApp</span>
@@ -7900,7 +7900,7 @@ function WhatsAppBroadcastModal({
             </div>
             <div className="mt-3 flex max-h-36 flex-wrap gap-2 overflow-y-auto pr-1">
               {recipients.slice(0, 100).map((lead) => (
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-[#d9fdd3] py-1 pl-3 pr-1 text-xs font-bold text-slate-800" key={`${lead.id}-${lead.phone}`}>
+                <span className="broadcast-recipient-chip inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-[#d9fdd3] py-1 pl-3 pr-1 text-xs font-bold text-slate-800" key={`${lead.id}-${lead.phone}`}>
                   {lead.name}
                   <button aria-label={`Remover ${lead.name}`} className="grid h-6 w-6 place-items-center rounded-full text-[#008069] transition hover:bg-white" onClick={() => onRemove(lead)} type="button"><X size={13} /></button>
                 </span>
@@ -9258,7 +9258,7 @@ function ConversationsView({ records = [] }) {
                 );
                 return (
                   <div className={`flex ${outgoing ? 'justify-end' : 'justify-start'}`} key={message.id}>
-                    <div className={`${conversationExpanded ? 'max-w-[64%] max-md:max-w-[88%]' : 'max-w-[78%]'} rounded-2xl border px-4 py-3 shadow-[0_8px_24px_rgba(11,20,26,0.10)] ${outgoing ? 'border-[#c8e7bf] bg-[#d9fdd3] text-[#111b21]' : 'border-[#e9edef] bg-white text-[#111b21]'}`}>
+                    <div className={`${conversationExpanded ? 'max-w-[64%] max-md:max-w-[88%]' : 'max-w-[78%]'} ${outgoing ? 'whatsapp-message-outgoing border-[#c8e7bf] bg-[#d9fdd3] text-[#111b21]' : 'whatsapp-message-incoming border-[#e9edef] bg-white text-[#111b21]'} rounded-2xl border px-4 py-3 shadow-[0_8px_24px_rgba(11,20,26,0.10)]`}>
                       <span className={`block text-[11px] font-black uppercase tracking-[0.14em] ${outgoing ? 'text-[#008069]' : 'text-[#667781]'}`}>
                         {outgoing ? 'Mensagem de saída' : 'Pergunta recebida'}
                       </span>
@@ -9773,7 +9773,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   }, []);
 
   return (
-    <div className="grid gap-6">
+    <div className="ai-agent-view grid gap-6">
       <section className={`${panelClass} overflow-hidden p-6`}>
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
