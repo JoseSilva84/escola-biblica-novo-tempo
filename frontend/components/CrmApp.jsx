@@ -5878,7 +5878,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
             </div>
             <div className="flex flex-wrap items-end justify-end gap-3">
               <button
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white/80 px-4 text-sm font-black text-emerald-950 shadow-sm transition hover:bg-emerald-50"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-black px-4 text-sm font-black text-white shadow-sm transition hover:bg-emerald-50"
                 onClick={() => onNavigate('geolocation')}
                 type="button"
               >
@@ -7203,7 +7203,7 @@ function AdminGeneralView({
               </label>
               <label className="grid gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
                 Distrito
-                <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-slate-100 outline-none" onChange={(event) => setLeadFilter('distrito', event.target.value)} value={leadFilters.distrito}>
+                <select className="h-11 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 text-sm font-bold text-black outline-none" onChange={(event) => setLeadFilter('distrito', event.target.value)} value={leadFilters.distrito}>
                   <option value="all">Todos os distritos</option>
                   {districts.map((district) => <option key={district} value={district}>{district}</option>)}
                 </select>
