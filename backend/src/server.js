@@ -23,12 +23,7 @@ const gzipAsync = promisify(gzip);
 const ANA_SEQUENCE_GUIDE_FILE = 'PLANO_SEQUENCIA_ANA_PRESENTE_19_SETEMBRO.md';
 const ANA_TRAINING_DIR = 'TREINAMENTO_IA_NOVO_TEMPO';
 const ANA_TRAINING_FILES = [
-  ['01_LEIA_PRIMEIRO.md', 'Contexto da operacao V3'],
-  ['02_GUIA_RESUMIDO_IMPLEMENTACAO.md', 'Guia resumido de implementacao'],
-  ['03_SYSTEM_PROMPT_ANA_V3.md', 'System prompt Ana V3'],
-  ['04_REGUA_21_DIAS_COMPLETA.md', 'Regua completa de 21 dias'],
-  ['05_CAMPANHA_EXPRESSA_19_09.md', 'Campanha expressa 19/09'],
-  ['06_COPYS_ICEBREAKERS.md', 'Copys, icebreakers e ramificacoes'],
+  ['08_PROMPT_MESTRE_ANA_GEMINI.md', 'Personalidade, segurança e fluxo operacional da Ana no Gemini'],
   ['07_ESTUDOS_BIBLICOS_ADVENTISTAS.md', 'Base bíblica adventista oficial para acompanhamento']
 ];
 let anaSequenceGuideCache = { cacheKey: null, text: '', sources: [], loadedAt: 0 };
@@ -969,7 +964,7 @@ function confirmsRegisteredAddress(value) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  if (/^(sim|s|isso|correto|certo|esta correto|esta certo|sim esta correto|sim esta certo|continua o mesmo|e o mesmo|o mesmo|pode ser|confirmo)$/.test(answer)) return true;
+  if (/^(sim|s|isso|correto|certo|esta correto|esta certo|sim esta correto|sim esta certo|continua o mesmo|e o mesmo|o mesmo|mesmo|pode ser|confirmo)$/.test(answer)) return true;
   return /\b(sim|correto|confirmo)\b/.test(answer)
     && /\b(mesmo|igual|endereco|dados)\b/.test(answer)
     && !/\b(mudou|mudei|novo|diferente|incorreto)\b/.test(answer);
@@ -1023,7 +1018,7 @@ function anaDeliveryQuestion(value) {
     .replace(/\s+/g, ' ')
     .trim();
   if (!text.includes('?')) return null;
-  if (/(endereco|dados)/.test(text) && /(continua o mesmo|ainda e o mesmo|esta correto|esta certo|confirmar)/.test(text)) {
+  if (/(endereco|dados)/.test(text) && /(continua o mesmo|ainda e o mesmo|e o mesmo|esta correto|esta certo|confirmar|cadastrado.*outro)/.test(text)) {
     return 'ADDRESS_CONFIRMATION';
   }
   if (/endereco/.test(text) && /(informar|enviar|passar|qual e|endereco completo|endereco atual)/.test(text)) {
@@ -1137,7 +1132,7 @@ function explicitContactOptOut(value) {
 function anaGiftOfferReply(name) {
   const firstName = String(name || '').trim().split(/\s+/)[0];
   const greetingName = firstName ? `, ${firstName}` : '';
-  return `Que bom${greetingName}! A Novo Tempo preparou um brinde especial para você. Gostaríamos de entregá-lo no sábado, dia 19 de setembro, pela parte da tarde, por meio de um representante da nossa equipe. Você gostaria de receber esse brinde em casa?`;
+  return `A partir do dia 19 de setembro de 2026, a equipe da Novo Tempo estará entregando um brinde especial às pessoas que foram contatadas${greetingName}. Você gostaria de receber esse brinde?`;
 }
 
 async function anaIntentReply(event) {
@@ -1150,8 +1145,8 @@ async function anaIntentReply(event) {
   let informedAddress = explicitAddress || plausibleNewAddress(event.inboundText);
   let addressReady = Boolean(informedAddress || deliveryState.addressProvided || addressState.hasAddress);
 
-  // GPT Maker and WAHA can notify the same inbound message concurrently. Give WAHA
-  // a short window to persist the address before deciding to ask for it again.
+  // A legacy intention webhook and WAHA can notify the same inbound message
+  // concurrently. Give WAHA a short window to persist the address first.
   if (addressIntent && !addressReady && event.phone) {
     for (const delay of [400, 800, 1200]) {
       await sleep(delay);
@@ -1692,47 +1687,26 @@ function wahaConfig() {
   };
 }
 
-function gptMakerConfig() {
-  const apiToken = normalizeApiToken(
-    process.env.GPTMAKER_API_TOKEN
-    || process.env.GPTMAKER_API_KEY
-    || process.env.GPT_MAKER_API_TOKEN
+function anaApiKey() {
+  const value = normalizeApiToken(
+    process.env.GEMINI_API_KEY
+    || process.env.GOOGLE_API_KEY
+    || process.env.ASSISTENTE_ANA
   );
-  const agentId = String(process.env.GPTMAKER_AGENT_ID || '').trim();
-  const autoReplyEnabled = String(process.env.GPTMAKER_AUTO_REPLY || 'false').toLowerCase() === 'true';
-  return {
-    name: process.env.GPTMAKER_AGENT_NAME || 'Ana',
-    provider: 'gpt-maker',
-    configured: Boolean(apiToken && agentId),
-    autoReplyEnabled,
-    baseUrl: String(process.env.GPTMAKER_API_URL || 'https://api.gptmaker.ai').trim().replace(/\/+$/, ''),
-    agentId,
-    workspaceId: String(process.env.GPTMAKER_WORKSPACE_ID || '').trim() || null,
-    apiToken: { loaded: Boolean(apiToken) }
-  };
-}
-
-function gptMakerTrainingStatus() {
-  const config = gptMakerConfig();
-  return {
-    loaded: config.configured,
-    managedExternally: true,
-    provider: 'gpt-maker',
-    files: []
-  };
+  return /^(true|false)$/i.test(value) ? '' : value;
 }
 
 function anaConfig() {
-  const apiKey = normalizeApiToken(process.env.ASSISTENTE_ANA || process.env.ANA_API_KEY);
+  const apiKey = anaApiKey();
   const autoReplyEnabled = String(process.env.ASSISTENTE_ANA_AUTO_REPLY || 'false').toLowerCase() === 'true';
   const modelEnabled = String(process.env.ASSISTENTE_ANA_USE_MODEL || 'true').toLowerCase() !== 'false';
   return {
     name: 'Ana',
-    provider: 'openai-responses',
+    provider: 'gemini',
     configured: Boolean(apiKey),
     autoReplyEnabled,
     modelEnabled,
-    model: process.env.ANA_MODEL || 'gpt-4.1-mini',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     apiKey: tokenDiagnostic(apiKey)
   };
 }
@@ -2016,7 +1990,7 @@ function classifyAnaConversation(messages = []) {
   return { label: 'Triagem', tone: 'slate', action: 'Classificar intenção antes da próxima resposta.' };
 }
 
-function isGptMakerManagedMessage(message = {}) {
+function isAnaManagedMessage(message = {}) {
   const metadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
   return message.provider === 'gpt-maker'
     || message.senderType === 'AI'
@@ -2036,10 +2010,10 @@ function isAnaTestConversation(conversation = {}) {
   ));
 }
 
-function gptMakerClassification(messages = [], delivery = null) {
+function anaClassification(messages = [], delivery = null) {
   if (delivery?.accepted) {
     return {
-      label: 'Visita marcada',
+      label: 'Brinde confirmado',
       tone: 'green',
       action: delivery?.address
         ? 'Brinde aceito e endereço disponível para a entrega.'
@@ -2048,7 +2022,7 @@ function gptMakerClassification(messages = [], delivery = null) {
     };
   }
   if (delivery?.declined) {
-    return { label: 'Não aceitou a visita', tone: 'red', action: 'Respeitar a recusa e encerrar a oferta.', source: 'conversation' };
+    return { label: 'Brinde recusado', tone: 'red', action: 'Respeitar a recusa e encerrar a oferta.', source: 'conversation' };
   }
   if (delivery?.pendingGiftDecision) {
     return { label: 'Aguardando decisão do brinde', tone: 'orange', action: 'Aguardar a pessoa confirmar se deseja receber o brinde.', source: 'conversation' };
@@ -2088,8 +2062,8 @@ function gptMakerClassification(messages = [], delivery = null) {
   return {
     label: rawLabel || 'Qualificado',
     tone: 'blue',
-    action: String(metadata.gptMakerNextAction || '').trim() || 'Seguir a orientacao registrada pelo GPT Maker.',
-    source: 'gpt-maker'
+    action: String(metadata.gptMakerNextAction || '').trim() || 'Seguir a orientação registrada pelo agente de IA.',
+    source: 'legacy-ai'
   };
 }
 
@@ -2582,7 +2556,7 @@ function summarizeAnaConversation(conversation, dashboardRecordsById = new Map()
   const qualificationMessage = [...messages].reverse().find((message) => message?.metadata?.gptMakerSummary);
   const gptMakerSummary = String(qualificationMessage?.metadata?.gptMakerSummary || '').trim();
   const delivery = summarizeAnaDelivery(conversation, dashboardRecordsById);
-  const classification = gptMakerClassification(messages, delivery);
+  const classification = anaClassification(messages, delivery);
 
   return {
     id: conversation.id,
@@ -2708,9 +2682,18 @@ function conversationMessagesForPrompt(messages = []) {
     direction: message.direction,
     senderType: message.senderType,
     senderName: message.senderName || (message.direction === 'INBOUND' ? 'Lead' : 'Ana'),
-    body: String(message.body || '').slice(0, 900),
+    body: sanitizeAnaPromptText(message.body).slice(0, 900),
     createdAt: message.createdAt
   }));
+}
+
+function sanitizeAnaPromptText(value) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  if (plausibleNewAddress(text)) return '[ENDEREÇO INFORMADO PELO INTERESSADO]';
+  return text
+    .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, '[E-MAIL]')
+    .replace(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}/g, '[TELEFONE]');
 }
 
 function inferAnaConversationState(conversation) {
@@ -2773,9 +2756,7 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
   const address = addressFromConversation(conversation);
   const district = conversation?.district || conversation?.lead?.district?.name || 'Distrito não vinculado';
   const lead = {
-    nome_cadastrado: name || null,
     primeiro_nome_confiavel: firstName || null,
-    telefone: conversation?.phone || null,
     distrito: district,
     material_solicitado: material,
     possui_endereco_cadastrado: Boolean(address),
@@ -2800,7 +2781,7 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     JSON.stringify(conversationMessagesForPrompt(conversation?.messages || []), null, 2),
     '',
     '=== ÚLTIMA MENSAGEM RECEBIDA ===',
-    String(inboundMessage?.body || ''),
+    sanitizeAnaPromptText(inboundMessage?.body),
     '',
     '=== TAREFA ===',
     'Gere apenas a próxima mensagem da Ana para WhatsApp.',
@@ -2809,13 +2790,14 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     'Não use listas.',
     'Faça no máximo uma pergunta principal.',
     'Se não houver nome confiável, não invente nome e não use "Oi" como nome.',
-    'Não convide para o presente do dia 19 logo após a pessoa confirmar que recebeu o material.',
-    'Antes de falar do presente, converse primeiro sobre o material: pergunte o que ela entendeu, quais pontos chamaram atenção e se gostaria de receber um próximo material semelhante.',
-    'Somente depois dessas etapas fale que no sábado, 19 de setembro de 2026, à tarde, uma equipe da Novo Tempo entregará um material/brinde.',
-    'Se ela aceitar o presente e houver endereço cadastrado, considere o endereço pronto e finalize confirmando a data e o período da entrega. Não peça confirmação do endereço.',
-    'Se não houver endereço cadastrado, peça o endereço completo apenas uma vez.',
-    'Quando a pessoa enviar o endereço completo, reconheça o endereço e finalize confirmando a entrega. Não peça o endereço novamente e não encaminhe para atendente.',
-    'Se a pessoa disser "já dei", "já enviei" ou equivalente, releia o histórico, use o endereço já informado e finalize a entrega sem fazer outra pergunta.'
+    'Responda primeiro, com sensibilidade, ao que a pessoa realmente disse ou perguntou.',
+    'Se o brinde ainda não foi oferecido, conduza naturalmente a conversa para informar que, a partir de 19 de setembro de 2026, a equipe da Novo Tempo entregará um brinde especial e pergunte se a pessoa deseja recebê-lo.',
+    'Não prometa dia, horário ou visita já marcada. A equipe ainda entrará em contato para combinar a forma da entrega.',
+    'Se a pessoa já aceitou o brinde, não volte a perguntar se ela o deseja. O sistema cuidará da confirmação ou coleta do endereço.',
+    'Nunca revele telefone, e-mail ou endereço completo no texto da resposta.',
+    'Em perguntas bíblicas, responda com clareza, esperança e fidelidade às fontes fornecidas. Não invente versículos nem referências.',
+    'Se houver risco imediato, violência, abuso, ameaça ou ideação suicida, acolha sem julgamento e indique atendimento humano urgente.',
+    'Se a pessoa pedir para não receber mensagens, respeite e encerre imediatamente.'
   ].join('\n');
 }
 
@@ -2823,27 +2805,24 @@ async function callAnaModel({ conversation, inboundMessage, guideText, config })
   const prompt = buildAnaPrompt({ conversation, inboundMessage, guideText });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Number(process.env.ANA_MODEL_TIMEOUT_MS || 18000));
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:generateContent`, {
     method: 'POST',
     signal: controller.signal,
     headers: {
-      Authorization: `Bearer ${normalizeApiToken(process.env.ASSISTENTE_ANA || process.env.ANA_API_KEY)}`,
+      'x-goog-api-key': anaApiKey(),
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: config.model,
-      input: [
-        {
-          role: 'system',
-          content: 'Você é a Ana da Novo Tempo. Siga estritamente o manual e responda somente com a mensagem final para WhatsApp.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.4,
-      max_output_tokens: 220
+      systemInstruction: {
+        parts: [{
+          text: 'Você é Ana, assistente virtual da Escola Bíblica Novo Tempo. Seja humana, acolhedora, clara e respeitosa. Siga estritamente o manual, o estado da conversa e as regras operacionais. Produza somente a próxima mensagem para WhatsApp, sem Markdown.'
+        }]
+      },
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.35,
+        maxOutputTokens: 260
+      }
     })
   }).finally(() => clearTimeout(timeout));
 
@@ -2855,10 +2834,9 @@ async function callAnaModel({ conversation, inboundMessage, guideText, config })
     throw error;
   }
 
-  const text = payload.output_text
-    || payload.output?.flatMap((item) => item.content || [])
-      .map((content) => content.text || '')
-      .join('')
+  const text = payload.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text || '')
+    .join('')
     || '';
   return String(text || '').trim();
 }
@@ -2879,12 +2857,6 @@ function validateAnaReply(message, { conversation, inboundMessage }) {
   const repeatsArrivalQuestion = /(material chegou|chegou até aí|chegou ate ai|chegou a receber|receber ou acessar)/i.test(clean);
   if (alreadyAnsweredMaterial && repeatsArrivalQuestion) clean = fallback;
 
-  const askedUnderstanding = anaHistoryIncludes(history, /(o que você entendeu|o que voce entendeu|pontos importantes|chamou mais sua atenção|chamou mais sua atencao|conseguiu dar uma olhada|já conseguiu começar|ja conseguiu comecar)/i);
-  const askedNextMaterial = anaHistoryIncludes(history, /(próximo material|proximo material|outro material|material semelhante|continuar recebendo|continuar esse estudo)/i);
-  const giftTooEarly = /(19 de setembro|dia 19|presente|brinde|entrega especial)/i.test(clean)
-    && (!askedUnderstanding || !askedNextMaterial);
-  if (giftTooEarly) clean = fallback;
-
   const normalizedClean = clean.toLowerCase().replace(/\s+/g, ' ').trim();
   const repeated = (conversation?.messages || []).some((item) => {
     const previous = String(item.body || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -2903,7 +2875,7 @@ function validateAnaReply(message, { conversation, inboundMessage }) {
   return clean;
 }
 
-async function guardGptMakerReply(message, { conversation, inboundMessage }) {
+async function guardAnaReply(message, { conversation, inboundMessage }) {
   let clean = String(message || '').replace(/\r/g, '').replace(/\*\*/g, '').replace(/^\s*Ana:\s*/i, '').trim();
   if (!clean) clean = buildAnaFallbackReply({ conversation, inboundMessage });
 
@@ -2916,7 +2888,7 @@ async function guardGptMakerReply(message, { conversation, inboundMessage }) {
   const messages = conversation?.messages || [];
   const proposedQuestion = anaDeliveryQuestion(clean);
   const addressInLastReply = plausibleNewAddress(inboundMessage?.body);
-  const addressReady = Boolean(addressInLastReply || deliveryState.addressProvided || addressState.hasAddress || addressFromConversation(conversation));
+  const addressReady = Boolean(addressInLastReply || deliveryState.addressProvided || addressState.confirmed);
   const giftAccepted = deliveryState.giftAccepted === 'sim'
     || /(quero receber|pode entregar|aceito|gostaria de receber|pode trazer)/i.test(String(inboundMessage?.body || ''));
   const askedAddress = messages.some((item) => item.direction === 'OUTBOUND'
@@ -2929,8 +2901,16 @@ async function guardGptMakerReply(message, { conversation, inboundMessage }) {
   const firstName = leadFirstName(conversation?.leadName || lead?.name);
   const nameSuffix = firstName ? `, ${firstName}` : '';
   const finalDeliveryReply = deliveryState.deliveryConfirmed
-    ? `Tudo certo${nameSuffix}. Sua entrega já está confirmada para sábado, dia 19 de setembro, pela parte da tarde.`
-    : `Perfeito${nameSuffix}. No sábado, dia 19 de setembro, pela parte da tarde, um representante da Novo Tempo irá até sua casa para entregar o seu brinde em mãos. Deus abençoe você e sua família.`;
+    ? `Tudo certo${nameSuffix}. A equipe já registrou sua confirmação e entrará em contato para combinar a entrega.`
+    : anaDeliveryFinalReply(firstName);
+
+  if (giftAccepted && addressState.hasAddress && !addressReady) {
+    return {
+      message: `Que bom${nameSuffix}! O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro?`,
+      guarded: true,
+      reason: 'confirm-registered-address'
+    };
+  }
 
   if (giftAccepted && addressReady && (
     proposedQuestion === 'GIFT_ACCEPTANCE'
@@ -2988,6 +2968,176 @@ async function guardGptMakerReply(message, { conversation, inboundMessage }) {
   return { message: clean, guarded: false, reason: null };
 }
 
+function anaDeliveryFinalReply(name) {
+  const suffix = name ? `, ${name}` : '';
+  return `Muito obrigado pela confirmação${suffix}. A partir do dia 19 de setembro de 2026, nossa equipe entrará em contato para combinar a melhor forma de entregar o brinde diretamente a você. Deus abençoe você e sua família.`;
+}
+
+async function recordAnaAddressDecision({ lead, address, confirmedExisting = false }) {
+  if (!lead?.id) return { addressSaved: false, existingAddressConfirmed: false };
+
+  if (address && String(lead.newAddress || '').trim() !== address) {
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: { newAddress: address }
+    });
+    await prisma.leadInteraction.create({
+      data: {
+        leadId: lead.id,
+        channel: 'SISTEMA',
+        summary: 'Endereço atualizado pela Ana para a entrega do brinde.',
+        metadata: {
+          type: 'ANA_ADDRESS_UPDATE',
+          newAddress: address,
+          previousAddressPresent: Boolean(String(lead.address || '').trim()),
+          source: 'gemini-ana'
+        }
+      }
+    });
+    lead.newAddress = address;
+    return { addressSaved: true, existingAddressConfirmed: false };
+  }
+
+  if (confirmedExisting) {
+    const currentState = await registeredAddressState(lead);
+    if (!currentState.confirmed) {
+      await prisma.leadInteraction.create({
+        data: {
+          leadId: lead.id,
+          channel: 'SISTEMA',
+          summary: 'Endereço cadastrado confirmado para a entrega do brinde.',
+          metadata: {
+            type: 'ANA_ADDRESS_CONFIRMATION',
+            source: 'gemini-ana'
+          }
+        }
+      });
+    }
+    return { addressSaved: false, existingAddressConfirmed: true };
+  }
+
+  return { addressSaved: false, existingAddressConfirmed: false };
+}
+
+async function buildAnaOperationalReply({ conversation, inboundMessage }) {
+  const messages = conversation?.messages || [];
+  const inboundText = String(inboundMessage?.body || '').trim();
+  const normalizedInbound = normalizedIntentName(inboundText);
+  const firstName = leadFirstName(conversation?.leadName || conversation?.lead?.name);
+  const suffix = firstName ? `, ${firstName}` : '';
+  const previousOutbound = [...messages]
+    .reverse()
+    .find((message) => message.direction === 'OUTBOUND' && message.id !== inboundMessage?.id);
+  const previousQuestion = anaDeliveryQuestion(previousOutbound?.body);
+  const address = plausibleNewAddress(inboundText);
+  const affirmative = isAffirmativeReply(inboundText);
+  const confirmsExisting = confirmsRegisteredAddress(inboundText);
+  const negative = isNegativeReply(inboundText);
+  const saysDifferentAddress = /\b(outro|outra|diferente|mudou|mudei|novo endereco|novo endereço|nao e o mesmo|não é o mesmo)\b/i.test(inboundText);
+  const saysAlreadyProvided = /\b(ja dei|já dei|ja enviei|já enviei|ja informei|já informei|mandei antes)\b/i.test(inboundText);
+  const lead = conversation?.lead || null;
+  const addressState = await registeredAddressState(lead);
+
+  if (explicitContactOptOut(inboundText)) {
+    return {
+      message: `Tudo bem${suffix}. Respeitaremos seu pedido e não enviaremos novas mensagens. Deus abençoe você e sua família.`,
+      reason: 'opt-out'
+    };
+  }
+
+  if (detectAnaReplyIntent(inboundText) === 'human') {
+    return {
+      message: `${firstName ? `${firstName}, ` : ''}obrigada por confiar isso a mim. Sua segurança é o mais importante. Vou sinalizar agora para uma pessoa da equipe acompanhar você com cuidado. Se houver risco imediato, procure o serviço de emergência da sua região ou alguém de confiança que possa ficar com você.`,
+      reason: 'human-safety'
+    };
+  }
+
+  if (previousQuestion === 'GIFT_ACCEPTANCE') {
+    if (negative && !affirmative) {
+      return {
+        message: `Tudo bem${suffix}. Agradeço por nos avisar e respeito sua decisão. Deus abençoe você e sua família.`,
+        reason: 'gift-declined'
+      };
+    }
+    if (affirmative || /\b(quero receber|aceito o brinde|pode entregar|gostaria de receber)\b/i.test(inboundText)) {
+      return addressState.hasAddress
+        ? {
+            message: `Que bom${suffix}! O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro?`,
+            reason: 'confirm-registered-address'
+          }
+        : {
+            message: `Que bom${suffix}! Para registrarmos a entrega, pode enviar seu endereço completo atual?`,
+            reason: 'request-address'
+          };
+    }
+  }
+
+  if (previousQuestion === 'ADDRESS_CONFIRMATION') {
+    if (address) {
+      await recordAnaAddressDecision({ lead, address });
+      return { message: anaDeliveryFinalReply(firstName), reason: 'new-address-saved' };
+    }
+    if ((affirmative || confirmsExisting) && !saysDifferentAddress) {
+      await recordAnaAddressDecision({ lead, confirmedExisting: true });
+      return { message: anaDeliveryFinalReply(firstName), reason: 'registered-address-confirmed' };
+    }
+    if (negative || saysDifferentAddress) {
+      return {
+        message: `Sem problema${suffix}. Pode enviar seu endereço completo atual para eu registrá-lo para a equipe?`,
+        reason: 'request-different-address'
+      };
+    }
+  }
+
+  if (previousQuestion === 'ADDRESS_REQUEST') {
+    if (address) {
+      await recordAnaAddressDecision({ lead, address });
+      return { message: anaDeliveryFinalReply(firstName), reason: 'new-address-saved' };
+    }
+    if (saysAlreadyProvided && addressState.hasAddress) {
+      return { message: anaDeliveryFinalReply(firstName), reason: 'address-already-available' };
+    }
+    return {
+      message: `Para concluir o registro${suffix}, pode enviar o endereço atual com rua, número, bairro e cidade? Se souber, inclua também o CEP.`,
+      reason: 'address-incomplete'
+    };
+  }
+
+  const deliveryState = await inferAnaDeliveryState({
+    phone: conversation?.phone,
+    inboundText
+  }, lead, addressState);
+
+  if (normalizedInbound && address && deliveryState.giftAccepted === 'sim') {
+    await recordAnaAddressDecision({ lead, address });
+    return { message: anaDeliveryFinalReply(firstName), reason: 'new-address-saved' };
+  }
+
+  if (deliveryState.giftAccepted === 'sim' && !deliveryState.deliveryConfirmed) {
+    if (deliveryState.addressProvided || addressState.confirmed) {
+      return { message: anaDeliveryFinalReply(firstName), reason: 'delivery-ready' };
+    }
+    return addressState.hasAddress
+      ? {
+          message: `Que bom${suffix}! O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro?`,
+          reason: 'confirm-registered-address'
+        }
+      : {
+          message: `Que bom${suffix}! Para registrarmos a entrega, pode enviar seu endereço completo atual?`,
+          reason: 'request-address'
+        };
+  }
+
+  if (deliveryState.giftOffered && deliveryState.giftAccepted === 'nao') {
+    return {
+      message: `Tudo bem${suffix}. Agradeço por nos avisar e respeito sua decisão. Deus abençoe você e sua família.`,
+      reason: 'gift-declined'
+    };
+  }
+
+  return null;
+}
+
 async function buildAnaReply({ conversation, inboundMessage, config }) {
   let guide = null;
   let guideError = null;
@@ -2998,6 +3148,16 @@ async function buildAnaReply({ conversation, inboundMessage, config }) {
     console.error('[ai:ana:guide:error]', error.message);
   }
   const fallback = buildAnaFallbackReply({ conversation, inboundMessage });
+  const operationalReply = await buildAnaOperationalReply({ conversation, inboundMessage });
+  if (operationalReply) {
+    return {
+      message: operationalReply.message,
+      source: 'operational-rule',
+      reason: operationalReply.reason,
+      guide,
+      error: guideError
+    };
+  }
   if (!config.configured || String(process.env.ASSISTENTE_ANA_USE_MODEL || 'true').toLowerCase() === 'false') {
     return {
       message: validateAnaReply(fallback, { conversation, inboundMessage }),
@@ -3120,11 +3280,11 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
   const alreadyAskedMaterialRead = /(dar uma olhada|chamou mais sua atenção|chamou mais sua atencao)/i.test(fullHistory);
   const alreadyAskedUnderstanding = /(o que você entendeu|o que voce entendeu|pontos importantes|chamou mais sua atenção|chamou mais sua atencao|qual parte fez mais sentido|já conseguiu começar|ja conseguiu comecar)/i.test(fullHistory);
   const alreadyAskedNextMaterial = /(próximo material|proximo material|outro material|material semelhante|continuar recebendo|continuar esse estudo)/i.test(fullHistory);
-  const alreadyOfferedGift = /(presente físico|presente fisico|19 de setembro)/i.test(fullHistory);
+  const alreadyOfferedGift = /(presente físico|presente fisico|brinde|19 de setembro)/i.test(fullHistory);
   const alreadyAskedAddress = /(endereço em nossos registros|endereco em nossos registros|esse ainda é o melhor endereço|esse ainda e o melhor endereco|o seu endereço é|o seu endereco e)/i.test(fullHistory);
   const alreadyConfirmedDelivery = /(entrega no dia 19 de setembro|entregar o presente em mãos|entregar o presente em maos|representantes para esse fim|receber os representantes)/i.test(fullHistory);
   const alreadyAskedCanReceive = /(você poderá receber os representantes|voce podera receber os representantes|você poderá receber esse material|voce podera receber esse material|poderá receber esse material|podera receber esse material)/i.test(fullHistory);
-  const acceptedGift = alreadyOfferedGift && !alreadyAskedAddress && (isAffirmativeReply(inboundText) || /(quero receber|pode entregar|aceito|gostaria de receber|sim.*presente|sim.*brinde)/i.test(inboundText));
+  const acceptedGift = alreadyOfferedGift && (isAffirmativeReply(inboundText) || /(quero receber|pode entregar|aceito|gostaria de receber|sim.*presente|sim.*brinde)/i.test(inboundText));
   const confirmedAddress = alreadyAskedAddress && !alreadyConfirmedDelivery && isAffirmativeReply(inboundText);
   const deniedAddress = alreadyAskedAddress && !alreadyConfirmedDelivery && isNegativeReply(inboundText);
   const confirmedVisit = alreadyAskedCanReceive && isAffirmativeReply(inboundText);
@@ -3140,23 +3300,33 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
   if (intent === 'human') {
     return `${anaNameText(name)}obrigada por me contar. Esse assunto merece uma atenção mais cuidadosa, então vou deixar registrado para alguém da equipe Novo Tempo acompanhar com carinho.`;
   }
+  if (!alreadyOfferedGift) {
+    const introduction = intent === 'not_received'
+      ? `Entendi${anaNameSuffix(name)}. Obrigada por me avisar; vou deixar registrado que o material ainda não chegou.`
+      : intent === 'does_not_remember'
+        ? `Sem problema${anaNameSuffix(name)}. Este contato é da Escola Bíblica Novo Tempo e aparece relacionado a ${theme}.`
+        : intent === 'received'
+          ? `Que bom saber${anaNameSuffix(name)}. Fico feliz que o material chegou.`
+          : `Obrigada por responder${anaNameSuffix(name)}.`;
+    return `${introduction}\n\n${anaGiftOfferReply('')}`;
+  }
   if (confirmedVisit) {
-    return `Muito obrigado${anaNameSuffix(name)}. Então fica combinado: no sábado, dia 19 de setembro de 2026, pela parte da tarde, um representante da equipe Novo Tempo irá até você para entregar esse material especial em suas mãos.`;
+    return anaDeliveryFinalReply(name);
   }
   if (confirmedAddress) {
-    return `Perfeito${anaNameSuffix(name)}. Então vou deixar combinado: no dia 19 de setembro de 2026, pela parte da tarde, um representante da Novo Tempo levará o presente até você.\n\nVocê poderá receber os representantes nesse horário?`;
+    return anaDeliveryFinalReply(name);
   }
   if (deniedAddress) {
     return `Obrigado por avisar${anaNameSuffix(name)}. Para eu registrar certinho a entrega do presente no dia 19 de setembro de 2026, você pode me enviar seu endereço completo atual?`;
   }
   if (sentAddress) {
-    return `Perfeito${anaNameSuffix(name)}, recebi seu endereço. Muito obrigado por enviar.\n\nVou deixar registrado e passar para a equipe da Novo Tempo organizar essa entrega com carinho. No sábado, dia 19 de setembro de 2026, pela parte da tarde, o representante levará esse material especial até você.`;
+    return anaDeliveryFinalReply(name);
   }
   if (acceptedGift) {
     if (address) {
-      return `Perfeito${anaNameSuffix(name)}. Temos seu endereço em nossos dados. Ele continua o mesmo para você receber o presente?`;
+      return `Que bom${anaNameSuffix(name)}! O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro?`;
     }
-    return `Que bom${anaNameSuffix(name)}. Para organizar a entrega do presente no dia 19 de setembro de 2026, você pode me enviar seu endereço atual completo?`;
+    return `Que bom${anaNameSuffix(name)}! Para registrarmos a entrega, por favor, envie seu endereço completo atual.`;
   }
   if (alreadyAskedUnderstanding && !alreadyAskedNextMaterial && !isNegativeReply(inboundText)) {
     return pickUnusedAnaReply([
@@ -3170,9 +3340,9 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
       return `Tudo bem${anaNameSuffix(name)}. Vou deixar seu retorno registrado com carinho para a equipe da Novo Tempo.`;
     }
     return pickUnusedAnaReply([
-      `Que bom que você deseja continuar${anaNameSuffix(name)}. Olha, no sábado, dia 19 de setembro de 2026, pela parte da tarde, uma equipe da Novo Tempo vai entregar um material especial, um brinde, para quem está acompanhando a Escola Bíblica.\n\nVocê poderá receber esse material?`,
-      `${anaNameText(name)}fico feliz em saber disso. No sábado, 19 de setembro de 2026, à tarde, a Novo Tempo terá uma equipe fazendo uma entrega especial de um material/brinde.\n\nVocê poderá receber?`,
-      `Perfeito${anaNameSuffix(name)}. Então posso te contar uma coisa: no sábado, dia 19 de setembro de 2026, pela parte da tarde, representantes da Novo Tempo vão entregar um presente para apoiar esse acompanhamento.\n\nVocê poderá receber esse material?`
+      `Que bom que você deseja continuar${anaNameSuffix(name)}. A partir do dia 19 de setembro de 2026, a equipe da Novo Tempo estará entregando um brinde especial às pessoas que foram contatadas.\n\nVocê gostaria de receber esse brinde?`,
+      `${anaNameText(name)}fico feliz em saber disso. A partir de 19 de setembro de 2026, nossa equipe fará a entrega de um brinde especial da Novo Tempo.\n\nVocê deseja recebê-lo?`,
+      `Perfeito${anaNameSuffix(name)}. A Novo Tempo preparou um brinde especial, com entregas a partir de 19 de setembro de 2026.\n\nVocê gostaria de receber?`
     ], fullHistory);
   }
   if (alreadyOfferedGift && !alreadyAskedAddress && isNegativeReply(inboundText)) {
@@ -3205,9 +3375,9 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     }
     if (!alreadyOfferedGift) {
       return pickUnusedAnaReply([
-        `Que bom que você deseja continuar${anaNameSuffix(name)}. Olha, no sábado, dia 19 de setembro de 2026, pela parte da tarde, uma equipe da Novo Tempo vai entregar um material especial, um brinde, para quem está acompanhando a Escola Bíblica.\n\nVocê poderá receber esse material?`,
-        `${anaNameText(name)}fico feliz em saber disso. No sábado, 19 de setembro de 2026, à tarde, a Novo Tempo terá uma equipe fazendo uma entrega especial de um material/brinde.\n\nVocê poderá receber?`,
-        `Perfeito${anaNameSuffix(name)}. Então posso te contar uma coisa: no sábado, dia 19 de setembro de 2026, pela parte da tarde, representantes da Novo Tempo vão entregar um presente para apoiar esse acompanhamento.\n\nVocê poderá receber esse material?`
+        `Que bom que você deseja continuar${anaNameSuffix(name)}. A partir do dia 19 de setembro de 2026, a equipe da Novo Tempo estará entregando um brinde especial às pessoas que foram contatadas.\n\nVocê gostaria de receber esse brinde?`,
+        `${anaNameText(name)}fico feliz em saber disso. A partir de 19 de setembro de 2026, nossa equipe fará a entrega de um brinde especial da Novo Tempo.\n\nVocê deseja recebê-lo?`,
+        `Perfeito${anaNameSuffix(name)}. A Novo Tempo preparou um brinde especial, com entregas a partir de 19 de setembro de 2026.\n\nVocê gostaria de receber?`
       ], fullHistory);
     }
     return `Perfeito${anaNameSuffix(name)}. Vou deixar isso registrado para a equipe da Novo Tempo acompanhar com carinho.`;
@@ -3216,73 +3386,6 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     return `Que bom você falar sobre isso${anaNameSuffix(name)}. Vou deixar registrado para alguém da equipe Novo Tempo acompanhar com carinho.`;
   }
   return `${anaNameText(name)}obrigada por responder 😊\n\nPara eu seguir com o acompanhamento certinho: você chegou a receber o material da Escola Bíblica Novo Tempo?`;
-}
-
-function gptMakerContextId(phone) {
-  return normalizePhone(phone);
-}
-
-async function sendGptMakerRequest(endpoint, body) {
-  const config = gptMakerConfig();
-  const apiToken = normalizeApiToken(
-    process.env.GPTMAKER_API_TOKEN
-    || process.env.GPTMAKER_API_KEY
-    || process.env.GPT_MAKER_API_TOKEN
-  );
-  if (!config.baseUrl || !apiToken || !config.agentId) {
-    const error = new Error('Configuracao do GPT Maker incompleta. Informe GPTMAKER_API_TOKEN e GPTMAKER_AGENT_ID.');
-    error.status = 500;
-    throw error;
-  }
-
-  const providerResponse = await fetch(`${config.baseUrl}/v2/agent/${encodeURIComponent(config.agentId)}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiToken}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(Math.min(Math.max(Number(process.env.GPTMAKER_TIMEOUT_MS) || 90000, 5000), 120000))
-  });
-  const data = await parseProviderResponse(providerResponse);
-  if (!providerResponse.ok) {
-    const error = new Error(data?.error || data?.message || `GPT Maker respondeu com status ${providerResponse.status}`);
-    error.status = 502;
-    error.providerStatus = providerResponse.status;
-    error.providerResponse = data;
-    throw error;
-  }
-  return data;
-}
-
-async function askGptMakerAgent({ conversation, inboundMessage }) {
-  const contextId = gptMakerContextId(conversation?.phone);
-  const prompt = String(inboundMessage?.body || '').trim();
-  if (!contextId || !prompt) return null;
-
-  const data = await sendGptMakerRequest('/conversation', {
-    contextId,
-    prompt,
-    chatName: conversation?.leadName || conversation?.lead?.name || 'Interessado',
-    phone: contextId
-  });
-  const message = String(data?.message || '').trim();
-  if (!message) {
-    const error = new Error('O agente do GPT Maker respondeu sem texto.');
-    error.status = 502;
-    error.providerResponse = data;
-    throw error;
-  }
-  return { message, contextId, providerResponse: data };
-}
-
-async function addGptMakerContext({ phone, message, role = 'assistant' }) {
-  const config = gptMakerConfig();
-  const contextId = gptMakerContextId(phone);
-  const prompt = String(message || '').trim();
-  if (!config.configured || !contextId || !prompt) return { skipped: true };
-  return sendGptMakerRequest('/add-message', { contextId, prompt, role });
 }
 
 function optionalBoolean(value) {
@@ -3298,11 +3401,11 @@ function conversationAiReplySetting(messages = []) {
   return controlMessage ? controlMessage.metadata.aiReplyEnabled : null;
 }
 
-async function processGptMakerReply(saved, inboundMessage) {
+async function processAnaReply(saved, inboundMessage) {
   if (!saved?.conversation?.id || !inboundMessage?.body) return null;
-  const config = gptMakerConfig();
+  const config = anaConfig();
   if (!config.configured) {
-    console.warn('[gptmaker:auto-reply:skipped] GPT Maker nao configurado');
+    console.warn('[ai:ana:auto-reply:skipped] Gemini não configurado');
     return null;
   }
 
@@ -3330,25 +3433,10 @@ async function processGptMakerReply(saved, inboundMessage) {
   if (recentAgentReply) return null;
 
   const typing = await sendWhatsAppTypingIndicator(conversation?.phone || saved.conversation.phone);
-  let agentReply;
-  try {
-    agentReply = await askGptMakerAgent({ conversation, inboundMessage });
-  } catch (error) {
-    await prisma.whatsAppMessage.update({
-      where: { id: inboundMessage.id },
-      data: {
-        metadata: {
-          ...(inboundMessage.metadata && typeof inboundMessage.metadata === 'object' ? inboundMessage.metadata : {}),
-          gptMakerError: error.message,
-          gptMakerHttpStatus: error.providerStatus || null,
-          gptMakerAttemptedAt: new Date().toISOString()
-        }
-      }
-    }).catch(() => null);
-    throw error;
-  }
-
-  const guardedReply = await guardGptMakerReply(agentReply.message, { conversation, inboundMessage });
+  const agentReply = await buildAnaReply({ conversation, inboundMessage, config });
+  const guardedReply = agentReply.source === 'operational-rule'
+    ? { message: agentReply.message, guarded: true, reason: agentReply.reason }
+    : await guardAnaReply(agentReply.message, { conversation, inboundMessage });
   const message = guardedReply.message;
   let result;
   try {
@@ -3356,7 +3444,7 @@ async function processGptMakerReply(saved, inboundMessage) {
       phone: conversation?.phone || saved.conversation.phone,
       message,
       leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
-      templateId: 'gptmaker-auto-reply'
+      templateId: 'gemini-ana-auto-reply'
     });
   } catch (error) {
     return recordWhatsAppMessage({
@@ -3374,15 +3462,14 @@ async function processGptMakerReply(saved, inboundMessage) {
       occurredAt: new Date(),
       metadata: {
         assistant: 'Ana',
-        aiProvider: 'gpt-maker',
+        aiProvider: 'gemini',
+        aiModel: config.model,
+        aiReplySource: agentReply.source,
         transport: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
         autoReply: true,
         replyToMessageId: inboundMessage.id,
-        source: 'gpt-maker-conversation',
+        source: 'gemini-ana',
         aiReplyEnabled: true,
-        gptMakerAgentId: config.agentId,
-        gptMakerContextId: agentReply.contextId,
-        gptMakerResponse: agentReply.providerResponse,
         replyGuarded: guardedReply.guarded,
         replyGuardReason: guardedReply.reason,
         typing,
@@ -3409,15 +3496,14 @@ async function processGptMakerReply(saved, inboundMessage) {
     occurredAt: new Date(),
     metadata: {
       assistant: 'Ana',
-      aiProvider: 'gpt-maker',
+      aiProvider: 'gemini',
+      aiModel: config.model,
+      aiReplySource: agentReply.source,
       transport: result.provider,
       autoReply: true,
       replyToMessageId: inboundMessage.id,
-      source: 'gpt-maker-conversation',
+      source: 'gemini-ana',
       aiReplyEnabled: true,
-      gptMakerAgentId: config.agentId,
-      gptMakerContextId: agentReply.contextId,
-      gptMakerResponse: agentReply.providerResponse,
       replyGuarded: guardedReply.guarded,
       replyGuardReason: guardedReply.reason,
       typing,
@@ -3426,21 +3512,21 @@ async function processGptMakerReply(saved, inboundMessage) {
   });
 }
 
-const gptMakerReplyInFlight = new Map();
+const anaReplyInFlight = new Map();
 
-async function maybeReplyWithGptMaker(saved, inboundMessage) {
+async function maybeReplyWithAna(saved, inboundMessage) {
   const conversationId = saved?.conversation?.id;
   if (!conversationId) return null;
-  const current = gptMakerReplyInFlight.get(conversationId);
+  const current = anaReplyInFlight.get(conversationId);
   if (current) return current;
 
-  const task = processGptMakerReply(saved, inboundMessage);
-  gptMakerReplyInFlight.set(conversationId, task);
+  const task = processAnaReply(saved, inboundMessage);
+  anaReplyInFlight.set(conversationId, task);
   try {
     return await task;
   } finally {
-    if (gptMakerReplyInFlight.get(conversationId) === task) {
-      gptMakerReplyInFlight.delete(conversationId);
+    if (anaReplyInFlight.get(conversationId) === task) {
+      anaReplyInFlight.delete(conversationId);
     }
   }
 }
@@ -4426,12 +4512,12 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
   response.set('Expires', '0');
 
   try {
-    const training = gptMakerTrainingStatus();
+    const training = await readAnaTrainingStatus();
     if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
       response.json({
-        agent: gptMakerConfig(),
+        agent: anaConfig(),
         training,
-        metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, gptMakerEvents: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
+        metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, aiProviderEvents: 0, gptMakerEvents: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
         funnel: { transmissions: 0, dispatches: 0, messagesSent: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
         analysis: { materialReceived: 0, materialNotReceived: 0, materialPending: 0, giftOffered: 0, giftPending: 0, withoutReply: 0 },
         requestAgeBuckets: ANA_REQUEST_AGE_BUCKETS.map((item) => ({ id: item.id, label: item.label, count: 0, percentage: 0 })),
@@ -4479,7 +4565,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
     const managedConversations = chronologicalConversations.filter((conversation) => (
       !isAnaTestConversation(conversation)
       && (
-        (conversation.messages || []).some(isGptMakerManagedMessage)
+        (conversation.messages || []).some(isAnaManagedMessage)
         || (conversation.messages || []).some((message) =>
           message.direction === 'OUTBOUND'
           && /(brinde|presente)/i.test(String(message.body || ''))
@@ -4560,24 +4646,27 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       giftPending: reportConversations.filter((conversation) => conversation.delivery?.pendingGiftDecision).length,
       withoutReply: reportConversations.filter((conversation) => !conversation.hasLeadReply).length
     };
-    const gptMakerEvents = managedConversations.filter((conversation) => (
+    const aiProviderEvents = managedConversations.filter((conversation) => (
       (conversation.messages || []).some((message) => {
         const metadata = message?.metadata && typeof message.metadata === 'object' ? message.metadata : {};
         return message.provider === 'gpt-maker'
           || metadata.source === 'gpt-maker-intention'
-          || metadata.aiProvider === 'gpt-maker';
+          || metadata.aiProvider === 'gpt-maker'
+          || metadata.aiProvider === 'gemini'
+          || metadata.source === 'gemini-ana';
       })
     )).length;
 
     response.json({
-      agent: gptMakerConfig(),
+      agent: anaConfig(),
       training,
       metrics: {
         conversations: reportConversations.length,
         contacted: contactedConversations.length,
         leadReplies: reportConversations.filter((conversation) => conversation.hasLeadReply).length,
         aiReplies: reportConversations.filter((conversation) => conversation.aiCount > 0).length,
-        gptMakerEvents,
+        aiProviderEvents,
+        gptMakerEvents: aiProviderEvents,
         acceptedVisits: funnel.conversions,
         needsHuman: reportConversations.filter((conversation) => conversation.classification?.label === 'Encaminhar humano').length,
         optOut: reportConversations.filter((conversation) => conversation.classification?.label === 'Opt-out').length
@@ -4591,9 +4680,9 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
   } catch (error) {
     console.error('[ai:ana:summary:error]', error.message);
     response.status(500).json({
-      agent: gptMakerConfig(),
-      training: gptMakerTrainingStatus(),
-      metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, gptMakerEvents: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
+      agent: anaConfig(),
+      training: { loaded: false, provider: 'gemini', files: [] },
+      metrics: { conversations: 0, contacted: 0, leadReplies: 0, aiReplies: 0, aiProviderEvents: 0, gptMakerEvents: 0, acceptedVisits: 0, needsHuman: 0, optOut: 0 },
       funnel: { transmissions: 0, dispatches: 0, messagesSent: 0, responses: 0, conversions: 0, responseRate: 0, conversionRate: 0, overallConversionRate: 0 },
       analysis: { materialReceived: 0, materialNotReceived: 0, materialPending: 0, giftOffered: 0, giftPending: 0, withoutReply: 0 },
       requestAgeBuckets: ANA_REQUEST_AGE_BUCKETS.map((item) => ({ id: item.id, label: item.label, count: 0, percentage: 0 })),
@@ -4612,7 +4701,7 @@ app.get('/api/ai-intentions', (request, response) => {
   response.json({
     ok: true,
     webhook: 'ready',
-    provider: 'gpt-maker',
+    provider: 'legacy-intention-webhook',
     requiredFields: ['phone ou telefone', 'agentMessage ou resposta'],
     optionalFields: ['userMessage', 'intent', 'name', 'leadId', 'address ou endereco']
   });
@@ -5044,11 +5133,6 @@ app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
         ...(aiReplyEnabled === null ? {} : { aiReplyEnabled })
       }
     });
-    await addGptMakerContext({
-      phone: result.phone,
-      message: request.body?.message,
-      role: 'assistant'
-    }).catch((error) => console.warn('[gptmaker:add-context:error]', error.message));
     response.json({
       ...result,
       conversationId: saved?.conversation?.id || null,
@@ -5123,11 +5207,6 @@ app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
         ...(aiReplyEnabled === null ? {} : { aiReplyEnabled })
       }
     });
-    await addGptMakerContext({
-      phone: result.phone,
-      message: savedBody,
-      role: 'assistant'
-    }).catch((error) => console.warn('[gptmaker:add-context:error]', error.message));
     response.json({
       ...result,
       conversationId: saved?.conversation?.id || null,
@@ -5334,11 +5413,6 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         warnings.push('Algumas mensagens foram enviadas, mas nao puderam ser salvas no historico.');
         console.warn('[whatsapp:broadcast:message-tracking:error]', error.message);
       }
-      await addGptMakerContext({
-        phone: result.phone,
-        message: personalizedMessage,
-        role: 'assistant'
-      }).catch((error) => console.warn('[gptmaker:add-context:error]', error.message));
       if (recipientRecord) {
         await prisma.whatsAppBroadcastRecipient.update({
           where: { id: recipientRecord.id },
@@ -5978,8 +6052,8 @@ app.post('/api/webhooks/waha/whatsapp', async (request, response) => {
   });
 
   if (saved?.created && saved.message?.direction === 'INBOUND') {
-    maybeReplyWithGptMaker(saved, saved.message).catch((error) => {
-      console.error('[gptmaker:auto-reply:error]', error.message, error.providerResponse || '');
+    maybeReplyWithAna(saved, saved.message).catch((error) => {
+      console.error('[ai:ana:auto-reply:error]', error.message, error.providerResponse || '');
     });
   }
 
@@ -5990,10 +6064,20 @@ app.post('/api/webhooks/waha/whatsapp', async (request, response) => {
     duplicate: Boolean(saved && !saved.created),
     conversationId: saved?.conversation?.id || null,
     messageId: saved?.message?.id || null,
-    agentReplyQueued: Boolean(saved?.created && saved.message?.direction === 'INBOUND' && gptMakerConfig().configured)
+    agentReplyQueued: Boolean(saved?.created && saved.message?.direction === 'INBOUND' && anaConfig().configured)
   });
 });
 
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Amigos NT backend running on port ${port}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Amigos NT backend running on port ${port}`);
+  });
+}
+
+export {
+  anaDeliveryQuestion,
+  confirmsRegisteredAddress,
+  isAffirmativeReply,
+  isNegativeReply,
+  plausibleNewAddress
+};

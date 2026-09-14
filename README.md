@@ -57,9 +57,9 @@ cd backend
 npm install
 ```
 
-Crie um arquivo `.env` local dentro de `backend/`. Esse arquivo nao deve subir para o GitHub.
+Crie um arquivo `.env` local dentro de `backend/`. Esse arquivo não deve subir para o GitHub.
 
-Variaveis usadas ate o momento:
+Variáveis usadas até o momento:
 
 ```env
 DATABASE_URL="postgresql://usuario:senha@host:porta/banco"
@@ -70,21 +70,20 @@ WAHA_API_URL="https://waha.seu-dominio.com"
 WAHA_API_KEY="chave-privada-da-api-do-waha"
 WAHA_SESSION="default"
 WAHA_WEBHOOK_SECRET="segredo-privado-do-webhook-waha"
-GPTMAKER_API_URL="https://api.gptmaker.ai"
-GPTMAKER_API_TOKEN="token-privado-da-api-do-gpt-maker"
-GPTMAKER_AGENT_ID="id-do-agente-ana-no-gpt-maker"
-GPTMAKER_AGENT_NAME="Ana"
-GPTMAKER_AUTO_REPLY="false"
-GPTMAKER_WEBHOOK_SECRET="segredo-privado-do-webhook-gpt-maker"
+GEMINI_API_KEY="chave-privada-do-google-ai-studio"
+GEMINI_MODEL="gemini-2.5-flash"
+ASSISTENTE_ANA_AUTO_REPLY="false"
+ASSISTENTE_ANA_USE_MODEL="true"
+ANA_MODEL_TIMEOUT_MS="18000"
 ADMIN_EMAIL="admin@leadsnt.com.br"
 ADMIN_PASSWORD="senha-com-no-minimo-8-caracteres"
 ADMIN_NAME="Admin"
 DATASET_DIR="../dataset"
 ```
 
-O mapa de leads usa Leaflet com blocos do OpenStreetMap e nao exige chave de API.
+O mapa de leads usa Leaflet com blocos do OpenStreetMap e não exige chave de API.
 
-Preparar Prisma e usuario admin:
+Preparar Prisma e usuário admin:
 
 ```bash
 npm run setup:db
@@ -118,26 +117,21 @@ WHATSAPP_HOOK_EVENTS="message,message.any,message.ack"
 WHATSAPP_HOOK_CUSTOM_HEADERS="X-Waha-Webhook-Secret:O_MESMO_VALOR_DE_WAHA_WEBHOOK_SECRET"
 ```
 
-Envie o mesmo segredo de `WAHA_WEBHOOK_SECRET` no header `x-waha-webhook-secret`. Os eventos usados são `message`, `message.any` e `message.ack`. O evento `message.any` registra também mensagens enviadas pelo próprio numero, inclusive por automacoes externas conectadas ao WhatsApp.
+Envie o mesmo segredo de `WAHA_WEBHOOK_SECRET` no header `x-waha-webhook-secret`. Os eventos usados são `message`, `message.any` e `message.ack`. O evento `message.any` registra também mensagens enviadas pelo próprio número.
 
-O WAHA recebe e envia as mensagens, e o backend grava o historico completo. Quando o proprio GPT Maker ja esta conectado ao WhatsApp e responde por sua automacao, mantenha `GPTMAKER_AUTO_REPLY="false"` para existir apenas um fluxo respondendo. Use `true` somente quando o backend for o unico responsavel por chamar o agente e enviar a resposta.
+O WAHA recebe e envia as mensagens, e o backend grava o histórico completo. A Ana usa diretamente a API do Gemini; o GPT Maker não participa desse fluxo.
 
-### Agente do GPT Maker
+### Assistente Ana com Gemini
 
-Quando `GPTMAKER_AUTO_REPLY="true"`, o backend conversa com o agente usando `GPTMAKER_AGENT_ID` e `GPTMAKER_API_TOKEN`. Use o mesmo telefone como contexto da conversa para que o agente mantenha o historico do interessado. Nao ative essa opcao ao mesmo tempo que uma automacao do GPT Maker que ja envia respostas diretamente ao WhatsApp.
+Configure `GEMINI_API_KEY` com a chave do Google AI Studio. `GEMINI_MODEL` define o modelo usado; o padrão é `gemini-2.5-flash`.
 
-Com `GPTMAKER_AUTO_REPLY="false"`, a interface permite ativar a Ana manualmente pela opcao
-`Deixar IA responder` em cada mensagem ou transmissao. A escolha fica vinculada ao historico
-do contato: marcada, a proxima resposta recebida chama o GPT Maker; desmarcada, a conversa
-permanece para atendimento humano. A escolha mais recente prevalece e nao exige migracao.
+`ASSISTENTE_ANA_AUTO_REPLY="true"` ativa a resposta automática como padrão. Com `false`, a interface permite ativar a Ana manualmente pela opção `Deixar IA responder` em cada mensagem ou transmissão. A escolha mais recente de cada conversa prevalece.
 
-As intenções e qualificações configuradas no GPT Maker devem chamar:
+`ASSISTENTE_ANA` não é uma variável booleana e não deve receber `true`. Por compatibilidade, se ela já contém sua chave do Gemini, o backend ainda a reconhece; porém, o nome recomendado é `GEMINI_API_KEY`. Para habilitar o modelo, use `ASSISTENTE_ANA_USE_MODEL="true"`.
 
-```text
-https://SEU_BACKEND_PUBLICO/api/ai-intentions?token=O_MESMO_VALOR_DE_GPTMAKER_WEBHOOK_SECRET
-```
+O fluxo crítico do brinde e do endereço é validado pelo backend: o Gemini redige a conversa, mas o sistema controla aceite, recusa, confirmação do endereço e gravação de um endereço novo. Telefone, e-mail e endereço completo são removidos do contexto enviado ao modelo sempre que identificados.
 
-Envie no corpo os campos `phone`, `intent`, `qualification`, `summary`, `nextAction`, `userMessage` e `agentMessage` quando estiverem disponíveis. Também é possível proteger o endpoint pelo header `x-gptmaker-secret` ou `x-webhook-secret`. A qualificação recebida é anexada à mensagem existente do WAHA e alimenta a tela do Agente IA sem duplicar a conversa.
+Os arquivos ativos de comportamento ficam em `PLANO_SEQUENCIA_ANA_PRESENTE_19_SETEMBRO.md` e `TREINAMENTO_IA_NOVO_TEMPO/`. Alterações nesses arquivos são recarregadas automaticamente pelo backend.
 
 Rotas internas do Amigos NT para disparo:
 

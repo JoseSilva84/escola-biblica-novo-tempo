@@ -9463,6 +9463,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const acceptedConversations = anaSummary?.acceptedConversations || anaConversations.filter((conversation) => conversation.delivery?.accepted);
   const anaConversationGroups = useMemo(() => {
     const preferredOrder = [
+      'Brinde confirmado',
+      'Brinde recusado',
       'Visita marcada',
       'Aceitou a visita',
       'Não aceitou a visita',
@@ -9624,7 +9626,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const anaTraining = anaSummary?.training || null;
   const anaAgent = anaSummary?.agent || null;
   const active = Boolean(anaAgent?.configured && anaAgent?.autoReplyEnabled);
-  const gptMakerSynchronized = Boolean(anaMetrics.gptMakerEvents || anaAgent?.configured);
+  const geminiSynchronized = Boolean(anaMetrics.aiProviderEvents || anaMetrics.gptMakerEvents || anaAgent?.configured);
   const anaGroupCounts = useMemo(() => Object.fromEntries(
     anaConversationGroups.map((group) => [group.label, group.conversations.length])
   ), [anaConversationGroups]);
@@ -9780,15 +9782,15 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             <span className={labelClass}>IA de atendimento</span>
             <h1 className="silver-title mt-2 text-5xl font-black leading-tight tracking-normal max-md:text-4xl">Agente IA</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
-              O agente Ana do GPT Maker responde às mensagens recebidas pelo WAHA, qualifica os atendimentos e sinaliza quando precisa de revisão humana.
+              A assistente Ana usa o Gemini para responder às mensagens recebidas pelo WAHA, conduzir o fluxo do brinde e sinalizar quando precisa de revisão humana.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className={`inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-black ${gptMakerSynchronized ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+            <div className={`inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-black ${geminiSynchronized ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
               <WandSparkles size={18} />
-              {gptMakerSynchronized ? 'Dados do GPT Maker sincronizados' : 'Aguardando dados do GPT Maker'}
+              {geminiSynchronized ? 'Gemini conectado' : 'Aguardando configuração do Gemini'}
             </div>
-            <button className={`${ghostButtonClass} h-11 px-3`} disabled={anaLoading} onClick={() => loadAnaSummary()} title="Atualizar dados do GPT Maker" type="button">
+            <button className={`${ghostButtonClass} h-11 px-3`} disabled={anaLoading} onClick={() => loadAnaSummary()} title="Atualizar dados da Ana" type="button">
               <RefreshCw className={anaLoading ? 'animate-spin' : ''} size={17} /> Atualizar
             </button>
           </div>
@@ -9798,9 +9800,9 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
       <section className="grid grid-cols-6 gap-4 max-2xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
         <MetricCard detail={`${formatNumber(anaFunnel.transmissions || 0)} transmissão(ões) registrada(s)`} icon={Send} label="Receberam contato" tone="blue" value={anaLoading ? '...' : formatNumber(anaFunnel.dispatches || 0)} />
         <MetricCard detail={`${anaFunnel.responseRate || 0}% dos contatos abordados`} icon={MessageCircle} label="Responderam" tone="orange" value={anaLoading ? '...' : formatNumber(anaFunnel.responses || 0)} />
-        <MetricCard detail={`${anaFunnel.conversionRate || 0}% das respostas`} icon={CheckCircle2} label="Aceitaram a visita" tone="green" value={anaLoading ? '...' : formatNumber(anaFunnel.conversions || 0)} />
+        <MetricCard detail={`${anaFunnel.conversionRate || 0}% das respostas`} icon={CheckCircle2} label="Aceitaram o brinde" tone="green" value={anaLoading ? '...' : formatNumber(anaFunnel.conversions || 0)} />
         <MetricCard detail="aguardando qualificação" icon={Sparkles} label="Triagens" tone="violet" value={anaLoading ? '...' : formatNumber(anaGroupCounts.Triagem || 0)} />
-        <MetricCard detail="recusaram o recebimento" icon={X} label="Não aceitaram" tone="orange" value={anaLoading ? '...' : formatNumber(anaGroupCounts['Não aceitou a visita'] || 0)} />
+        <MetricCard detail="recusaram o recebimento" icon={X} label="Não aceitaram" tone="orange" value={anaLoading ? '...' : formatNumber(anaGroupCounts['Brinde recusado'] || anaGroupCounts['Não aceitou a visita'] || 0)} />
         <MetricCard detail="precisam receber ou reenviar" icon={ClipboardList} label="Enviar material" value={anaLoading ? '...' : formatNumber(anaGroupCounts['Enviar material'] || 0)} />
       </section>
 
@@ -9943,7 +9945,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
 
             <article className={`${panelClass} p-6`}>
               <span className={labelClass}>Tempo entre solicitação e aceite</span>
-              <h2 className="mt-2 text-2xl font-black text-slate-50">Da solicitação do material até a visita aceita</h2>
+              <h2 className="mt-2 text-2xl font-black text-slate-50">Da solicitação do material até o aceite do brinde</h2>
               <p className="mt-2 text-sm font-semibold text-slate-400">Quantidade e percentual das pessoas que aceitaram, separados pelo tempo desde o pedido do material.</p>
               <div className="mt-5 divide-y divide-white/10 border-y border-white/10">
                 {filteredRequestAgeBuckets.map((bucket) => (
@@ -9962,8 +9964,8 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
           <section className={`${panelClass} p-6`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <span className={labelClass}>Visitas confirmadas</span>
-                <h2 className="mt-2 text-2xl font-black text-slate-50">Pessoas que aceitaram</h2>
+                <span className={labelClass}>Entregas confirmadas</span>
+                <h2 className="mt-2 text-2xl font-black text-slate-50">Pessoas que aceitaram o brinde</h2>
               </div>
               <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-lg bg-emerald-600 px-3 text-lg font-black text-white">
                 {formatNumber(filteredAcceptedConversations.length)}
@@ -9991,7 +9993,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                   <ChevronRight className="text-emerald-700" size={18} />
                 </button>
               )) : (
-                <p className="p-5 text-sm font-semibold text-slate-600">Nenhuma visita confirmada até o momento.</p>
+                <p className="p-5 text-sm font-semibold text-slate-600">Nenhuma entrega confirmada até o momento.</p>
               )}
             </div>
           </section>
@@ -10004,7 +10006,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 <h2 className="mt-2 text-2xl font-black text-slate-50">Atendimentos da Ana depois do disparo</h2>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${anaAgent?.configured ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
-                {anaAgent?.configured ? 'GPT Maker conectado' : 'Configuração pendente'}
+                {anaAgent?.configured ? 'Gemini conectado' : 'Configuração pendente'}
               </span>
             </div>
             <div className="mt-5 grid gap-3">
@@ -10092,10 +10094,10 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             </div>
           </article>
           <article className={`${panelClass} p-6`}>
-            <span className={labelClass}>Agente no GPT Maker</span>
+            <span className={labelClass}>Assistente com Gemini</span>
             <div className="mt-5 grid gap-3">
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
-                As instruções, os treinamentos e as intenções da Ana são administrados no GPT Maker. Este painel mostra somente os resultados recebidos desse agente.
+                A personalidade, a base bíblica e o fluxo do brinde são carregados pelo backend. O Gemini redige as respostas, enquanto o sistema controla o aceite e o endereço.
               </div>
             </div>
           </article>
@@ -10109,10 +10111,10 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             <span className={labelClass}>Conexão do agente</span>
             <div className="mt-5 grid gap-3">
               {[
-                ['Plataforma', 'GPT Maker'],
+                ['Plataforma', 'Google Gemini'],
                 ['Agente', anaAgent?.name || 'Ana'],
                 ['Respostas', active ? 'Automáticas pelo WAHA' : 'Aguardando configuração'],
-                ['Qualificação', 'Intenções recebidas do GPT Maker']
+                ['Modelo', anaAgent?.model || 'gemini-2.5-flash']
               ].map(([label, value]) => (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={label}>
                   <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</span>
@@ -10125,7 +10127,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             <span className={labelClass}>Administração</span>
             <div className="mt-5 grid gap-3">
               <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold leading-relaxed text-slate-700 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
-                Nome, tom de voz, instruções, treinamento, limites e intenções são alterados diretamente no agente Ana dentro do GPT Maker.
+                O treinamento ativo está nos arquivos da Ana no backend. As etapas críticas da campanha são validadas pelo sistema para impedir repetição ou salto de etapa.
               </div>
             </div>
           </article>
@@ -10230,9 +10232,9 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
         <section className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-md:grid-cols-1">
           {[
             ['Elegiveis para IA', hotWhatsapp + studyWhatsapp + vipWhatsapp, 'quentes, estudos e VIPs'],
-            ['Modo atual', active ? 'Automático' : 'Inativo', 'configurado no GPT Maker'],
+            ['Modo atual', active ? 'Automático' : 'Inativo', 'configurado no backend'],
             ['Campanhas ativas', campaigns.filter((campaign) => campaign.status === 'Ativa').length, 'podem receber IA'],
-            ['Custo', 'GPT Maker', 'acompanhar na plataforma']
+            ['Modelo', anaAgent?.model || 'Gemini', 'uso acompanhado no Google AI Studio']
           ].map(([label, value, detail]) => (
             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={label}>
               <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</span>
@@ -10369,7 +10371,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
               </div>
               <div className="grid grid-cols-2 gap-3 border-b border-slate-200 pb-4 max-sm:grid-cols-1">
                 <div>
-                  <span className="block text-xs font-black uppercase text-slate-500">Aceite da visita</span>
+                  <span className="block text-xs font-black uppercase text-slate-500">Confirmação da entrega</span>
                   <strong className="mt-1 block text-sm text-slate-900">
                     {selectedAcceptedConversation.delivery?.acceptedAt
                       ? new Date(selectedAcceptedConversation.delivery.acceptedAt).toLocaleString('pt-BR')
