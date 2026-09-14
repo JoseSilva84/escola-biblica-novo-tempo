@@ -8,7 +8,8 @@ const {
   confirmsRegisteredAddress,
   isAffirmativeReply,
   isNegativeReply,
-  plausibleNewAddress
+  plausibleNewAddress,
+  resolveConversationAiReplySetting
 } = await import('./server.js');
 
 test('identifica a pergunta de aceite do brinde', () => {
@@ -40,4 +41,11 @@ test('interpreta respostas curtas à confirmação do endereço', () => {
 test('aceita endereço informado e não confunde confirmação com endereço', () => {
   assert.equal(plausibleNewAddress('Rua das Flores, 123, Centro, São Paulo - SP'), 'Rua das Flores, 123, Centro, São Paulo - SP');
   assert.equal(plausibleNewAddress('é o mesmo'), '');
+});
+
+test('prioriza o modo persistente da conversa sem apagar o controle histórico', () => {
+  const messages = [{ metadata: { aiReplyEnabled: true } }];
+  assert.equal(resolveConversationAiReplySetting({ aiReplyEnabled: false, messages }), false);
+  assert.equal(resolveConversationAiReplySetting({ aiReplyEnabled: null, messages }), true);
+  assert.equal(resolveConversationAiReplySetting({ messages: [] }), null);
 });

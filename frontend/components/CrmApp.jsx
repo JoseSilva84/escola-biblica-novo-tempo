@@ -7162,10 +7162,10 @@ function AdminGeneralView({
               Mensagem do lote
               <textarea className="min-h-28 rounded-xl border border-white/[0.08] bg-slate-950/70 px-3 py-3 text-slate-100 outline-none" name="batchMessage" defaultValue="Ola! Aqui e da Escola Biblica Novo Tempo. Estamos felizes pelo seu interesse e queremos ajudar voce a continuar seus estudos." />
             </label>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-black text-slate-200">
-              <input checked={batchAiReplyEnabled} className="h-4 w-4 accent-emerald-500" onChange={(event) => setBatchAiReplyEnabled(event.target.checked)} type="checkbox" />
-              <WandSparkles size={17} /> Deixar IA responder
-            </label>
+            <div className="grid gap-2">
+              <span className={labelClass}>Quem continuará o atendimento</span>
+              <AiReplyModeSelector enabled={batchAiReplyEnabled} onChange={setBatchAiReplyEnabled} compact />
+            </div>
             <button className={primaryButtonClass} disabled={batchLoading} type="submit">
               <ClipboardList size={18} />
               {batchLoading ? 'Enviando...' : 'Enviar lote'}
@@ -7862,6 +7862,34 @@ function WhatsAppLeadPickerModal({
   );
 }
 
+function AiReplyModeSelector({ enabled, onChange, disabled = false, compact = false }) {
+  const optionBase = `inline-flex items-center justify-center gap-2 rounded-xl border font-black transition focus:outline-none focus:ring-4 disabled:cursor-wait disabled:opacity-60 ${compact ? 'min-h-9 px-3 py-2 text-xs' : 'min-h-11 px-4 py-2.5 text-sm'}`;
+  return (
+    <div aria-label="Modo do atendimento" className="ai-reply-mode-selector grid grid-cols-2 gap-2" role="radiogroup">
+      <button
+        aria-checked={enabled}
+        className={`${optionBase} ${enabled ? 'border-emerald-400 bg-emerald-500 text-white shadow-lg shadow-emerald-900/20 focus:ring-emerald-500/20' : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-emerald-400 hover:text-emerald-700 focus:ring-slate-400/15'}`}
+        disabled={disabled}
+        onClick={() => onChange(true)}
+        role="radio"
+        type="button"
+      >
+        <WandSparkles size={compact ? 15 : 17} /> Deixar IA responder
+      </button>
+      <button
+        aria-checked={!enabled}
+        className={`${optionBase} ${!enabled ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-950/20 focus:ring-blue-500/20' : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-blue-400 hover:text-blue-700 focus:ring-slate-400/15'}`}
+        disabled={disabled}
+        onClick={() => onChange(false)}
+        role="radio"
+        type="button"
+      >
+        <UsersRound size={compact ? 15 : 17} /> Assumir atendimento
+      </button>
+    </div>
+  );
+}
+
 function WhatsAppBroadcastModal({
   aiReplyEnabled,
   listName,
@@ -7912,18 +7940,12 @@ function WhatsAppBroadcastModal({
             <span className="text-xs font-black uppercase tracking-wide text-slate-600">Mensagem *</span>
             <textarea autoFocus className="min-h-36 resize-y rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onMessageChange(event.target.value)} placeholder="Digite a mensagem que todos receberão" required value={message} />
           </label>
-          <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4">
-            <span className="min-w-0">
-              <strong className="flex items-center gap-2 text-sm font-black text-slate-900"><WandSparkles size={17} /> Deixar IA responder</strong>
-              <span className="mt-1 block text-xs font-semibold text-slate-500">A Ana assume somente quando o contato responder a esta transmissão.</span>
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <AiReplyModeSelector enabled={aiReplyEnabled} onChange={onAiReplyEnabledChange} />
+            <span className="mt-2 block text-xs font-semibold text-slate-500">
+              Escolha quem continuará cada conversa quando o contato responder a esta transmissão.
             </span>
-            <input
-              checked={aiReplyEnabled}
-              className="h-5 w-5 shrink-0 accent-[#00a884]"
-              onChange={(event) => onAiReplyEnabledChange(event.target.checked)}
-              type="checkbox"
-            />
-          </label>
+          </div>
           <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
             <span className="text-[11px] font-black uppercase tracking-wide text-emerald-800">Variáveis disponíveis</span>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -8268,6 +8290,7 @@ function ConversationsView({ records = [] }) {
   const [newContact, setNewContact] = useState({ name: '', phone: '', district: '', priority: '' });
   const [messageAttachment, setMessageAttachment] = useState(null);
   const [messageAiReplyEnabled, setMessageAiReplyEnabled] = useState(false);
+  const [aiModeSaving, setAiModeSaving] = useState(false);
   const chatEndRef = useRef(null);
   const messageTextRef = useRef(null);
   const attachmentInputRef = useRef(null);
@@ -8838,7 +8861,11 @@ function ConversationsView({ records = [] }) {
   const conversationAiControl = [...messages].reverse().find((message) => (
     typeof message?.metadata?.aiReplyEnabled === 'boolean'
   ));
-  const conversationAiReplyEnabled = conversationAiControl?.metadata?.aiReplyEnabled === true;
+  const conversationAiReplyEnabled = typeof selectedConversation?.aiReplyEnabled === 'boolean'
+    ? selectedConversation.aiReplyEnabled
+    : typeof selectedConversation?.effectiveAiReplyEnabled === 'boolean'
+      ? selectedConversation.effectiveAiReplyEnabled
+      : conversationAiControl?.metadata?.aiReplyEnabled === true;
   const lastMessage = messages[messages.length - 1];
   const activePhoneSuffix = String(activePhone).slice(-10);
   const recordLead = records.find((lead) => activePhoneSuffix && phoneDigits(lead.tel).includes(activePhoneSuffix));
@@ -8866,6 +8893,56 @@ function ConversationsView({ records = [] }) {
   useEffect(() => {
     setMessageAiReplyEnabled(conversationAiReplyEnabled);
   }, [conversationAiReplyEnabled, selectedConversation?.id]);
+
+  function updateConversationAiModeLocally(conversationId, phone, aiReplyEnabled, details = {}) {
+    const normalizedPhone = phoneDigits(phone);
+    setConversations((current) => current.map((conversation) => {
+      const sameConversation = conversation.id === conversationId
+        || (normalizedPhone && phoneDigits(conversation.phone).endsWith(normalizedPhone.slice(-10)));
+      return sameConversation ? {
+        ...conversation,
+        aiReplyEnabled,
+        effectiveAiReplyEnabled: aiReplyEnabled,
+        aiReplyUpdatedAt: details.updatedAt || new Date().toISOString(),
+        aiReplyUpdatedBy: details.updatedBy || conversation.aiReplyUpdatedBy || null
+      } : conversation;
+    }));
+  }
+
+  async function changeActiveConversationAiMode(aiReplyEnabled) {
+    const conversationId = selectedConversation?.id;
+    const phone = selectedConversation?.phone || activePhone;
+    const previousValue = conversationAiReplyEnabled;
+    setMessageAiReplyEnabled(aiReplyEnabled);
+
+    if (!conversationId || String(conversationId).startsWith('temp-') || String(conversationId).startsWith('ana-snapshot-')) {
+      return;
+    }
+
+    updateConversationAiModeLocally(conversationId, phone, aiReplyEnabled);
+    setAiModeSaving(true);
+    try {
+      const response = await apiFetch(`/api/whatsapp/conversations/${encodeURIComponent(conversationId)}/ai-mode`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiReplyEnabled })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Não foi possível alterar o modo do atendimento.');
+      updateConversationAiModeLocally(conversationId, phone, payload.aiReplyEnabled, payload);
+      toast.success(payload.aiReplyEnabled ? 'Ana ativada nesta conversa' : 'Atendimento assumido', {
+        description: payload.aiReplyEnabled
+          ? 'A IA poderá responder às próximas mensagens deste contato.'
+          : 'A IA não responderá enquanto o atendimento estiver com você.'
+      });
+    } catch (error) {
+      setMessageAiReplyEnabled(previousValue);
+      updateConversationAiModeLocally(conversationId, phone, previousValue);
+      toast.error('Falha ao alterar o atendimento', { description: error.message });
+    } finally {
+      setAiModeSaving(false);
+    }
+  }
   const visibleConversations = useMemo(() => {
     const term = conversationListSearch.trim().toLocaleLowerCase('pt-BR');
     if (!term) return displayedConversations;
@@ -8984,6 +9061,7 @@ function ConversationsView({ records = [] }) {
           ...existing,
           id: existing.id || conversationId,
           phone: existing.phone || normalizedPhone,
+          ...(typeof payload.aiReplyEnabled === 'boolean' ? { aiReplyEnabled: payload.aiReplyEnabled } : {}),
           updatedAt: now,
           messages: alreadyExists ? messages : [...messages, outgoingMessage]
         };
@@ -8995,6 +9073,7 @@ function ConversationsView({ records = [] }) {
         leadName: activeLeadName,
         district: activeLeadDistrict,
         lead: activeLead || null,
+        ...(typeof payload.aiReplyEnabled === 'boolean' ? { aiReplyEnabled: payload.aiReplyEnabled } : {}),
         messages: [outgoingMessage],
         updatedAt: now,
         createdAt: now
@@ -9301,15 +9380,19 @@ function ConversationsView({ records = [] }) {
                 }} type="button"><X size={16} /></button>
               </div>
             ) : null}
-            <label className="flex cursor-pointer items-center gap-2 text-xs font-black text-[#54656f]">
-              <input
-                checked={messageAiReplyEnabled}
-                className="h-4 w-4 accent-[#00a884]"
-                onChange={(event) => setMessageAiReplyEnabled(event.target.checked)}
-                type="checkbox"
+            <div className="grid gap-1.5">
+              <AiReplyModeSelector
+                compact
+                disabled={aiModeSaving || !activePhone}
+                enabled={messageAiReplyEnabled}
+                onChange={changeActiveConversationAiMode}
               />
-              <WandSparkles size={16} /> Deixar IA responder
-            </label>
+              <span className="text-[11px] font-semibold text-[#667781]">
+                {messageAiReplyEnabled
+                  ? 'A Ana responderá este contato. Você pode assumir o atendimento a qualquer momento.'
+                  : 'Atendimento humano ativo. A Ana não responderá a este contato.'}
+              </span>
+            </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <input accept="image/*,video/*" className="hidden" onChange={selectMessageAttachment} ref={attachmentInputRef} type="file" />

@@ -238,6 +238,9 @@ model WhatsAppConversation {
   leadName       String?
   district       String?
   status         String            @default("ABERTA")
+  aiReplyEnabled Boolean?
+  aiReplyUpdatedAt DateTime?
+  aiReplyUpdatedBy String?
   lead           Lead?             @relation(fields: [leadId], references: [id])
   messages       WhatsAppMessage[]
   createdAt      DateTime          @default(now())

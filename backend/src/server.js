@@ -1438,6 +1438,7 @@ async function recordWhatsAppMessage({
   const dbLeadId = lead?.id || null;
   const nextLeadName = lead?.name || leadName || null;
   const nextDistrict = lead?.district?.name || district || null;
+  const aiReplyEnabled = senderType === 'AI' ? null : optionalBoolean(metadata?.aiReplyEnabled);
 
   const conversation = await prisma.whatsAppConversation.upsert({
     where: { phone: normalizedPhone },
@@ -1446,13 +1447,23 @@ async function recordWhatsAppMessage({
       leadId: dbLeadId,
       externalLeadId: numericLeadId,
       leadName: nextLeadName,
-      district: nextDistrict
+      district: nextDistrict,
+      ...(aiReplyEnabled === null ? {} : {
+        aiReplyEnabled,
+        aiReplyUpdatedAt: occurredAt,
+        aiReplyUpdatedBy: senderName || 'Sistema'
+      })
     },
     update: {
       ...(dbLeadId ? { leadId: dbLeadId } : {}),
       ...(numericLeadId ? { externalLeadId: numericLeadId } : {}),
       ...(nextLeadName ? { leadName: nextLeadName } : {}),
-      ...(nextDistrict ? { district: nextDistrict } : {})
+      ...(nextDistrict ? { district: nextDistrict } : {}),
+      ...(aiReplyEnabled === null ? {} : {
+        aiReplyEnabled,
+        aiReplyUpdatedAt: occurredAt,
+        aiReplyUpdatedBy: senderName || 'Sistema'
+      })
     }
   });
 
@@ -3401,6 +3412,12 @@ function conversationAiReplySetting(messages = []) {
   return controlMessage ? controlMessage.metadata.aiReplyEnabled : null;
 }
 
+function resolveConversationAiReplySetting(conversation = {}) {
+  const savedSetting = optionalBoolean(conversation?.aiReplyEnabled);
+  if (savedSetting !== null) return savedSetting;
+  return conversationAiReplySetting(conversation?.messages || []);
+}
+
 async function processAnaReply(saved, inboundMessage) {
   if (!saved?.conversation?.id || !inboundMessage?.body) return null;
   const config = anaConfig();
@@ -3422,7 +3439,7 @@ async function processAnaReply(saved, inboundMessage) {
   if (conversation?.messages) {
     conversation.messages = [...conversation.messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   }
-  const conversationSetting = conversationAiReplySetting(conversation?.messages || []);
+  const conversationSetting = resolveConversationAiReplySetting(conversation);
   const shouldReply = conversationSetting === null ? config.autoReplyEnabled : conversationSetting;
   if (!shouldReply) return null;
   const recentAgentReply = (conversation?.messages || []).find((message) => (
@@ -3438,6 +3455,11 @@ async function processAnaReply(saved, inboundMessage) {
     ? { message: agentReply.message, guarded: true, reason: agentReply.reason }
     : await guardAnaReply(agentReply.message, { conversation, inboundMessage });
   const message = guardedReply.message;
+  const currentMode = await prisma.whatsAppConversation.findUnique({
+    where: { id: conversation.id },
+    select: { aiReplyEnabled: true }
+  });
+  if (currentMode?.aiReplyEnabled === false) return null;
   let result;
   try {
     result = await sendWhatsAppTextMessage({
@@ -5088,8 +5110,12 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
       || null;
     const serializedLead = lead ? serializeWhatsAppLead(lead) : null;
     const { lead: _lead, ...conversationData } = conversation;
+    const savedAiReplySetting = resolveConversationAiReplySetting(conversationData);
     return {
       ...conversationData,
+      effectiveAiReplyEnabled: savedAiReplySetting === null
+        ? anaConfig().autoReplyEnabled
+        : savedAiReplySetting,
       messages: dedupeWhatsAppMessageList(conversationData.messages),
       lead: serializedLead,
       leadId: conversation.leadId || serializedLead?.id || null,
@@ -5101,6 +5127,48 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
   });
 
   response.json({ conversations: enrichedConversations });
+});
+
+app.patch('/api/whatsapp/conversations/:conversationId/ai-mode', requireAuth, async (request, response) => {
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.status(403).json({ ok: false, message: 'Você não tem permissão para alterar este atendimento.' });
+    return;
+  }
+
+  const conversationId = String(request.params?.conversationId || '').trim();
+  const aiReplyEnabled = optionalBoolean(request.body?.aiReplyEnabled);
+  if (!conversationId || aiReplyEnabled === null) {
+    response.status(400).json({ ok: false, message: 'Informe a conversa e o modo de atendimento.' });
+    return;
+  }
+
+  try {
+    const updatedAt = new Date();
+    const conversation = await prisma.whatsAppConversation.update({
+      where: { id: conversationId },
+      data: {
+        aiReplyEnabled,
+        aiReplyUpdatedAt: updatedAt,
+        aiReplyUpdatedBy: request.user?.email || request.user?.sub || 'Sistema'
+      }
+    });
+    response.json({
+      ok: true,
+      conversationId: conversation.id,
+      phone: conversation.phone,
+      aiReplyEnabled: conversation.aiReplyEnabled,
+      mode: conversation.aiReplyEnabled ? 'AI' : 'HUMAN',
+      updatedAt: conversation.aiReplyUpdatedAt,
+      updatedBy: conversation.aiReplyUpdatedBy
+    });
+  } catch (error) {
+    if (error?.code === 'P2025') {
+      response.status(404).json({ ok: false, message: 'Conversa não encontrada.' });
+      return;
+    }
+    console.error('[whatsapp:ai-mode:error]', error.message);
+    response.status(500).json({ ok: false, message: 'Não foi possível alterar o modo do atendimento.' });
+  }
 });
 
 app.post('/api/whatsapp/send', requireAuth, async (request, response) => {
@@ -6079,5 +6147,6 @@ export {
   confirmsRegisteredAddress,
   isAffirmativeReply,
   isNegativeReply,
-  plausibleNewAddress
+  plausibleNewAddress,
+  resolveConversationAiReplySetting
 };
