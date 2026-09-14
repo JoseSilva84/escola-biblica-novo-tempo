@@ -9865,13 +9865,13 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
             <span className={labelClass}>IA de atendimento</span>
             <h1 className="silver-title mt-2 text-5xl font-black leading-tight tracking-normal max-md:text-4xl">Agente IA</h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">
-              A assistente Ana usa o Gemini para responder às mensagens recebidas pelo WAHA, conduzir o fluxo do brinde e sinalizar quando precisa de revisão humana.
+              A assistente Ana responderá às mensagens recebidas pelo WhatsApp, conduzirá o fluxo do brinde e sinalizará quando precisar de revisão humana.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className={`inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-black ${geminiSynchronized ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
               <WandSparkles size={18} />
-              {geminiSynchronized ? 'Gemini conectado' : 'Aguardando configuração do Gemini'}
+              {geminiSynchronized ? 'Ana conectada' : 'Aguardando configuração da Ana'}
             </div>
             <button className={`${ghostButtonClass} h-11 px-3`} disabled={anaLoading} onClick={() => loadAnaSummary()} title="Atualizar dados da Ana" type="button">
               <RefreshCw className={anaLoading ? 'animate-spin' : ''} size={17} /> Atualizar
@@ -10054,10 +10054,10 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 {formatNumber(filteredAcceptedConversations.length)}
               </span>
             </div>
-            <div className="mt-5 max-h-80 divide-y divide-slate-200 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+            <div className="accepted-delivery-list mt-5 max-h-80 divide-y divide-slate-200 overflow-y-auto rounded-lg border border-slate-200 bg-white">
               {filteredAcceptedConversations.length ? filteredAcceptedConversations.map((conversation) => (
                 <button
-                  className="grid w-full grid-cols-[1fr_auto] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-emerald-50 focus:bg-emerald-50 focus:outline-none"
+                  className="accepted-delivery-row grid w-full grid-cols-[1fr_auto] items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-emerald-50 focus:bg-emerald-50 focus:outline-none"
                   key={conversation.id}
                   onClick={() => setSelectedAcceptedConversation(conversation)}
                   type="button"
@@ -10162,7 +10162,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                         </button>
                       ))}
                       {group.conversations.length > 6 ? (
-                        <button className="w-full px-3 py-2 text-left text-[11px] font-black text-blue-700 hover:bg-blue-50" onClick={() => setSelectedConversationGroup(group)} type="button">
+                        <button className="accepted-delivery-more w-full px-3 py-2 text-left text-[11px] font-black text-blue-700 hover:bg-blue-50" onClick={() => setSelectedConversationGroup(group)} type="button">
                           Ver mais {group.conversations.length - 6} pessoa(s)
                         </button>
                       ) : null}

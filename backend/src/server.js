@@ -1135,6 +1135,11 @@ function anaGiftOfferReply(name) {
   return `A partir do dia 19 de setembro de 2026, a equipe da Novo Tempo estará entregando um brinde especial às pessoas que foram contatadas${greetingName}. Você gostaria de receber esse brinde?`;
 }
 
+function anaAddressConfirmationReply(name) {
+  const suffix = name ? `, ${name}` : '';
+  return `Que bom${suffix}! O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro? Se for outro, pode me passar o endereço completo.`;
+}
+
 async function anaIntentReply(event) {
   const intent = normalizedIntentName(event.intentName);
   const addressIntent = intent.includes('registrar endereco');
@@ -1236,9 +1241,9 @@ async function anaIntentReply(event) {
 
     return {
       action: 'REQUEST_NEW_ADDRESS',
-      reply: 'Que bom! 😊 Para organizarmos a entrega do brinde, pode me informar seu endereço completo?',
+      reply: anaAddressConfirmationReply(firstName),
       leadFound: Boolean(lead),
-      hasRegisteredAddress: false,
+      hasRegisteredAddress: addressState.hasAddress,
       addressShouldBeHidden: true
     };
   }
@@ -1277,9 +1282,9 @@ async function anaIntentReply(event) {
     if (!addressReady) {
       return {
         action: 'REQUEST_NEW_ADDRESS',
-        reply: 'Pode me informar seu endereço completo para organizarmos a entrega do brinde?',
+        reply: anaAddressConfirmationReply(firstName),
         leadFound: Boolean(lead),
-        hasRegisteredAddress: false,
+        hasRegisteredAddress: addressState.hasAddress,
         addressShouldBeHidden: true,
         addressSaved: false
       };
@@ -2804,7 +2809,7 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     'Responda primeiro, com sensibilidade, ao que a pessoa realmente disse ou perguntou.',
     'Se o brinde ainda não foi oferecido, conduza naturalmente a conversa para informar que, a partir de 19 de setembro de 2026, a equipe da Novo Tempo entregará um brinde especial e pergunte se a pessoa deseja recebê-lo.',
     'Não prometa dia, horário ou visita já marcada. A equipe ainda entrará em contato para combinar a forma da entrega.',
-    'Se a pessoa já aceitou o brinde, não volte a perguntar se ela o deseja. O sistema cuidará da confirmação ou coleta do endereço.',
+    'Se a pessoa já aceitou o brinde, não volte a perguntar se ela o deseja. Pergunte se o endereço é o mesmo que está cadastrado na Novo Tempo ou se ela deseja informar outro; só peça o endereço completo quando ela disser que é outro, que mudou ou que não é o mesmo.',
     'Nunca revele telefone, e-mail ou endereço completo no texto da resposta.',
     'Em perguntas bíblicas, responda com clareza, esperança e fidelidade às fontes fornecidas. Não invente versículos nem referências.',
     'Se houver risco imediato, violência, abuso, ameaça ou ideação suicida, acolha sem julgamento e indique atendimento humano urgente.',
@@ -2917,7 +2922,7 @@ async function guardAnaReply(message, { conversation, inboundMessage }) {
 
   if (giftAccepted && addressState.hasAddress && !addressReady) {
     return {
-      message: `Que bom${nameSuffix}! O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro?`,
+      message: anaAddressConfirmationReply(firstName),
       guarded: true,
       reason: 'confirm-registered-address'
     };
@@ -2935,7 +2940,7 @@ async function guardAnaReply(message, { conversation, inboundMessage }) {
   if (proposedQuestion === 'GIFT_ACCEPTANCE' && (giftAccepted || askedGift)) {
     if (!addressReady && !askedAddress) {
       return {
-        message: `Que bom${nameSuffix}! Para organizarmos a entrega do brinde, pode me informar seu endereço completo?`,
+        message: anaAddressConfirmationReply(firstName),
         guarded: true,
         reason: 'gift-already-accepted'
       };
@@ -3073,12 +3078,12 @@ async function buildAnaOperationalReply({ conversation, inboundMessage }) {
     if (affirmative || /\b(quero receber|aceito o brinde|pode entregar|gostaria de receber)\b/i.test(inboundText)) {
       return addressState.hasAddress
         ? {
-            message: `Que bom${suffix}! O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro?`,
+            message: anaAddressConfirmationReply(firstName),
             reason: 'confirm-registered-address'
           }
         : {
-            message: `Que bom${suffix}! Para registrarmos a entrega, pode enviar seu endereço completo atual?`,
-            reason: 'request-address'
+            message: anaAddressConfirmationReply(firstName),
+            reason: 'confirm-or-request-address'
           };
     }
   }
@@ -3130,12 +3135,12 @@ async function buildAnaOperationalReply({ conversation, inboundMessage }) {
     }
     return addressState.hasAddress
       ? {
-          message: `Que bom${suffix}! O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro?`,
+          message: anaAddressConfirmationReply(firstName),
           reason: 'confirm-registered-address'
         }
       : {
-          message: `Que bom${suffix}! Para registrarmos a entrega, pode enviar seu endereço completo atual?`,
-          reason: 'request-address'
+          message: anaAddressConfirmationReply(firstName),
+          reason: 'confirm-or-request-address'
         };
   }
 
@@ -3335,9 +3340,9 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
   }
   if (acceptedGift) {
     if (address) {
-      return `Que bom${anaNameSuffix(name)}! O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro?`;
+      return anaAddressConfirmationReply(name);
     }
-    return `Que bom${anaNameSuffix(name)}! Para registrarmos a entrega, por favor, envie seu endereço completo atual.`;
+    return anaAddressConfirmationReply(name);
   }
   if (alreadyAskedUnderstanding && !alreadyAskedNextMaterial && !isNegativeReply(inboundText)) {
     return pickUnusedAnaReply([

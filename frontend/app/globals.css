@@ -432,6 +432,36 @@ html[data-crm-theme="dark"] [role="dialog"] .leads-map-church-count {
   color: rgb(248 250 252) !important;
 }
 
+.app-dark .ai-agent-view .accepted-delivery-list {
+  background-color: rgba(8, 17, 31, 0.94) !important;
+}
+
+.app-dark .ai-agent-view .accepted-delivery-row {
+  color: rgb(241 245 249) !important;
+}
+
+.app-dark .ai-agent-view .accepted-delivery-row:hover,
+.app-dark .ai-agent-view .accepted-delivery-row:focus {
+  background-color: rgba(5, 150, 105, 0.16) !important;
+}
+
+.app-dark .ai-agent-view .accepted-delivery-row :is(.text-slate-950, .text-slate-900) {
+  color: rgb(248 250 252) !important;
+}
+
+.app-dark .ai-agent-view .accepted-delivery-row :is(.text-slate-600, .text-slate-500) {
+  color: rgb(203 213 225) !important;
+}
+
+.app-dark .ai-agent-view .accepted-delivery-row :is(.bg-emerald-100, .bg-amber-100) {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.app-dark .ai-agent-view .accepted-delivery-more:hover {
+  background-color: rgba(37, 99, 235, 0.18) !important;
+  color: rgb(191 219 254) !important;
+}
+
 .app-dark .ai-agent-view :is(input, textarea, select) {
   border-color: rgba(148, 163, 184, 0.24) !important;
   background: rgba(8, 17, 31, 0.94) !important;
