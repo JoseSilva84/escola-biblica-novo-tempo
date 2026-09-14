@@ -462,6 +462,36 @@ html[data-crm-theme="dark"] [role="dialog"] .leads-map-church-count {
   color: rgb(191 219 254) !important;
 }
 
+.app-dark .ai-agent-view .broadcast-analytics-card {
+  border-color: rgba(148, 163, 184, 0.26) !important;
+  background-color: rgba(8, 17, 31, 0.96) !important;
+}
+
+.app-dark .ai-agent-view .broadcast-analytics-header {
+  border-color: rgba(148, 163, 184, 0.18) !important;
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.14), rgba(15, 23, 42, 0.94)) !important;
+}
+
+.app-dark .ai-agent-view .broadcast-metric-card {
+  border-color: rgba(226, 232, 240, 0.74) !important;
+  background-color: rgba(8, 17, 31, 0.92) !important;
+}
+
+.app-dark .ai-agent-view .broadcast-metric-card:hover,
+.app-dark .ai-agent-view .broadcast-metric-card:focus {
+  border-color: rgba(45, 212, 191, 0.72) !important;
+  background-color: rgba(15, 23, 42, 0.98) !important;
+}
+
+.app-dark .ai-agent-view .broadcast-metric-value {
+  color: rgb(248 250 252) !important;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.36);
+}
+
+.app-dark .ai-agent-view .broadcast-metric-card :is(.text-\[\#667781\], .text-\[\#111b21\]) {
+  color: rgb(203 213 225) !important;
+}
+
 .app-dark .ai-agent-view :is(input, textarea, select) {
   border-color: rgba(148, 163, 184, 0.24) !important;
   background: rgba(8, 17, 31, 0.94) !important;

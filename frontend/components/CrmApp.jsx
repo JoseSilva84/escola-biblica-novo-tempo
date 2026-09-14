@@ -8025,8 +8025,8 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
               ? new Date(transmission.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
               : 'Data não informada';
             return (
-              <article className="overflow-hidden rounded-2xl border border-[#d1d7db] bg-white shadow-[0_16px_42px_rgba(11,20,26,0.10)]" key={transmission.id}>
-                <div className="border-b border-[#e9edef] bg-[linear-gradient(135deg,#f7fffb,#edfdf7)] px-5 py-4">
+              <article className="broadcast-analytics-card overflow-hidden rounded-2xl border border-[#d1d7db] bg-white shadow-[0_16px_42px_rgba(11,20,26,0.10)]" key={transmission.id}>
+                <div className="broadcast-analytics-header border-b border-[#e9edef] bg-[linear-gradient(135deg,#f7fffb,#edfdf7)] px-5 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <strong className="block truncate text-base font-black text-[#111b21]">{transmission.name}</strong>
@@ -8046,7 +8046,7 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
                     return (
                       <button
                         aria-label={`Ver ${metric.label.toLowerCase()} da transmissão ${transmission.name}`}
-                        className="rounded-xl border border-[#e9edef] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#00a884]/50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#00a884]/30"
+                        className="broadcast-metric-card rounded-xl border border-[#e9edef] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#00a884]/50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#00a884]/30"
                         key={metric.key}
                         onClick={() => setSelectedBreakdown({ transmission, metricKey: metric.key })}
                         type="button"
@@ -8057,7 +8057,7 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
                           </span>
                           <span className="text-[11px] font-black uppercase tracking-wide text-[#667781]">{metric.label}</span>
                         </div>
-                        <strong className="mt-3 block text-2xl font-black text-[#111b21]">{formatNumber(value)}</strong>
+                        <strong className="broadcast-metric-value mt-3 block text-2xl font-black text-[#111b21]">{formatNumber(value)}</strong>
                         <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: metric.track }}>
                           <span className="block h-full rounded-full transition-all" style={{ backgroundColor: metric.color, width: `${percentage}%` }} />
                         </div>
