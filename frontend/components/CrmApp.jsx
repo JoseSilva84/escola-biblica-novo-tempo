@@ -10140,10 +10140,10 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">+{group.districts.length - 4} distritos</span>
                       ) : null}
                     </div>
-                    <div className="mt-3 divide-y divide-slate-100 overflow-hidden rounded-md border border-slate-100 bg-slate-50">
+                    <div className="ana-group-conversation-list mt-3 divide-y divide-slate-100 overflow-hidden rounded-md border border-slate-100 bg-slate-50">
                       {group.conversations.slice(0, 6).map((conversation) => (
                         <button
-                          className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-3 py-2.5 text-left transition hover:bg-blue-50"
+                          className="ana-group-conversation-row grid w-full grid-cols-[1fr_auto] items-center gap-3 px-3 py-2.5 text-left transition hover:bg-blue-50"
                           key={conversation.id}
                           onClick={() => setSelectedGroupConversation(conversation)}
                           type="button"
@@ -10359,10 +10359,10 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 ))}
               </div>
             </div>
-            <div className="conversation-tools-scroll min-h-0 flex-1 divide-y divide-slate-200 overflow-y-auto">
+            <div className="ana-group-conversation-list conversation-tools-scroll min-h-0 flex-1 divide-y divide-slate-200 overflow-y-auto">
               {selectedConversationGroup.conversations.map((conversation) => (
                 <button
-                  className="grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left transition hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
+                  className="ana-group-conversation-row grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left transition hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
                   key={conversation.id}
                   onClick={() => {
                     setSelectedConversationGroup(null);

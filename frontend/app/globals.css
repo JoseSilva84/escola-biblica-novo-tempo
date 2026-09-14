@@ -462,6 +462,31 @@ html[data-crm-theme="dark"] [role="dialog"] .leads-map-church-count {
   color: rgb(191 219 254) !important;
 }
 
+.app-dark .ai-agent-view .ana-group-conversation-list {
+  background-color: rgba(8, 17, 31, 0.92) !important;
+}
+
+.app-dark .ai-agent-view .ana-group-conversation-row {
+  background-color: rgba(8, 17, 31, 0.92) !important;
+}
+
+.app-dark .ai-agent-view .ana-group-conversation-row:hover,
+.app-dark .ai-agent-view .ana-group-conversation-row:focus {
+  background-color: rgba(37, 99, 235, 0.16) !important;
+}
+
+.app-dark .ai-agent-view .ana-group-conversation-row :is(.text-slate-950, .text-slate-900, .text-slate-800) {
+  color: rgb(248 250 252) !important;
+}
+
+.app-dark .ai-agent-view .ana-group-conversation-row :is(.text-slate-600, .text-slate-500) {
+  color: rgb(203 213 225) !important;
+}
+
+.app-dark .ai-agent-view .ana-group-conversation-row :is(.text-blue-700, .text-slate-500) {
+  color: rgb(147 197 253) !important;
+}
+
 .app-dark .ai-agent-view .broadcast-analytics-card {
   border-color: rgba(148, 163, 184, 0.26) !important;
   background-color: rgba(8, 17, 31, 0.96) !important;
