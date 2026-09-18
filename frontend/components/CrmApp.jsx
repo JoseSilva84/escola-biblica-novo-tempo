@@ -206,7 +206,8 @@ function whatsappLeadToDetailRecord(lead, records = []) {
   if (dashboardLead) {
     return {
       ...dashboardLead,
-      whatsappContactCount: Number(lead.whatsappContactCount ?? dashboardLead.whatsappContactCount ?? 0)
+      whatsappContactCount: Number(lead.whatsappContactCount ?? dashboardLead.whatsappContactCount ?? 0),
+      whatsappMessages: lead.whatsappMessages || dashboardLead.whatsappMessages || []
     };
   }
 
@@ -235,6 +236,7 @@ function whatsappLeadToDetailRecord(lead, records = []) {
     faixa: lead.band || lead.faixa || 'Não informada',
     c: lead.daysSinceLastContact ?? lead.c ?? null,
     whatsappContactCount: Number(lead.whatsappContactCount || 0),
+    whatsappMessages: lead.whatsappMessages || [],
     lastContactDate: lead.lastContactDate || null,
     t: Boolean(phone)
   };
@@ -1035,6 +1037,21 @@ function MetricCard({ icon: Icon, label, value, detail, tone = 'silver' }) {
 
 function whatsappHistoryForLead(lead) {
   const history = [];
+  const savedMessages = Array.isArray(lead.whatsappMessages) ? lead.whatsappMessages : [];
+  if (savedMessages.length) {
+    const outboundCount = savedMessages.filter((message) => (
+      message.direction === 'OUTBOUND'
+      && !message.metadata?.failure
+      && !String(message.providerStatus || '').toUpperCase().startsWith('FAILED')
+    )).length;
+    const lastMessage = savedMessages[savedMessages.length - 1];
+    const lastMessageAt = lastMessage?.sentAt || lastMessage?.receivedAt || lastMessage?.createdAt;
+    history.push({
+      title: 'Histórico registrado no WhatsApp',
+      detail: `${formatNumber(savedMessages.length)} mensagem(ns) na conversa, com ${formatNumber(outboundCount)} envio(s) realizado(s)${lastMessageAt ? `. Última atividade em ${new Date(lastMessageAt).toLocaleString('pt-BR')}` : ''}.`,
+      tone: 'bg-emerald-500/10 border-emerald-400/20 text-emerald-100'
+    });
+  }
   if (lead.desc && lead.desc !== 'N/I') {
     history.push({
       title: 'Conversa registrada',
@@ -1292,7 +1309,7 @@ function LeadDetailModal({ churches = [], lead, onClose }) {
       .then((response) => response.ok ? response.json() : null)
       .then((payload) => {
         if (active && payload && Number.isFinite(Number(payload.count))) {
-          setWhatsappContactCount(Number(payload.count));
+          setWhatsappContactCount(Math.max(Number.isFinite(knownCount) ? knownCount : 0, Number(payload.count)));
         } else if (active && !Number.isFinite(knownCount)) {
           setWhatsappContactCount(0);
         }
@@ -7644,6 +7661,7 @@ function RecencyMultiSelect({ onChange, options = [], selected = [] }) {
 }
 
 function WhatsAppLeadPickerModal({
+  audienceLabel = '',
   districts = [],
   filterOptions,
   filters,
@@ -7747,9 +7765,14 @@ function WhatsAppLeadPickerModal({
             </button>
           </div>
 
-          {selectedFilterChips.length ? (
+          {selectedFilterChips.length || audienceLabel ? (
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-2.5">
               <span className="mr-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">Filtros combinados</span>
+              {audienceLabel ? (
+                <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-100 px-3 text-[11px] font-black text-emerald-900 shadow-sm">
+                  <CheckCircle2 size={13} /> Público: {audienceLabel}
+                </span>
+              ) : null}
               {selectedFilterChips.map((chip) => (
                 <button
                   className="inline-flex h-8 items-center gap-1.5 rounded-full border border-blue-200 bg-white px-3 text-[11px] font-black text-slate-700 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
@@ -8306,6 +8329,7 @@ function ConversationsView({ records = [] }) {
   const [leadDirectory, setLeadDirectory] = useState([]);
   const [leadDistricts, setLeadDistricts] = useState([]);
   const [whatsappContactCounts, setWhatsappContactCounts] = useState({});
+  const [contactAudience, setContactAudience] = useState(null);
   const [leadDirectoryLoading, setLeadDirectoryLoading] = useState(false);
   const [contactFilters, setContactFilters] = useState({
     association: 'paulistana',
@@ -8387,12 +8411,24 @@ function ConversationsView({ records = [] }) {
     setConversationExpanded(true);
   }
 
-  async function loadLeadDirectory() {
+  async function loadLeadDirectory(seedLeads = []) {
     const fallbackDistricts = Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-    const fallbackLeads = records
+    const recordFallbackLeads = records
       .filter((lead) => lead.t && phoneDigits(lead.tel))
       .map(dashboardLeadToWhatsAppLead)
       .slice(0, 250);
+    const fallbackLeadsByPhone = new Map();
+    [...recordFallbackLeads, ...seedLeads].forEach((lead) => {
+      const phone = phoneDigits(lead.phone || lead.tel);
+      if (!phone) return;
+      fallbackLeadsByPhone.set(phone.slice(-10), {
+        ...lead,
+        phone,
+        name: lead.name || lead.n || `Contato ${phone.slice(-4)}`,
+        district: lead.district || lead.d || null
+      });
+    });
+    const fallbackLeads = Array.from(fallbackLeadsByPhone.values());
     setLeadDirectory(fallbackLeads);
     setLeadDistricts(fallbackDistricts);
     setLeadDirectoryLoading(true);
@@ -8434,6 +8470,7 @@ function ConversationsView({ records = [] }) {
   }
 
   function openLeadPicker() {
+    setContactAudience(null);
     setLeadPickerOpen(true);
     setNewContactMode(false);
     loadLeadDirectory();
@@ -8744,14 +8781,21 @@ function ConversationsView({ records = [] }) {
     window.localStorage.removeItem('open-whatsapp-phone');
     window.localStorage.removeItem('open-whatsapp-district-request');
     const requestedDistrict = String(districtRequest?.district || '').trim();
+    const requestedRecipients = Array.isArray(districtRequest?.recipients)
+      ? districtRequest.recipients.filter((recipient) => phoneDigits(recipient?.phone))
+      : [];
     if (requestedDistrict) {
       setContactFilters((current) => ({ ...current, districts: [requestedDistrict], search: '' }));
       setBroadcastListName(`Aviso - ${requestedDistrict}`);
+      setContactAudience({
+        label: String(districtRequest?.audienceLabel || 'Aceitaram a visita'),
+        phones: requestedRecipients.map((recipient) => phoneDigits(recipient.phone).slice(-8))
+      });
       setNewContactMode(false);
       setLeadPickerOpen(true);
-      loadLeadDirectory();
+      loadLeadDirectory(requestedRecipients);
       toast.success(`Contatos de ${requestedDistrict}`, {
-        description: 'A lista foi filtrada e selecionada para você preparar o novo aviso.'
+        description: `${requestedRecipients.length} pessoa(s) que aceitaram a visita foram selecionadas para o novo aviso.`
       });
     }
     if (requestedPhone || requestedId) {
@@ -8844,8 +8888,17 @@ function ConversationsView({ records = [] }) {
   }, [leadDirectory, records, whatsappContactCounts]);
 
   const deferredContactFilters = useDeferredValue(contactFilters);
+  const contactAudiencePhoneSet = useMemo(
+    () => new Set((contactAudience?.phones || []).filter(Boolean)),
+    [contactAudience]
+  );
+  const audienceContactFilterRecords = useMemo(() => (
+    contactAudiencePhoneSet.size
+      ? contactFilterRecords.filter((lead) => contactAudiencePhoneSet.has(phoneDigits(lead.tel).slice(-8)))
+      : contactFilterRecords
+  ), [contactAudiencePhoneSet, contactFilterRecords]);
   const contactFilterOptions = useMemo(() => {
-    const recordsFor = (group) => contactFilterRecords.filter((lead) => (
+    const recordsFor = (group) => audienceContactFilterRecords.filter((lead) => (
       leadMatchesFilterGroup(lead, deferredContactFilters, [group])
       && leadMatchesBirthdayFilter(lead, deferredContactFilters, group === 'birthday')
     ));
@@ -8919,17 +8972,21 @@ function ConversationsView({ records = [] }) {
         .filter(Boolean)))
         .sort((a, b) => Number(b) - Number(a))
     };
-  }, [contactFilterRecords, deferredContactFilters]);
+  }, [audienceContactFilterRecords, deferredContactFilters]);
 
-  const filteredContactLeadRecords = useMemo(() => contactFilterRecords
+  const filteredContactLeadRecords = useMemo(() => audienceContactFilterRecords
     .filter((lead) => leadMatchesFilterGroup(lead, deferredContactFilters))
     .filter((lead) => leadMatchesBirthdayFilter(lead, deferredContactFilters))
-    .sort((a, b) => (b.s || 0) - (a.s || 0)), [contactFilterRecords, deferredContactFilters]);
+    .sort((a, b) => (b.s || 0) - (a.s || 0)), [audienceContactFilterRecords, deferredContactFilters]);
 
-  const filteredSourceLeadCount = useMemo(() => records
-    .filter((lead) => leadMatchesFilterGroup(lead, deferredContactFilters, ['whatsapp']))
-    .filter((lead) => leadMatchesBirthdayFilter(lead, deferredContactFilters))
-    .length, [deferredContactFilters, records]);
+  const filteredSourceLeadCount = useMemo(() => Math.max(
+    records
+      .filter((lead) => !contactAudiencePhoneSet.size || contactAudiencePhoneSet.has(phoneDigits(lead.tel).slice(-8)))
+      .filter((lead) => leadMatchesFilterGroup(lead, deferredContactFilters, ['whatsapp']))
+      .filter((lead) => leadMatchesBirthdayFilter(lead, deferredContactFilters))
+      .length,
+    filteredContactLeadRecords.length
+  ), [contactAudiencePhoneSet, deferredContactFilters, filteredContactLeadRecords.length, records]);
 
   const allFilteredContactLeads = useMemo(() => filteredContactLeadRecords
     .map((lead) => lead._directoryLead || dashboardLeadToWhatsAppLead(lead)), [filteredContactLeadRecords]);
@@ -8958,6 +9015,11 @@ function ConversationsView({ records = [] }) {
   const selectedConversation = searchedPhone ? searchedConversation : selectedById || displayedConversations[0] || null;
   const activePhone = searchedPhone || selectedConversation?.phone || '';
   const messages = selectedConversation?.messages || [];
+  const successfulOutboundMessages = messages.filter((message) => (
+    message.direction === 'OUTBOUND'
+    && !message.metadata?.failure
+    && !String(message.providerStatus || '').toUpperCase().startsWith('FAILED')
+  ));
   const conversationAiControl = [...messages].reverse().find((message) => (
     typeof message?.metadata?.aiReplyEnabled === 'boolean'
   ));
@@ -8984,6 +9046,17 @@ function ConversationsView({ records = [] }) {
     directoryLead?.name
   ) || null;
   const activeLeadDistrict = activeLead?.district || activeLead?.d || selectedConversation?.district || null;
+  const activeLeadForDetails = activePhone ? {
+    ...(activeLead || {}),
+    name: activeLead?.name || activeLead?.n || activeLeadName,
+    phone: activeLead?.phone || activeLead?.tel || activePhone,
+    district: activeLeadDistrict,
+    whatsappContactCount: Math.max(
+      Number(activeLead?.whatsappContactCount || 0),
+      successfulOutboundMessages.length || (messages.length ? 1 : 0)
+    ),
+    whatsappMessages: messages
+  } : null;
   const quickActions = [
     ['Resumo', 'Gerar resumo da conversa para o coordenador.'],
     ['Visita', 'Marcar como candidato para visita ou estudo presencial.'],
@@ -9404,11 +9477,7 @@ function ConversationsView({ records = [] }) {
                 {activePhone ? (
                   <button
                     className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#d1d7db] bg-white px-3 text-xs font-black text-[#54656f] shadow-sm transition hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
-                    onClick={() => openLeadDetails(activeLead || {
-                      name: activeLeadName,
-                      phone: activePhone,
-                      district: activeLeadDistrict
-                    })}
+                    onClick={() => openLeadDetails(activeLeadForDetails)}
                     type="button"
                   >
                     <Eye size={17} /> Detalhes
@@ -9563,6 +9632,7 @@ function ConversationsView({ records = [] }) {
       </section>
       {leadPickerOpen ? (
         <WhatsAppLeadPickerModal
+          audienceLabel={contactAudience?.label || ''}
           districts={leadDistricts}
           filterOptions={contactFilterOptions}
           filters={contactFilters}
@@ -9863,8 +9933,34 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
 
   function openDistrictBroadcast(district) {
     if (!district) return;
+    const recipientsByPhone = new Map();
+    anaConversations
+      .filter((conversation) => conversation.district === district && conversation.delivery?.accepted)
+      .forEach((conversation) => {
+        const phone = phoneDigits(conversation.phone);
+        if (!phone) return;
+        recipientsByPhone.set(phone.slice(-8), {
+          id: conversation.id,
+          name: conversation.leadName || `Contato ${phone.slice(-4)}`,
+          phone,
+          district: conversation.district || district,
+          priority: conversation.priority || null,
+          material: conversation.delivery?.material || null,
+          whatsappContactCount: Math.max(Number(conversation.outboundCount || 0), 1)
+        });
+      });
+    const recipients = Array.from(recipientsByPhone.values());
+    if (!recipients.length) {
+      toast.error('Nenhum aceite encontrado', {
+        description: `Não há pessoas com aceite registrado em ${district}.`
+      });
+      return;
+    }
     window.localStorage.setItem('open-whatsapp-district-request', JSON.stringify({
       district,
+      audience: 'accepted-visit',
+      audienceLabel: 'Aceitaram a visita',
+      recipients,
       requestedAt: new Date().toISOString()
     }));
     onNavigate?.('conversations');
