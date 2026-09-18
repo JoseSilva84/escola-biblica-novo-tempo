@@ -4963,17 +4963,21 @@ app.get('/api/whatsapp/contact-count', requireAuth, async (request, response) =>
 
   try {
     const lead = await findLeadReference({ leadId: requestedLeadId || null, phone });
+    const phoneSuffix = phone.slice(-8);
+    const matchingConversations = phoneSuffix
+      ? await prisma.whatsAppConversation.findMany({
+        where: { phone: { endsWith: phoneSuffix } },
+        select: { id: true }
+      })
+      : [];
     const matchers = [];
     if (lead?.id) matchers.push({ leadId: lead.id });
     if (lead?.externalId) matchers.push({ externalLeadId: lead.externalId });
-    if (phone) matchers.push({ conversation: { is: { phone } } });
-
-    if (!matchers.length) {
-      response.json({ count: 0 });
-      return;
+    if (matchingConversations.length) {
+      matchers.push({ conversationId: { in: matchingConversations.map((item) => item.id) } });
     }
 
-    const count = await prisma.whatsAppMessage.count({
+    const messages = matchers.length ? await prisma.whatsAppMessage.findMany({
       where: {
         direction: 'OUTBOUND',
         OR: matchers,
@@ -4983,9 +4987,28 @@ app.get('/api/whatsapp/contact-count', requireAuth, async (request, response) =>
             { providerStatus: { notIn: ['FAILED', 'FAILED_463'] } }
           ]
         }]
-      }
-    });
-    response.json({ count });
+      },
+      select: { id: true }
+    }) : [];
+    const broadcastMatchers = [];
+    if (lead?.id) broadcastMatchers.push({ leadId: lead.id });
+    if (lead?.externalId) broadcastMatchers.push({ externalLeadId: lead.externalId });
+    if (phoneSuffix) broadcastMatchers.push({ phone: { endsWith: phoneSuffix } });
+    const broadcastRecipients = broadcastMatchers.length
+      ? await prisma.whatsAppBroadcastRecipient.findMany({
+        where: {
+          status: 'ENVIADO',
+          OR: broadcastMatchers
+        },
+        select: { messageId: true }
+      })
+      : [];
+    const savedMessageIds = new Set(messages.map((message) => message.id));
+    const broadcastsWithoutSavedMessage = broadcastRecipients.filter((recipient) => (
+      !recipient.messageId || !savedMessageIds.has(recipient.messageId)
+    )).length;
+    const recordedCount = messages.length + broadcastsWithoutSavedMessage;
+    response.json({ count: recordedCount || (matchingConversations.length ? 1 : 0) });
   } catch (error) {
     console.error('[whatsapp:contact-count:error]', error.message);
     response.status(500).json({ count: 0, message: 'Nao foi possivel contar os contatos do WhatsApp.' });
@@ -4999,27 +5022,51 @@ app.get('/api/whatsapp/contact-counts', requireAuth, async (request, response) =
   }
 
   try {
-    const groupedMessages = await prisma.whatsAppMessage.groupBy({
-      by: ['conversationId'],
-      where: {
-        direction: 'OUTBOUND',
-        OR: [
-          { providerStatus: null },
-          { providerStatus: { notIn: ['FAILED', 'FAILED_463'] } }
-        ]
-      },
-      _count: { _all: true }
-    });
+    const [groupedMessages, groupedAnyMessages, orphanBroadcasts] = await Promise.all([
+      prisma.whatsAppMessage.groupBy({
+        by: ['conversationId'],
+        where: {
+          direction: 'OUTBOUND',
+          OR: [
+            { providerStatus: null },
+            { providerStatus: { notIn: ['FAILED', 'FAILED_463'] } }
+          ]
+        },
+        _count: { _all: true }
+      }),
+      prisma.whatsAppMessage.groupBy({
+        by: ['conversationId'],
+        _count: { _all: true }
+      }),
+      prisma.whatsAppBroadcastRecipient.findMany({
+        where: { status: 'ENVIADO', messageId: null },
+        select: { phone: true }
+      })
+    ]);
+    const conversationIds = Array.from(new Set([
+      ...groupedMessages.map((item) => item.conversationId),
+      ...groupedAnyMessages.map((item) => item.conversationId)
+    ]));
     const conversations = await prisma.whatsAppConversation.findMany({
-      where: { id: { in: groupedMessages.map((item) => item.conversationId) } },
+      where: { id: { in: conversationIds } },
       select: { id: true, phone: true }
     });
     const phoneByConversation = new Map(conversations.map((item) => [item.id, normalizePhone(item.phone)]));
+    const countsByPhone = new Map();
+    for (const item of groupedMessages) {
+      const phone = phoneByConversation.get(item.conversationId);
+      if (phone) countsByPhone.set(phone, (countsByPhone.get(phone) || 0) + Number(item._count?._all || 0));
+    }
+    for (const item of groupedAnyMessages) {
+      const phone = phoneByConversation.get(item.conversationId);
+      if (phone && !countsByPhone.has(phone)) countsByPhone.set(phone, 1);
+    }
+    for (const recipient of orphanBroadcasts) {
+      const phone = normalizePhone(recipient.phone);
+      if (phone) countsByPhone.set(phone, (countsByPhone.get(phone) || 0) + 1);
+    }
     response.json({
-      counts: groupedMessages.flatMap((item) => {
-        const phone = phoneByConversation.get(item.conversationId);
-        return phone ? [{ phone, count: Number(item._count?._all || 0) }] : [];
-      })
+      counts: Array.from(countsByPhone, ([phone, count]) => ({ phone, count }))
     });
   } catch (error) {
     console.error('[whatsapp:contact-counts:error]', error.message);

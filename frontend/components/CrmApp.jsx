@@ -8406,10 +8406,16 @@ function ConversationsView({ records = [] }) {
       if (!response.ok) throw new Error(payload.message || 'Não foi possível buscar os leads.');
       if (countsResponse?.ok) {
         const countsPayload = await countsResponse.json();
-        setWhatsappContactCounts(Object.fromEntries((countsPayload.counts || []).map((item) => [
-          phoneDigits(item.phone).slice(-10),
-          Number(item.count || 0)
-        ])));
+        const nextCounts = {};
+        for (const item of countsPayload.counts || []) {
+          const countPhone = phoneDigits(item.phone);
+          const count = Number(item.count || 0);
+          const exactKey = `phone:${countPhone.slice(-10)}`;
+          const suffixKey = `suffix:${countPhone.slice(-8)}`;
+          nextCounts[exactKey] = (nextCounts[exactKey] || 0) + count;
+          nextCounts[suffixKey] = (nextCounts[suffixKey] || 0) + count;
+        }
+        setWhatsappContactCounts(nextCounts);
       }
       const mergedLeads = new Map();
       [...fallbackLeads, ...(payload.leads || [])].forEach((lead) => {
@@ -8797,6 +8803,9 @@ function ConversationsView({ records = [] }) {
     leadDirectory.forEach((lead) => {
       const phone = phoneDigits(lead.phone);
       if (!phone) return;
+      const recordedCount = whatsappContactCounts[`phone:${phone.slice(-10)}`]
+        ?? whatsappContactCounts[`suffix:${phone.slice(-8)}`]
+        ?? 0;
       byPhone.set(phone.slice(-10), {
         id: `directory-${lead.id}`,
         n: lead.name,
@@ -8810,7 +8819,7 @@ function ConversationsView({ records = [] }) {
         e: Boolean(lead.hasActiveStudy),
         v: Boolean(lead.isVip),
         birthDate: lead.birthDate || null,
-        whatsappContactCount: Number(lead.whatsappContactCount || whatsappContactCounts[phone.slice(-10)] || 0),
+        whatsappContactCount: Number(lead.whatsappContactCount || recordedCount),
         _directoryLead: lead
       });
     });
@@ -8819,12 +8828,15 @@ function ConversationsView({ records = [] }) {
       if (lead.t && phone) {
         const key = phone.slice(-10);
         const directoryLead = byPhone.get(key)?._directoryLead;
+        const recordedCount = whatsappContactCounts[`phone:${key}`]
+          ?? whatsappContactCounts[`suffix:${phone.slice(-8)}`]
+          ?? 0;
         byPhone.set(key, {
           ...lead,
-          whatsappContactCount: Number(directoryLead?.whatsappContactCount || whatsappContactCounts[key] || 0),
+          whatsappContactCount: Number(directoryLead?.whatsappContactCount || recordedCount),
           _directoryLead: directoryLead
-            ? { ...dashboardLeadToWhatsAppLead(lead), ...directoryLead, whatsappContactCount: Number(directoryLead.whatsappContactCount || whatsappContactCounts[key] || 0) }
-            : { ...dashboardLeadToWhatsAppLead(lead), whatsappContactCount: Number(whatsappContactCounts[key] || 0) }
+            ? { ...dashboardLeadToWhatsAppLead(lead), ...directoryLead, whatsappContactCount: Number(directoryLead.whatsappContactCount || recordedCount) }
+            : { ...dashboardLeadToWhatsAppLead(lead), whatsappContactCount: Number(recordedCount) }
         });
       }
     });
