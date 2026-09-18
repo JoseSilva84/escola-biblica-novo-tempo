@@ -1647,7 +1647,20 @@ const whatsappLeadSelect = {
   isVip: true,
   hasActiveStudy: true,
   district: { select: { name: true } },
-  association: { select: { name: true, slug: true } }
+  association: { select: { name: true, slug: true } },
+  _count: {
+    select: {
+      whatsAppMessages: {
+        where: {
+          direction: 'OUTBOUND',
+          OR: [
+            { providerStatus: null },
+            { providerStatus: { notIn: ['FAILED', 'FAILED_463'] } }
+          ]
+        }
+      }
+    }
+  }
 };
 
 function serializeWhatsAppLead(lead) {
@@ -1665,6 +1678,7 @@ function serializeWhatsAppLead(lead) {
     score: lead?.score == null ? null : Number(lead.score),
     isVip: Boolean(lead?.isVip),
     hasActiveStudy: Boolean(lead?.hasActiveStudy),
+    whatsappContactCount: Number(lead?._count?.whatsAppMessages || 0),
     association: lead?.association || null
   };
 }
@@ -4935,6 +4949,81 @@ app.get('/api/whatsapp/leads', requireAuth, async (request, response) => {
   } catch (error) {
     console.error('[whatsapp:leads:error]', error.message);
     response.status(500).json({ leads: [], districts: [], message: 'Nao foi possivel buscar os leads do banco.' });
+  }
+});
+
+app.get('/api/whatsapp/contact-count', requireAuth, async (request, response) => {
+  const requestedLeadId = String(request.query?.leadId || '').trim();
+  const phone = normalizePhone(request.query?.phone);
+
+  if (!requestedLeadId && !phone) {
+    response.status(400).json({ count: 0, message: 'Informe o lead ou o telefone.' });
+    return;
+  }
+
+  try {
+    const lead = await findLeadReference({ leadId: requestedLeadId || null, phone });
+    const matchers = [];
+    if (lead?.id) matchers.push({ leadId: lead.id });
+    if (lead?.externalId) matchers.push({ externalLeadId: lead.externalId });
+    if (phone) matchers.push({ conversation: { is: { phone } } });
+
+    if (!matchers.length) {
+      response.json({ count: 0 });
+      return;
+    }
+
+    const count = await prisma.whatsAppMessage.count({
+      where: {
+        direction: 'OUTBOUND',
+        OR: matchers,
+        AND: [{
+          OR: [
+            { providerStatus: null },
+            { providerStatus: { notIn: ['FAILED', 'FAILED_463'] } }
+          ]
+        }]
+      }
+    });
+    response.json({ count });
+  } catch (error) {
+    console.error('[whatsapp:contact-count:error]', error.message);
+    response.status(500).json({ count: 0, message: 'Nao foi possivel contar os contatos do WhatsApp.' });
+  }
+});
+
+app.get('/api/whatsapp/contact-counts', requireAuth, async (request, response) => {
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.json({ counts: [] });
+    return;
+  }
+
+  try {
+    const groupedMessages = await prisma.whatsAppMessage.groupBy({
+      by: ['conversationId'],
+      where: {
+        direction: 'OUTBOUND',
+        OR: [
+          { providerStatus: null },
+          { providerStatus: { notIn: ['FAILED', 'FAILED_463'] } }
+        ]
+      },
+      _count: { _all: true }
+    });
+    const conversations = await prisma.whatsAppConversation.findMany({
+      where: { id: { in: groupedMessages.map((item) => item.conversationId) } },
+      select: { id: true, phone: true }
+    });
+    const phoneByConversation = new Map(conversations.map((item) => [item.id, normalizePhone(item.phone)]));
+    response.json({
+      counts: groupedMessages.flatMap((item) => {
+        const phone = phoneByConversation.get(item.conversationId);
+        return phone ? [{ phone, count: Number(item._count?._all || 0) }] : [];
+      })
+    });
+  } catch (error) {
+    console.error('[whatsapp:contact-counts:error]', error.message);
+    response.status(500).json({ counts: [], message: 'Nao foi possivel contar os contatos do WhatsApp.' });
   }
 });
 

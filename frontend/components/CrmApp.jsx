@@ -190,6 +190,7 @@ function dashboardLeadToWhatsAppLead(lead) {
     isVip: Boolean(lead?.v),
     hasActiveStudy: Boolean(lead?.e),
     birthDate: lead?.birthDate || null,
+    whatsappContactCount: Number(lead?.whatsappContactCount || 0),
     source: 'dashboard'
   };
 }
@@ -202,7 +203,12 @@ function whatsappLeadToDetailRecord(lead, records = []) {
     (externalId && Number(record.id) === externalId)
     || (phone && phoneDigits(record.tel).endsWith(phone.slice(-10)))
   ));
-  if (dashboardLead) return dashboardLead;
+  if (dashboardLead) {
+    return {
+      ...dashboardLead,
+      whatsappContactCount: Number(lead.whatsappContactCount ?? dashboardLead.whatsappContactCount ?? 0)
+    };
+  }
 
   const priority = whatsappPriorityBadgeKey(lead.priority || lead.p);
   return {
@@ -228,6 +234,7 @@ function whatsappLeadToDetailRecord(lead, records = []) {
     sim: Number(lead.similarity ?? lead.sim ?? 0),
     faixa: lead.band || lead.faixa || 'Não informada',
     c: lead.daysSinceLastContact ?? lead.c ?? null,
+    whatsappContactCount: Number(lead.whatsappContactCount || 0),
     lastContactDate: lead.lastContactDate || null,
     t: Boolean(phone)
   };
@@ -1263,7 +1270,40 @@ function LeadDetailOsmMap({ captureRef, churches = [], lead }) {
 
 function LeadDetailModal({ churches = [], lead, onClose }) {
   const [exportingDetailPdf, setExportingDetailPdf] = useState(false);
+  const [whatsappContactCount, setWhatsappContactCount] = useState(null);
   const detailMapCaptureRef = useRef(null);
+
+  useEffect(() => {
+    if (!lead) {
+      setWhatsappContactCount(null);
+      return;
+    }
+
+    let active = true;
+    const knownCount = Number(lead.whatsappContactCount);
+    setWhatsappContactCount(Number.isFinite(knownCount) ? knownCount : null);
+
+    const params = new URLSearchParams();
+    if (lead.id) params.set('leadId', String(lead.id));
+    if (lead.tel) params.set('phone', phoneDigits(lead.tel));
+    if (!params.size) return () => { active = false; };
+
+    apiFetch(`/api/whatsapp/contact-count?${params.toString()}`, { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => {
+        if (active && payload && Number.isFinite(Number(payload.count))) {
+          setWhatsappContactCount(Number(payload.count));
+        } else if (active && !Number.isFinite(knownCount)) {
+          setWhatsappContactCount(0);
+        }
+      })
+      .catch(() => {
+        if (active && !Number.isFinite(knownCount)) setWhatsappContactCount(0);
+      });
+
+    return () => { active = false; };
+  }, [lead?.id, lead?.tel, lead?.whatsappContactCount]);
+
   if (!lead) return null;
 
   const fields = [
@@ -1336,6 +1376,7 @@ function LeadDetailModal({ churches = [], lead, onClose }) {
       };
       const pdfFields = [
         ...fields,
+        ['Contatos realizados via WhatsApp', formatNumber(whatsappContactCount || 0)],
         ['Último contato', whatsappHistory[0]?.detail || 'Sem histórico de contato'],
         ['Resumo operacional', operationalSummary]
       ];
@@ -1472,6 +1513,13 @@ function LeadDetailModal({ churches = [], lead, onClose }) {
           </section>
           <section className="grid content-start gap-3">
             <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">WhatsApp e acompanhamento</span>
+            <article className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-[0_10px_28px_rgba(16,185,129,0.10)]">
+              <span className="block text-[11px] font-black uppercase tracking-[0.14em] text-emerald-800">Contatos realizados via WhatsApp</span>
+              <div className="mt-2 flex items-end gap-2">
+                <strong className="text-3xl font-black text-emerald-700">{whatsappContactCount === null ? '…' : formatNumber(whatsappContactCount)}</strong>
+                <span className="pb-1 text-xs font-bold text-emerald-800">{whatsappContactCount === 1 ? 'contato registrado' : 'contatos registrados'}</span>
+              </div>
+            </article>
             {whatsappHistory.map((item) => (
               <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.05)]" key={item.title}>
                 <strong className="block text-sm text-slate-950">{item.title}</strong>
@@ -7839,6 +7887,9 @@ function WhatsAppLeadPickerModal({
                           <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${priorityBadgeClasses(whatsappPriorityBadgeKey(lead.priority))}`}>
                             {whatsappPriorityLabels[lead.priority] || lead.priority || 'Sem tipo'}
                           </span>
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-800">
+                            <MessageCircle size={12} /> {formatNumber(lead.whatsappContactCount || 0)} {Number(lead.whatsappContactCount) === 1 ? 'contato' : 'contatos'}
+                          </span>
                           {lead.birthDate && lead.birthDate !== 'N/I' ? <span className="text-[11px] font-bold text-emerald-800">Aniversário: {lead.birthDate}</span> : null}
                         </span>
                       </span>
@@ -8254,6 +8305,7 @@ function ConversationsView({ records = [] }) {
   const [leadPickerOpen, setLeadPickerOpen] = useState(false);
   const [leadDirectory, setLeadDirectory] = useState([]);
   const [leadDistricts, setLeadDistricts] = useState([]);
+  const [whatsappContactCounts, setWhatsappContactCounts] = useState({});
   const [leadDirectoryLoading, setLeadDirectoryLoading] = useState(false);
   const [contactFilters, setContactFilters] = useState({
     association: 'paulistana',
@@ -8346,9 +8398,19 @@ function ConversationsView({ records = [] }) {
     setLeadDirectoryLoading(true);
     try {
       const params = new URLSearchParams({ limit: '250' });
-      const response = await apiFetch(`/api/whatsapp/leads?${params.toString()}`, { cache: 'no-store' });
+      const [response, countsResponse] = await Promise.all([
+        apiFetch(`/api/whatsapp/leads?${params.toString()}`, { cache: 'no-store' }),
+        apiFetch('/api/whatsapp/contact-counts', { cache: 'no-store' }).catch(() => null)
+      ]);
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Não foi possível buscar os leads.');
+      if (countsResponse?.ok) {
+        const countsPayload = await countsResponse.json();
+        setWhatsappContactCounts(Object.fromEntries((countsPayload.counts || []).map((item) => [
+          phoneDigits(item.phone).slice(-10),
+          Number(item.count || 0)
+        ])));
+      }
       const mergedLeads = new Map();
       [...fallbackLeads, ...(payload.leads || [])].forEach((lead) => {
         const key = phoneDigits(lead.phone).slice(-10) || lead.id;
@@ -8660,10 +8722,13 @@ function ConversationsView({ records = [] }) {
 
   useEffect(() => {
     let openRequest = null;
+    let districtRequest = null;
     try {
       openRequest = JSON.parse(window.localStorage.getItem('open-whatsapp-request') || 'null');
+      districtRequest = JSON.parse(window.localStorage.getItem('open-whatsapp-district-request') || 'null');
     } catch {
       openRequest = null;
+      districtRequest = null;
     }
     const legacyPhone = window.localStorage.getItem('open-whatsapp-phone') || '';
     const requestedPhone = phoneDigits(openRequest?.phone || legacyPhone || '');
@@ -8671,6 +8736,18 @@ function ConversationsView({ records = [] }) {
     const seedConversation = anaSummaryToConversationSnapshot(openRequest?.snapshot);
     window.localStorage.removeItem('open-whatsapp-request');
     window.localStorage.removeItem('open-whatsapp-phone');
+    window.localStorage.removeItem('open-whatsapp-district-request');
+    const requestedDistrict = String(districtRequest?.district || '').trim();
+    if (requestedDistrict) {
+      setContactFilters((current) => ({ ...current, districts: [requestedDistrict], search: '' }));
+      setBroadcastListName(`Aviso - ${requestedDistrict}`);
+      setNewContactMode(false);
+      setLeadPickerOpen(true);
+      loadLeadDirectory();
+      toast.success(`Contatos de ${requestedDistrict}`, {
+        description: 'A lista foi filtrada e selecionada para você preparar o novo aviso.'
+      });
+    }
     if (requestedPhone || requestedId) {
       window.localStorage.removeItem('open-whatsapp-phone');
       setPhoneSearch(requestedPhone);
@@ -8733,15 +8810,26 @@ function ConversationsView({ records = [] }) {
         e: Boolean(lead.hasActiveStudy),
         v: Boolean(lead.isVip),
         birthDate: lead.birthDate || null,
+        whatsappContactCount: Number(lead.whatsappContactCount || whatsappContactCounts[phone.slice(-10)] || 0),
         _directoryLead: lead
       });
     });
     records.forEach((lead) => {
       const phone = phoneDigits(lead.tel);
-      if (lead.t && phone) byPhone.set(phone.slice(-10), lead);
+      if (lead.t && phone) {
+        const key = phone.slice(-10);
+        const directoryLead = byPhone.get(key)?._directoryLead;
+        byPhone.set(key, {
+          ...lead,
+          whatsappContactCount: Number(directoryLead?.whatsappContactCount || whatsappContactCounts[key] || 0),
+          _directoryLead: directoryLead
+            ? { ...dashboardLeadToWhatsAppLead(lead), ...directoryLead, whatsappContactCount: Number(directoryLead.whatsappContactCount || whatsappContactCounts[key] || 0) }
+            : { ...dashboardLeadToWhatsAppLead(lead), whatsappContactCount: Number(whatsappContactCounts[key] || 0) }
+        });
+      }
     });
     return Array.from(byPhone.values());
-  }, [leadDirectory, records]);
+  }, [leadDirectory, records, whatsappContactCounts]);
 
   const deferredContactFilters = useDeferredValue(contactFilters);
   const contactFilterOptions = useMemo(() => {
@@ -9761,6 +9849,15 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
     onNavigate?.('conversations');
   }
 
+  function openDistrictBroadcast(district) {
+    if (!district) return;
+    window.localStorage.setItem('open-whatsapp-district-request', JSON.stringify({
+      district,
+      requestedAt: new Date().toISOString()
+    }));
+    onNavigate?.('conversations');
+  }
+
   async function exportAnaConversationGroup(group) {
     if (!group?.conversations?.length || exportingGroupKey) return;
     setExportingGroupKey(group.key);
@@ -9972,20 +10069,27 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
                 {districtStats.map((stat) => {
                   const isActive = selectedDistrict === stat.name;
                   return (
-                    <button
-                      className={`group grid items-start gap-1 rounded-xl border p-4 text-left transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${isActive ? 'border-blue-600 bg-blue-600 text-white shadow-[0_8px_30px_rgba(37,99,235,0.4)] hover:-translate-y-1' : 'border-slate-200 bg-slate-100 text-slate-900 shadow-sm hover:-translate-y-1 hover:border-slate-300 hover:bg-slate-200 hover:shadow-[0_10px_40px_rgba(0,0,0,0.08)]'}`}
+                    <article
+                      className={`group grid items-start gap-1 rounded-xl border p-4 text-left transition-all duration-300 ${isActive ? 'border-blue-600 bg-blue-600 text-white shadow-[0_8px_30px_rgba(37,99,235,0.4)]' : 'border-slate-200 bg-slate-100 text-slate-900 shadow-sm hover:-translate-y-1 hover:border-slate-300 hover:bg-slate-200 hover:shadow-[0_10px_40px_rgba(0,0,0,0.08)]'}`}
                       key={stat.name}
-                      onClick={() => setSelectedDistrict(isActive ? null : stat.name)}
-                      type="button"
                     >
-                      <strong className={`block truncate text-sm font-black transition-colors ${isActive ? 'text-white' : 'text-slate-900 group-hover:text-black'}`}>{stat.name}</strong>
-                      <span className={`mt-2 block text-2xl font-black transition-colors ${isActive ? 'text-white' : 'text-emerald-600 group-hover:text-emerald-700'}`}>{formatNumber(stat.accepted)}</span>
-                      <span className={`text-[11px] font-bold uppercase tracking-wide transition-colors ${isActive ? 'text-blue-200' : 'text-slate-500 group-hover:text-slate-600'}`}>aceitaram a visita</span>
-                      <div className={`mt-4 grid grid-cols-2 gap-2 border-t pt-3 text-[11px] font-semibold transition-colors ${isActive ? 'border-blue-500/50 text-blue-100' : 'border-slate-200 text-slate-500 group-hover:border-slate-300 group-hover:text-slate-700'}`}>
-                        <span>{formatNumber(stat.responded)} responderam</span>
-                        <span>{formatNumber(stat.total)} abordados</span>
-                      </div>
-                    </button>
+                      <button className="w-full text-left focus:outline-none" onClick={() => setSelectedDistrict(isActive ? null : stat.name)} type="button">
+                        <strong className={`block truncate text-sm font-black transition-colors ${isActive ? 'text-white' : 'text-slate-900 group-hover:text-black'}`}>{stat.name}</strong>
+                        <span className={`mt-2 block text-2xl font-black transition-colors ${isActive ? 'text-white' : 'text-emerald-600 group-hover:text-emerald-700'}`}>{formatNumber(stat.accepted)}</span>
+                        <span className={`text-[11px] font-bold uppercase tracking-wide transition-colors ${isActive ? 'text-blue-200' : 'text-slate-500 group-hover:text-slate-600'}`}>aceitaram a visita</span>
+                        <div className={`mt-4 grid grid-cols-2 gap-2 border-t pt-3 text-[11px] font-semibold transition-colors ${isActive ? 'border-blue-500/50 text-blue-100' : 'border-slate-200 text-slate-500 group-hover:border-slate-300 group-hover:text-slate-700'}`}>
+                          <span>{formatNumber(stat.responded)} responderam</span>
+                          <span>{formatNumber(stat.total)} abordados</span>
+                        </div>
+                      </button>
+                      <button
+                        className={`mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg text-xs font-black shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 ${isActive ? 'bg-white text-blue-800 hover:bg-emerald-50' : 'bg-[#00a884] text-white hover:bg-[#008069]'}`}
+                        onClick={() => openDistrictBroadcast(stat.name)}
+                        type="button"
+                      >
+                        <Send size={14} /> Disparar novo aviso
+                      </button>
+                    </article>
                   );
                 })}
               </div>
