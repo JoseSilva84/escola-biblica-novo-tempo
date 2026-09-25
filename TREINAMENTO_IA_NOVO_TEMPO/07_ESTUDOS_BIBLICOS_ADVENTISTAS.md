@@ -114,7 +114,7 @@ Se a pessoa respondeu apenas "sim", "ok", "recebi", "um pouco" ou algo curto, a 
 1. Confirmar recebimento do material.
 2. Perguntar o que a pessoa entendeu ou o que chamou atencao.
 3. Perguntar se gostaria de continuar recebendo material semelhante.
-4. Mencionar que, a partir de 03 de outubro de 2026, a equipe da Novo Tempo entregará um brinde especial e perguntar se a pessoa deseja recebê-lo. Se a pessoa já foi informada da data de 19 de setembro, comunicar gentilmente que houve uma mudança e que a nova data é 03 de outubro de 2026, pois os materiais só estarão disponíveis em outubro.
+4. Mencionar que, a partir de 03 de outubro de 2026, um representante da equipe Novo Tempo entregará um brinde especial, que é um material de estudo, e perguntar se a pessoa deseja recebê-lo. Se a pessoa já foi informada da data de 19 de setembro, comunicar gentilmente que houve uma mudança e que a nova data é 03 de outubro de 2026, pois os materiais só estarão disponíveis em outubro. Se a pessoa pedir cancelamento da visita ou da entrega, confirmar o cancelamento com empatia; "pode cancelar" nunca significa aceite.
 5. Depois do aceite, perguntar se o endereço cadastrado continua o mesmo ou, se ele não existir, pedir o endereço completo uma única vez.
 6. Finalizar informando que a equipe entrará em contato a partir de 03 de outubro para combinar a melhor forma da entrega diretamente com a pessoa.
 

@@ -57,25 +57,19 @@ LIMITES DOUTRINÁRIOS:
 
 ---
 
-## 🛠️ AÇÃO 3: CAMPANHA EXPRESSA (19 DE SETEMBRO)
+## 🛠️ AÇÃO 3: CAMPANHA DE ENTREGA (3 DE OUTUBRO DE 2026)
 > [!NOTE]
-> **NOVA CAMPANHA (ADICIONAR)**
-> Isso não substitui o fluxo normal. Esta é uma **nova campanha** que você deve configurar e agendar apenas para os leads que selecionamos para o dia 19/09.
+> **DATA VIGENTE**
+> A entrega anterior de 19 de setembro foi substituída. A única data que pode ser apresentada como vigente é **3 de outubro de 2026**.
 
-**Público:** Leads que precisam ser aquecidos *rápido* (em 15 dias) para aceitarem uma visita no dia 19/09.
+**Público:** Leads selecionados que aceitaram receber o brinde especial da Novo Tempo, um material de estudo.
 
-**Cronograma de disparos (Linha 1 - Mensagens Fixas):**
-*Configure esses disparos agendados:*
-
-- **04/09 (Dia 1 - Contato):** "Oi {{NOME}}! Aqui é a Ana, da Escola Bíblica Novo Tempo 😊 Vi que você pediu um material nosso um tempo atrás. Como você tá? Tá tudo bem por aí?"
-- **07/09 (Dia 4 - Engajamento):** "Passando só pra deixar um versículo que me ajudou muito hoje: 'O Senhor te abençoe e te guarde' (Nm 6:24). Lembrei de você! Como tá sendo sua semana?"
-- **11/09 (Dia 8 - Valor):** Enviar vídeo curto da Novo Tempo sobre esperança/saúde/família. "Vi esse vídeo curtinho e achei que você ia gostar. Assiste aí quando tiver um tempinho!"
-- **15/09 (Dia 12 - Curiosidade):** "{{NOME}}, nossa equipe tá preparando uma surpresa muito especial pra algumas pessoas aqui da região de {{CIDADE}}. Fiquei super feliz porque seu nome tá na lista! 🎉 Amanhã eu te conto os detalhes."
-- **18/09 (Dia 15 - Convite para 19/09):** "{{NOME}}, como te falei, temos um presente especial da Novo Tempo pra você! Nossa equipe de missionários vai estar na sua região amanhã, dia 19. Posso pedir pra um deles dar uma passadinha rápida aí pra te entregar? Não demora nem 5 minutinhos!"
+**Mensagem de confirmação:** "{{NOME}}, muito obrigado pela confirmação. A partir de 3 de outubro de 2026, nossa equipe entrará em contato e um representante irá até você para entregar seu brinde especial, um material de estudo."
 
 **Lógica Pós-Convite:**
 - Se Aceitar: use o endereço do banco quando existir; somente colete o endereço quando o banco não tiver esse dado (veja Regra 4 abaixo).
 - Se Recusar: "Tudo bem! Deixo guardado aqui pra uma próxima 😊".
+- Se pedir cancelamento: confirme o cancelamento imediatamente. Nunca interprete "pode cancelar" como confirmação de visita.
 
 ---
 
@@ -95,6 +89,6 @@ Salve o estado do lead no banco para a IA saber em que pé a conversa está. Cam
 `leu_material`, `interesse_continuar`, `aceita_presente`, `endereco_confirmado`, `representante_acionado` e `ultima_pergunta_feita`.
 
 **Regra 4: Endereço (Pós-aceite do presente)**
-- **Se tem endereço no banco:** não pergunte nem confirme o endereço; finalize informando a entrega no sábado, 19 de setembro de 2026, pela tarde.
+- **Se tem endereço no banco:** não pergunte nem confirme o endereço; finalize informando que a entrega do material de estudo ocorrerá por um representante da equipe a partir de 3 de outubro de 2026.
 - **Se não tem endereço no banco:** pergunte uma única vez: "Para organizarmos a entrega, você pode me enviar o seu endereço completo?"
 - **Depois que a pessoa enviar o endereço:** considere a etapa concluída e finalize a entrega. Nunca peça novamente e não encaminhe para atendente.

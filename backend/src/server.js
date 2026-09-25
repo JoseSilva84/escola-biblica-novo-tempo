@@ -26,7 +26,37 @@ const ANA_TRAINING_FILES = [
   ['08_PROMPT_MESTRE_ANA_GEMINI.md', 'Personalidade, segurança e fluxo operacional da Ana no Gemini'],
   ['07_ESTUDOS_BIBLICOS_ADVENTISTAS.md', 'Base bíblica adventista oficial para acompanhamento']
 ];
+const ANA_GIFT_CAMPAIGN_START_DATE = String(process.env.ANA_GIFT_CAMPAIGN_START_DATE || '2026-10-03').trim();
+const ANA_GIFT_CAMPAIGN_START_LABEL = formatAnaCampaignDate(ANA_GIFT_CAMPAIGN_START_DATE);
 let anaSequenceGuideCache = { cacheKey: null, text: '', sources: [], loadedAt: 0 };
+
+function formatAnaCampaignDate(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '3 de outubro de 2026';
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+  if (Number.isNaN(date.getTime())) return '3 de outubro de 2026';
+  if (date.getUTCFullYear() !== Number(match[1])
+    || date.getUTCMonth() !== Number(match[2]) - 1
+    || date.getUTCDate() !== Number(match[3])) return '3 de outubro de 2026';
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(date);
+}
+
+function enforceActiveAnaCampaignDate(value) {
+  return String(value || '')
+    .replace(/a partir do dia 19 de setembro(?: de 2026)?/gi, (match) => `${match[0] === 'A' ? 'A' : 'a'} partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}`)
+    .replace(/a partir de 19 de setembro(?: de 2026)?/gi, (match) => `${match[0] === 'A' ? 'A' : 'a'} partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}`)
+    .replace(/(?:no\s+)?s[aá]bado,?\s*(?:dia\s*)?19 de setembro(?: de 2026)?/gi, `a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}`)
+    .replace(/(?:dia\s*)?19 de setembro(?: de 2026)?/gi, ANA_GIFT_CAMPAIGN_START_LABEL)
+    .replace(/\b19\/09\/2026\b/g, ANA_GIFT_CAMPAIGN_START_LABEL)
+    .replace(/\b19\/09\b/g, ANA_GIFT_CAMPAIGN_START_LABEL)
+    .replace(/(?:dia\s*)?0?3 de outubro de 2026/gi, ANA_GIFT_CAMPAIGN_START_LABEL)
+    .replace(/\b0?3\/10\/2026\b/g, ANA_GIFT_CAMPAIGN_START_LABEL);
+}
 
 function resolveDatasetDir() {
   if (process.env.DATASET_DIR) return path.resolve(process.env.DATASET_DIR);
@@ -1032,7 +1062,7 @@ function anaDeliveryQuestion(value) {
   }
   if (/receb/.test(text)
     && /(gostaria|podera|pode|quer|aceita|ainda gostaria)/.test(text)
-    && /(representante|equipe|entrega|entregar|brinde|presente|19 de setembro|sabado|sua casa)/.test(text)
+    && /(representante|equipe|entrega|entregar|brinde|presente|3 de outubro|19 de setembro|sabado|sua casa)/.test(text)
     && !/(chegou|ja recebeu|já recebeu|chegou a receber)/.test(text)) {
     return 'GIFT_ACCEPTANCE';
   }
@@ -1047,7 +1077,7 @@ function anaDeliveryWasConfirmed(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
   return /(representante|equipe da novo tempo)/.test(text)
-    && /(19 de setembro|dia 19)/.test(text)
+    && /(3 de outubro|dia 3|19 de setembro|dia 19)/.test(text)
     && /(entregar|entrega|levara|ira ate)/.test(text)
     && !text.includes('?');
 }
@@ -1081,6 +1111,7 @@ async function inferAnaDeliveryState(event, lead, addressState) {
     addressConfirmed: Boolean(addressState?.confirmed),
     addressProvided: Boolean(String(lead?.newAddress || '').trim()),
     deliveryConfirmed: false,
+    deliveryCancelled: false,
     pendingQuestion: null
   };
 
@@ -1088,29 +1119,41 @@ async function inferAnaDeliveryState(event, lead, addressState) {
     const body = String(message.body || '').trim();
     if (!body) continue;
     if (message.direction === 'OUTBOUND') {
-      if (/(brinde|presente).*(19 de setembro|dia 19)|(19 de setembro|dia 19).*(brinde|presente)/i.test(body)) {
+      if (/(brinde|presente).*(3 de outubro|dia 3|19 de setembro|dia 19)|(3 de outubro|dia 3|19 de setembro|dia 19).*(brinde|presente)/i.test(body)) {
         state.giftOffered = true;
       }
-      if (anaDeliveryWasConfirmed(body)) state.deliveryConfirmed = true;
+      if (!state.deliveryCancelled && anaDeliveryWasConfirmed(body)) state.deliveryConfirmed = true;
       const question = anaDeliveryQuestion(body);
       if (question) state.pendingQuestion = question;
       continue;
     }
 
+    if (isGiftVisitCancellation(body)) {
+      state.giftAccepted = 'cancelado';
+      state.deliveryConfirmed = false;
+      state.deliveryCancelled = true;
+      state.pendingQuestion = null;
+      continue;
+    }
     const informedAddress = plausibleNewAddress(body);
     const affirmative = isAffirmativeReply(body);
     const negative = isNegativeReply(body);
     if (informedAddress) {
+      state.deliveryCancelled = false;
       state.addressProvided = true;
       state.addressConfirmed = true;
       state.pendingQuestion = null;
       continue;
     }
     if (/(quero receber|pode entregar|aceito|gostaria de receber|pode trazer)/i.test(body)) {
+      state.deliveryCancelled = false;
       state.giftAccepted = 'sim';
     }
     if (affirmative) {
-      if (state.pendingQuestion === 'GIFT_ACCEPTANCE') state.giftAccepted = 'sim';
+      if (state.pendingQuestion === 'GIFT_ACCEPTANCE') {
+        state.deliveryCancelled = false;
+        state.giftAccepted = 'sim';
+      }
       if (state.pendingQuestion === 'ADDRESS_CONFIRMATION' && state.hasRegisteredAddress) state.addressConfirmed = true;
       state.pendingQuestion = null;
       continue;
@@ -1129,10 +1172,27 @@ function explicitContactOptOut(value) {
   return /(pare de (me )?(mandar|enviar)|nao (me )?(mande|envie|procure|contate)|não (me )?(mande|envie|procure|contate)|remova meu (numero|número|contato)|quero sair|cancele meu contato|nao quero mais mensagens|não quero mais mensagens)/i.test(String(value || ''));
 }
 
+function isGiftVisitCancellation(value) {
+  const text = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return false;
+  return /(cancel|desmarc|nao venha|nao poderei recepcionar|nao posso recepcionar|nao poderei receber ninguem|nao posso receber ninguem)/.test(text)
+    && /(visita|entrega|representante|equipe|recepcionar|receber ninguem|nao venha)/.test(text);
+}
+
+function anaVisitCancellationReply(name) {
+  const suffix = name ? `, ${name}` : '';
+  return `Sinto muito${suffix}. A visita e a entrega foram canceladas, e nossa equipe não irá até você agora. Desejo melhoras. Quando estiver bem e quiser reagendar a entrega do material de estudo, é só nos avisar.`;
+}
+
 function anaGiftOfferReply(name) {
   const firstName = String(name || '').trim().split(/\s+/)[0];
-  const greetingName = firstName ? `, ${firstName}` : '';
-  return `A partir do dia 19 de setembro de 2026, a equipe da Novo Tempo estará entregando um brinde especial às pessoas que foram contatadas${greetingName}. Você gostaria de receber esse brinde?`;
+  const greetingName = firstName ? `${firstName}, ` : '';
+  return `${greetingName}a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, um representante da equipe Novo Tempo poderá entregar a você um brinde especial: um material de estudo. Você gostaria de recebê-lo?`;
 }
 
 function anaAddressConfirmationReply(name) {
@@ -1170,7 +1230,18 @@ async function anaIntentReply(event) {
   const giftAccepted = deliveryState.giftAccepted === 'sim'
     || (deliveryState.giftOffered && isAffirmativeReply(event.inboundText));
   const contactOptOut = explicitContactOptOut(event.inboundText);
-  const finalDeliveryReply = `Perfeito${greetingName}. No sábado, dia 19 de setembro, pela parte da tarde, um representante da Novo Tempo irá até sua casa para entregar o seu brinde em mãos. Deus abençoe você e sua família.`;
+  const visitCancellation = isGiftVisitCancellation(event.inboundText);
+  const finalDeliveryReply = anaDeliveryFinalReply(firstName);
+
+  if (visitCancellation) {
+    return {
+      action: 'CANCEL_GIFT_VISIT',
+      reply: anaVisitCancellationReply(firstName),
+      leadFound: Boolean(lead),
+      hasRegisteredAddress: addressState.hasAddress,
+      addressShouldBeHidden: true
+    };
+  }
 
   if (lead && informedAddress && String(lead.newAddress || '').trim() !== informedAddress) {
     await prisma.lead.update({
@@ -1208,7 +1279,7 @@ async function anaIntentReply(event) {
     return {
       action: deliveryState.deliveryConfirmed ? 'DELIVERY_ALREADY_CONFIRMED' : 'CONFIRM_GIFT_DELIVERY',
       reply: deliveryState.deliveryConfirmed
-        ? `Tudo certo${greetingName}. Sua entrega já está confirmada para sábado, dia 19 de setembro, pela parte da tarde.`
+        ? `Tudo certo${greetingName}. A entrega do seu material de estudo está registrada para ocorrer a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}; nossa equipe entrará em contato para combinar.`
         : finalDeliveryReply,
       leadFound: Boolean(lead),
       hasRegisteredAddress: true,
@@ -1994,6 +2065,7 @@ function dedupeWhatsAppMessageList(messages = []) {
 
 function classifyAnaConversation(messages = []) {
   const inboundMessages = messages.filter((message) => message.direction === 'INBOUND');
+  const lastInboundText = String(inboundMessages[inboundMessages.length - 1]?.body || '');
   const inboundText = inboundMessages
     .map((message) => message.body)
     .join(' ')
@@ -2002,7 +2074,10 @@ function classifyAnaConversation(messages = []) {
   if (!inboundMessages.length) {
     return { label: 'Sem resposta', tone: 'slate', action: 'Aguardar a resposta da pessoa.' };
   }
-  if (/(parar|remover|cancelar|não quero|nao quero|sem interesse|sair)/i.test(inboundText)) {
+  if (isGiftVisitCancellation(lastInboundText)) {
+    return { label: 'Visita cancelada', tone: 'orange', action: 'Não realizar a visita; aguardar a pessoa pedir um reagendamento.' };
+  }
+  if (explicitContactOptOut(inboundText)) {
     return { label: 'Opt-out', tone: 'red', action: 'Respeitar pedido e encerrar contato.' };
   }
   if (/(suicid|me matar|morrer|desespero|abuso|violência|violencia|ameaça|ameaca|urgente)/i.test(inboundText)) {
@@ -2041,6 +2116,15 @@ function isAnaTestConversation(conversation = {}) {
 }
 
 function anaClassification(messages = [], delivery = null) {
+  const lastInbound = [...messages].reverse().find((message) => message.direction === 'INBOUND');
+  if (delivery?.cancelled || isGiftVisitCancellation(lastInbound?.body)) {
+    return {
+      label: 'Visita cancelada',
+      tone: 'orange',
+      action: 'Não realizar a visita; aguardar a pessoa pedir um reagendamento.',
+      source: 'conversation'
+    };
+  }
   if (delivery?.accepted) {
     return {
       label: 'Brinde confirmado',
@@ -2158,6 +2242,7 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
   let typedAddress = '';
   let addressConfirmed = false;
   let deliveryConfirmed = false;
+  let deliveryCancelled = false;
   let giftOffered = false;
   let materialReceiptAsked = false;
   let materialReceived = null;
@@ -2166,12 +2251,22 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
 
   for (const message of messages) {
     const body = String(message.body || '').trim();
+    if (message.direction === 'INBOUND' && isGiftVisitCancellation(body)) {
+      deliveryCancelled = true;
+      giftAccepted = false;
+      giftDeclined = false;
+      deliveryConfirmed = false;
+      pendingQuestion = null;
+      lastInboundBody = body;
+      lastInboundAt = message.receivedAt || message.sentAt || message.createdAt || null;
+      continue;
+    }
     const metadata = message?.metadata && typeof message.metadata === 'object' ? message.metadata : {};
     const metadataIntent = normalizedIntentName(`${metadata.gptMakerQualification || ''} ${metadata.intent || ''}`);
     const metadataAction = normalizedIntentName(metadata.gptMakerAction || '').replace(/[_-]+/g, ' ');
     const metadataOccurredAt = metadata.gptMakerReceivedAt || message.receivedAt || message.sentAt || message.createdAt || null;
-    if (/(confirm gift delivery|delivery already confirmed)/i.test(metadataAction)
-      || metadataIntent.includes('registrar endereco')) {
+    if (!deliveryCancelled && (/(confirm gift delivery|delivery already confirmed)/i.test(metadataAction)
+      || metadataIntent.includes('registrar endereco'))) {
       giftAccepted = true;
       addressConfirmed = true;
       deliveryConfirmed = /(confirm gift delivery|delivery already confirmed)/i.test(metadataAction) || deliveryConfirmed;
@@ -2206,7 +2301,7 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
         giftAccepted = true;
         acceptedAt ||= lastInboundAt;
       }
-      if (anaDeliveryWasConfirmed(body)) {
+      if (!deliveryCancelled && anaDeliveryWasConfirmed(body)) {
         giftOffered = true;
         giftAccepted = true;
         acceptedAt ||= lastInboundAt || message.sentAt || message.createdAt || null;
@@ -2230,6 +2325,7 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
 
     const informedAddress = plausibleNewAddress(body);
     if (informedAddress) {
+      deliveryCancelled = false;
       typedAddress = informedAddress;
       addressConfirmed = true;
       giftAccepted = true;
@@ -2239,13 +2335,16 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     }
     const directlyAcceptedGift = /(quero receber|pode entregar|aceito|gostaria de receber|pode trazer|pode enviar|pode mandar|envie por favor)/i.test(body);
     if (giftOffered && directlyAcceptedGift) {
+      deliveryCancelled = false;
       giftAccepted = true;
       acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
     } else if (pendingQuestion === 'GIFT_ACCEPTANCE' && isAffirmativeReply(body)) {
+      deliveryCancelled = false;
       giftAccepted = true;
       acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
     }
     if (pendingQuestion === 'ADDRESS_CONFIRMATION' && isAffirmativeReply(body)) {
+      deliveryCancelled = false;
       addressConfirmed = true;
       giftAccepted = true;
       acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
@@ -2312,8 +2411,9 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
   const giftWasOffered = giftOffered || giftAccepted || giftDeclined;
 
   return {
-    accepted: giftAccepted,
-    declined: giftDeclined && !giftAccepted,
+    accepted: giftAccepted && !deliveryCancelled,
+    declined: giftDeclined && !giftAccepted && !deliveryCancelled,
+    cancelled: deliveryCancelled,
     acceptedAt,
     address: address || null,
     addressSource,
@@ -2321,8 +2421,8 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     addressConfirmed: addressConfirmed || Boolean(leadUpdatedAddress),
     deliveryConfirmed,
     giftOffered: giftWasOffered,
-    giftDecisionStatus: giftAccepted ? 'ACCEPTED' : giftDeclined ? 'DECLINED' : giftWasOffered ? 'PENDING' : 'NOT_OFFERED',
-    pendingGiftDecision: giftWasOffered && !giftAccepted && !giftDeclined,
+    giftDecisionStatus: deliveryCancelled ? 'CANCELLED' : giftAccepted ? 'ACCEPTED' : giftDeclined ? 'DECLINED' : giftWasOffered ? 'PENDING' : 'NOT_OFFERED',
+    pendingGiftDecision: giftWasOffered && !giftAccepted && !giftDeclined && !deliveryCancelled,
     materialReceiptAsked,
     materialStatus: materialReceived === true
       ? 'RECEIVED'
@@ -2655,7 +2755,8 @@ function anaNameSuffix(name) {
 
 function detectAnaReplyIntent(messageText) {
   const text = String(messageText || '').toLowerCase();
-  if (/(parar|remover|cancelar|não quero|nao quero|sem interesse|sair)/i.test(text)) return 'optout';
+  if (isGiftVisitCancellation(text)) return 'visit_cancellation';
+  if (explicitContactOptOut(text) || /(parar mensagens|remover meu contato|sem interesse|quero sair)/i.test(text)) return 'optout';
   if (/(suicid|me matar|morrer|desespero|abuso|violência|violencia|ameaça|ameaca|urgente)/i.test(text)) return 'human';
   if (/(não lembro|nao lembro|quem é você|quem e voce|qual material|que material)/i.test(text)) return 'does_not_remember';
   if (/(visita|igreja|endereço|endereco|pastor|missionário|missionario|voluntário|voluntario)/i.test(text)) return 'visit';
@@ -2665,6 +2766,7 @@ function detectAnaReplyIntent(messageText) {
 }
 
 function isAffirmativeReply(value) {
+  if (isGiftVisitCancellation(value) || isNegativeReply(value)) return false;
   return /\b(sim|s|claro|pode|quero|aceito|gostaria|isso|correto|certo|esse mesmo|essa mesma|ta certo|tá certo|esta certo|está certo|confirmo|ok|envie|enviem|mande|mandem|pode deixar)\b/i.test(String(value || ''));
 }
 
@@ -2757,10 +2859,10 @@ function inferAnaConversationState(conversation) {
         : 'desconhecido',
     interesse_continuar: /(quero|tenho interesse|pode mandar|manda|gostaria|sim)/i.test(inboundHistory)
       ? 'sim'
-      : /(não quero|nao quero|sem interesse|parar|cancelar|remover)/i.test(inboundHistory)
+      : /(não quero|nao quero|sem interesse|parar mensagens|remover meu contato)/i.test(inboundHistory)
         ? 'nao'
         : 'desconhecido',
-    convite_presente_enviado: /(presente|brinde|19 de setembro|dia 19)/i.test(outboundHistory),
+    convite_presente_enviado: /(presente|brinde|3 de outubro|dia 3|19 de setembro|dia 19)/i.test(outboundHistory),
     aceita_presente: /(quero receber|pode entregar|aceito|gostaria de receber|pode passar|sim.*presente|sim.*brinde)/i.test(inboundHistory)
       ? 'sim'
       : /(não quero|nao quero|não posso|nao posso|não precisa|nao precisa)/i.test(inboundHistory)
@@ -2771,7 +2873,7 @@ function inferAnaConversationState(conversation) {
       ? 'sim'
       : 'desconhecido',
     representante_acionado: /(vou deixar registrado|equipe da novo tempo acompanhar|missionario conversar|missionário conversar)/i.test(outboundHistory),
-    pausado: /(parar|remover|cancelar|não quero|nao quero|sair)/i.test(inboundHistory),
+    pausado: /(parar mensagens|remover meu contato|não quero mais mensagens|nao quero mais mensagens|quero sair)/i.test(inboundHistory),
     ultima_pergunta_feita: lastOutbound?.body || null,
     ultima_resposta_recebida_em: lastInbound?.createdAt || null,
     proxima_acao: classifyAnaConversation(messages).action,
@@ -2821,8 +2923,11 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     'Faça no máximo uma pergunta principal.',
     'Se não houver nome confiável, não invente nome e não use "Oi" como nome.',
     'Responda primeiro, com sensibilidade, ao que a pessoa realmente disse ou perguntou.',
-    'Se o brinde ainda não foi oferecido, conduza naturalmente a conversa para informar que, a partir de 19 de setembro de 2026, a equipe da Novo Tempo entregará um brinde especial e pergunte se a pessoa deseja recebê-lo.',
+    `DATA VIGENTE DA CAMPANHA: ${ANA_GIFT_CAMPAIGN_START_LABEL}. Esta é a única data válida para novas entregas.`,
+    'A data de 19 de setembro de 2026 está vencida e não pode ser apresentada como data atual. Se ela aparecer no histórico, informe apenas que a entrega foi atualizada para a data vigente.',
+    `Se o brinde ainda não foi oferecido, conduza naturalmente a conversa para informar que, a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, um representante da equipe Novo Tempo entregará um brinde especial, que é um material de estudo, e pergunte se a pessoa deseja recebê-lo.`,
     'Não prometa dia, horário ou visita já marcada. A equipe ainda entrará em contato para combinar a forma da entrega.',
+    'Se a pessoa pedir para cancelar ou desmarcar a visita ou a entrega, confirme o cancelamento com empatia. Nunca interprete "pode cancelar" como aceite.',
     'Se a pessoa já aceitou o brinde, não volte a perguntar se ela o deseja. Pergunte se o endereço é o mesmo que está cadastrado na Novo Tempo ou se ela deseja informar outro; só peça o endereço completo quando ela disser que é outro, que mudou ou que não é o mesmo.',
     'Nunca revele telefone, e-mail ou endereço completo no texto da resposta.',
     'Em perguntas bíblicas, responda com clareza, esperança e fidelidade às fontes fornecidas. Não invente versículos nem referências.',
@@ -2930,6 +3035,13 @@ async function guardAnaReply(message, { conversation, inboundMessage }) {
     && normalizeMessageSignature(item.body) === normalizedClean);
   const firstName = leadFirstName(conversation?.leadName || lead?.name);
   const nameSuffix = firstName ? `, ${firstName}` : '';
+  if (isGiftVisitCancellation(inboundMessage?.body)) {
+    return {
+      message: anaVisitCancellationReply(firstName),
+      guarded: true,
+      reason: 'visit-cancelled'
+    };
+  }
   const finalDeliveryReply = deliveryState.deliveryConfirmed
     ? `Tudo certo${nameSuffix}. A equipe já registrou sua confirmação e entrará em contato para combinar a entrega.`
     : anaDeliveryFinalReply(firstName);
@@ -2995,12 +3107,17 @@ async function guardAnaReply(message, { conversation, inboundMessage }) {
 
   const questionCount = (clean.match(/\?/g) || []).length;
   if (questionCount > 1) clean = clean.slice(0, clean.indexOf('?') + 1).trim();
-  return { message: clean, guarded: false, reason: null };
+  const campaignSafeMessage = enforceActiveAnaCampaignDate(clean);
+  return {
+    message: campaignSafeMessage,
+    guarded: campaignSafeMessage !== clean,
+    reason: campaignSafeMessage !== clean ? 'active-campaign-date-enforced' : null
+  };
 }
 
 function anaDeliveryFinalReply(name) {
   const suffix = name ? `, ${name}` : '';
-  return `Muito obrigado pela confirmação${suffix}. A partir do dia 19 de setembro de 2026, nossa equipe entrará em contato para combinar a melhor forma de entregar o brinde diretamente a você. Deus abençoe você e sua família.`;
+  return `Muito obrigado pela confirmação${suffix}. A partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, nossa equipe entrará em contato e um representante irá até você para entregar seu brinde especial, um material de estudo. Deus abençoe você e sua família.`;
 }
 
 async function recordAnaAddressDecision({ lead, address, confirmedExisting = false }) {
@@ -3067,6 +3184,13 @@ async function buildAnaOperationalReply({ conversation, inboundMessage }) {
   const saysAlreadyProvided = /\b(ja dei|já dei|ja enviei|já enviei|ja informei|já informei|mandei antes)\b/i.test(inboundText);
   const lead = conversation?.lead || null;
   const addressState = await registeredAddressState(lead);
+
+  if (isGiftVisitCancellation(inboundText)) {
+    return {
+      message: anaVisitCancellationReply(firstName),
+      reason: 'visit-cancelled'
+    };
+  }
 
   if (explicitContactOptOut(inboundText)) {
     return {
@@ -3310,9 +3434,9 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
   const alreadyAskedMaterialRead = /(dar uma olhada|chamou mais sua atenção|chamou mais sua atencao)/i.test(fullHistory);
   const alreadyAskedUnderstanding = /(o que você entendeu|o que voce entendeu|pontos importantes|chamou mais sua atenção|chamou mais sua atencao|qual parte fez mais sentido|já conseguiu começar|ja conseguiu comecar)/i.test(fullHistory);
   const alreadyAskedNextMaterial = /(próximo material|proximo material|outro material|material semelhante|continuar recebendo|continuar esse estudo)/i.test(fullHistory);
-  const alreadyOfferedGift = /(presente físico|presente fisico|brinde|19 de setembro)/i.test(fullHistory);
+  const alreadyOfferedGift = /(presente físico|presente fisico|brinde|3 de outubro|19 de setembro)/i.test(fullHistory);
   const alreadyAskedAddress = /(endereço em nossos registros|endereco em nossos registros|esse ainda é o melhor endereço|esse ainda e o melhor endereco|o seu endereço é|o seu endereco e)/i.test(fullHistory);
-  const alreadyConfirmedDelivery = /(entrega no dia 19 de setembro|entregar o presente em mãos|entregar o presente em maos|representantes para esse fim|receber os representantes)/i.test(fullHistory);
+  const alreadyConfirmedDelivery = /(entrega (?:a partir de|no dia) (?:3 de outubro|19 de setembro)|entregar o presente em mãos|entregar o presente em maos|entregar seu brinde especial|representantes para esse fim|receber os representantes)/i.test(fullHistory);
   const alreadyAskedCanReceive = /(você poderá receber os representantes|voce podera receber os representantes|você poderá receber esse material|voce podera receber esse material|poderá receber esse material|podera receber esse material)/i.test(fullHistory);
   const acceptedGift = alreadyOfferedGift && (isAffirmativeReply(inboundText) || /(quero receber|pode entregar|aceito|gostaria de receber|sim.*presente|sim.*brinde)/i.test(inboundText));
   const confirmedAddress = alreadyAskedAddress && !alreadyConfirmedDelivery && isAffirmativeReply(inboundText);
@@ -3324,6 +3448,9 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     && !isNegativeReply(inboundText)
     && looksLikeAddress(inboundText);
 
+  if (intent === 'visit_cancellation') {
+    return anaVisitCancellationReply(name);
+  }
   if (intent === 'optout') {
     return `Tudo bem${anaNameSuffix(name)}, sem problema nenhum. Vou respeitar seu pedido e encerrar o contato por aqui. Deus te abençoe! 🙏`;
   }
@@ -3347,7 +3474,7 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     return anaDeliveryFinalReply(name);
   }
   if (deniedAddress) {
-    return `Obrigado por avisar${anaNameSuffix(name)}. Para eu registrar certinho a entrega do presente no dia 19 de setembro de 2026, você pode me enviar seu endereço completo atual?`;
+    return `Obrigado por avisar${anaNameSuffix(name)}. Para eu registrar corretamente a entrega do material de estudo a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, você pode me enviar seu endereço completo atual?`;
   }
   if (sentAddress) {
     return anaDeliveryFinalReply(name);
@@ -3370,9 +3497,9 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
       return `Tudo bem${anaNameSuffix(name)}. Vou deixar seu retorno registrado com carinho para a equipe da Novo Tempo.`;
     }
     return pickUnusedAnaReply([
-      `Que bom que você deseja continuar${anaNameSuffix(name)}. A partir do dia 19 de setembro de 2026, a equipe da Novo Tempo estará entregando um brinde especial às pessoas que foram contatadas.\n\nVocê gostaria de receber esse brinde?`,
-      `${anaNameText(name)}fico feliz em saber disso. A partir de 19 de setembro de 2026, nossa equipe fará a entrega de um brinde especial da Novo Tempo.\n\nVocê deseja recebê-lo?`,
-      `Perfeito${anaNameSuffix(name)}. A Novo Tempo preparou um brinde especial, com entregas a partir de 19 de setembro de 2026.\n\nVocê gostaria de receber?`
+      `Que bom que você deseja continuar${anaNameSuffix(name)}. A partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, um representante da equipe Novo Tempo entregará um brinde especial, um material de estudo.\n\nVocê gostaria de recebê-lo?`,
+      `${anaNameText(name)}fico feliz em saber disso. A partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, nossa equipe fará a entrega de um brinde especial: um material de estudo.\n\nVocê deseja recebê-lo?`,
+      `Perfeito${anaNameSuffix(name)}. A Novo Tempo preparou um material de estudo como brinde especial, com entregas a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}.\n\nVocê gostaria de receber?`
     ], fullHistory);
   }
   if (alreadyOfferedGift && !alreadyAskedAddress && isNegativeReply(inboundText)) {
@@ -3405,9 +3532,9 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     }
     if (!alreadyOfferedGift) {
       return pickUnusedAnaReply([
-        `Que bom que você deseja continuar${anaNameSuffix(name)}. A partir do dia 19 de setembro de 2026, a equipe da Novo Tempo estará entregando um brinde especial às pessoas que foram contatadas.\n\nVocê gostaria de receber esse brinde?`,
-        `${anaNameText(name)}fico feliz em saber disso. A partir de 19 de setembro de 2026, nossa equipe fará a entrega de um brinde especial da Novo Tempo.\n\nVocê deseja recebê-lo?`,
-        `Perfeito${anaNameSuffix(name)}. A Novo Tempo preparou um brinde especial, com entregas a partir de 19 de setembro de 2026.\n\nVocê gostaria de receber?`
+        `Que bom que você deseja continuar${anaNameSuffix(name)}. A partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, um representante da equipe Novo Tempo entregará um brinde especial, um material de estudo.\n\nVocê gostaria de recebê-lo?`,
+        `${anaNameText(name)}fico feliz em saber disso. A partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, nossa equipe fará a entrega de um brinde especial: um material de estudo.\n\nVocê deseja recebê-lo?`,
+        `Perfeito${anaNameSuffix(name)}. A Novo Tempo preparou um material de estudo como brinde especial, com entregas a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}.\n\nVocê gostaria de receber?`
       ], fullHistory);
     }
     return `Perfeito${anaNameSuffix(name)}. Vou deixar isso registrado para a equipe da Novo Tempo acompanhar com carinho.`;
@@ -3473,7 +3600,7 @@ async function processAnaReply(saved, inboundMessage) {
   const guardedReply = agentReply.source === 'operational-rule'
     ? { message: agentReply.message, guarded: true, reason: agentReply.reason }
     : await guardAnaReply(agentReply.message, { conversation, inboundMessage });
-  const message = guardedReply.message;
+  const message = enforceActiveAnaCampaignDate(guardedReply.message);
   const currentMode = await prisma.whatsAppConversation.findUnique({
     where: { id: conversation.id },
     select: { aiReplyEnabled: true }
@@ -6285,9 +6412,14 @@ if (process.env.NODE_ENV !== 'test') {
 
 export {
   anaDeliveryQuestion,
+  anaDeliveryFinalReply,
+  anaGiftOfferReply,
   confirmsRegisteredAddress,
+  enforceActiveAnaCampaignDate,
   isAffirmativeReply,
+  isGiftVisitCancellation,
   isNegativeReply,
   plausibleNewAddress,
-  resolveConversationAiReplySetting
+  resolveConversationAiReplySetting,
+  summarizeAnaDelivery
 };
