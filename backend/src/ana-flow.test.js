@@ -4,6 +4,7 @@ import test from 'node:test';
 process.env.NODE_ENV = 'test';
 
 const {
+  anaReplyDelayMs,
   anaDeliveryFinalReply,
   anaDeliveryQuestion,
   anaGiftOfferReply,
@@ -16,6 +17,14 @@ const {
   resolveConversationAiReplySetting,
   summarizeAnaDelivery
 } = await import('./server.js');
+
+test('calcula uma pausa humana proporcional ao tamanho da resposta', () => {
+  const shortDelay = anaReplyDelayMs('Resposta curta.', { body: 'Oi' });
+  const longDelay = anaReplyDelayMs('Esta é uma resposta mais longa. '.repeat(20), { body: 'Pode me explicar melhor?' });
+  assert.ok(shortDelay >= 4000);
+  assert.ok(longDelay > shortDelay);
+  assert.ok(longDelay <= 25000);
+});
 
 test('identifica a pergunta de aceite do brinde', () => {
   assert.equal(

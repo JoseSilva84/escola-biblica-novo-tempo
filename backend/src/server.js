@@ -3352,18 +3352,26 @@ async function buildAnaReply({ conversation, inboundMessage, config }) {
 function anaReplyDelayMs(message, inboundMessage) {
   const inboundLength = String(inboundMessage?.body || '').length;
   const outboundLength = String(message || '').length;
-  const base = inboundLength <= 25 ? 4000 : inboundLength <= 140 ? 8000 : 15000;
-  const calculated = base + Math.round(outboundLength / 25) * 1000;
+  const configuredMinValue = Number(process.env.ANA_TYPING_MIN_DELAY_MS);
+  const configuredMaxValue = Number(process.env.ANA_TYPING_MAX_DELAY_MS);
+  const charsPerSecondValue = Number(process.env.ANA_TYPING_CHARS_PER_SECOND);
+  const configuredMin = Number.isFinite(configuredMinValue) ? configuredMinValue : 4000;
+  const configuredMax = Number.isFinite(configuredMaxValue) ? configuredMaxValue : 25000;
+  const charsPerSecond = Math.min(Math.max(Number.isFinite(charsPerSecondValue) ? charsPerSecondValue : 25, 10), 80);
+  const min = Math.min(Math.max(configuredMin, 2000), 15000);
+  const standardMax = Math.min(Math.max(configuredMax, min), 45000);
+  const base = inboundLength <= 25 ? min : inboundLength <= 140 ? Math.max(min, 8000) : Math.max(min, 15000);
+  const calculated = base + Math.ceil(outboundLength / charsPerSecond) * 1000;
   const sensitive = detectAnaReplyIntent(inboundMessage?.body) === 'human';
-  const max = sensitive ? 35000 : 25000;
-  return Math.min(Math.max(calculated, 4000), max);
+  const max = sensitive ? Math.max(standardMax, 35000) : standardMax;
+  return Math.min(Math.max(calculated, min), max);
 }
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function sendZproTypingIndicator(phone) {
+async function sendZproTypingIndicator(phone, active = true) {
   const typingPath = String(process.env.ZPRO_TYPING_PATH || '').trim();
   if (!typingPath) return { ok: false, skipped: true };
   const config = zproConfig();
@@ -3390,8 +3398,8 @@ async function sendZproTypingIndicator(phone) {
         number: normalizedPhone,
         phone: normalizedPhone,
         to: normalizedPhone,
-        typing: true,
-        presence: 'composing',
+        typing: active,
+        presence: active ? 'composing' : 'paused',
         channelId: config.channelId || config.apiId,
         sessionId: config.channelId || config.apiId,
         bearertoken: config.token
@@ -3403,12 +3411,12 @@ async function sendZproTypingIndicator(phone) {
   }
 }
 
-async function sendWahaTypingIndicator(phone) {
+async function sendWahaTypingIndicator(phone, active = true) {
   const normalizedPhone = normalizePhone(phone);
   if (!normalizedPhone) return { ok: false, skipped: true };
   const config = wahaConfig();
   try {
-    await sendWahaRequest('/api/startTyping', {
+    await sendWahaRequest(active ? '/api/startTyping' : '/api/stopTyping', {
       session: config.session,
       chatId: `${normalizedPhone}@c.us`
     });
@@ -3418,10 +3426,44 @@ async function sendWahaTypingIndicator(phone) {
   }
 }
 
-async function sendWhatsAppTypingIndicator(phone) {
+async function sendWhatsAppTypingIndicator(phone, active = true) {
   return whatsappProvider() === 'waha'
-    ? sendWahaTypingIndicator(phone)
-    : sendZproTypingIndicator(phone);
+    ? sendWahaTypingIndicator(phone, active)
+    : sendZproTypingIndicator(phone, active);
+}
+
+async function beginWhatsAppTyping(phone) {
+  const configuredPulseMs = Number(process.env.ANA_TYPING_PULSE_MS);
+  const pulseMs = Math.min(Math.max(Number.isFinite(configuredPulseMs) ? configuredPulseMs : 3500, 2000), 8000);
+  const state = {
+    started: await sendWhatsAppTypingIndicator(phone, true),
+    pulseMs,
+    pulses: [],
+    delayMs: 0,
+    stopped: null
+  };
+  let stopped = false;
+  let pendingPulse = Promise.resolve();
+  const heartbeat = setInterval(() => {
+    if (stopped) return;
+    pendingPulse = pendingPulse.then(async () => {
+      if (stopped) return;
+      const pulse = await sendWhatsAppTypingIndicator(phone, true);
+      state.pulses.push(pulse);
+    });
+  }, pulseMs);
+
+  return {
+    state,
+    async stop() {
+      if (stopped) return state.stopped;
+      stopped = true;
+      clearInterval(heartbeat);
+      await pendingPulse;
+      state.stopped = await sendWhatsAppTypingIndicator(phone, false);
+      return state.stopped;
+    }
+  };
 }
 
 function buildAnaFallbackReply({ conversation, inboundMessage }) {
@@ -3595,28 +3637,74 @@ async function processAnaReply(saved, inboundMessage) {
   ));
   if (recentAgentReply) return null;
 
-  const typing = await sendWhatsAppTypingIndicator(conversation?.phone || saved.conversation.phone);
-  const agentReply = await buildAnaReply({ conversation, inboundMessage, config });
-  const guardedReply = agentReply.source === 'operational-rule'
-    ? { message: agentReply.message, guarded: true, reason: agentReply.reason }
-    : await guardAnaReply(agentReply.message, { conversation, inboundMessage });
-  const message = enforceActiveAnaCampaignDate(guardedReply.message);
-  const currentMode = await prisma.whatsAppConversation.findUnique({
-    where: { id: conversation.id },
-    select: { aiReplyEnabled: true }
-  });
-  if (currentMode?.aiReplyEnabled === false) return null;
-  let result;
+  const replyPhone = conversation?.phone || saved.conversation.phone;
+  const typingSession = await beginWhatsAppTyping(replyPhone);
+  const typing = typingSession.state;
   try {
-    result = await sendWhatsAppTextMessage({
-      phone: conversation?.phone || saved.conversation.phone,
-      message,
-      leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
-      templateId: 'gemini-ana-auto-reply'
+    const agentReply = await buildAnaReply({ conversation, inboundMessage, config });
+    const guardedReply = agentReply.source === 'operational-rule'
+      ? { message: agentReply.message, guarded: true, reason: agentReply.reason }
+      : await guardAnaReply(agentReply.message, { conversation, inboundMessage });
+    const message = enforceActiveAnaCampaignDate(guardedReply.message);
+    const currentMode = await prisma.whatsAppConversation.findUnique({
+      where: { id: conversation.id },
+      select: { aiReplyEnabled: true }
     });
-  } catch (error) {
+    if (currentMode?.aiReplyEnabled === false) return null;
+
+    typing.delayMs = anaReplyDelayMs(message, inboundMessage);
+    await sleep(typing.delayMs);
+
+    const modeBeforeSend = await prisma.whatsAppConversation.findUnique({
+      where: { id: conversation.id },
+      select: { aiReplyEnabled: true }
+    });
+    if (modeBeforeSend?.aiReplyEnabled === false) return null;
+
+    let result;
+    try {
+      result = await sendWhatsAppTextMessage({
+        phone: replyPhone,
+        message,
+        leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
+        templateId: 'gemini-ana-auto-reply'
+      });
+    } catch (error) {
+      return recordWhatsAppMessage({
+        phone: conversation?.phone || saved.conversation.phone,
+        body: message,
+        direction: 'OUTBOUND',
+        senderType: 'AI',
+        senderName: 'Ana',
+        leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
+        leadName: conversation?.leadName || conversation?.lead?.name || null,
+        district: conversation?.district || conversation?.lead?.district?.name || null,
+        provider: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
+        providerStatus: error.deliveryStatus || 'FAILED',
+        providerResponse: error.providerResponse || null,
+        occurredAt: new Date(),
+        metadata: {
+          assistant: 'Ana',
+          aiProvider: 'gemini',
+          aiModel: config.model,
+          aiReplySource: agentReply.source,
+          transport: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
+          autoReply: true,
+          replyToMessageId: inboundMessage.id,
+          source: 'gemini-ana',
+          aiReplyEnabled: true,
+          replyGuarded: guardedReply.guarded,
+          replyGuardReason: guardedReply.reason,
+          typing,
+          failure: true,
+          providerHttpStatus: error.providerStatus || error.status || null,
+          attempts: error.providerAttempts || []
+        }
+      });
+    }
+
     return recordWhatsAppMessage({
-      phone: conversation?.phone || saved.conversation.phone,
+      phone: result.phone,
       body: message,
       direction: 'OUTBOUND',
       senderType: 'AI',
@@ -3624,16 +3712,17 @@ async function processAnaReply(saved, inboundMessage) {
       leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
       leadName: conversation?.leadName || conversation?.lead?.name || null,
       district: conversation?.district || conversation?.lead?.district?.name || null,
-      provider: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
-      providerStatus: error.deliveryStatus || 'FAILED',
-      providerResponse: error.providerResponse || null,
+      provider: result.provider,
+      providerStatus: result.deliveryStatus,
+      providerResponse: result.providerResponse,
+      providerMessageId: providerMessageId(result.providerResponse),
       occurredAt: new Date(),
       metadata: {
         assistant: 'Ana',
         aiProvider: 'gemini',
         aiModel: config.model,
         aiReplySource: agentReply.source,
-        transport: whatsappProvider() === 'waha' ? 'waha-gows' : 'zpro-baileys',
+        transport: result.provider,
         autoReply: true,
         replyToMessageId: inboundMessage.id,
         source: 'gemini-ana',
@@ -3641,43 +3730,12 @@ async function processAnaReply(saved, inboundMessage) {
         replyGuarded: guardedReply.guarded,
         replyGuardReason: guardedReply.reason,
         typing,
-        failure: true,
-        providerHttpStatus: error.providerStatus || error.status || null,
-        attempts: error.providerAttempts || []
+        attempts: result.attempts || []
       }
     });
+  } finally {
+    await typingSession.stop();
   }
-
-  return recordWhatsAppMessage({
-    phone: result.phone,
-    body: message,
-    direction: 'OUTBOUND',
-    senderType: 'AI',
-    senderName: 'Ana',
-    leadId: conversation?.externalLeadId || conversation?.lead?.externalId || conversation?.leadId || null,
-    leadName: conversation?.leadName || conversation?.lead?.name || null,
-    district: conversation?.district || conversation?.lead?.district?.name || null,
-    provider: result.provider,
-    providerStatus: result.deliveryStatus,
-    providerResponse: result.providerResponse,
-    providerMessageId: providerMessageId(result.providerResponse),
-    occurredAt: new Date(),
-    metadata: {
-      assistant: 'Ana',
-      aiProvider: 'gemini',
-      aiModel: config.model,
-      aiReplySource: agentReply.source,
-      transport: result.provider,
-      autoReply: true,
-      replyToMessageId: inboundMessage.id,
-      source: 'gemini-ana',
-      aiReplyEnabled: true,
-      replyGuarded: guardedReply.guarded,
-      replyGuardReason: guardedReply.reason,
-      typing,
-      attempts: result.attempts || []
-    }
-  });
 }
 
 const anaReplyInFlight = new Map();
@@ -6411,6 +6469,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export {
+  anaReplyDelayMs,
   anaDeliveryQuestion,
   anaDeliveryFinalReply,
   anaGiftOfferReply,
