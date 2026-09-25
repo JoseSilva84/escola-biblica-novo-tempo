@@ -70,6 +70,39 @@ test('cancelamento posterior retira o lead da entrega aceita mesmo com resposta 
   assert.equal(delivery.giftDecisionStatus, 'CANCELLED');
 });
 
+test('reconhece aceite natural de visita mesmo quando o convite não termina com interrogação', () => {
+  const delivery = summarizeAnaDelivery({
+    messages: [
+      { direction: 'OUTBOUND', body: 'Podemos pedir para um representante da Novo Tempo passar em sua casa e entregar um material de estudo' },
+      { direction: 'INBOUND', body: 'Com certeza, será um prazer recebê-los', createdAt: new Date('2026-09-25T18:00:00Z') }
+    ]
+  });
+  assert.equal(delivery.accepted, true);
+  assert.equal(delivery.giftDecisionStatus, 'ACCEPTED');
+});
+
+test('reconhece confirmação operacional da visita mesmo sem repetir a data da campanha', () => {
+  const delivery = summarizeAnaDelivery({
+    messages: [
+      { direction: 'INBOUND', body: 'Está ótimo', createdAt: new Date('2026-09-25T18:00:00Z') },
+      { direction: 'OUTBOUND', body: 'Perfeito. Vou avisar nossa equipe e deixar a visita registrada para a entrega do material.' }
+    ]
+  });
+  assert.equal(delivery.accepted, true);
+  assert.equal(delivery.deliveryConfirmed, true);
+});
+
+test('não confunde confirmação de recebimento de material com aceite de visita', () => {
+  const delivery = summarizeAnaDelivery({
+    messages: [
+      { direction: 'OUTBOUND', body: 'Você chegou a receber o material?' },
+      { direction: 'INBOUND', body: 'Com certeza', createdAt: new Date('2026-09-25T18:00:00Z') }
+    ]
+  });
+  assert.equal(delivery.accepted, false);
+  assert.equal(delivery.materialStatus, 'RECEIVED');
+});
+
 test('distingue confirmação de endereço de pedido de endereço novo', () => {
   assert.equal(
     anaDeliveryQuestion('O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro?'),

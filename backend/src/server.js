@@ -1047,7 +1047,9 @@ function anaDeliveryQuestion(value) {
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
-  if (!text.includes('?')) return null;
+  const questionLike = text.includes('?')
+    || /(gostaria|voce quer|aceita|deseja|posso|podemos|pode me|poderia|podera receber)/.test(text);
+  if (!questionLike) return null;
   if (/(endereco|dados)/.test(text) && /(continua o mesmo|ainda e o mesmo|e o mesmo|esta correto|esta certo|confirmar|cadastrado.*outro)/.test(text)) {
     return 'ADDRESS_CONFIRMATION';
   }
@@ -1066,6 +1068,11 @@ function anaDeliveryQuestion(value) {
     && !/(chegou|ja recebeu|já recebeu|chegou a receber)/.test(text)) {
     return 'GIFT_ACCEPTANCE';
   }
+  if (/(visita|representante|missionario|equipe)/.test(text)
+    && /(ir ate|passar|visitar|entregar|levar|receber)/.test(text)
+    && /(gostaria|quer|aceita|deseja|posso|podemos|pode|podera)/.test(text)) {
+    return 'GIFT_ACCEPTANCE';
+  }
   if (/material/.test(text) && /(chegou|recebeu|receber)/.test(text)) return 'MATERIAL_RECEIVED';
   if (/(material|estudo)/.test(text) && /(olhada|leu|ler|entendeu|atencao)/.test(text)) return 'MATERIAL_READ';
   return null;
@@ -1076,10 +1083,17 @@ function anaDeliveryWasConfirmed(value) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
-  return /(representante|equipe da novo tempo)/.test(text)
-    && /(3 de outubro|dia 3|19 de setembro|dia 19)/.test(text)
-    && /(entregar|entrega|levara|ira ate)/.test(text)
-    && !text.includes('?');
+  const hasDelivery = /(representante|missionario|equipe da novo tempo|nossa equipe)/.test(text)
+    && /(entregar|entrega|levara|ira ate|passara|visita)/.test(text);
+  const hasCampaignDate = /(3 de outubro|dia 3|19 de setembro|dia 19)/.test(text);
+  const acknowledgesAcceptance = /(obrigad[oa] pela confirmacao|entrega (?:esta|ja esta) confirmada|visita (?:esta|ja esta) confirmada|vou avisar (?:a )?nossa equipe|deix(?:ar|ei) (?:a visita|a entrega|seu aceite) registrad[oa]|tudo certo.*entrega)/.test(text);
+  return hasDelivery && (hasCampaignDate || acknowledgesAcceptance) && !text.includes('?');
+}
+
+function directlyAcceptsAnaVisit(value) {
+  if (isGiftVisitCancellation(value) || isNegativeReply(value)) return false;
+  const text = normalizedIntentName(value);
+  return /(quero receber|aceito(?: a visita| o brinde| o presente)?|gostaria de receber|pode(?:m)? (?:vir|ir|passar|entregar|trazer|enviar|mandar)|pode deixar|vou aguardar|estarei aguardando|estarei esperando|sera um prazer receber|seria um prazer receber|com certeza.*(?:receb|visita|entrega)|(?:receb|visita|entrega).*(?:sim|claro|certeza)|podem mandar (?:um )?representante)/i.test(text);
 }
 
 async function inferAnaDeliveryState(event, lead, addressState) {
@@ -2265,11 +2279,11 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     const metadataIntent = normalizedIntentName(`${metadata.gptMakerQualification || ''} ${metadata.intent || ''}`);
     const metadataAction = normalizedIntentName(metadata.gptMakerAction || '').replace(/[_-]+/g, ' ');
     const metadataOccurredAt = metadata.gptMakerReceivedAt || message.receivedAt || message.sentAt || message.createdAt || null;
-    if (!deliveryCancelled && (/(confirm gift delivery|delivery already confirmed)/i.test(metadataAction)
-      || metadataIntent.includes('registrar endereco'))) {
+    if (!deliveryCancelled && (/(confirm gift delivery|delivery already confirmed|confirmar entrega|entrega confirmada|confirmar visita|visita confirmada|visita aceita|aceitou visita|registrar aceite)/i.test(metadataAction)
+      || /(registrar endereco|aceitou visita|aceitar visita|confirmar visita|confirmar entrega)/i.test(metadataIntent))) {
       giftAccepted = true;
       addressConfirmed = true;
-      deliveryConfirmed = /(confirm gift delivery|delivery already confirmed)/i.test(metadataAction) || deliveryConfirmed;
+      deliveryConfirmed = /(confirm gift delivery|delivery already confirmed|confirmar entrega|entrega confirmada|confirmar visita|visita confirmada|visita aceita|aceitou visita)/i.test(metadataAction) || deliveryConfirmed;
       acceptedAt ||= metadataOccurredAt;
     } else if (/(request new address|offer gift)/i.test(metadataAction)) {
       if (metadataAction.includes('offer gift')) giftOffered = true;
@@ -2333,9 +2347,12 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
       pendingQuestion = null;
       continue;
     }
-    const directlyAcceptedGift = /(quero receber|pode entregar|aceito|gostaria de receber|pode trazer|pode enviar|pode mandar|envie por favor)/i.test(body);
-    if (giftOffered && directlyAcceptedGift) {
+    const directlyAcceptedGift = directlyAcceptsAnaVisit(body);
+    const explicitlyReferencesVisit = /(brinde|presente|visita|representante|missionario|missionário|entrega)/i.test(body)
+      && directlyAcceptedGift;
+    if ((giftOffered || explicitlyReferencesVisit) && directlyAcceptedGift) {
       deliveryCancelled = false;
+      giftOffered = true;
       giftAccepted = true;
       acceptedAt ||= message.receivedAt || message.sentAt || message.createdAt || null;
     } else if (pendingQuestion === 'GIFT_ACCEPTANCE' && isAffirmativeReply(body)) {
@@ -2366,17 +2383,23 @@ function summarizeAnaDelivery(conversation, dashboardRecordsById = new Map()) {
     const body = String(message.body || '').trim();
     if (!body || !isAffirmativeReply(body) || isNegativeReply(body)) continue;
 
-    const previousOutbound = messages
+    const previousOutboundCandidates = messages
       .slice(Math.max(0, index - 8), index)
       .reverse()
-      .find((candidate) => candidate?.direction === 'OUTBOUND' && String(candidate.body || '').trim());
-    const nextOutbound = messages
+      .filter((candidate) => candidate?.direction === 'OUTBOUND' && String(candidate.body || '').trim());
+    const previousOutbound = previousOutboundCandidates.find((candidate) => anaDeliveryQuestion(candidate.body) === 'GIFT_ACCEPTANCE')
+      || previousOutboundCandidates[0];
+    const nextOutboundCandidates = messages
       .slice(index + 1, index + 5)
-      .find((candidate) => candidate?.direction === 'OUTBOUND' && String(candidate.body || '').trim());
+      .filter((candidate) => candidate?.direction === 'OUTBOUND' && String(candidate.body || '').trim());
+    const nextOutbound = nextOutboundCandidates.find((candidate) => (
+      ['ADDRESS_REQUEST', 'ADDRESS_CONFIRMATION'].includes(anaDeliveryQuestion(candidate.body))
+      || anaDeliveryWasConfirmed(candidate.body)
+    )) || nextOutboundCandidates[0];
     const previousQuestion = anaDeliveryQuestion(previousOutbound?.body);
     const nextQuestion = anaDeliveryQuestion(nextOutbound?.body);
-    const directlyReferencesGift = /(brinde|presente)/i.test(normalizedIntentName(body))
-      && /(quero receber|pode entregar|aceito|gostaria de receber|pode trazer|pode enviar|pode mandar|envie por favor)/i.test(body);
+    const directlyReferencesGift = /(brinde|presente|visita|representante|missionario|entrega)/i.test(normalizedIntentName(body))
+      && directlyAcceptsAnaVisit(body);
     const followsGiftOffer = previousQuestion === 'GIFT_ACCEPTANCE';
     const promptedAddressOrConfirmation = ['ADDRESS_REQUEST', 'ADDRESS_CONFIRMATION'].includes(nextQuestion)
       || anaDeliveryWasConfirmed(nextOutbound?.body);
@@ -2767,7 +2790,7 @@ function detectAnaReplyIntent(messageText) {
 
 function isAffirmativeReply(value) {
   if (isGiftVisitCancellation(value) || isNegativeReply(value)) return false;
-  return /\b(sim|s|claro|pode|quero|aceito|gostaria|isso|correto|certo|esse mesmo|essa mesma|ta certo|tá certo|esta certo|está certo|confirmo|ok|envie|enviem|mande|mandem|pode deixar)\b/i.test(String(value || ''));
+  return /\b(sim|s|claro|com certeza|pode|podem|quero|aceito|gostaria|isso|correto|certo|esse mesmo|essa mesma|ta certo|tá certo|esta certo|está certo|tudo bem|ta bom|tá bom|combinado|beleza|confirmo|ok|envie|enviem|mande|mandem|pode deixar|vou aguardar|estarei aguardando|estarei esperando)\b/i.test(String(value || ''));
 }
 
 function looksLikeAddress(value) {
@@ -4794,7 +4817,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
         (conversation.messages || []).some(isAnaManagedMessage)
         || (conversation.messages || []).some((message) =>
           message.direction === 'OUTBOUND'
-          && /(brinde|presente)/i.test(String(message.body || ''))
+          && /(brinde|presente|visita|representante|missionario|missionário|entrega.{0,40}material|material.{0,40}entrega)/i.test(String(message.body || ''))
         )
       )
     ));
