@@ -7644,7 +7644,8 @@ function WhatsAppNewContactForm({ districts = [], initialContact, onSubmit, savi
 
 function RecencyMultiSelect({ onChange, options = [], selected = [] }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
   const choices = options.filter(([value]) => value !== 'all');
   const selectedTotal = choices
     .filter(([value]) => selected.includes(value))
@@ -7653,26 +7654,36 @@ function RecencyMultiSelect({ onChange, options = [], selected = [] }) {
   useEffect(() => {
     if (!open) return undefined;
     const closeWhenClickingOutside = (event) => {
-      if (!containerRef.current?.contains(event.target)) setOpen(false);
+      const clickedTrigger = triggerRef.current?.contains(event.target);
+      const clickedMenu = menuRef.current?.contains(event.target);
+      if (!clickedTrigger && !clickedMenu) setOpen(false);
     };
-    document.addEventListener('pointerdown', closeWhenClickingOutside);
-    return () => document.removeEventListener('pointerdown', closeWhenClickingOutside);
+    const closeWithEscape = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeWhenClickingOutside, true);
+    document.addEventListener('keydown', closeWithEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeWhenClickingOutside, true);
+      document.removeEventListener('keydown', closeWithEscape);
+    };
   }, [open]);
 
   return (
-    <div className="grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500 lg:col-span-4" ref={containerRef}>
+    <div className="grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500 lg:col-span-4">
       <span>Tempo</span>
       <button
         aria-expanded={open}
         className="flex h-9 min-w-0 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 text-left text-xs font-bold normal-case text-slate-800 outline-none transition hover:border-blue-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 lg:max-w-sm"
         onClick={() => setOpen((current) => !current)}
+        ref={triggerRef}
         type="button"
       >
         <span className="truncate">{selected.length ? `${selected.length} faixas · ${formatNumber(selectedTotal)} contatos` : options[0]?.[1] || 'Todos'}</span>
         <ChevronDown className={`shrink-0 transition ${open ? 'rotate-180' : ''}`} size={15} />
       </button>
       {open ? (
-        <div className="mt-1 w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-2 shadow-[0_16px_38px_rgba(15,23,42,0.16)]">
+        <div className="mt-1 w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-2 shadow-[0_16px_38px_rgba(15,23,42,0.16)]" ref={menuRef}>
           <div className="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 px-2 pb-2">
             <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">Selecione um ou vários períodos</span>
             {selected.length ? <button className="text-[10px] font-black uppercase text-blue-700 hover:text-red-600" onClick={() => onChange([])} type="button">Limpar</button> : null}
