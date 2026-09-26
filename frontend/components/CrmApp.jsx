@@ -7799,7 +7799,7 @@ function WhatsAppLeadPickerModal({
           <WhatsAppNewContactForm districts={districts} initialContact={newContact} onSubmit={onNewContactSubmit} saving={newContactSaving} />
         ) : (
         <form className="whatsapp-picker-filters conversation-tools-scroll grid max-h-[55vh] shrink-0 gap-3 overflow-y-auto overscroll-contain border-b border-slate-200 bg-white p-4 pr-3" onSubmit={onSearch}>
-          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          {advancedFiltersOpen ? <div className="grid gap-3 md:grid-cols-[1fr_auto]">
             <label className="grid gap-1.5">
               <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">Buscar contato</span>
               <input
@@ -7813,7 +7813,7 @@ function WhatsAppLeadPickerModal({
             <button className={`${primaryButtonClass} mt-auto h-10`} type="submit">
               <Search size={18} /> Buscar
             </button>
-          </div>
+          </div> : null}
 
           {selectedFilterChips.length || audienceLabel ? (
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-2.5">
