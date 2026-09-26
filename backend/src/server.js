@@ -1780,13 +1780,13 @@ function dashboardLeadIndex() {
 }
 
 function serializeWhatsAppLead(lead, dashboardRecord = null) {
-  const phone = normalizedPhonesFromValue(lead?.phone)[0] || '';
+  const phone = normalizedPhonesFromValue(lead?.phone || dashboardRecord?.tel)[0] || '';
   return {
-    id: lead?.id || null,
-    externalId: lead?.externalId || null,
-    name: lead?.name || null,
+    id: lead?.id || dashboardRecord?.id || null,
+    externalId: lead?.externalId || externalLeadId(dashboardRecord?.id) || null,
+    name: lead?.name || dashboardRecord?.n || null,
     phone,
-    storedPhone: lead?.phone || null,
+    storedPhone: lead?.phone || dashboardRecord?.tel || null,
     address: lead?.address || dashboardRecord?.addr || dashboardRecord?.end || null,
     newAddress: lead?.newAddress || null,
     district: lead?.district?.name || dashboardRecord?.d || null,
@@ -5250,6 +5250,64 @@ app.get('/api/whatsapp/leads', requireAuth, async (request, response) => {
   }
 });
 
+app.get('/api/whatsapp/lead-details', requireAuth, async (request, response) => {
+  response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.set('Pragma', 'no-cache');
+  response.set('Expires', '0');
+
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.status(403).json({ message: 'Usuário sem permissão para consultar este lead.' });
+    return;
+  }
+
+  const conversationId = String(request.query?.conversationId || '').trim();
+  const requestedLeadId = String(request.query?.leadId || '').trim();
+  const requestedExternalLeadId = externalLeadId(request.query?.externalLeadId);
+  const phone = normalizePhone(request.query?.phone);
+
+  if (!conversationId && !requestedLeadId && !requestedExternalLeadId && !phone) {
+    response.status(400).json({ message: 'Informe a conversa, o lead ou o telefone.' });
+    return;
+  }
+
+  try {
+    const conversation = conversationId
+      ? await prisma.whatsAppConversation.findUnique({
+          where: { id: conversationId },
+          include: { lead: { select: whatsappLeadSelect } }
+        })
+      : null;
+    const resolvedPhone = normalizePhone(phone || conversation?.phone || conversation?.lead?.phone);
+    const lead = conversation?.lead || await findLeadReference({
+      leadId: requestedLeadId || requestedExternalLeadId || conversation?.leadId || conversation?.externalLeadId || null,
+      phone: resolvedPhone
+    });
+    const dashboardRecord = dashboardRecordForConversation(dashboardLeadIndex(), {
+      ...(conversation || {}),
+      externalLeadId: conversation?.externalLeadId || lead?.externalId || requestedExternalLeadId || externalLeadId(requestedLeadId),
+      phone: resolvedPhone || lead?.phone,
+      lead,
+      leadName: conversation?.leadName || lead?.name,
+      district: conversation?.district || lead?.district?.name
+    });
+
+    if (!lead && !dashboardRecord) {
+      response.status(404).json({ message: 'Não foi possível localizar os dados completos deste lead.' });
+      return;
+    }
+
+    response.json({
+      lead: serializeWhatsAppLead(lead, dashboardRecord),
+      matchedBy: dashboardRecord
+        ? (lead?.externalId && Number(dashboardRecord.id) === Number(lead.externalId) ? 'externalId' : 'phone-or-name')
+        : 'database'
+    });
+  } catch (error) {
+    console.error('[whatsapp:lead-details:error]', error.message);
+    response.status(500).json({ message: 'Não foi possível carregar os detalhes completos do lead.' });
+  }
+});
+
 app.get('/api/whatsapp/contact-count', requireAuth, async (request, response) => {
   const requestedLeadId = String(request.query?.leadId || '').trim();
   const phone = normalizePhone(request.query?.phone);
@@ -6846,6 +6904,7 @@ if (process.env.NODE_ENV !== 'test') {
 export {
   anaReplyDelayMs,
   buildAnaOperationalReply,
+  dashboardRecordForConversation,
   anaDeliveryQuestion,
   anaDeliveryFinalReply,
   anaGiftOfferReply,
@@ -6857,5 +6916,6 @@ export {
   isNegativeReply,
   plausibleNewAddress,
   resolveConversationAiReplySetting,
+  serializeWhatsAppLead,
   summarizeAnaDelivery
 };

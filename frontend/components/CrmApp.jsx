@@ -8583,13 +8583,38 @@ function ConversationsView({ records = [] }) {
     loadLeadDirectory();
   }
 
-  function openLeadDetails(lead) {
-    const detailLead = whatsappLeadToDetailRecord(lead, records);
-    if (!detailLead) {
+  async function openLeadDetails(lead) {
+    const fallbackDetailLead = whatsappLeadToDetailRecord(lead, records);
+    if (!fallbackDetailLead) {
       toast.error('Detalhes indisponíveis', { description: 'Não foi possível localizar os dados deste lead.' });
       return;
     }
-    setSelectedLeadDetails(detailLead);
+    setSelectedLeadDetails(fallbackDetailLead);
+
+    const params = new URLSearchParams();
+    if (lead?.conversationId) params.set('conversationId', String(lead.conversationId));
+    if (lead?.id) params.set('leadId', String(lead.id));
+    if (lead?.externalId) params.set('externalLeadId', String(lead.externalId));
+    const detailPhone = phoneDigits(lead?.phone || lead?.tel);
+    if (detailPhone) params.set('phone', detailPhone);
+    if (!params.size) return;
+
+    try {
+      const response = await apiFetch(`/api/whatsapp/lead-details?${params.toString()}`, { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok || !payload?.lead) throw new Error(payload?.message || 'Não foi possível carregar os dados completos.');
+      const completeDetailLead = whatsappLeadToDetailRecord({
+        ...lead,
+        ...payload.lead,
+        whatsappContactCount: lead?.whatsappContactCount,
+        whatsappMessages: lead?.whatsappMessages || []
+      }, records);
+      if (completeDetailLead) setSelectedLeadDetails(completeDetailLead);
+    } catch (error) {
+      toast.error('Dados completos indisponíveis', {
+        description: `${error.message} Os dados já carregados foram mantidos.`
+      });
+    }
   }
 
   async function submitLeadSearch(event) {
@@ -9183,6 +9208,7 @@ function ConversationsView({ records = [] }) {
   const activeLeadDistrict = activeLead?.district || activeLead?.d || selectedConversation?.district || null;
   const activeLeadForDetails = activePhone ? {
     ...(activeLead || {}),
+    conversationId: selectedConversation?.id || null,
     name: activeLead?.name || activeLead?.n || activeLeadName,
     phone: activeLead?.phone || activeLead?.tel || activePhone,
     district: activeLeadDistrict,

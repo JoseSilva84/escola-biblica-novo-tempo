@@ -6,6 +6,7 @@ process.env.NODE_ENV = 'test';
 const {
   anaReplyDelayMs,
   buildAnaOperationalReply,
+  dashboardRecordForConversation,
   anaDeliveryFinalReply,
   anaDeliveryQuestion,
   anaGiftOfferReply,
@@ -17,6 +18,7 @@ const {
   isNegativeReply,
   plausibleNewAddress,
   resolveConversationAiReplySetting,
+  serializeWhatsAppLead,
   summarizeAnaDelivery
 } = await import('./server.js');
 
@@ -198,4 +200,45 @@ test('não reinicia a pergunta sobre o material depois que a entrega já foi con
   assert.match(reply.message, /^Amém, Antônio!/i);
   assert.doesNotMatch(reply.message, /chegou a receber|receber o material/i);
   assert.doesNotMatch(reply.message, /\?/);
+});
+
+test('carrega dados completos do lead mesmo quando a conversa tem o nono dígito', () => {
+  const dashboardRecord = {
+    id: 3806278,
+    n: 'Marilene santos',
+    tel: '+55(11)91018504',
+    em: 'marinaguiicorreia@gmail.com',
+    d: 'JD. SILVIANIA',
+    addr: 'Rua Clemente José da Silva, 7 - Jardim Roseli - Carapicuíba - SP',
+    a: 40,
+    birthDate: '14/07/1986',
+    g: 'F',
+    r: 'Assembléia de Deus',
+    materialName: 'Descobrindo Tesouros - Rodrigo Silva',
+    tm: 'Impresso',
+    m: 1
+  };
+  const index = new Map([['phone8:91018504', dashboardRecord]]);
+  const databaseLead = {
+    id: 'lead-marilene',
+    name: 'Marilene santos',
+    phone: '5511991018504',
+    district: { name: 'JD. SILVIANIA' },
+    _count: { whatsAppMessages: 7 }
+  };
+
+  const matchedRecord = dashboardRecordForConversation(index, {
+    phone: databaseLead.phone,
+    lead: databaseLead
+  });
+  const details = serializeWhatsAppLead(databaseLead, matchedRecord);
+
+  assert.equal(matchedRecord, dashboardRecord);
+  assert.equal(details.email, 'marinaguiicorreia@gmail.com');
+  assert.equal(details.address, dashboardRecord.addr);
+  assert.equal(details.gender, 'F');
+  assert.equal(details.age, 40);
+  assert.equal(details.birthDate, '14/07/1986');
+  assert.equal(details.religion, 'Assembléia de Deus');
+  assert.equal(details.materialName, 'Descobrindo Tesouros - Rodrigo Silva');
 });
