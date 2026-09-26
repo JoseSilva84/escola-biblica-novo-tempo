@@ -2826,6 +2826,22 @@ function anaNameSuffix(name) {
   return name ? `, ${name}` : '';
 }
 
+function isAnaClosingAcknowledgement(value) {
+  const text = normalizedIntentName(value)
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text || text.length > 100 || text.includes('?')) return false;
+  return /^(amem|amen|assim seja|obrigad[oa]|muito obrigad[oa]|deus abencoe|deus te abencoe|deus abencoe voces|gloria a deus|ok|certo|ta certo|esta certo|tudo bem|ta bom|combinado|beleza)(?:[\s!.]*)$/i.test(text);
+}
+
+function anaCompletedFlowReply(name, inboundText = '') {
+  if (/\b(amem|amen|assim seja|gloria a deus)\b/i.test(normalizedIntentName(inboundText))) {
+    return `Amém${anaNameSuffix(name)}! Deus abençoe você e sua família. 🙏`;
+  }
+  return `Agradeço pelo retorno${anaNameSuffix(name)}. Sua confirmação já está registrada. Deus abençoe você e sua família. 🙏`;
+}
+
 function detectAnaReplyIntent(messageText) {
   const text = String(messageText || '').toLowerCase();
   if (isGiftVisitCancellation(text)) return 'visit_cancellation';
@@ -3052,6 +3068,13 @@ async function callAnaModel({ conversation, inboundMessage, guideText, config })
 function validateAnaReply(message, { conversation, inboundMessage }) {
   let clean = String(message || '').replace(/\r/g, '').trim();
   const fallback = buildAnaFallbackReply({ conversation, inboundMessage });
+  const delivery = summarizeAnaDelivery(conversation);
+  if (delivery.deliveryConfirmed && !delivery.cancelled && isAnaClosingAcknowledgement(inboundMessage?.body)) {
+    return anaCompletedFlowReply(
+      leadFirstName(conversation?.leadName || conversation?.lead?.name),
+      inboundMessage?.body
+    );
+  }
   if (!clean) return fallback;
   clean = clean.replace(/\*\*/g, '').replace(/^\s*Ana:\s*/i, '').trim();
   if (clean.length > 700) clean = fallback;
@@ -3276,6 +3299,16 @@ async function buildAnaOperationalReply({ conversation, inboundMessage }) {
     return {
       message: `${firstName ? `${firstName}, ` : ''}obrigada por confiar isso a mim. Sua segurança é o mais importante. Vou sinalizar agora para uma pessoa da equipe acompanhar você com cuidado. Se houver risco imediato, procure o serviço de emergência da sua região ou alguém de confiança que possa ficar com você.`,
       reason: 'human-safety'
+    };
+  }
+
+  const summarizedDelivery = summarizeAnaDelivery(conversation);
+  if (summarizedDelivery.deliveryConfirmed
+    && !summarizedDelivery.cancelled
+    && isAnaClosingAcknowledgement(inboundText)) {
+    return {
+      message: anaCompletedFlowReply(firstName, inboundText),
+      reason: 'delivery-completed-acknowledgement'
     };
   }
 
@@ -3571,6 +3604,9 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
   }
   if (intent === 'human') {
     return `${anaNameText(name)}obrigada por me contar. Esse assunto merece uma atenção mais cuidadosa, então vou deixar registrado para alguém da equipe Novo Tempo acompanhar com carinho.`;
+  }
+  if (alreadyConfirmedDelivery && isAnaClosingAcknowledgement(inboundMessage?.body)) {
+    return anaCompletedFlowReply(name, inboundMessage?.body);
   }
   if (!alreadyOfferedGift) {
     const introduction = intent === 'not_received'
@@ -6809,12 +6845,14 @@ if (process.env.NODE_ENV !== 'test') {
 
 export {
   anaReplyDelayMs,
+  buildAnaOperationalReply,
   anaDeliveryQuestion,
   anaDeliveryFinalReply,
   anaGiftOfferReply,
   confirmsRegisteredAddress,
   enforceActiveAnaCampaignDate,
   isAffirmativeReply,
+  isAnaClosingAcknowledgement,
   isGiftVisitCancellation,
   isNegativeReply,
   plausibleNewAddress,

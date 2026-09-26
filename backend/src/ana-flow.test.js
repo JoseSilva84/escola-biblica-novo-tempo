@@ -5,12 +5,14 @@ process.env.NODE_ENV = 'test';
 
 const {
   anaReplyDelayMs,
+  buildAnaOperationalReply,
   anaDeliveryFinalReply,
   anaDeliveryQuestion,
   anaGiftOfferReply,
   confirmsRegisteredAddress,
   enforceActiveAnaCampaignDate,
   isAffirmativeReply,
+  isAnaClosingAcknowledgement,
   isGiftVisitCancellation,
   isNegativeReply,
   plausibleNewAddress,
@@ -132,4 +134,68 @@ test('prioriza o modo persistente da conversa sem apagar o controle histórico',
   assert.equal(resolveConversationAiReplySetting({ aiReplyEnabled: false, messages }), false);
   assert.equal(resolveConversationAiReplySetting({ aiReplyEnabled: null, messages }), true);
   assert.equal(resolveConversationAiReplySetting({ messages: [] }), null);
+});
+
+test('não reinicia a pergunta sobre o material depois que a entrega já foi confirmada', async () => {
+  const inboundMessage = {
+    id: 'inbound-amen',
+    direction: 'INBOUND',
+    body: 'Amém',
+    createdAt: new Date('2026-09-26T09:58:18Z')
+  };
+  const conversation = {
+    leadName: 'Antônio Carlos bispo perassim',
+    messages: [
+      {
+        id: 'outbound-material',
+        direction: 'OUTBOUND',
+        body: 'Você chegou a receber o material da Escola Bíblica Novo Tempo?',
+        createdAt: new Date('2026-09-25T22:29:40Z')
+      },
+      {
+        id: 'inbound-not-received',
+        direction: 'INBOUND',
+        body: 'Não chegou',
+        createdAt: new Date('2026-09-25T22:30:00Z')
+      },
+      {
+        id: 'outbound-gift',
+        direction: 'OUTBOUND',
+        body: 'A partir de 3 de outubro de 2026, um representante poderá entregar um brinde especial, um material de estudo. Você gostaria de recebê-lo?',
+        createdAt: new Date('2026-09-26T09:56:45Z')
+      },
+      {
+        id: 'inbound-yes',
+        direction: 'INBOUND',
+        body: 'Sim',
+        createdAt: new Date('2026-09-26T09:57:05Z')
+      },
+      {
+        id: 'outbound-address',
+        direction: 'OUTBOUND',
+        body: 'O endereço para a entrega é o mesmo que está cadastrado na Novo Tempo ou você deseja informar outro?',
+        createdAt: new Date('2026-09-26T09:57:16Z')
+      },
+      {
+        id: 'inbound-same-address',
+        direction: 'INBOUND',
+        body: 'É o mesmo',
+        createdAt: new Date('2026-09-26T09:57:46Z')
+      },
+      {
+        id: 'outbound-confirmation',
+        direction: 'OUTBOUND',
+        body: anaDeliveryFinalReply('Antônio'),
+        createdAt: new Date('2026-09-26T09:58:00Z')
+      },
+      inboundMessage
+    ]
+  };
+
+  assert.equal(isAnaClosingAcknowledgement('Amém'), true);
+  const reply = await buildAnaOperationalReply({ conversation, inboundMessage });
+  assert.equal(reply.reason, 'delivery-completed-acknowledgement');
+  assert.match(reply.message, /^Amém, Antônio!/i);
+  assert.doesNotMatch(reply.message, /chegou a receber|receber o material/i);
+  assert.doesNotMatch(reply.message, /\?/);
 });
