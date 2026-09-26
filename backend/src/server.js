@@ -1725,6 +1725,9 @@ const whatsappLeadSelect = {
   externalId: true,
   name: true,
   phone: true,
+  email: true,
+  gender: true,
+  age: true,
   address: true,
   newAddress: true,
   priority: true,
@@ -1748,7 +1751,35 @@ const whatsappLeadSelect = {
   }
 };
 
-function serializeWhatsAppLead(lead) {
+let dashboardLeadIndexCache = { records: null, index: null };
+function dashboardLeadIndex() {
+  const records = getDashboardData()?.records || [];
+  if (dashboardLeadIndexCache.records === records && dashboardLeadIndexCache.index) {
+    return dashboardLeadIndexCache.index;
+  }
+  const index = new Map(records.map((record) => [String(record.id), record]));
+  for (const record of records) {
+    const nameKey = normalizedIntentName(record.n);
+    const districtKey = normalizedIntentName(record.d);
+    if (nameKey) {
+      const fullNameKey = `name:${nameKey}:${districtKey}`;
+      const existingByName = index.get(fullNameKey);
+      if (!index.has(fullNameKey)) index.set(fullNameKey, record);
+      else if (existingByName?.id !== record.id) index.set(fullNameKey, null);
+    }
+    for (const phone of normalizedPhonesFromValue(record.tel)) {
+      index.set(`phone:${phone}`, record);
+      const suffixKey = `phone8:${phone.slice(-8)}`;
+      const existing = index.get(suffixKey);
+      if (!index.has(suffixKey)) index.set(suffixKey, record);
+      else if (existing?.id !== record.id) index.set(suffixKey, null);
+    }
+  }
+  dashboardLeadIndexCache = { records, index };
+  return index;
+}
+
+function serializeWhatsAppLead(lead, dashboardRecord = null) {
   const phone = normalizedPhonesFromValue(lead?.phone)[0] || '';
   return {
     id: lead?.id || null,
@@ -1756,13 +1787,26 @@ function serializeWhatsAppLead(lead) {
     name: lead?.name || null,
     phone,
     storedPhone: lead?.phone || null,
-    address: lead?.address || null,
+    address: lead?.address || dashboardRecord?.addr || dashboardRecord?.end || null,
     newAddress: lead?.newAddress || null,
-    district: lead?.district?.name || null,
-    priority: lead?.priority || null,
-    score: lead?.score == null ? null : Number(lead.score),
-    isVip: Boolean(lead?.isVip),
-    hasActiveStudy: Boolean(lead?.hasActiveStudy),
+    district: lead?.district?.name || dashboardRecord?.d || null,
+    priority: lead?.priority || (dashboardRecord?.p ? String(dashboardRecord.p).toUpperCase() : null),
+    score: lead?.score == null ? (dashboardRecord?.s ?? null) : Number(lead.score),
+    isVip: Boolean(lead?.isVip || dashboardRecord?.v),
+    hasActiveStudy: Boolean(lead?.hasActiveStudy || dashboardRecord?.e),
+    email: lead?.email || dashboardRecord?.em || null,
+    gender: lead?.gender || dashboardRecord?.g || null,
+    age: lead?.age ?? dashboardRecord?.a ?? null,
+    birthDate: dashboardRecord?.birthDate || null,
+    religion: dashboardRecord?.r || null,
+    material: dashboardRecord?.materialName || dashboardRecord?.tm || null,
+    materialName: dashboardRecord?.materialName || null,
+    materialCount: Number(dashboardRecord?.m || 0),
+    description: dashboardRecord?.desc || null,
+    similarity: Number(dashboardRecord?.sim || 0),
+    band: dashboardRecord?.faixa || null,
+    daysSinceLastContact: dashboardRecord?.c ?? null,
+    lastContactDate: dashboardRecord?.lastContactDate || null,
     whatsappContactCount: Number(lead?._count?.whatsAppMessages || 0),
     association: lead?.association || null
   };
@@ -2243,6 +2287,12 @@ function dashboardRecordForConversation(dashboardRecordsById, conversation = {})
     if (byPhone) return byPhone;
     const bySuffix = dashboardRecordsById.get(`phone8:${phone.slice(-8)}`);
     if (bySuffix) return bySuffix;
+  }
+  const nameKey = normalizedIntentName(conversation.lead?.name || conversation.leadName);
+  const districtKey = normalizedIntentName(conversation.lead?.district?.name || conversation.district);
+  if (nameKey) {
+    const byName = dashboardRecordsById.get(`name:${nameKey}:${districtKey}`);
+    if (byName) return byName;
   }
   return null;
 }
@@ -5147,9 +5197,13 @@ app.get('/api/whatsapp/leads', requireAuth, async (request, response) => {
         orderBy: { name: 'asc' }
       })
     ]);
+    const fullLeadIndex = dashboardLeadIndex();
 
     response.json({
-      leads: leads.map(serializeWhatsAppLead).filter((lead) => lead.phone),
+      leads: leads.map((lead) => serializeWhatsAppLead(
+        lead,
+        dashboardRecordForConversation(fullLeadIndex, { externalLeadId: lead.externalId, phone: lead.phone, lead })
+      )).filter((lead) => lead.phone),
       districts: districts.map((item) => item.name),
       limit,
       association: associationSlug
@@ -5453,11 +5507,15 @@ app.get('/api/whatsapp/conversations', requireAuth, async (request, response) =>
     })
     : [];
 
+  const fullLeadIndex = dashboardLeadIndex();
   const enrichedConversations = conversations.map((conversation) => {
     const lead = conversation.lead
       || candidates.find((candidate) => storedPhoneMatches(candidate.phone, conversation.phone))
       || null;
-    const serializedLead = lead ? serializeWhatsAppLead(lead) : null;
+    const serializedLead = lead ? serializeWhatsAppLead(
+      lead,
+      dashboardRecordForConversation(fullLeadIndex, { ...conversation, lead })
+    ) : null;
     const { lead: _lead, ...conversationData } = conversation;
     const savedAiReplySetting = resolveConversationAiReplySetting(conversationData);
     return {
@@ -5654,6 +5712,232 @@ app.post('/api/whatsapp/send-media', requireAuth, async (request, response) => {
   }
 });
 
+function validBroadcastRecipients(values, limit = 50_000) {
+  const unique = new Map();
+  for (const value of Array.isArray(values) ? values : []) {
+    const recipient = value && typeof value === 'object' ? value : { phone: value };
+    const phone = normalizePhone(recipient.phone || recipient.tel);
+    if (!phone || unique.has(phone)) continue;
+    unique.set(phone, { ...recipient, phone });
+    if (unique.size >= limit) break;
+  }
+  return Array.from(unique.values());
+}
+
+async function dispatchScheduledBroadcast(broadcast) {
+  const recipients = broadcast.recipients || [];
+  const configuredDelay = Number(process.env.WAHA_BROADCAST_DELAY_MS);
+  const broadcastDelayMs = Number.isFinite(configuredDelay)
+    ? Math.min(Math.max(configuredDelay, 250), 10000)
+    : 1200;
+  let sent = 0;
+  let failed = 0;
+  let lastError = null;
+
+  for (let index = 0; index < recipients.length; index += 1) {
+    const recipient = recipients[index];
+    const personalizedMessage = recipient.personalizedMessage
+      || renderWhatsAppTemplate(broadcast.messageTemplate, recipient);
+    try {
+      const result = await sendWhatsAppTextMessage({
+        phone: recipient.phone,
+        message: personalizedMessage,
+        leadId: recipient.leadId || recipient.externalLeadId || null,
+        templateId: null
+      });
+      const saved = await recordWhatsAppMessage({
+        phone: result.phone,
+        body: personalizedMessage,
+        direction: 'OUTBOUND',
+        senderType: 'AUTOMATION',
+        senderName: broadcast.createdByName || 'Agendamento do sistema',
+        leadId: recipient.leadId || recipient.externalLeadId || null,
+        leadName: recipient.leadName || null,
+        district: recipient.district || null,
+        provider: result.provider,
+        providerStatus: result.deliveryStatus,
+        providerResponse: result.providerResponse,
+        providerMessageId: providerMessageId(result.providerResponse),
+        metadata: {
+          batch: true,
+          scheduled: true,
+          scheduledAt: broadcast.scheduledAt,
+          broadcastId: broadcast.broadcastKey,
+          listName: broadcast.name,
+          recipientTotal: broadcast.recipientTotal,
+          templateMessage: broadcast.messageTemplate,
+          material: recipient.material || null,
+          theme: recipient.material || null,
+          ...(broadcast.aiReplyEnabled === null ? {} : { aiReplyEnabled: broadcast.aiReplyEnabled }),
+          attempts: result.attempts || []
+        }
+      }).catch((error) => {
+        console.warn('[whatsapp:scheduled-broadcast:message-tracking:error]', error.message);
+        return null;
+      });
+      await prisma.whatsAppBroadcastRecipient.update({
+        where: { id: recipient.id },
+        data: {
+          status: 'ENVIADO',
+          deliveryStatus: result.deliveryStatus,
+          conversationId: saved?.conversation?.id || null,
+          messageId: saved?.message?.id || null,
+          sentAt: new Date(),
+          error: null
+        }
+      });
+      sent += 1;
+    } catch (error) {
+      lastError = error.message || 'Falha no envio agendado';
+      failed += 1;
+      const saved = await recordWhatsAppMessage({
+        phone: recipient.phone,
+        body: personalizedMessage,
+        direction: 'OUTBOUND',
+        senderType: 'AUTOMATION',
+        senderName: broadcast.createdByName || 'Agendamento do sistema',
+        leadId: recipient.leadId || recipient.externalLeadId || null,
+        leadName: recipient.leadName || null,
+        district: recipient.district || null,
+        provider: 'waha-gows',
+        providerStatus: error.deliveryStatus || 'FAILED',
+        providerResponse: error.providerResponse || null,
+        metadata: {
+          failure: true,
+          batch: true,
+          scheduled: true,
+          scheduledAt: broadcast.scheduledAt,
+          broadcastId: broadcast.broadcastKey,
+          listName: broadcast.name,
+          recipientTotal: broadcast.recipientTotal,
+          material: recipient.material || null
+        }
+      }).catch(() => null);
+      await prisma.whatsAppBroadcastRecipient.update({
+        where: { id: recipient.id },
+        data: {
+          status: 'FALHA',
+          deliveryStatus: error.deliveryStatus || 'FAILED',
+          conversationId: saved?.conversation?.id || null,
+          messageId: saved?.message?.id || null,
+          error: lastError
+        }
+      }).catch(() => null);
+    }
+
+    if (index < recipients.length - 1) {
+      await sleep(broadcastDelayMs + Math.floor(Math.random() * 350));
+    }
+  }
+
+  await prisma.whatsAppBroadcast.update({
+    where: { id: broadcast.id },
+    data: {
+      status: failed ? (sent ? 'CONCLUIDA_COM_FALHAS' : 'FALHA') : 'CONCLUIDA',
+      completedAt: new Date(),
+      lastError
+    }
+  });
+  return { sent, failed };
+}
+
+let scheduledBroadcastWorkerRunning = false;
+async function processScheduledBroadcasts() {
+  if (scheduledBroadcastWorkerRunning) return;
+  scheduledBroadcastWorkerRunning = true;
+  try {
+    const staleBefore = new Date(Date.now() - (30 * 60 * 1000));
+    await prisma.whatsAppBroadcast.updateMany({
+      where: { status: 'PROCESSANDO', scheduledAt: { not: null }, startedAt: { lt: staleBefore } },
+      data: { status: 'AGENDADA', startedAt: null }
+    });
+    const due = await prisma.whatsAppBroadcast.findMany({
+      where: { status: 'AGENDADA', scheduledAt: { lte: new Date() } },
+      orderBy: { scheduledAt: 'asc' },
+      take: 3
+    });
+    for (const item of due) {
+      const claimed = await prisma.whatsAppBroadcast.updateMany({
+        where: { id: item.id, status: 'AGENDADA' },
+        data: { status: 'PROCESSANDO', startedAt: new Date(), lastError: null }
+      });
+      if (!claimed.count) continue;
+      const broadcast = await prisma.whatsAppBroadcast.findUnique({
+        where: { id: item.id },
+        include: { recipients: { where: { status: 'PENDENTE' }, orderBy: { createdAt: 'asc' } } }
+      });
+      if (broadcast) await dispatchScheduledBroadcast(broadcast);
+    }
+  } catch (error) {
+    console.error('[whatsapp:scheduled-broadcast:worker-error]', error.message);
+  } finally {
+    scheduledBroadcastWorkerRunning = false;
+  }
+}
+
+app.post('/api/whatsapp/schedule-broadcast', requireAuth, async (request, response) => {
+  const recipients = validBroadcastRecipients(request.body?.recipients);
+  const message = String(request.body?.message || '').trim();
+  const listName = String(request.body?.listName || '').trim().slice(0, 120);
+  const scheduledAt = new Date(request.body?.scheduledAt);
+  const aiReplyEnabled = optionalBoolean(request.body?.aiReplyEnabled);
+  if (!recipients.length) return response.status(400).json({ ok: false, message: 'Informe ao menos um destinatário válido.' });
+  if (!listName) return response.status(400).json({ ok: false, message: 'Informe o nome da transmissão.' });
+  if (message.length < 2) return response.status(400).json({ ok: false, message: 'Informe a mensagem da transmissão.' });
+  if (Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {
+    return response.status(400).json({ ok: false, message: 'Escolha uma data e um horário futuros.' });
+  }
+
+  try {
+    const broadcastKey = randomUUID();
+    const broadcastDbId = randomUUID();
+    const recipientRows = recipients.map((recipient) => ({
+      broadcastId: broadcastDbId,
+      leadId: typeof recipient.leadId === 'string' ? recipient.leadId : null,
+      externalLeadId: Number.isFinite(Number(recipient.externalLeadId))
+        ? Number(recipient.externalLeadId)
+        : (Number.isFinite(Number(recipient.id)) ? Number(recipient.id) : null),
+      leadName: recipient.name || null,
+      phone: recipient.phone,
+      district: recipient.district || null,
+      material: recipient.material || recipient.theme || null,
+      personalizedMessage: renderWhatsAppTemplate(message, recipient),
+      status: 'PENDENTE'
+    }));
+    const operations = [prisma.whatsAppBroadcast.create({
+      data: {
+        id: broadcastDbId,
+        broadcastKey,
+        name: listName,
+        messageTemplate: message,
+        recipientTotal: recipients.length,
+        createdById: request.user?.sub || null,
+        createdByName: request.user?.email || request.user?.name || request.user?.sub || 'Sistema',
+        status: 'AGENDADA',
+        scheduledAt,
+        aiReplyEnabled
+      }
+    })];
+    for (let index = 0; index < recipientRows.length; index += 500) {
+      operations.push(prisma.whatsAppBroadcastRecipient.createMany({
+        data: recipientRows.slice(index, index + 500),
+        skipDuplicates: true
+      }));
+    }
+    const [broadcast] = await prisma.$transaction(operations);
+    response.status(201).json({
+      ok: true,
+      broadcastId: broadcast.broadcastKey,
+      scheduledAt: broadcast.scheduledAt,
+      recipientTotal: broadcast.recipientTotal,
+      status: broadcast.status
+    });
+  } catch (error) {
+    console.error('[whatsapp:schedule-broadcast:error]', error.message);
+    response.status(500).json({ ok: false, message: 'Não foi possível salvar o agendamento.' });
+  }
+});
+
 app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
   const recipients = Array.isArray(request.body?.recipients) ? request.body.recipients.slice(0, 50) : [];
   const message = String(request.body?.message || '').trim();
@@ -5690,12 +5974,19 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         messageTemplate: message,
         recipientTotal,
         createdById: request.user?.sub || null,
-        createdByName: request.user?.email || request.user?.name || request.user?.sub || 'Sistema'
+        createdByName: request.user?.email || request.user?.name || request.user?.sub || 'Sistema',
+        status: 'PROCESSANDO',
+        startedAt: new Date(),
+        aiReplyEnabled
       },
       update: {
         name: listName,
         messageTemplate: message,
-        recipientTotal: Math.max(recipientTotal, recipients.length)
+        recipientTotal: Math.max(recipientTotal, recipients.length),
+        status: 'PROCESSANDO',
+        startedAt: new Date(),
+        aiReplyEnabled,
+        lastError: null
       }
     });
   } catch (error) {
@@ -5868,6 +6159,20 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
       : `${sent} mensagem(ns) foram aceitas pelo WAHA.`
     : `Nenhuma mensagem foi aceita pelo WAHA.${firstFailure?.message ? ` Motivo: ${firstFailure.message}` : ''}`;
 
+  if (broadcast) {
+    const savedRecipientCount = await prisma.whatsAppBroadcastRecipient.count({ where: { broadcastId: broadcast.id } }).catch(() => 0);
+    if (savedRecipientCount >= recipientTotal) {
+      await prisma.whatsAppBroadcast.update({
+        where: { id: broadcast.id },
+        data: {
+          status: failed ? (sent ? 'CONCLUIDA_COM_FALHAS' : 'FALHA') : 'CONCLUIDA',
+          completedAt: new Date(),
+          lastError: firstFailure?.message || null
+        }
+      }).catch(() => null);
+    }
+  }
+
   response.status(sent ? 200 : 502).json({
     ok: sent > 0,
     message: messageText,
@@ -6035,12 +6340,14 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
             name: broadcast.name,
             message: broadcast.messageTemplate,
             createdAt: broadcast.createdAt,
+            scheduledAt: broadcast.scheduledAt,
+            status: broadcast.status,
             targeted: Math.max(Number(broadcast.recipientTotal) || 0, recipients.length),
             sent: recipients.filter((recipient) => recipient.sent).length,
             delivered: recipients.filter((recipient) => recipient.delivered).length,
             responded: recipients.filter((recipient) => recipient.repliedAt).length,
             failed: recipients.filter((recipient) => recipient.status === 'FALHA').length,
-            lastError: recipients.find((recipient) => recipient.status === 'FALHA' && recipient.error)?.error || null,
+            lastError: broadcast.lastError || recipients.find((recipient) => recipient.status === 'FALHA' && recipient.error)?.error || null,
             recipients
           };
         })
@@ -6488,6 +6795,15 @@ app.post('/api/webhooks/waha/whatsapp', async (request, response) => {
 if (process.env.NODE_ENV !== 'test') {
   app.listen(port, '0.0.0.0', () => {
     console.log(`Amigos NT backend running on port ${port}`);
+  });
+  const scheduledBroadcastTimer = setInterval(() => {
+    processScheduledBroadcasts().catch((error) => {
+      console.error('[whatsapp:scheduled-broadcast:timer-error]', error.message);
+    });
+  }, 20_000);
+  scheduledBroadcastTimer.unref?.();
+  processScheduledBroadcasts().catch((error) => {
+    console.error('[whatsapp:scheduled-broadcast:startup-error]', error.message);
   });
 }
 

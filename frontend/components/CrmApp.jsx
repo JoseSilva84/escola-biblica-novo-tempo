@@ -27,6 +27,7 @@ import {
   ChevronRight,
   ChevronUp,
   Church,
+  Clock3,
   ClipboardList,
   Crown,
   Database,
@@ -183,13 +184,25 @@ function dashboardLeadToWhatsAppLead(lead) {
     name: lead?.n || `Contato ${phone.slice(-4)}`,
     phone,
     district: lead?.d || null,
-    address: lead?.address || lead?.endereco || lead?.end || null,
+    address: lead?.address || lead?.endereco || lead?.addr || lead?.end || null,
+    newAddress: lead?.newAddress || null,
+    email: lead?.em || null,
+    gender: lead?.g || null,
+    age: lead?.a ?? null,
+    religion: lead?.r || null,
     material: lead?.materialName || lead?.materialPrincipal || lead?.material || lead?.tm || null,
+    materialName: lead?.materialName || null,
+    materialCount: Number(lead?.m || 0),
+    description: lead?.desc || null,
     priority,
     score: lead?.s ?? null,
     isVip: Boolean(lead?.v),
     hasActiveStudy: Boolean(lead?.e),
     birthDate: lead?.birthDate || null,
+    similarity: Number(lead?.sim || 0),
+    band: lead?.faixa || null,
+    daysSinceLastContact: lead?.c ?? null,
+    lastContactDate: lead?.lastContactDate || null,
     whatsappContactCount: Number(lead?.whatsappContactCount || 0),
     source: 'dashboard'
   };
@@ -206,6 +219,22 @@ function whatsappLeadToDetailRecord(lead, records = []) {
   if (dashboardLead) {
     return {
       ...dashboardLead,
+      n: lead.name || dashboardLead.n,
+      tel: phone || dashboardLead.tel,
+      em: lead.email || dashboardLead.em || '',
+      d: lead.district || dashboardLead.d,
+      end: lead.newAddress || lead.address || dashboardLead.end || '',
+      addr: lead.newAddress || lead.address || dashboardLead.addr || '',
+      a: lead.age ?? dashboardLead.a,
+      birthDate: lead.birthDate || dashboardLead.birthDate,
+      g: lead.gender || dashboardLead.g,
+      r: lead.religion || dashboardLead.r,
+      v: Boolean(lead.isVip ?? dashboardLead.v),
+      e: Boolean(lead.hasActiveStudy ?? dashboardLead.e),
+      tm: lead.material || dashboardLead.tm,
+      materialName: lead.materialName || lead.material || dashboardLead.materialName,
+      m: Number(lead.materialCount ?? dashboardLead.m ?? 0),
+      desc: lead.description || dashboardLead.desc,
       whatsappContactCount: Number(lead.whatsappContactCount ?? dashboardLead.whatsappContactCount ?? 0),
       whatsappMessages: lead.whatsappMessages || dashboardLead.whatsappMessages || []
     };
@@ -7615,13 +7644,23 @@ function WhatsAppNewContactForm({ districts = [], initialContact, onSubmit, savi
 
 function RecencyMultiSelect({ onChange, options = [], selected = [] }) {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
   const choices = options.filter(([value]) => value !== 'all');
   const selectedTotal = choices
     .filter(([value]) => selected.includes(value))
     .reduce((sum, [, label]) => sum + Number(String(label).match(/\(([\d.]+)\)$/)?.[1]?.replace(/\./g, '') || 0), 0);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeWhenClickingOutside = (event) => {
+      if (!containerRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeWhenClickingOutside);
+    return () => document.removeEventListener('pointerdown', closeWhenClickingOutside);
+  }, [open]);
+
   return (
-    <div className="grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500 lg:col-span-4">
+    <div className="grid min-w-0 gap-1 text-[10px] font-black uppercase tracking-wide text-slate-500 lg:col-span-4" ref={containerRef}>
       <span>Tempo</span>
       <button
         aria-expanded={open}
@@ -7868,21 +7907,6 @@ function WhatsAppLeadPickerModal({
         )}
 
         {!newContactMode ? <div className="whatsapp-picker-results min-h-0 flex-1 overflow-y-auto bg-slate-100 p-5">
-          <div className="whatsapp-picker-summary mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-white p-3 shadow-sm">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">Lista de transmissão</span>
-                <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{selectedLeads.length} selecionados</span>
-              </div>
-              <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-                {selectedLeads.length ? `${selectedLeads.slice(0, 4).map((lead) => lead.name).join(', ')}${selectedLeads.length > 4 ? ` e mais ${selectedLeads.length - 4}` : ''}` : 'A lista acompanha os filtros escolhidos.'}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {selectedLeads.length ? <button className="h-9 rounded-lg px-3 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-950" onClick={onClearSelected} type="button">Limpar</button> : null}
-              <button className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#00a884] px-4 text-xs font-black text-white shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={!selectedLeads.length} onClick={onOpenBroadcast} type="button"><Send size={15} /> Criar transmissão</button>
-            </div>
-          </div>
           <div className="mb-3 flex items-center justify-between gap-3">
             <span>
               <span className="block text-xs font-black uppercase tracking-[0.16em] text-slate-500">Contatos encontrados</span>
@@ -7973,12 +7997,32 @@ function WhatsAppBroadcastModal({
   onListNameChange,
   onMessageChange,
   onRemove,
+  onSchedule,
   onSubmit,
   recipients = [],
   sending = false
 }) {
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
   const previewLead = recipients[0] || null;
   const previewMessage = renderPreviewTemplate(message || defaultBroadcastMessage, previewLead || {});
+  const minimumScheduleDate = new Date().toLocaleDateString('en-CA');
+
+  function confirmSchedule(event) {
+    event.preventDefault();
+    const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`);
+    if (!scheduleDate || !scheduleTime || Number.isNaN(scheduledAt.getTime())) {
+      toast.error('Informe a data e o horário do envio.');
+      return;
+    }
+    if (scheduledAt.getTime() <= Date.now()) {
+      toast.error('Escolha um horário futuro para o envio.');
+      return;
+    }
+    onSchedule(scheduledAt.toISOString());
+  }
+
   return createPortal(
     <div className="whatsapp-broadcast-modal-backdrop fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-broadcast-title">
       <form className="whatsapp-broadcast-modal flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#f0f2f5] shadow-[0_34px_110px_rgba(0,0,0,0.6)]" onSubmit={onSubmit}>
@@ -8045,9 +8089,35 @@ function WhatsAppBroadcastModal({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white p-4">
           <button className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50" onClick={onClose} type="button">Cancelar</button>
+          <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#00a884] bg-white px-5 text-sm font-black text-[#008069] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !recipients.length || !listName.trim() || !message.trim()} onClick={() => setScheduleOpen(true)} type="button"><Clock3 size={18} /> Enviar agendado</button>
           <button className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !recipients.length || !listName.trim() || !message.trim()} type="submit"><Send size={18} /> {sending ? 'Enviando...' : `Enviar para ${recipients.length}`}</button>
         </div>
       </form>
+      {scheduleOpen ? (
+        <div className="fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="broadcast-schedule-title">
+          <form className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-white shadow-[0_30px_90px_rgba(0,0,0,0.55)]" onSubmit={confirmSchedule}>
+            <div className="bg-[linear-gradient(135deg,#075e54,#00a884)] p-5 text-white">
+              <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">Envio automático</span>
+              <h3 className="mt-1 text-2xl font-black" id="broadcast-schedule-title">Agendar transmissão</h3>
+              <p className="mt-1 text-sm font-semibold text-emerald-50">O servidor enviará a mensagem para {recipients.length} contatos mesmo que esta tela esteja fechada.</p>
+            </div>
+            <div className="grid gap-4 p-5 sm:grid-cols-2">
+              <label className="grid gap-1.5">
+                <span className="text-xs font-black uppercase tracking-wide text-slate-600">Data</span>
+                <input className="h-12 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" min={minimumScheduleDate} onChange={(event) => setScheduleDate(event.target.value)} required type="date" value={scheduleDate} />
+              </label>
+              <label className="grid gap-1.5">
+                <span className="text-xs font-black uppercase tracking-wide text-slate-600">Horário</span>
+                <input className="h-12 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => setScheduleTime(event.target.value)} required type="time" value={scheduleTime} />
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-4">
+              <button className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700" onClick={() => setScheduleOpen(false)} type="button">Voltar</button>
+              <button className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-sm font-black text-white shadow-lg shadow-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !scheduleDate || !scheduleTime} type="submit"><Clock3 size={18} /> {sending ? 'Agendando...' : 'Agendar envio'}</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>,
     document.body
   );
@@ -8098,6 +8168,9 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
             const formattedDate = transmission.createdAt
               ? new Date(transmission.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
               : 'Data não informada';
+            const scheduledLabel = transmission.scheduledAt
+              ? new Date(transmission.scheduledAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+              : null;
             return (
               <article className="broadcast-analytics-card overflow-hidden rounded-2xl border border-[#d1d7db] bg-white shadow-[0_16px_42px_rgba(11,20,26,0.10)]" key={transmission.id}>
                 <div className="broadcast-analytics-header border-b border-[#e9edef] bg-[linear-gradient(135deg,#f7fffb,#edfdf7)] px-5 py-4">
@@ -8105,6 +8178,9 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
                     <div className="min-w-0">
                       <strong className="block truncate text-base font-black text-[#111b21]">{transmission.name}</strong>
                       <span className="mt-1 block text-xs font-bold text-[#667781]">{formattedDate}</span>
+                      {scheduledLabel && ['AGENDADA', 'PROCESSANDO'].includes(transmission.status) ? (
+                        <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-black text-amber-800"><Clock3 size={12} /> {transmission.status === 'PROCESSANDO' ? 'Enviando agora' : `Agendada para ${scheduledLabel}`}</span>
+                      ) : null}
                     </div>
                     <span className="rounded-full bg-[#075e54] px-3 py-1 text-xs font-black text-white">
                       {formatNumber(transmission.targeted || transmission.sent || 0)} destinatários
@@ -8456,7 +8532,8 @@ function ConversationsView({ records = [] }) {
       const mergedLeads = new Map();
       [...fallbackLeads, ...(payload.leads || [])].forEach((lead) => {
         const key = phoneDigits(lead.phone).slice(-10) || lead.id;
-        mergedLeads.set(key, lead);
+        const existing = mergedLeads.get(key) || {};
+        mergedLeads.set(key, { ...existing, ...lead });
       });
       setLeadDirectory(Array.from(mergedLeads.values()).slice(0, 250));
       setLeadDistricts(Array.from(new Set([...fallbackDistricts, ...(payload.districts || [])])).sort((a, b) => a.localeCompare(b)));
@@ -8551,9 +8628,10 @@ function ConversationsView({ records = [] }) {
       const recipients = broadcastSelectedLeads.map((lead) => ({
         id: lead.id,
         leadId: lead.id,
+        externalLeadId: lead.externalId || null,
         name: lead.name,
         district: lead.district || null,
-        address: lead.address || null,
+        address: lead.newAddress || lead.address || null,
         material: leadMaterial(lead),
         theme: leadMaterial(lead),
         priority: lead.priority || null,
@@ -8605,6 +8683,52 @@ function ConversationsView({ records = [] }) {
       await loadBroadcastAnalytics({ silent: true });
     } catch (error) {
       toast.error('Falha na transmissão', { description: error.message });
+    } finally {
+      setBroadcastSending(false);
+    }
+  }
+
+  async function scheduleBroadcast(scheduledAt) {
+    if (!broadcastSelectedLeads.length || !broadcastListName.trim() || !broadcastMessage.trim()) return;
+    setBroadcastSending(true);
+    try {
+      const recipients = broadcastSelectedLeads.map((lead) => ({
+        id: lead.id,
+        leadId: lead.id,
+        externalLeadId: lead.externalId || null,
+        name: lead.name,
+        district: lead.district || null,
+        address: lead.newAddress || lead.address || null,
+        material: leadMaterial(lead),
+        theme: leadMaterial(lead),
+        priority: lead.priority || null,
+        phone: phoneDigits(lead.phone)
+      }));
+      const response = await apiFetch('/api/whatsapp/schedule-broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipients,
+          message: broadcastMessage.trim(),
+          listName: broadcastListName.trim(),
+          scheduledAt,
+          aiReplyEnabled: broadcastAiReplyEnabled
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.ok === false) throw new Error(payload.message || 'Não foi possível agendar a transmissão.');
+      toast.success('Transmissão agendada', {
+        description: `O envio para ${recipients.length} contatos começará em ${new Date(payload.scheduledAt || scheduledAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.`
+      });
+      setBroadcastModalOpen(false);
+      setLeadPickerOpen(false);
+      setBroadcastSelectedLeads([]);
+      setBroadcastListName('');
+      setBroadcastMessage(defaultBroadcastMessage);
+      setBroadcastAiReplyEnabled(false);
+      await loadBroadcastAnalytics({ silent: true });
+    } catch (error) {
+      toast.error('Falha ao agendar transmissão', { description: error.message });
     } finally {
       setBroadcastSending(false);
     }
@@ -9667,6 +9791,7 @@ function ConversationsView({ records = [] }) {
           onListNameChange={setBroadcastListName}
           onMessageChange={setBroadcastMessage}
           onRemove={toggleBroadcastLead}
+          onSchedule={scheduleBroadcast}
           onSubmit={submitBroadcast}
           recipients={broadcastSelectedLeads}
           sending={broadcastSending}

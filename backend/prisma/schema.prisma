@@ -49,16 +49,16 @@ enum WhatsAppSenderType {
 }
 
 model User {
-  id             String      @id @default(cuid())
-  name           String
-  email          String      @unique
-  passwordHash   String
-  role           UserRole
-  associationId  String?
-  association    Association? @relation(fields: [associationId], references: [id])
-  visits         Visit[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id            String       @id @default(cuid())
+  name          String
+  email         String       @unique
+  passwordHash  String
+  role          UserRole
+  associationId String?
+  association   Association? @relation(fields: [associationId], references: [id])
+  visits        Visit[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 model Association {
@@ -93,48 +93,48 @@ model Church {
 }
 
 model Campaign {
-  id            String          @id @default(cuid())
+  id            String               @id @default(cuid())
   name          String
   slug          String
-  status        CampaignStatus  @default(PLANEJADA)
+  status        CampaignStatus       @default(PLANEJADA)
   associationId String
-  association   Association     @relation(fields: [associationId], references: [id])
+  association   Association          @relation(fields: [associationId], references: [id])
   leads         CampaignLead[]
   sequences     AutomationSequence[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
   @@unique([associationId, slug])
 }
 
 model Lead {
-  id             String            @id @default(cuid())
-  externalId     Int?
-  name           String
-  phone          String?
-  email          String?
-  gender         String?
-  age            Int?
-  address        String?
-  newAddress     String?
-  priority       LeadPriority?
-  score          Decimal?          @db.Decimal(5, 2)
-  isVip          Boolean           @default(false)
-  hasActiveStudy Boolean           @default(false)
-  associationId  String
-  association    Association       @relation(fields: [associationId], references: [id])
-  districtId     String?
-  district       District?         @relation(fields: [districtId], references: [id])
-  churchId       String?
-  church         Church?           @relation(fields: [churchId], references: [id])
-  campaigns      CampaignLead[]
-  interactions   LeadInteraction[]
-  whatsAppSends   WhatsAppSend[]
+  id                    String                 @id @default(cuid())
+  externalId            Int?
+  name                  String
+  phone                 String?
+  email                 String?
+  gender                String?
+  age                   Int?
+  address               String?
+  newAddress            String?
+  priority              LeadPriority?
+  score                 Decimal?               @db.Decimal(5, 2)
+  isVip                 Boolean                @default(false)
+  hasActiveStudy        Boolean                @default(false)
+  associationId         String
+  association           Association            @relation(fields: [associationId], references: [id])
+  districtId            String?
+  district              District?              @relation(fields: [districtId], references: [id])
+  churchId              String?
+  church                Church?                @relation(fields: [churchId], references: [id])
+  campaigns             CampaignLead[]
+  interactions          LeadInteraction[]
+  whatsAppSends         WhatsAppSend[]
   whatsAppConversations WhatsAppConversation[]
   whatsAppMessages      WhatsAppMessage[]
-  visits         Visit[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  visits                Visit[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   @@index([associationId, priority])
   @@index([districtId])
@@ -177,13 +177,13 @@ model CampaignLead {
 }
 
 model MessageTemplate {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   name      String
   body      String
   variables Json?
   sequences AutomationStep[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 }
 
 model AutomationSequence {
@@ -198,20 +198,20 @@ model AutomationSequence {
 }
 
 model AutomationStep {
-  id          String             @id @default(cuid())
-  sequenceId  String
-  templateId  String
-  delayHours  Int                @default(0)
-  sequence    AutomationSequence @relation(fields: [sequenceId], references: [id])
-  template    MessageTemplate    @relation(fields: [templateId], references: [id])
-  sends       WhatsAppSend[]
+  id         String             @id @default(cuid())
+  sequenceId String
+  templateId String
+  delayHours Int                @default(0)
+  sequence   AutomationSequence @relation(fields: [sequenceId], references: [id])
+  template   MessageTemplate    @relation(fields: [templateId], references: [id])
+  sends      WhatsAppSend[]
 }
 
 model WhatsAppSend {
-  id        String         @id @default(cuid())
+  id        String          @id @default(cuid())
   stepId    String?
   leadId    String
-  status    String         @default("PENDENTE")
+  status    String          @default("PENDENTE")
   provider  String?
   sentAt    DateTime?
   repliedAt DateTime?
@@ -231,27 +231,27 @@ model LeadInteraction {
 }
 
 model WhatsAppConversation {
-  id             String            @id @default(cuid())
-  phone          String            @unique
-  leadId         String?
-  externalLeadId Int?
-  leadName       String?
-  district       String?
-  status         String            @default("ABERTA")
-  aiReplyEnabled Boolean?
+  id               String            @id @default(cuid())
+  phone            String            @unique
+  leadId           String?
+  externalLeadId   Int?
+  leadName         String?
+  district         String?
+  status           String            @default("ABERTA")
+  aiReplyEnabled   Boolean?
   aiReplyUpdatedAt DateTime?
   aiReplyUpdatedBy String?
-  lead           Lead?             @relation(fields: [leadId], references: [id])
-  messages       WhatsAppMessage[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  lead             Lead?             @relation(fields: [leadId], references: [id])
+  messages         WhatsAppMessage[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([leadId])
   @@index([externalLeadId])
 }
 
 model WhatsAppMessage {
-  id                String              @id @default(cuid())
+  id                String               @id @default(cuid())
   conversationId    String
   leadId            String?
   externalLeadId    Int?
@@ -276,18 +276,25 @@ model WhatsAppMessage {
 }
 
 model WhatsAppBroadcast {
-  id             String                       @id @default(cuid())
-  broadcastKey   String                       @unique
-  name           String
+  id              String                       @id @default(cuid())
+  broadcastKey    String                       @unique
+  name            String
   messageTemplate String
-  recipientTotal Int                          @default(0)
-  createdById    String?
-  createdByName  String?
+  recipientTotal  Int                          @default(0)
+  createdById     String?
+  createdByName   String?
+  status          String                       @default("PENDENTE")
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  aiReplyEnabled  Boolean?
+  lastError       String?
   recipients      WhatsAppBroadcastRecipient[]
   createdAt       DateTime                     @default(now())
   updatedAt       DateTime                     @updatedAt
 
   @@index([createdAt])
+  @@index([status, scheduledAt])
 }
 
 model WhatsAppBroadcastRecipient {
@@ -339,7 +346,7 @@ model DatasetUploadHistory {
 }
 
 model Visit {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   leadId      String
   volunteerId String?
   happened    Boolean?
@@ -347,9 +354,9 @@ model Visit {
   accepted    String?
   materials   String[]
   notes       String?
-  lead        Lead     @relation(fields: [leadId], references: [id])
-  volunteer   User?    @relation(fields: [volunteerId], references: [id])
+  lead        Lead      @relation(fields: [leadId], references: [id])
+  volunteer   User?     @relation(fields: [volunteerId], references: [id])
   scheduledAt DateTime?
   finishedAt  DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 }
