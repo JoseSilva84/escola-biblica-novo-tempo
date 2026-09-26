@@ -91,7 +91,7 @@ const associationNavItems = [
   ['automations', 'WhatsApp', MessageCircle],
   ['reports', 'Relat\u00f3rios', PieChart]
 ];
-const defaultBroadcastMessage = 'Boa noite, {{NOME}}, tudo bem? Eu sou a Ana, assistente virtual da Novo Tempo 😊\n\nVi aqui, em nossos registros da Novo Tempo, que você pediu um material sobre {{TEMA}} pela Escola Bíblica Novo Tempo.\n\nQuero só confirmar com você: esse material chegou até aí?';
+const defaultBroadcastMessage = 'Boa noite, {{PRIMEIRO_NOME}}! Tudo bem? Eu sou a Ana, agente da Novo Tempo 😊\n\nVi aqui, em nossos registros da Novo Tempo, que você pediu um material sobre {{TEMA}} pela Escola Bíblica Novo Tempo.\n\nQuero só confirmar com você: esse material chegou até aí?';
 const crmPriorityLabels = {
   Hot: 'Quente',
   Warm: 'Potencial',
