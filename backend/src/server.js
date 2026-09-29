@@ -543,6 +543,9 @@ function firstValue(...values) {
 function cleanWhatsAppJid(value) {
   return String(value || '')
     .trim()
+    // GOWS can include the linked-device id before the JID domain, for example
+    // 5511999999999:77@s.whatsapp.net. It is not part of the phone number.
+    .replace(/:\d+(?=@(?:s\.whatsapp\.net|c\.us|g\.us|lid)$)/i, '')
     .replace(/@s\.whatsapp\.net$/i, '')
     .replace(/@c\.us$/i, '')
     .replace(/@g\.us$/i, '')
@@ -6915,6 +6918,7 @@ export {
   isGiftVisitCancellation,
   isNegativeReply,
   plausibleNewAddress,
+  readWahaMessage,
   resolveConversationAiReplySetting,
   serializeWhatsAppLead,
   summarizeAnaDelivery

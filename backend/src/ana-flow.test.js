@@ -17,10 +17,38 @@ const {
   isGiftVisitCancellation,
   isNegativeReply,
   plausibleNewAddress,
+  readWahaMessage,
   resolveConversationAiReplySetting,
   serializeWhatsAppLead,
   summarizeAnaDelivery
 } = await import('./server.js');
+
+test('extrai o telefone real do SenderAlt do GOWS com identificador de aparelho', () => {
+  const event = readWahaMessage({
+    event: 'message',
+    session: 'default',
+    payload: {
+      id: 'false_275651202396160@lid_A56293F0926833D7C1A3559B377DA1A8',
+      timestamp: 1790642177,
+      from: '275651202396160@lid',
+      fromMe: false,
+      body: 'Oi',
+      _data: {
+        Info: {
+          Chat: '275651202396160@lid',
+          Sender: '275651202396160:77@lid',
+          SenderAlt: '557592456130:77@s.whatsapp.net',
+          IsFromMe: false,
+          PushName: 'Desenvolvedor Web José Silva'
+        }
+      }
+    }
+  });
+
+  assert.equal(event.phone, '557592456130');
+  assert.equal(event.text, 'Oi');
+  assert.equal(event.fromMe, false);
+});
 
 test('calcula uma pausa humana proporcional ao tamanho da resposta', () => {
   const shortDelay = anaReplyDelayMs('Resposta curta.', { body: 'Oi' });
