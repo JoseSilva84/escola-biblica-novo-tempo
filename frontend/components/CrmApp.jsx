@@ -6547,6 +6547,7 @@ function AdminGeneralView({
   const [conversationModalOpen, setConversationModalOpen] = useState(false);
   const [selectedAdminLead, setSelectedAdminLead] = useState(null);
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
+  const [campaignDispatchMessage, setCampaignDispatchMessage] = useState(defaultBroadcastMessage);
   const [leadFilters, setLeadFilters] = useState({
     association: 'paulistana',
     distrito: 'all',
@@ -6859,9 +6860,10 @@ function AdminGeneralView({
     const proposal = String(form.get('proposal') || '').trim();
     const objective = String(form.get('objective') || '').trim();
     const audience = String(form.get('audience') || '').trim();
+    const whatsappDispatchMessage = String(form.get('whatsappDispatchMessage') || '').trim();
     const startDate = String(form.get('startDate') || '');
     const endDate = String(form.get('endDate') || '');
-    if (!name || !proposal || !objective || !audience) return;
+    if (!name || !proposal || !objective || !audience || !whatsappDispatchMessage) return;
     if (startDate && endDate && endDate < startDate) {
       toast.error('Período inválido', { description: 'A data final deve ser igual ou posterior à data inicial.' });
       return;
@@ -6886,10 +6888,11 @@ function AdminGeneralView({
       kpis: String(form.get('kpis') || '').trim(),
       risks: String(form.get('risks') || '').trim(),
       stakeholders: String(form.get('stakeholders') || '').trim(),
-      whatsappDispatchMessage: String(form.get('whatsappDispatchMessage') || '').trim(),
+      whatsappDispatchMessage,
       whatsappDispatchGreeting: String(form.get('whatsappDispatchGreeting') || 'boa-noite').trim()
     });
     event.currentTarget.reset();
+    setCampaignDispatchMessage(defaultBroadcastMessage);
     setCampaignModalOpen(false);
     toast.success('Campanha adicionada', {
       description: `${name} ficou pronta para acompanhamento administrativo.`
@@ -7886,9 +7889,31 @@ function AdminGeneralView({
                         </div>
                       </label>
                       <label className="grid gap-2 text-sm font-black text-slate-200">
-                        Mensagem de disparo WhatsApp
-                        <textarea className="min-h-32 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-green-300 focus:ring-4 focus:ring-green-500/15" name="whatsappDispatchMessage" placeholder="Boa noite, {{PRIMEIRO_NOME}}! Tudo bem? Eu sou a Ana, agente da Novo Tempo..." />
+                        Mensagem de disparo WhatsApp *
+                        <textarea
+                          className="min-h-32 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-green-300 focus:ring-4 focus:ring-green-500/15"
+                          name="whatsappDispatchMessage"
+                          onChange={(event) => setCampaignDispatchMessage(event.target.value)}
+                          placeholder="Boa noite, {{PRIMEIRO_NOME}}! Tudo bem? Eu sou a Ana, agente da Novo Tempo..."
+                          required
+                          value={campaignDispatchMessage}
+                        />
                       </label>
+                      <div>
+                        <span className="text-xs font-bold text-slate-400">Clique para inserir uma variável na mensagem:</span>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {['{{NOME}}', '{{PRIMEIRO_NOME}}', '{{TEMA}}', '{{MATERIAL}}', '{{DISTRITO}}', '{{WHATSAPP}}'].map((variable) => (
+                            <button
+                              className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20"
+                              key={variable}
+                              onClick={() => setCampaignDispatchMessage((current) => `${current}${current ? ' ' : ''}${variable}`)}
+                              type="button"
+                            >
+                              +{variable}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </section>
 
@@ -8441,30 +8466,39 @@ function WhatsAppBroadcastModal({
           <button aria-label="Fechar" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 transition hover:bg-white/25" onClick={onClose} type="button"><X size={20} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {(campaigns.length > 0 || messageTemplates.length > 0) ? (
-            <div className="mb-4 grid gap-3 rounded-2xl border border-emerald-200/30 bg-emerald-950/20 p-4">
-              <span className="text-[11px] font-black uppercase tracking-wide text-emerald-400">Selecionar pre-configuracao</span>
-              {campaigns.length > 0 ? (
-                <label className="grid gap-1.5">
-                  <span className="text-xs font-bold text-slate-300">Campanha</span>
-                  <select
-                    className="h-11 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm font-bold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10"
-                    value={selectedCampaignId}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setSelectedCampaignId(id);
-                      const camp = campaigns.find((camp) => camp.id === id);
-                      if (camp?.whatsappDispatchMessage) {
-                        onMessageChange(camp.whatsappDispatchMessage);
-                        setActiveGreeting(camp.whatsappDispatchGreeting || 'boa-noite');
-                      }
-                    }}
-                  >
-                    {campaigns.length > 1 ? <option value="">-- Escolha uma campanha --</option> : null}
-                    {campaigns.map((camp) => <option key={camp.id} value={camp.id}>{camp.name}</option>)}
-                  </select>
-                </label>
-              ) : null}
+          <div className="mb-4 grid gap-3 rounded-2xl border border-emerald-200/30 bg-emerald-950/20 p-4">
+              <span className="text-[11px] font-black uppercase tracking-wide text-emerald-400">Campanha e mensagem</span>
+              <label className="grid gap-1.5">
+                <span className="text-xs font-bold text-slate-300">Campanha</span>
+                <select
+                  className="h-11 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm font-bold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={!campaigns.length}
+                  value={selectedCampaignId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedCampaignId(id);
+                    const camp = campaigns.find((campaign) => campaign.id === id);
+                    if (camp?.whatsappDispatchMessage) {
+                      onMessageChange(camp.whatsappDispatchMessage);
+                      setActiveGreeting(camp.whatsappDispatchGreeting || 'boa-noite');
+                    } else if (camp) {
+                      toast.warning('Campanha sem mensagem de disparo', {
+                        description: 'Edite esta campanha e cadastre o texto que será usado no WhatsApp.'
+                      });
+                    }
+                  }}
+                >
+                  <option value="">{campaigns.length ? '-- Escolha uma campanha --' : 'Nenhuma campanha cadastrada'}</option>
+                  {campaigns.map((campaign) => (
+                    <option key={campaign.id} value={campaign.id}>
+                      {campaign.name}{campaign.whatsappDispatchMessage ? '' : ' — sem mensagem'}
+                    </option>
+                  ))}
+                </select>
+                {!campaigns.length ? (
+                  <span className="text-xs font-semibold text-slate-400">Cadastre uma campanha para disponibilizar seu texto de disparo nesta tela.</span>
+                ) : null}
+              </label>
               {messageTemplates.length > 0 ? (
                 <label className="grid gap-1.5">
                   <span className="text-xs font-bold text-slate-300">Mensagem salva</span>
@@ -8506,7 +8540,6 @@ function WhatsAppBroadcastModal({
                 </div>
               </div>
             </div>
-          ) : null}
           <label className="grid gap-1.5">
             <span className="text-xs font-black uppercase tracking-wide text-slate-600">Nome da transmissao *</span>
             <input className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onListNameChange(event.target.value)} placeholder="Ex.: Reativacao estudo de Daniel" required value={listName} />
@@ -8539,7 +8572,7 @@ function WhatsAppBroadcastModal({
           <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
             <span className="text-[11px] font-black uppercase tracking-wide text-emerald-800">Variaveis disponiveis</span>
             <div className="mt-2 flex flex-wrap gap-2">
-              {['{{NOME}}', '{{PRIMEIRO_NOME}}', '{{TEMA}}', '{{MATERIAL}}', '{{DISTRITO}}'].map((item) => (
+              {['{{NOME}}', '{{PRIMEIRO_NOME}}', '{{TEMA}}', '{{MATERIAL}}', '{{DISTRITO}}', '{{WHATSAPP}}'].map((item) => (
                 <button className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-800 transition hover:bg-[#d9fdd3]" key={item} onClick={() => onMessageChange(`${message}${message ? ' ' : ''}${item}`)} type="button">{item}</button>
               ))}
             </div>

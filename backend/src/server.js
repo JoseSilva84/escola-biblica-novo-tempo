@@ -6598,8 +6598,10 @@ app.get('/api/campaigns', requireAuth, async (request, response) => {
 app.post('/api/campaigns', requireAuth, async (request, response) => {
   const name = String(request.body?.name || '').trim();
   const associationId = String(request.body?.associationId || '').trim();
+  const whatsappDispatchMessage = String(request.body?.whatsappDispatchMessage || '').trim();
   if (!name) return response.status(400).json({ ok: false, message: 'Nome da campanha e obrigatorio.' });
   if (!associationId) return response.status(400).json({ ok: false, message: 'Associacao e obrigatoria.' });
+  if (!whatsappDispatchMessage) return response.status(400).json({ ok: false, message: 'Mensagem de disparo da campanha e obrigatoria.' });
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
   const statusMap = { Planejada: 'PLANEJADA', Ativa: 'ATIVA', Pausada: 'PAUSADA', Finalizada: 'FINALIZADA' };
   try {
@@ -6622,7 +6624,7 @@ app.post('/api/campaigns', requireAuth, async (request, response) => {
         kpis: String(request.body?.kpis || '').trim() || null,
         risks: String(request.body?.risks || '').trim() || null,
         stakeholders: String(request.body?.stakeholders || '').trim() || null,
-        whatsappDispatchMessage: String(request.body?.whatsappDispatchMessage || '').trim() || null,
+        whatsappDispatchMessage,
         whatsappDispatchGreeting: String(request.body?.whatsappDispatchGreeting || 'boa-noite').trim()
       }
     });
