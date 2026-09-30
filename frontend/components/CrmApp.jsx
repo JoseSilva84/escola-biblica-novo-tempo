@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { Component, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -8009,6 +8009,7 @@ function WhatsAppBroadcastModal({
   onMessageChange,
   onRemove,
   onSchedule,
+  onScheduleBatches,
   onSubmit,
   recipients = [],
   sending = false
@@ -8020,15 +8021,45 @@ function WhatsAppBroadcastModal({
   const previewMessage = renderPreviewTemplate(message || defaultBroadcastMessage, previewLead || {});
   const minimumScheduleDate = new Date().toLocaleDateString('en-CA');
 
+  // Batch split
+  const [batchMode, setBatchMode] = useState(false);
+  const [batches, setBatches] = useState([{ count: '', date: '', time: '' }]);
+  const totalAllocated = batches.reduce((sum, b) => sum + (Number(b.count) || 0), 0);
+  const batchRemaining = recipients.length - totalAllocated;
+
+  function addBatch() { setBatches((c) => [...c, { count: '', date: '', time: '' }]); }
+  function removeBatch(i) { setBatches((c) => c.filter((_, idx) => idx !== i)); }
+  function updateBatch(i, field, value) { setBatches((c) => c.map((b, idx) => (idx === i ? { ...b, [field]: value } : b))); }
+
+  function handleScheduleBatches() {
+    if (!listName.trim() || !message.trim()) { toast.error('Preencha o nome e a mensagem antes de agendar os lotes.'); return; }
+    if (batchRemaining !== 0) {
+      toast.error(batchRemaining > 0 ? `Ainda ha ${batchRemaining} destinatario(s) sem lote.` : `Os lotes excedem o total em ${Math.abs(batchRemaining)} pessoa(s).`);
+      return;
+    }
+    const batchDefs = [];
+    let offset = 0;
+    for (let i = 0; i < batches.length; i++) {
+      const count = Number(batches[i].count) || 0;
+      if (!count) { toast.error(`Lote ${i + 1}: informe a quantidade.`); return; }
+      if (!batches[i].date || !batches[i].time) { toast.error(`Lote ${i + 1}: informe a data e o horario.`); return; }
+      const scheduledAt = new Date(`${batches[i].date}T${batches[i].time}`);
+      if (Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) { toast.error(`Lote ${i + 1}: escolha um horario futuro.`); return; }
+      batchDefs.push({ recipients: recipients.slice(offset, offset + count), scheduledAt: scheduledAt.toISOString() });
+      offset += count;
+    }
+    onScheduleBatches(batchDefs);
+  }
+
   function confirmSchedule(event) {
     event.preventDefault();
     const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`);
     if (!scheduleDate || !scheduleTime || Number.isNaN(scheduledAt.getTime())) {
-      toast.error('Informe a data e o horário do envio.');
+      toast.error('Informe a data e o horario do envio.');
       return;
     }
     if (scheduledAt.getTime() <= Date.now()) {
-      toast.error('Escolha um horário futuro para o envio.');
+      toast.error('Escolha um horario futuro para o envio.');
       return;
     }
     onSchedule(scheduledAt.toISOString());
@@ -8040,19 +8071,19 @@ function WhatsAppBroadcastModal({
         <div className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,#075e54,#008069,#00a884)] p-6 text-white">
           <div>
             <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">WhatsApp</span>
-            <h2 className="mt-2 text-2xl font-black" id="whatsapp-broadcast-title">Lista de transmissão</h2>
-            <p className="mt-1 text-sm font-semibold text-emerald-50">A mesma mensagem será enviada individualmente para {recipients.length} contatos.</p>
+            <h2 className="mt-2 text-2xl font-black" id="whatsapp-broadcast-title">Lista de transmissao</h2>
+            <p className="mt-1 text-sm font-semibold text-emerald-50">A mesma mensagem sera enviada individualmente para {recipients.length} contatos.</p>
           </div>
           <button aria-label="Fechar" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 transition hover:bg-white/25" onClick={onClose} type="button"><X size={20} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           <label className="grid gap-1.5">
-            <span className="text-xs font-black uppercase tracking-wide text-slate-600">Nome da transmissão *</span>
-            <input className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onListNameChange(event.target.value)} placeholder="Ex.: Reativação estudo de Daniel" required value={listName} />
+            <span className="text-xs font-black uppercase tracking-wide text-slate-600">Nome da transmissao *</span>
+            <input className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onListNameChange(event.target.value)} placeholder="Ex.: Reativacao estudo de Daniel" required value={listName} />
           </label>
           <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-black uppercase tracking-wide text-slate-600">Destinatários</span>
+              <span className="text-xs font-black uppercase tracking-wide text-slate-600">Destinatarios</span>
               <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{formatNumber(recipients.length)}</span>
             </div>
             <div className="mt-3 flex max-h-36 flex-wrap gap-2 overflow-y-auto pr-1">
@@ -8067,36 +8098,94 @@ function WhatsAppBroadcastModal({
           </div>
           <label className="mt-4 grid gap-1.5">
             <span className="text-xs font-black uppercase tracking-wide text-slate-600">Mensagem *</span>
-            <textarea autoFocus className="min-h-36 resize-y rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onMessageChange(event.target.value)} placeholder="Digite a mensagem que todos receberão" required value={message} />
+            <textarea autoFocus className="min-h-36 resize-y rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onMessageChange(event.target.value)} placeholder="Digite a mensagem que todos receberao" required value={message} />
           </label>
           <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
             <AiReplyModeSelector enabled={aiReplyEnabled} onChange={onAiReplyEnabledChange} />
             <span className="mt-2 block text-xs font-semibold text-slate-500">
-              Escolha quem continuará cada conversa quando o contato responder a esta transmissão.
+              Escolha quem continuara cada conversa quando o contato responder a esta transmissao.
             </span>
           </div>
           <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-            <span className="text-[11px] font-black uppercase tracking-wide text-emerald-800">Variáveis disponíveis</span>
+            <span className="text-[11px] font-black uppercase tracking-wide text-emerald-800">Variaveis disponiveis</span>
             <div className="mt-2 flex flex-wrap gap-2">
               {['{{NOME}}', '{{PRIMEIRO_NOME}}', '{{TEMA}}', '{{MATERIAL}}', '{{DISTRITO}}'].map((item) => (
-                <button
-                  className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-800 transition hover:bg-[#d9fdd3]"
-                  key={item}
-                  onClick={() => onMessageChange(`${message}${message ? ' ' : ''}${item}`)}
-                  type="button"
-                >
-                  {item}
-                </button>
+                <button className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-800 transition hover:bg-[#d9fdd3]" key={item} onClick={() => onMessageChange(`${message}${message ? ' ' : ''}${item}`)} type="button">{item}</button>
               ))}
             </div>
             <div className="mt-3 rounded-xl bg-white p-3 text-sm font-semibold leading-relaxed text-slate-700">
               <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500">
-                Prévia {previewLead ? `para ${previewLead.name || previewLead.n}` : ''}
+                Previa {previewLead ? `para ${previewLead.name || previewLead.n}` : ''}
               </span>
               <p className="whitespace-pre-line">{previewMessage}</p>
             </div>
           </div>
-          <p className="mt-2 text-xs font-semibold text-slate-500">Esta transmissão ficará salva com estes destinatários. Cada contato receberá uma conversa separada e não verá os demais participantes.</p>
+
+          {/* Dividir em lotes agendados */}
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <button className="flex w-full items-center justify-between gap-2 text-left" onClick={() => setBatchMode((v) => !v)} type="button">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-[#008069]">
+                  <svg fill="none" height="16" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24" width="16"><rect height="4" rx="1" width="7" x="3" y="3"/><rect height="4" rx="1" width="7" x="14" y="3"/><rect height="4" rx="1" width="7" x="3" y="10"/><rect height="4" rx="1" width="7" x="14" y="10"/><rect height="4" rx="1" width="7" x="3" y="17"/><rect height="4" rx="1" width="7" x="14" y="17"/></svg>
+                </span>
+                <span className="text-xs font-black uppercase tracking-wide text-slate-700">Dividir em lotes agendados</span>
+              </div>
+              <span className={`text-[11px] font-bold ${batchMode ? 'text-[#008069]' : 'text-slate-400'}`}>{batchMode ? 'Ativado ▲' : 'Desativado ▼'}</span>
+            </button>
+            {batchMode ? (
+              <div className="mt-4">
+                <p className="mb-3 text-xs font-semibold text-slate-500">Defina quantas pessoas receberao a mensagem em cada lote e o horario de envio. Os destinatarios sao distribuidos na ordem em que aparecem acima.</p>
+                <div className="space-y-3">
+                  {batches.map((batch, index) => {
+                    const batchCount = Number(batch.count) || 0;
+                    const prevAllocated = batches.slice(0, index).reduce((s, b) => s + (Number(b.count) || 0), 0);
+                    const thisRemaining = recipients.length - prevAllocated;
+                    const previewNames = recipients.slice(prevAllocated, prevAllocated + batchCount).slice(0, 3).map((r) => r.name || r.n);
+                    return (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3" key={index}>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#008069] text-[11px] font-black text-white">{index + 1}</span>
+                          <span className="text-[11px] font-bold text-slate-500">Lote {index + 1}</span>
+                          {batches.length > 1 ? <button className="ml-auto text-slate-400 transition hover:text-red-500" onClick={() => removeBatch(index)} title="Remover lote" type="button"><X size={14} /></button> : null}
+                        </div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                          <label className="grid gap-1">
+                            <span className="text-[11px] font-black uppercase tracking-wide text-slate-500">Destinatarios</span>
+                            <div className="flex gap-1">
+                              <input className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-2 focus:ring-emerald-500/10" min="1" max={recipients.length} onChange={(e) => updateBatch(index, 'count', e.target.value)} placeholder="Qtd." type="number" value={batch.count} />
+                              {thisRemaining > 0 ? <button className="h-10 shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-2 text-[11px] font-black text-[#008069] transition hover:bg-[#d9fdd3]" onClick={() => updateBatch(index, 'count', String(thisRemaining))} title={`Usar os ${thisRemaining} restantes`} type="button">+{thisRemaining}</button> : null}
+                            </div>
+                          </label>
+                          <label className="grid gap-1">
+                            <span className="text-[11px] font-black uppercase tracking-wide text-slate-500">Data</span>
+                            <input className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-2 focus:ring-emerald-500/10" min={minimumScheduleDate} onChange={(e) => updateBatch(index, 'date', e.target.value)} type="date" value={batch.date} />
+                          </label>
+                          <label className="grid gap-1">
+                            <span className="text-[11px] font-black uppercase tracking-wide text-slate-500">Horario</span>
+                            <input className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-2 focus:ring-emerald-500/10" onChange={(e) => updateBatch(index, 'time', e.target.value)} type="time" value={batch.time} />
+                          </label>
+                        </div>
+                        {previewNames.length > 0 ? <p className="mt-1.5 truncate text-[11px] font-semibold text-slate-400">{previewNames.join(', ')}{batchCount > 3 ? ` e mais ${batchCount - 3}...` : ''}</p> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className={`mt-3 rounded-xl px-3 py-2 text-xs font-bold ${batchRemaining < 0 ? 'bg-red-50 text-red-600' : batchRemaining > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-[#008069]'}`}>
+                  {batchRemaining < 0 ? `Os lotes excedem o total em ${Math.abs(batchRemaining)} pessoa(s).` : batchRemaining > 0 ? `${batchRemaining} destinatario(s) ainda sem lote.` : `Todos os ${recipients.length} destinatarios distribuidos.`}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 transition hover:bg-slate-50" onClick={addBatch} type="button">
+                    <svg fill="none" height="13" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" width="13"><path d="M12 5v14M5 12h14"/></svg> Adicionar lote
+                  </button>
+                  <button className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#00a884] px-4 text-xs font-black text-white shadow-md shadow-emerald-500/20 transition hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !recipients.length || !listName.trim() || !message.trim() || batchRemaining !== 0} onClick={handleScheduleBatches} type="button">
+                    <Clock3 size={14} /> {sending ? 'Agendando...' : `Agendar ${batches.length} lote${batches.length !== 1 ? 's' : ''}`}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <p className="mt-2 text-xs font-semibold text-slate-500">Esta transmissao ficara salva com estes destinatarios. Cada contato recebera uma conversa separada e nao vera os demais participantes.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white p-4">
           <button className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50" onClick={onClose} type="button">Cancelar</button>
@@ -8108,9 +8197,9 @@ function WhatsAppBroadcastModal({
         <div className="fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="broadcast-schedule-title">
           <form className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-white shadow-[0_30px_90px_rgba(0,0,0,0.55)]" onSubmit={confirmSchedule}>
             <div className="bg-[linear-gradient(135deg,#075e54,#00a884)] p-5 text-white">
-              <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">Envio automático</span>
-              <h3 className="mt-1 text-2xl font-black" id="broadcast-schedule-title">Agendar transmissão</h3>
-              <p className="mt-1 text-sm font-semibold text-emerald-50">O servidor enviará a mensagem para {recipients.length} contatos mesmo que esta tela esteja fechada.</p>
+              <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">Envio automatico</span>
+              <h3 className="mt-1 text-2xl font-black" id="broadcast-schedule-title">Agendar transmissao</h3>
+              <p className="mt-1 text-sm font-semibold text-emerald-50">O servidor enviara a mensagem para {recipients.length} contatos mesmo que esta tela esteja fechada.</p>
             </div>
             <div className="grid gap-4 p-5 sm:grid-cols-2">
               <label className="grid gap-1.5">
@@ -8118,7 +8207,7 @@ function WhatsAppBroadcastModal({
                 <input className="h-12 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" min={minimumScheduleDate} onChange={(event) => setScheduleDate(event.target.value)} required type="date" value={scheduleDate} />
               </label>
               <label className="grid gap-1.5">
-                <span className="text-xs font-black uppercase tracking-wide text-slate-600">Horário</span>
+                <span className="text-xs font-black uppercase tracking-wide text-slate-600">Horario</span>
                 <input className="h-12 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => setScheduleTime(event.target.value)} required type="time" value={scheduleTime} />
               </label>
             </div>
@@ -8133,7 +8222,6 @@ function WhatsAppBroadcastModal({
     document.body
   );
 }
-
 function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
   const [selectedBreakdown, setSelectedBreakdown] = useState(null);
   const metricDefinitions = [
@@ -8770,6 +8858,62 @@ function ConversationsView({ records = [] }) {
     }
   }
 
+  async function scheduleBroadcastBatches(batchDefs) {
+    if (!broadcastListName.trim() || !broadcastMessage.trim()) return;
+    setBroadcastSending(true);
+    let scheduled = 0;
+    let failed = 0;
+    try {
+      for (let i = 0; i < batchDefs.length; i++) {
+        const { recipients: batchRecipients, scheduledAt } = batchDefs[i];
+        const mappedRecipients = batchRecipients.map((lead) => ({
+          id: lead.id,
+          leadId: lead.id,
+          externalLeadId: lead.externalId || null,
+          name: lead.name,
+          district: lead.district || null,
+          address: lead.newAddress || lead.address || null,
+          material: leadMaterial(lead),
+          theme: leadMaterial(lead),
+          priority: lead.priority || null,
+          phone: phoneDigits(lead.phone)
+        }));
+        try {
+          const response = await apiFetch('/api/whatsapp/schedule-broadcast', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipients: mappedRecipients,
+              message: broadcastMessage.trim(),
+              listName: `${broadcastListName.trim()} - Lote ${i + 1}`,
+              scheduledAt,
+              aiReplyEnabled: broadcastAiReplyEnabled
+            })
+          });
+          const payload = await response.json();
+          if (!response.ok || payload.ok === false) throw new Error(payload.message || 'Erro ao agendar lote.');
+          scheduled++;
+        } catch (batchError) {
+          failed++;
+          toast.error(`Falha no lote ${i + 1}`, { description: batchError.message });
+        }
+      }
+      if (scheduled > 0) {
+        toast.success(`${scheduled} lote${scheduled !== 1 ? 's' : ''} agendado${scheduled !== 1 ? 's' : ''}`, {
+          description: failed > 0 ? `${failed} lote(s) falharam. Verifique os detalhes.` : `Todos os lotes foram agendados com sucesso.`
+        });
+        setBroadcastModalOpen(false);
+        setLeadPickerOpen(false);
+        setBroadcastSelectedLeads([]);
+        setBroadcastListName('');
+        setBroadcastMessage(defaultBroadcastMessage);
+        setBroadcastAiReplyEnabled(false);
+        await loadBroadcastAnalytics({ silent: true });
+      }
+    } finally {
+      setBroadcastSending(false);
+    }
+  }
   async function submitNewContact(contactDraft) {
     setNewContactSaving(true);
     try {
@@ -9829,6 +9973,7 @@ function ConversationsView({ records = [] }) {
           onMessageChange={setBroadcastMessage}
           onRemove={toggleBroadcastLead}
           onSchedule={scheduleBroadcast}
+          onScheduleBatches={scheduleBroadcastBatches}
           onSubmit={submitBroadcast}
           recipients={broadcastSelectedLeads}
           sending={broadcastSending}
