@@ -6547,6 +6547,7 @@ function AdminGeneralView({
   const [conversationModalOpen, setConversationModalOpen] = useState(false);
   const [selectedAdminLead, setSelectedAdminLead] = useState(null);
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
+  const [campaignSaving, setCampaignSaving] = useState(false);
   const [campaignDispatchMessage, setCampaignDispatchMessage] = useState(defaultBroadcastMessage);
   const [leadFilters, setLeadFilters] = useState({
     association: 'paulistana',
@@ -6853,9 +6854,10 @@ function AdminGeneralView({
     });
   }
 
-  function submitCampaign(event) {
+  async function submitCampaign(event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const name = String(form.get('name') || '').trim();
     const proposal = String(form.get('proposal') || '').trim();
     const objective = String(form.get('objective') || '').trim();
@@ -6868,35 +6870,42 @@ function AdminGeneralView({
       toast.error('Período inválido', { description: 'A data final deve ser igual ou posterior à data inicial.' });
       return;
     }
-    onAddCampaign({
-      id: `campaign-${Date.now()}`,
-      name,
-      association: String(form.get('association') || associations[0]?.name || 'Todas as associações'),
-      status: String(form.get('status') || 'Planejada'),
-      owner: String(form.get('owner') || 'Admin geral'),
-      goal: Number(form.get('goal') || 0),
-      proposal,
-      objective,
-      audience,
-      context: String(form.get('context') || '').trim(),
-      message: String(form.get('message') || '').trim(),
-      callToAction: String(form.get('callToAction') || '').trim(),
-      channels: form.getAll('channels').map(String),
-      startDate,
-      endDate,
-      budget: Number(form.get('budget') || 0),
-      kpis: String(form.get('kpis') || '').trim(),
-      risks: String(form.get('risks') || '').trim(),
-      stakeholders: String(form.get('stakeholders') || '').trim(),
-      whatsappDispatchMessage,
-      whatsappDispatchGreeting: String(form.get('whatsappDispatchGreeting') || 'boa-noite').trim()
-    });
-    event.currentTarget.reset();
-    setCampaignDispatchMessage(defaultBroadcastMessage);
-    setCampaignModalOpen(false);
-    toast.success('Campanha adicionada', {
-      description: `${name} ficou pronta para acompanhamento administrativo.`
-    });
+    setCampaignSaving(true);
+    try {
+      await onAddCampaign({
+        id: `campaign-${Date.now()}`,
+        name,
+        association: String(form.get('association') || associations[0]?.name || 'Todas as associações'),
+        status: String(form.get('status') || 'Planejada'),
+        owner: String(form.get('owner') || 'Admin geral'),
+        goal: Number(form.get('goal') || 0),
+        proposal,
+        objective,
+        audience,
+        context: String(form.get('context') || '').trim(),
+        message: String(form.get('message') || '').trim(),
+        callToAction: String(form.get('callToAction') || '').trim(),
+        channels: form.getAll('channels').map(String),
+        startDate,
+        endDate,
+        budget: Number(form.get('budget') || 0),
+        kpis: String(form.get('kpis') || '').trim(),
+        risks: String(form.get('risks') || '').trim(),
+        stakeholders: String(form.get('stakeholders') || '').trim(),
+        whatsappDispatchMessage,
+        whatsappDispatchGreeting: String(form.get('whatsappDispatchGreeting') || 'boa-noite').trim()
+      });
+      formElement.reset();
+      setCampaignDispatchMessage(defaultBroadcastMessage);
+      setCampaignModalOpen(false);
+      toast.success('Campanha adicionada', {
+        description: `${name} foi salva no banco de dados e está pronta para acompanhamento.`
+      });
+    } catch {
+      // O salvamento mantém o formulário aberto e o erro já é exibido pela operação.
+    } finally {
+      setCampaignSaving(false);
+    }
   }
 
   async function submitWhatsAppTest(event) {
@@ -7948,9 +7957,9 @@ function AdminGeneralView({
                 <span className="text-xs font-semibold text-slate-400">Os campos marcados com * são essenciais para criar a campanha.</span>
                 <div className="flex flex-wrap gap-2">
                   <button className={ghostButtonClass} onClick={() => setCampaignModalOpen(false)} type="button">Cancelar</button>
-                  <button className={`${primaryButtonClass} campaign-submit theme-modal-primary`} type="submit">
+                  <button className={`${primaryButtonClass} campaign-submit theme-modal-primary`} disabled={campaignSaving} type="submit">
                     <Plus size={18} />
-                    Criar campanha
+                    {campaignSaving ? 'Salvando campanha...' : 'Criar campanha'}
                   </button>
                 </div>
               </div>
@@ -12246,14 +12255,20 @@ export default function CrmApp({ payload: initialPayload = null }) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Erro ao salvar campanha.');
       const statusLabels = { PLANEJADA: 'Planejada', ATIVA: 'Ativa', PAUSADA: 'Pausada', FINALIZADA: 'Finalizada' };
-      const saved = { ...payload.campaign, status: statusLabels[payload.campaign.status] || payload.campaign.status };
+      const saved = {
+        ...payload.campaign,
+        association: payload.campaign.association || assoc?.name || campaign.association,
+        status: statusLabels[payload.campaign.status] || payload.campaign.status
+      };
       setAdminCampaigns((current) => [saved, ...current]);
       setAuditEvents((current) => [
         { id: `audit-${Date.now()}`, action: 'Campanha criada', user: user?.name || 'Admin geral', detail: campaign.name, when: 'Agora' },
         ...current
       ]);
+      return saved;
     } catch (error) {
       toast.error('Falha ao salvar campanha', { description: error.message });
+      throw error;
     }
   };
   const addAdminUser = (nextUser) => {

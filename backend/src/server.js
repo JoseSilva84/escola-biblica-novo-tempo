@@ -6597,17 +6597,30 @@ app.get('/api/campaigns', requireAuth, async (request, response) => {
 
 app.post('/api/campaigns', requireAuth, async (request, response) => {
   const name = String(request.body?.name || '').trim();
-  const associationId = String(request.body?.associationId || '').trim();
+  const associationReference = String(request.body?.associationId || '').trim();
   const whatsappDispatchMessage = String(request.body?.whatsappDispatchMessage || '').trim();
   if (!name) return response.status(400).json({ ok: false, message: 'Nome da campanha e obrigatorio.' });
-  if (!associationId) return response.status(400).json({ ok: false, message: 'Associacao e obrigatoria.' });
+  if (!associationReference) return response.status(400).json({ ok: false, message: 'Associacao e obrigatoria.' });
   if (!whatsappDispatchMessage) return response.status(400).json({ ok: false, message: 'Mensagem de disparo da campanha e obrigatoria.' });
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
   const statusMap = { Planejada: 'PLANEJADA', Ativa: 'ATIVA', Pausada: 'PAUSADA', Finalizada: 'FINALIZADA' };
   try {
+    const association = await prisma.association.findFirst({
+      where: {
+        OR: [
+          { id: associationReference },
+          { slug: associationReference.toLowerCase() }
+        ]
+      },
+      select: { id: true, name: true, slug: true }
+    });
+    if (!association) {
+      return response.status(400).json({ ok: false, message: 'A associacao selecionada nao foi encontrada no banco de dados.' });
+    }
+
     const campaign = await prisma.campaign.create({
       data: {
-        name, slug, associationId,
+        name, slug, associationId: association.id,
         status: statusMap[request.body?.status] || 'PLANEJADA',
         owner: String(request.body?.owner || '').trim() || null,
         goal: Number(request.body?.goal) || 0,
@@ -6628,7 +6641,14 @@ app.post('/api/campaigns', requireAuth, async (request, response) => {
         whatsappDispatchGreeting: String(request.body?.whatsappDispatchGreeting || 'boa-noite').trim()
       }
     });
-    return response.status(201).json({ ok: true, campaign });
+    return response.status(201).json({
+      ok: true,
+      campaign: {
+        ...campaign,
+        association: association.name,
+        associationSlug: association.slug
+      }
+    });
   } catch (error) {
     console.error('[campaigns:create:error]', error.message);
     return response.status(500).json({ ok: false, message: 'Erro ao criar campanha.' });
