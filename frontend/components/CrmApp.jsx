@@ -7883,7 +7883,7 @@ function AdminGeneralView({
                           {[['bom-dia', 'Bom dia'], ['boa-tarde', 'Boa tarde'], ['boa-noite', 'Boa noite']].map(([val, lbl]) => (
                             <label className="campaign-greeting-option inline-flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-slate-950/65 px-3 py-2 text-xs font-black text-slate-200 transition hover:border-green-300/45" key={val}>
                               <input className="h-4 w-4 accent-green-500" defaultChecked={val === 'boa-noite'} name="whatsappDispatchGreeting" type="radio" value={val} />
-                              {lbl}
+                              <span className="campaign-greeting-label">{lbl}</span>
                             </label>
                           ))}
                         </div>

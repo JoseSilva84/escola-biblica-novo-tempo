@@ -958,6 +958,10 @@ html[data-crm-theme='light'] .campaign-briefing-modal .campaign-greeting-option 
   box-shadow: 0 5px 14px rgba(15, 23, 42, 0.16);
 }
 
+html[data-crm-theme='light'] .campaign-briefing-modal .theme-modal-card .campaign-greeting-option .campaign-greeting-label {
+  color: #ffffff !important;
+}
+
 html[data-crm-theme='light'] .campaign-briefing-modal .campaign-greeting-option:hover,
 html[data-crm-theme='light'] .campaign-briefing-modal .campaign-greeting-option:focus-within {
   border-color: rgb(52 211 153) !important;
