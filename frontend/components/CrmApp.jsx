@@ -6236,7 +6236,7 @@ function WhatsAppTemplateLibrary({
     setEditingTemplate(null);
     setName('');
     setGreeting('boa-noite');
-    setMessage('Boa noite, {{PRIMEIRO_NOME}}! Tudo bem? Eu sou a Ana, agente da Novo Tempo ðŸ˜Š\n\nVi aqui que vocÃª pediu um material sobre {{TEMA}} pela Escola BÃ­blica.\n\nVocÃª jÃ¡ recebeu o material?');
+    setMessage('Boa noite, {{PRIMEIRO_NOME}}! Tudo bem? Eu sou a Ana, agente da Novo Tempo 😊\n\nVi aqui que você pediu um material sobre {{TEMA}} pela Escola Bíblica.\n\nVocê já recebeu o material?');
     setModalOpen(true);
   }
 
@@ -6318,12 +6318,12 @@ function WhatsAppTemplateLibrary({
       <section className={`${panelClass} overflow-hidden p-6`}>
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <span className={labelClass}>WhatsApp Â· Banco de Dados VPS</span>
+            <span className={labelClass}>WhatsApp · Banco de Dados VPS</span>
             <h1 className="silver-title mt-2 text-4xl font-extrabold leading-tight tracking-normal max-md:text-3xl">
               Biblioteca de Mensagens de Disparo
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
-              Crie e edite opÃ§Ãµes de mensagens prontas para transmissÃ£o. Todos os modelos sÃ£o persistidos no banco de dados da VPS e ficam disponÃ­veis para seleÃ§Ã£o instantÃ¢nea na Lista de TransmissÃ£o.
+              Crie e edite opções de mensagens prontas para transmissão. Todos os modelos são persistidos no banco de dados da VPS e ficam disponíveis para seleção instantânea na Lista de Transmissão.
             </p>
           </div>
           <button
@@ -6340,13 +6340,13 @@ function WhatsAppTemplateLibrary({
       {/* Grid de Modelos Salvos */}
       <section className="grid gap-4">
         {templates.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-white/15 bg-slate-950/40 p-12 text-center">
+          <div className="message-template-empty-state rounded-3xl border border-dashed border-white/15 bg-slate-950/40 p-12 text-center">
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-400">
               <MessageCircle size={32} />
             </div>
             <strong className="mt-4 block text-xl font-bold text-white">Nenhum modelo cadastrado no banco</strong>
             <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
-              Crie opÃ§Ãµes de mensagens (ex.: &ldquo;Boa noite â€” reativaÃ§Ã£o&rdquo;, &ldquo;Convite estudo Daniel&rdquo;) para selecionar diretamente no disparo.
+              Crie opções de mensagens (ex.: &ldquo;Boa noite — reativação&rdquo;, &ldquo;Convite estudo Daniel&rdquo;) para selecionar diretamente no disparo.
             </p>
             <button
               className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-[#008069]"
@@ -6406,7 +6406,7 @@ function WhatsAppTemplateLibrary({
                     <span>
                       {tpl.createdAt ? `Criado em ${new Date(tpl.createdAt).toLocaleDateString('pt-BR')}` : 'Salvo no banco'}
                     </span>
-                    <span className="text-emerald-400/80 font-bold">DisponÃ­vel na transmissÃ£o âœ“</span>
+                    <span className="text-emerald-400/80 font-bold">Disponível na transmissão ✓</span>
                   </div>
                 </article>
               );
@@ -6421,7 +6421,7 @@ function WhatsAppTemplateLibrary({
           <form className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.7)]" onSubmit={handleSubmit}>
             <div className="flex items-center justify-between border-b border-white/10 bg-[linear-gradient(135deg,#075e54,#008069,#00a884)] p-5 text-white">
               <div>
-                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-100">Modelo WhatsApp Â· VPS</span>
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-100">Modelo WhatsApp · VPS</span>
                 <h2 className="mt-1 text-2xl font-black">{editingTemplate ? 'Editar modelo de mensagem' : 'Novo modelo de mensagem'}</h2>
               </div>
               <button aria-label="Fechar" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 transition hover:bg-white/25" onClick={() => setModalOpen(false)} type="button">
@@ -6435,14 +6435,14 @@ function WhatsAppTemplateLibrary({
                 <input
                   className="h-11 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm font-bold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/15"
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex.: Boa noite â€” reativaÃ§Ã£o de estudos"
+                  placeholder="Ex.: Boa noite — reativação de estudos"
                   required
                   value={name}
                 />
               </label>
 
               <div>
-                <span className="text-sm font-black text-slate-200">SaudaÃ§Ã£o padrÃ£o</span>
+                <span className="text-sm font-black text-slate-200">Saudação padrão</span>
                 <div className="mt-2 flex gap-2">
                   {[['bom-dia', 'Bom dia'], ['boa-tarde', 'Boa tarde'], ['boa-noite', 'Boa noite']].map(([val, lbl]) => (
                     <button
@@ -6470,9 +6470,9 @@ function WhatsAppTemplateLibrary({
               </label>
 
               <div>
-                <span className="text-xs font-bold text-slate-400">Clique para inserir variÃ¡veis dinÃ¢micas:</span>
+                <span className="text-xs font-bold text-slate-400">Clique para inserir variáveis dinâmicas:</span>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {['{{PRIMEIRO_NOME}}', '{{NOME}}', '{{TEMA}}', '{{MATERIAL}}', '{{DISTRITO}}'].map((tag) => (
+                  {['{{PRIMEIRO_NOME}}', '{{NOME}}', '{{TEMA}}', '{{MATERIAL}}', '{{DISTRITO}}', '{{WHATSAPP}}'].map((tag) => (
                     <button
                       className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20"
                       key={tag}
@@ -6487,7 +6487,7 @@ function WhatsAppTemplateLibrary({
 
               {/* Previa ao vivo */}
               <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-4">
-                <span className="text-[11px] font-black uppercase tracking-wide text-emerald-400">PrÃ©via de envio com dados de exemplo</span>
+                <span className="text-[11px] font-black uppercase tracking-wide text-emerald-400">Prévia de envio com dados de exemplo</span>
                 <div className="mt-2 rounded-xl bg-white p-3 text-xs font-semibold leading-relaxed text-slate-800">
                   <p className="whitespace-pre-line">{samplePreview}</p>
                 </div>

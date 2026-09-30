@@ -676,6 +676,17 @@ html[data-crm-theme="dark"] .whatsapp-broadcast-modal > div:last-child {
   color: #ffffff !important;
 }
 
+.message-template-empty-state {
+  border-color: rgba(255, 255, 255, 0.30) !important;
+  background: linear-gradient(135deg, rgb(100 116 139), rgb(71 85 105)) !important;
+  color: #ffffff !important;
+}
+
+.message-template-empty-state strong,
+.message-template-empty-state p {
+  color: #ffffff !important;
+}
+
 .app-dark .premium-panel .leads-map-church-count,
 html[data-crm-theme="dark"] [role="dialog"] .leads-map-church-count {
   background: rgb(2 44 34) !important;
