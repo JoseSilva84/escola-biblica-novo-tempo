@@ -6577,10 +6577,18 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
 // ── Campaigns CRUD ──────────────────────────────────────────────────────────
 app.get('/api/campaigns', requireAuth, async (request, response) => {
   try {
+    const associationSlug = userAssociationSlug(request.user);
+    const where = isAdminGeralUser(request.user)
+      ? {}
+      : request.user?.associationId
+        ? { associationId: request.user.associationId }
+        : { association: { is: { slug: associationSlug } } };
     const campaigns = await prisma.campaign.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, name: true, slug: true, status: true, associationId: true,
+        association: { select: { name: true, slug: true } },
         owner: true, goal: true, proposal: true, objective: true, audience: true,
         context: true, message: true, callToAction: true, channels: true,
         startDate: true, endDate: true, budget: true, kpis: true, risks: true,
@@ -6588,7 +6596,26 @@ app.get('/api/campaigns', requireAuth, async (request, response) => {
         createdAt: true, updatedAt: true
       }
     });
-    return response.json({ ok: true, campaigns });
+    const normalizedCampaigns = campaigns.map(({ association, ...campaign }) => ({
+      ...campaign,
+      association: association?.name || null,
+      associationSlug: association?.slug || null
+    }));
+    const summary = normalizedCampaigns.reduce((result, campaign) => {
+      result.total += 1;
+      if (campaign.status === 'ATIVA') result.active += 1;
+      if (campaign.status === 'PLANEJADA') result.planned += 1;
+      if (campaign.status === 'PAUSADA') result.paused += 1;
+      if (campaign.status === 'FINALIZADA') result.finished += 1;
+      result.byAssociation[campaign.associationId] = (result.byAssociation[campaign.associationId] || 0) + 1;
+      if (campaign.associationSlug && campaign.associationSlug !== campaign.associationId) {
+        result.byAssociation[campaign.associationSlug] = (result.byAssociation[campaign.associationSlug] || 0) + 1;
+      }
+      return result;
+    }, { total: 0, active: 0, planned: 0, paused: 0, finished: 0, byAssociation: {} });
+
+    response.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    return response.json({ ok: true, campaigns: normalizedCampaigns, summary });
   } catch (error) {
     console.error('[campaigns:list:error]', error.message);
     return response.status(500).json({ ok: false, message: 'Erro ao listar campanhas.' });

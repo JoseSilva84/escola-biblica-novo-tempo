@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { Component, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Area,
@@ -656,6 +656,31 @@ function buildAdminUsers() {
 
 function buildAdminCampaigns() {
   return [];
+}
+
+const campaignStatusLabels = {
+  PLANEJADA: 'Planejada',
+  ATIVA: 'Ativa',
+  PAUSADA: 'Pausada',
+  FINALIZADA: 'Finalizada'
+};
+
+function normalizeCampaigns(campaigns = []) {
+  return campaigns.map((campaign) => ({
+    ...campaign,
+    status: campaignStatusLabels[campaign.status] || campaign.status
+  }));
+}
+
+function campaignBelongsToAssociation(campaign, association) {
+  if (!campaign || !association) return false;
+  const references = [campaign.associationId, campaign.associationSlug, campaign.association]
+    .filter(Boolean)
+    .map((value) => String(value).trim().toLowerCase());
+  return [association.id, association.slug, association.name]
+    .filter(Boolean)
+    .map((value) => String(value).trim().toLowerCase())
+    .some((value) => references.includes(value));
 }
 
 function scopedAssociationsForUser(associations, user) {
@@ -1733,7 +1758,7 @@ function AddAssociationForm({ onAdd }) {
   );
 }
 
-function AdminDashboard({ associations, data, canManageAdmin = false, isAssociationsView = false, onOpenAdminGeneral, onOpenAssociations, onOpenAssociation, onOpenLeads, onOpenUsers, onAddAssociation }) {
+function AdminDashboard({ associations, data, campaignsLoading = false, campaignsError = '', canManageAdmin = false, isAssociationsView = false, onOpenAdminGeneral, onOpenAssociations, onOpenAssociation, onOpenLeads, onOpenUsers, onAddAssociation }) {
   const totals = associations.reduce((acc, association) => ({
     leads: acc.leads + association.leads,
     campaigns: acc.campaigns + association.campaigns,
@@ -1823,7 +1848,13 @@ function AdminDashboard({ associations, data, canManageAdmin = false, isAssociat
           label={canManageAdmin ? 'Associações' : 'Associação'}
           value={formatNumber(associations.length)}
         />
-        <MetricCard detail="campanhas mapeadas" icon={Radio} label="Campanhas" tone="green" value={formatNumber(totals.campaigns)} />
+        <MetricCard
+          detail={campaignsError ? 'falha ao consultar o banco' : campaignsLoading ? 'consultando o banco' : 'campanhas mapeadas'}
+          icon={Radio}
+          label="Campanhas"
+          tone="green"
+          value={campaignsError ? '—' : formatNumber(totals.campaigns)}
+        />
         <MetricCard detail="com prioridade alta" icon={Sparkles} label="Leads quentes" tone="orange" value={formatNumber(totals.hot)} />
         <MetricCard detail="em acompanhamento" icon={ClipboardList} label="Estudos ativos" tone="violet" value={formatNumber(totals.studies)} />
       </section>
@@ -1855,7 +1886,7 @@ function AdminDashboard({ associations, data, canManageAdmin = false, isAssociat
                     <strong className="text-xl font-black text-slate-50">{association.name}</strong>
                     <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${association.status === 'Ativa' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>{association.status}</span>
                   </span>
-                  <span className="mt-2 block text-sm text-slate-500">{association.region} · {formatNumber(association.leads)} leads · {association.campaigns} campanhas</span>
+                  <span className="mt-2 block text-sm text-slate-500">{association.region} · {formatNumber(association.leads)} leads · {campaignsError ? 'campanhas indisponíveis' : `${association.campaigns} campanhas`}</span>
                 </span>
                 <span className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200/15 bg-white/[0.055] text-slate-200 transition group-hover:translate-x-1 group-hover:border-slate-200/30">
                   <ChevronRight size={22} />
@@ -4048,7 +4079,7 @@ function CampaignAutomationPanel({ automations = [] }) {
   );
 }
 
-function AssociationDashboard({ association, data, records = [], interestRecords = [], onDatasetUpdated, onOpenDetails, onOpenHistory, user }) {
+function AssociationDashboard({ association, campaignsLoading = false, campaignsError = '', data, records = [], interestRecords = [], onDatasetUpdated, onOpenDetails, onOpenHistory, user }) {
   const [operationalDistrict, setOperationalDistrict] = useState('');
 
   return (
@@ -4121,8 +4152,16 @@ function AssociationDashboard({ association, data, records = [], interestRecords
           </div>
           <div className="rounded-2xl border border-white/[0.07] bg-slate-950/42 p-5">
             <span className={labelClass}>Campanhas cadastradas</span>
-            <strong className="mt-2 block text-3xl font-black text-slate-50">0</strong>
-            <span className="mt-2 block text-sm leading-relaxed text-slate-400">Nenhuma campanha real cadastrada para esta associação.</span>
+            <strong className="mt-2 block text-3xl font-black text-slate-50">
+              {campaignsError ? '—' : campaignsLoading ? '...' : formatNumber(association.campaigns || 0)}
+            </strong>
+            <span className="mt-2 block text-sm leading-relaxed text-slate-400">
+              {campaignsError
+                ? 'Não foi possível consultar as campanhas no banco agora.'
+                : campaignsLoading
+                  ? 'Consultando as campanhas salvas no banco.'
+                  : `${formatNumber(association.activeCampaigns || 0)} campanha(s) em atividade nesta associação.`}
+            </span>
           </div>
         </article>
 
@@ -6531,6 +6570,9 @@ function AdminGeneralView({
   onAddTemplate,
   onUpdateTemplate,
   onDeleteTemplate,
+  campaignsLoading = false,
+  campaignsError = '',
+  onReloadCampaigns,
   initialSection = 'overview'
 }) {
   const [section, setSection] = useState(initialSection);
@@ -7050,7 +7092,13 @@ function AdminGeneralView({
 
       <section className="grid grid-cols-5 gap-4 max-xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
         <MetricCard detail="perfis administrativos" icon={UsersRound} label="Usuários" value={formatNumber(users.length)} />
-        <MetricCard detail={`${activeCampaigns} em andamento`} icon={Radio} label="Campanhas" tone="green" value={formatNumber(campaigns.length)} />
+        <MetricCard
+          detail={campaignsError ? 'última leitura; banco indisponível' : campaignsLoading ? 'consultando o banco' : `${activeCampaigns} em andamento`}
+          icon={Radio}
+          label="Campanhas"
+          tone="green"
+          value={campaignsError ? '—' : formatNumber(campaigns.length)}
+        />
         <MetricCard detail="com prioridade alta" icon={Sparkles} label="Leads quentes" tone="orange" value={formatNumber(data.hot)} />
         <MetricCard detail={`${associations.length} associações no painel`} icon={Building2} label="Territórios" value={formatNumber(data.districts)} />
         <MetricCard detail={`${pendingUsers} convite pendente`} icon={ShieldCheck} label="Pendências" tone="violet" value={formatNumber(pendingUsers)} />
@@ -7173,7 +7221,7 @@ function AdminGeneralView({
               <div className="mt-5 grid grid-cols-3 gap-3">
                 <div><span className={labelClass}>Distritos</span><strong className="mt-1 block text-2xl text-slate-50">{formatNumber(association.districts)}</strong></div>
                 <div><span className={labelClass}>Leads</span><strong className="mt-1 block text-2xl text-slate-50">{formatNumber(association.leads)}</strong></div>
-                <div><span className={labelClass}>Camp.</span><strong className="mt-1 block text-2xl text-slate-50">{formatNumber(association.campaigns)}</strong></div>
+                <div><span className={labelClass}>Camp.</span><strong className="mt-1 block text-2xl text-slate-50">{campaignsError ? '—' : formatNumber(association.campaigns)}</strong></div>
               </div>
             </article>
           ))}
@@ -7196,6 +7244,23 @@ function AdminGeneralView({
               </button>
             </div>
             <div className="mt-5 grid gap-3">
+              {campaignsError ? (
+                <div className="rounded-2xl border border-red-300/40 bg-red-950/35 p-6 text-center text-white">
+                  <AlertTriangle className="mx-auto text-red-300" size={30} />
+                  <strong className="mt-3 block text-lg font-black">Não foi possível consultar as campanhas no banco</strong>
+                  <p className="mt-2 text-sm font-semibold text-white/85">{campaignsError}</p>
+                  <button className={`${ghostButtonClass} mt-4`} onClick={onReloadCampaigns} type="button">
+                    <RefreshCw size={17} />
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : null}
+              {campaignsLoading && !campaigns.length ? (
+                <div className="rounded-2xl border border-white/15 bg-slate-950/35 p-8 text-center text-white">
+                  <RefreshCw className="mx-auto animate-spin text-blue-300" size={30} />
+                  <strong className="mt-3 block text-lg font-black">Consultando campanhas salvas...</strong>
+                </div>
+              ) : null}
               {campaigns.length ? campaigns.map((campaign, index) => (
                 <div className={`interactive-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/30 bg-gradient-to-br ${campaignColors[index % campaignColors.length]} p-5 text-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]`} key={campaign.id}>
                   <div>
@@ -7205,13 +7270,13 @@ function AdminGeneralView({
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${campaign.status === 'Ativa' ? 'bg-emerald-400 text-emerald-950' : 'bg-white/22 text-white'}`}>{campaign.status}</span>
                 </div>
-              )) : (
+              )) : !campaignsError && !campaignsLoading ? (
                 <div className="rounded-2xl border border-dashed border-white/15 bg-slate-950/35 p-8 text-center">
                   <Radio className="mx-auto text-blue-300" size={30} />
                   <strong className="mt-3 block text-lg font-black text-white">Nenhuma campanha cadastrada</strong>
                   <p className="mt-2 text-sm font-semibold text-white">Crie o primeiro briefing para iniciar o planejamento.</p>
                 </div>
-              )}
+              ) : null}
             </div>
           </article>
         </section>
@@ -8396,6 +8461,7 @@ function WhatsAppBroadcastModal({
   recipients = [],
   sending = false,
   campaigns = [],
+  campaignsError = '',
   messageTemplates = []
 }) {
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -8497,7 +8563,7 @@ function WhatsAppBroadcastModal({
                     }
                   }}
                 >
-                  <option value="">{campaigns.length ? '-- Escolha uma campanha --' : 'Nenhuma campanha cadastrada'}</option>
+                  <option value="">{campaignsError ? 'Não foi possível consultar as campanhas' : campaigns.length ? '-- Escolha uma campanha --' : 'Nenhuma campanha cadastrada'}</option>
                   {campaigns.map((campaign) => (
                     <option key={campaign.id} value={campaign.id}>
                       {campaign.name}{campaign.whatsappDispatchMessage ? '' : ' — sem mensagem'}
@@ -8505,7 +8571,9 @@ function WhatsAppBroadcastModal({
                   ))}
                 </select>
                 {!campaigns.length ? (
-                  <span className="broadcast-campaign-copy text-xs font-semibold text-slate-400">Cadastre uma campanha para disponibilizar seu texto de disparo nesta tela.</span>
+                  <span className="broadcast-campaign-copy text-xs font-semibold text-slate-400">
+                    {campaignsError ? 'A consulta ao banco falhou. Tente novamente na tela de Campanhas.' : 'Cadastre uma campanha para disponibilizar seu texto de disparo nesta tela.'}
+                  </span>
                 ) : null}
               </label>
               {messageTemplates.length > 0 ? (
@@ -8963,7 +9031,7 @@ function anaSummaryToConversationSnapshot(summary) {
   };
 }
 
-function ConversationsView({ campaigns = [], messageTemplates = [], records = [] }) {
+function ConversationsView({ campaigns = [], campaignsError = '', messageTemplates = [], records = [] }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [phoneSearch, setPhoneSearch] = useState('');
@@ -10449,6 +10517,7 @@ function ConversationsView({ campaigns = [], messageTemplates = [], records = []
           onScheduleBatches={scheduleBroadcastBatches}
           onSubmit={submitBroadcast}
           campaigns={campaigns}
+          campaignsError={campaignsError}
           messageTemplates={messageTemplates}
           recipients={broadcastSelectedLeads}
           sending={broadcastSending}
@@ -10477,7 +10546,7 @@ function anaGiftDecisionLabel(value) {
   }[value] || 'Brinde ainda não oferecido';
 }
 
-function AIAgentView({ associations = [], campaigns = [], data, records = [], onNavigate }) {
+function AIAgentView({ associations = [], campaigns = [], campaignsError = '', data, records = [], onNavigate }) {
   const [tab, setTab] = useState('overview');
   const [selectedReviewLead, setSelectedReviewLead] = useState(null);
   const [selectedAcceptedConversation, setSelectedAcceptedConversation] = useState(null);
@@ -10678,7 +10747,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
     .sort((a, b) => (b.s || 0) - (a.s || 0))
     .slice(0, 6);
   const knowledgeItems = [
-    ['Campanha ativa', campaigns.find((campaign) => campaign.status === 'Ativa')?.name || 'Nenhuma campanha ativa'],
+    ['Campanha ativa', campaignsError ? 'Consulta ao banco indisponível' : campaigns.find((campaign) => campaign.status === 'Ativa')?.name || 'Nenhuma campanha ativa'],
     ['Associação padrão', associations[0]?.name || 'Associação Paulistana'],
     ['Leads com WhatsApp', formatNumber(data.phone)],
     ['Estudos ativos', formatNumber(data.studies)]
@@ -11332,7 +11401,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
           {[
             ['Elegiveis para IA', hotWhatsapp + studyWhatsapp + vipWhatsapp, 'quentes, estudos e VIPs'],
             ['Modo atual', active ? 'Automático' : 'Inativo', 'configurado no backend'],
-            ['Campanhas ativas', campaigns.filter((campaign) => campaign.status === 'Ativa').length, 'podem receber IA'],
+            ['Campanhas ativas', campaignsError ? '—' : campaigns.filter((campaign) => campaign.status === 'Ativa').length, campaignsError ? 'consulta ao banco indisponível' : 'podem receber IA'],
             ['Modelo', anaAgent?.model || 'Gemini', 'uso acompanhado no Google AI Studio']
           ].map(([label, value, detail]) => (
             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.08)]" key={label}>
@@ -11962,27 +12031,42 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const [associations, setAssociations] = useState(() => initialAssociations);
   const [adminUsers, setAdminUsers] = useState(() => buildAdminUsers(initialAssociations));
   const [adminCampaigns, setAdminCampaigns] = useState(() => buildAdminCampaigns(initialAssociations));
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignsError, setCampaignsError] = useState('');
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+
+  const loadCampaigns = useCallback(async ({ showToast = false } = {}) => {
+    setCampaignsLoading(true);
+    setCampaignsError('');
+    try {
+      const response = await apiFetch('/api/campaigns', { cache: 'no-store' });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || 'O servidor não conseguiu consultar as campanhas.');
+      const normalized = normalizeCampaigns(result.campaigns || []);
+      setAdminCampaigns(normalized);
+      return normalized;
+    } catch (error) {
+      const message = error?.message || 'Não foi possível consultar as campanhas salvas.';
+      setCampaignsError(message);
+      if (showToast) toast.error('Campanhas não foram carregadas', { description: message });
+      throw error;
+    } finally {
+      setCampaignsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!user?.id) return undefined;
     let active = true;
 
-    apiFetch('/api/campaigns', { cache: 'no-store' })
-      .then((r) => r.ok ? r.json() : null)
-      .then((payload) => {
-        if (active && payload?.campaigns) {
-          const statusLabels = { PLANEJADA: 'Planejada', ATIVA: 'Ativa', PAUSADA: 'Pausada', FINALIZADA: 'Finalizada' };
-          setAdminCampaigns(payload.campaigns.map((c) => ({ ...c, status: statusLabels[c.status] || c.status })));
-        }
-      })
-      .catch(() => {});
+    loadCampaigns({ showToast: true }).catch(() => {});
     apiFetch('/api/whatsapp/message-templates', { cache: 'no-store' })
       .then((r) => r.ok ? r.json() : null)
       .then((payload) => { if (active && payload?.templates) setWhatsappTemplates(payload.templates); })
       .catch(() => {});
 
     return () => { active = false; };
-  }, [user?.id]);
+  }, [loadCampaigns, user?.id]);
   const [auditEvents, setAuditEvents] = useState([
     { id: 'audit-login', action: 'Login administrativo', user: 'Admin geral', detail: 'Sessão aberta com perfil ADMIN_GERAL', when: 'Agora' },
     { id: 'audit-export', action: 'Exportação controlada', user: 'Gestão Paulistana', detail: 'Relatório de distritos filtrados disponível', when: 'Hoje' },
@@ -12001,7 +12085,11 @@ export default function CrmApp({ payload: initialPayload = null }) {
     };
   }, [theme]);
   const baseRecords = useMemo(() => scopedRecordsForUser(payload?.records || [], user), [payload, user]);
-  const visibleAssociations = useMemo(() => scopedAssociationsForUser(associations, user), [associations, user]);
+  const visibleAssociations = useMemo(() => scopedAssociationsForUser(associations, user).map((association) => ({
+    ...association,
+    campaigns: adminCampaigns.filter((campaign) => campaignBelongsToAssociation(campaign, association)).length,
+    activeCampaigns: adminCampaigns.filter((campaign) => campaign.status === 'Ativa' && campaignBelongsToAssociation(campaign, association)).length
+  })), [adminCampaigns, associations, user]);
   const selectedAssociation = visibleAssociations.find((association) => association.id === selectedAssociationId) || visibleAssociations[0];
   const selectedAssociationSlug = selectedAssociation?.id || selectedAssociationId;
   const records = useMemo(() => (
@@ -12254,13 +12342,18 @@ export default function CrmApp({ payload: initialPayload = null }) {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Erro ao salvar campanha.');
-      const statusLabels = { PLANEJADA: 'Planejada', ATIVA: 'Ativa', PAUSADA: 'Pausada', FINALIZADA: 'Finalizada' };
       const saved = {
         ...payload.campaign,
         association: payload.campaign.association || assoc?.name || campaign.association,
-        status: statusLabels[payload.campaign.status] || payload.campaign.status
+        status: campaignStatusLabels[payload.campaign.status] || payload.campaign.status
       };
       setAdminCampaigns((current) => [saved, ...current]);
+      setCampaignsError('');
+      loadCampaigns().catch(() => {
+        toast.warning('Campanha salva; atualização pendente', {
+          description: 'A gravação foi confirmada, mas a lista não pôde ser consultada novamente agora. A campanha continuará visível nesta sessão.'
+        });
+      });
       setAuditEvents((current) => [
         { id: `audit-${Date.now()}`, action: 'Campanha criada', user: user?.name || 'Admin geral', detail: campaign.name, when: 'Agora' },
         ...current
@@ -12345,7 +12438,10 @@ export default function CrmApp({ payload: initialPayload = null }) {
     messageTemplates: whatsappTemplates,
     onAddTemplate: addWhatsAppTemplate,
     onUpdateTemplate: updateWhatsAppTemplate,
-    onDeleteTemplate: deleteWhatsAppTemplate
+    onDeleteTemplate: deleteWhatsAppTemplate,
+    campaignsLoading,
+    campaignsError,
+    onReloadCampaigns: () => loadCampaigns({ showToast: true }).catch(() => {})
   };
   const requestedView = canOpenView(user, view) ? view : defaultViewForUser(user);
   const deferredContentView = deferredView === 'details' ? requestedView : deferredView;
@@ -12357,6 +12453,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
     content = (
       <AdminDashboard
         associations={filteredAssociations}
+        campaignsError={campaignsError}
+        campaignsLoading={campaignsLoading}
         canManageAdmin={isAdminUser(user)}
         data={data}
         isAssociationsView={false}
@@ -12372,6 +12470,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
     content = (
       <AssociationDashboard
         association={selectedAssociation}
+        campaignsError={campaignsError}
+        campaignsLoading={campaignsLoading}
         data={data}
         onDatasetUpdated={loadDashboard}
         onOpenDetails={() => openDetailsView(navigateView)}
@@ -12385,6 +12485,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
     content = (
       <AdminDashboard
         associations={filteredAssociations}
+        campaignsError={campaignsError}
+        campaignsLoading={campaignsLoading}
         canManageAdmin={isAdminUser(user)}
         data={data}
         isAssociationsView
@@ -12438,6 +12540,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
     content = (
       <AssociationDashboard
         association={selectedAssociation}
+        campaignsError={campaignsError}
+        campaignsLoading={campaignsLoading}
         data={data}
         onDatasetUpdated={loadDashboard}
         onOpenDetails={() => openDetailsView(navigateView)}
@@ -12469,12 +12573,13 @@ export default function CrmApp({ payload: initialPayload = null }) {
     content = (
       <ConversationsView
         campaigns={adminCampaigns}
+        campaignsError={campaignsError}
         messageTemplates={whatsappTemplates}
         records={records}
       />
     );
   } else if (effectiveView === 'ai-agent') {
-    content = <AIAgentView associations={filteredAssociations} campaigns={adminCampaigns} data={data} onNavigate={navigateView} records={records} />;
+    content = <AIAgentView associations={filteredAssociations} campaigns={adminCampaigns} campaignsError={campaignsError} data={data} onNavigate={navigateView} records={records} />;
   } else if (effectiveView === 'reports') {
     content = isAdminUser(user)
       ? <AdminGeneralView {...adminGeneralProps} initialSection="audit" />
