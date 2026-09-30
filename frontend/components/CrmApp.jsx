@@ -8920,7 +8920,7 @@ function anaSummaryToConversationSnapshot(summary) {
   };
 }
 
-function ConversationsView({ records = [] }) {
+function ConversationsView({ campaigns = [], messageTemplates = [], records = [] }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [phoneSearch, setPhoneSearch] = useState('');
@@ -10405,8 +10405,8 @@ function ConversationsView({ records = [] }) {
           onSchedule={scheduleBroadcast}
           onScheduleBatches={scheduleBroadcastBatches}
           onSubmit={submitBroadcast}
-          campaigns={adminCampaigns}
-          messageTemplates={whatsappTemplates}
+          campaigns={campaigns}
+          messageTemplates={messageTemplates}
           recipients={broadcastSelectedLeads}
           sending={broadcastSending}
         />
@@ -11921,10 +11921,13 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const [adminCampaigns, setAdminCampaigns] = useState(() => buildAdminCampaigns(initialAssociations));
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
   useEffect(() => {
+    if (!user?.id) return undefined;
+    let active = true;
+
     apiFetch('/api/campaigns', { cache: 'no-store' })
       .then((r) => r.ok ? r.json() : null)
       .then((payload) => {
-        if (payload?.campaigns) {
+        if (active && payload?.campaigns) {
           const statusLabels = { PLANEJADA: 'Planejada', ATIVA: 'Ativa', PAUSADA: 'Pausada', FINALIZADA: 'Finalizada' };
           setAdminCampaigns(payload.campaigns.map((c) => ({ ...c, status: statusLabels[c.status] || c.status })));
         }
@@ -11932,9 +11935,11 @@ export default function CrmApp({ payload: initialPayload = null }) {
       .catch(() => {});
     apiFetch('/api/whatsapp/message-templates', { cache: 'no-store' })
       .then((r) => r.ok ? r.json() : null)
-      .then((payload) => { if (payload?.templates) setWhatsappTemplates(payload.templates); })
+      .then((payload) => { if (active && payload?.templates) setWhatsappTemplates(payload.templates); })
       .catch(() => {});
-  }, []);
+
+    return () => { active = false; };
+  }, [user?.id]);
   const [auditEvents, setAuditEvents] = useState([
     { id: 'audit-login', action: 'Login administrativo', user: 'Admin geral', detail: 'Sessão aberta com perfil ADMIN_GERAL', when: 'Agora' },
     { id: 'audit-export', action: 'Exportação controlada', user: 'Gestão Paulistana', detail: 'Relatório de distritos filtrados disponível', when: 'Hoje' },
@@ -12063,7 +12068,6 @@ export default function CrmApp({ payload: initialPayload = null }) {
       setPayload(nextPayload);
       setAssociations(nextAssociations);
       setAdminUsers(buildAdminUsers(nextAssociations));
-      setAdminCampaigns(buildAdminCampaigns(nextAssociations));
       setDistrictInterestBySlug({});
     } finally {
       setDashboardLoading(false);
@@ -12413,7 +12417,13 @@ export default function CrmApp({ payload: initialPayload = null }) {
       ? <AdminGeneralView {...adminGeneralProps} initialSection="distribution" />
       : <PlaceholderView icon={MessageCircle} subtitle="O WhatsApp desta associação será exibido aqui com conversas, envios e indicadores próprios." title="WhatsApp" />;
   } else if (effectiveView === 'conversations') {
-    content = <ConversationsView records={records} />;
+    content = (
+      <ConversationsView
+        campaigns={adminCampaigns}
+        messageTemplates={whatsappTemplates}
+        records={records}
+      />
+    );
   } else if (effectiveView === 'ai-agent') {
     content = <AIAgentView associations={filteredAssociations} campaigns={adminCampaigns} data={data} onNavigate={navigateView} records={records} />;
   } else if (effectiveView === 'reports') {
