@@ -648,6 +648,34 @@ html[data-crm-theme="dark"] .whatsapp-broadcast-modal > div:last-child {
   background: #0c1826 !important;
 }
 
+.whatsapp-broadcast-modal .broadcast-campaign-panel {
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  background: linear-gradient(135deg, rgb(82 96 111), rgb(65 77 91)) !important;
+  color: #ffffff !important;
+}
+
+.whatsapp-broadcast-modal .broadcast-campaign-panel .broadcast-campaign-copy,
+.whatsapp-broadcast-modal .broadcast-campaign-panel .broadcast-greeting-option {
+  color: #ffffff !important;
+}
+
+.whatsapp-broadcast-modal .broadcast-campaign-panel .broadcast-greeting-option {
+  border-color: rgba(255, 255, 255, 0.38) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.whatsapp-broadcast-modal .broadcast-campaign-panel .broadcast-greeting-option:hover,
+.whatsapp-broadcast-modal .broadcast-campaign-panel .broadcast-greeting-option:focus-visible {
+  border-color: rgb(110 231 183) !important;
+  background: rgba(255, 255, 255, 0.20) !important;
+}
+
+.whatsapp-broadcast-modal .broadcast-campaign-panel .broadcast-greeting-option[data-active='true'] {
+  border-color: rgb(52 211 153) !important;
+  background: rgb(5 150 105) !important;
+  color: #ffffff !important;
+}
+
 .app-dark .premium-panel .leads-map-church-count,
 html[data-crm-theme="dark"] [role="dialog"] .leads-map-church-count {
   background: rgb(2 44 34) !important;

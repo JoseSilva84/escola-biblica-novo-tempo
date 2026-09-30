@@ -8466,10 +8466,10 @@ function WhatsAppBroadcastModal({
           <button aria-label="Fechar" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 transition hover:bg-white/25" onClick={onClose} type="button"><X size={20} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          <div className="mb-4 grid gap-3 rounded-2xl border border-emerald-200/30 bg-emerald-950/20 p-4">
-              <span className="text-[11px] font-black uppercase tracking-wide text-emerald-400">Campanha e mensagem</span>
+          <div className="broadcast-campaign-panel mb-4 grid gap-3 rounded-2xl border border-emerald-200/30 bg-emerald-950/20 p-4">
+              <span className="broadcast-campaign-copy text-[11px] font-black uppercase tracking-wide text-emerald-400">Campanha e mensagem</span>
               <label className="grid gap-1.5">
-                <span className="text-xs font-bold text-slate-300">Campanha</span>
+                <span className="broadcast-campaign-copy text-xs font-bold text-slate-300">Campanha</span>
                 <select
                   className="h-11 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm font-bold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={!campaigns.length}
@@ -8496,12 +8496,12 @@ function WhatsAppBroadcastModal({
                   ))}
                 </select>
                 {!campaigns.length ? (
-                  <span className="text-xs font-semibold text-slate-400">Cadastre uma campanha para disponibilizar seu texto de disparo nesta tela.</span>
+                  <span className="broadcast-campaign-copy text-xs font-semibold text-slate-400">Cadastre uma campanha para disponibilizar seu texto de disparo nesta tela.</span>
                 ) : null}
               </label>
               {messageTemplates.length > 0 ? (
                 <label className="grid gap-1.5">
-                  <span className="text-xs font-bold text-slate-300">Mensagem salva</span>
+                  <span className="broadcast-campaign-copy text-xs font-bold text-slate-300">Mensagem salva</span>
                   <select
                     className="h-11 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm font-bold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10"
                     value={selectedTemplateId}
@@ -8518,11 +8518,12 @@ function WhatsAppBroadcastModal({
                 </label>
               ) : null}
               <div>
-                <span className="text-xs font-bold text-slate-300">Saudacao</span>
+                <span className="broadcast-campaign-copy text-xs font-bold text-slate-300">Saudacao</span>
                 <div className="mt-1.5 flex gap-2">
                   {[['bom-dia', 'Bom dia'], ['boa-tarde', 'Boa tarde'], ['boa-noite', 'Boa noite']].map(([val, lbl]) => (
                     <button
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-black transition ${activeGreeting === val ? 'border-[#00a884] bg-[#00a884] text-white' : 'border-white/20 bg-white/5 text-slate-300 hover:border-[#00a884]/50'}`}
+                      className={`broadcast-greeting-option rounded-lg border px-3 py-1.5 text-xs font-black transition ${activeGreeting === val ? 'border-[#00a884] bg-[#00a884] text-white' : 'border-white/20 bg-white/5 text-slate-300 hover:border-[#00a884]/50'}`}
+                      data-active={activeGreeting === val}
                       key={val}
                       onClick={() => {
                         setActiveGreeting(val);
