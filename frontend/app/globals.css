@@ -951,6 +951,26 @@ html[data-crm-theme='light'] .campaign-briefing-modal .campaign-channel-option:h
   background: rgb(239 246 255) !important;
 }
 
+html[data-crm-theme='light'] .campaign-briefing-modal .campaign-greeting-option {
+  border-color: rgb(100 116 139) !important;
+  background: rgb(71 85 105) !important;
+  color: rgb(248 250 252) !important;
+  box-shadow: 0 5px 14px rgba(15, 23, 42, 0.16);
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .campaign-greeting-option:hover,
+html[data-crm-theme='light'] .campaign-briefing-modal .campaign-greeting-option:focus-within {
+  border-color: rgb(52 211 153) !important;
+  background: rgb(51 65 85) !important;
+  color: #ffffff !important;
+}
+
+html[data-crm-theme='light'] .campaign-briefing-modal .campaign-greeting-option:has(input:checked) {
+  border-color: rgb(16 185 129) !important;
+  background: rgb(6 95 70) !important;
+  color: #ffffff !important;
+}
+
 html[data-crm-theme='light'] .campaign-briefing-modal .campaign-submit {
   border-color: transparent !important;
   background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 52%, #0f172a 100%) !important;
