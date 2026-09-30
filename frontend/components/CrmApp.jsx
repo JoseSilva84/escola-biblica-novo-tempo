@@ -6218,6 +6218,306 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   );
 }
 
+function WhatsAppTemplateLibrary({
+  templates = [],
+  onAddTemplate,
+  onUpdateTemplate,
+  onDeleteTemplate
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [name, setName] = useState('');
+  const [greeting, setGreeting] = useState('boa-noite');
+  const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  function openCreate() {
+    setEditingTemplate(null);
+    setName('');
+    setGreeting('boa-noite');
+    setMessage('Boa noite, {{PRIMEIRO_NOME}}! Tudo bem? Eu sou a Ana, agente da Novo Tempo ðŸ˜Š\n\nVi aqui que vocÃª pediu um material sobre {{TEMA}} pela Escola BÃ­blica.\n\nVocÃª jÃ¡ recebeu o material?');
+    setModalOpen(true);
+  }
+
+  function openEdit(tpl) {
+    setEditingTemplate(tpl);
+    setName(tpl.name || '');
+    setGreeting(tpl.greeting || 'boa-noite');
+    setMessage(tpl.message || '');
+    setModalOpen(true);
+  }
+
+  function insertVariable(variable) {
+    setMessage((current) => `${current}${current ? ' ' : ''}${variable}`);
+  }
+
+  function handleGreetingChange(newGreeting) {
+    setGreeting(newGreeting);
+    const greetingMap = { 'bom-dia': 'Bom dia', 'boa-tarde': 'Boa tarde', 'boa-noite': 'Boa noite' };
+    const label = greetingMap[newGreeting];
+    setMessage((current) => {
+      if (!current) return `${label}, {{PRIMEIRO_NOME}}!`;
+      const replaced = current.replace(/^(Bom dia|Boa tarde|Boa noite)/i, label);
+      return replaced !== current ? replaced : `${label}, ${current}`;
+    });
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!name.trim()) {
+      toast.error('Informe o nome do modelo.');
+      return;
+    }
+    if (!message.trim()) {
+      toast.error('Informe o texto da mensagem.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (editingTemplate) {
+        await onUpdateTemplate(editingTemplate.id, {
+          name: name.trim(),
+          greeting,
+          message: message.trim()
+        });
+      } else {
+        await onAddTemplate({
+          name: name.trim(),
+          greeting,
+          message: message.trim()
+        });
+      }
+      setModalOpen(false);
+    } catch {
+      // erro tratado no handler
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm('Tem certeza que deseja excluir este modelo de mensagem do banco de dados?')) return;
+    setDeletingId(id);
+    try {
+      await onDeleteTemplate(id);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  const samplePreview = renderPreviewTemplate(message || 'Nenhuma mensagem digitada', {
+    name: 'Maria Santos',
+    theme: 'O Grande Conflito',
+    district: 'Central'
+  });
+
+  return (
+    <div className="grid gap-6">
+      <section className={`${panelClass} overflow-hidden p-6`}>
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <span className={labelClass}>WhatsApp Â· Banco de Dados VPS</span>
+            <h1 className="silver-title mt-2 text-4xl font-extrabold leading-tight tracking-normal max-md:text-3xl">
+              Biblioteca de Mensagens de Disparo
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
+              Crie e edite opÃ§Ãµes de mensagens prontas para transmissÃ£o. Todos os modelos sÃ£o persistidos no banco de dados da VPS e ficam disponÃ­veis para seleÃ§Ã£o instantÃ¢nea na Lista de TransmissÃ£o.
+            </p>
+          </div>
+          <button
+            className={primaryButtonClass}
+            onClick={openCreate}
+            type="button"
+          >
+            <Plus size={18} />
+            Novo modelo de mensagem
+          </button>
+        </div>
+      </section>
+
+      {/* Grid de Modelos Salvos */}
+      <section className="grid gap-4">
+        {templates.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-white/15 bg-slate-950/40 p-12 text-center">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-400">
+              <MessageCircle size={32} />
+            </div>
+            <strong className="mt-4 block text-xl font-bold text-white">Nenhum modelo cadastrado no banco</strong>
+            <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
+              Crie opÃ§Ãµes de mensagens (ex.: &ldquo;Boa noite â€” reativaÃ§Ã£o&rdquo;, &ldquo;Convite estudo Daniel&rdquo;) para selecionar diretamente no disparo.
+            </p>
+            <button
+              className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-[#008069]"
+              onClick={openCreate}
+              type="button"
+            >
+              <Plus size={18} />
+              Criar primeiro modelo
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
+            {templates.map((tpl) => {
+              const greetingLabels = {
+                'bom-dia': 'Bom dia',
+                'boa-tarde': 'Boa tarde',
+                'boa-noite': 'Boa noite'
+              };
+              return (
+                <article
+                  className="rounded-2xl border border-white/10 bg-slate-950/70 p-5 shadow-lg backdrop-blur-md flex flex-col justify-between"
+                  key={tpl.id}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-black text-emerald-400">
+                          {greetingLabels[tpl.greeting] || 'Boa noite'}
+                        </span>
+                        <h3 className="mt-2 text-lg font-black text-white">{tpl.name}</h3>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-200 transition hover:bg-white/15"
+                          onClick={() => openEdit(tpl)}
+                          type="button"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 transition hover:bg-red-500/25 disabled:opacity-50"
+                          disabled={deletingId === tpl.id}
+                          onClick={() => handleDelete(tpl.id)}
+                          type="button"
+                        >
+                          {deletingId === tpl.id ? 'Excluindo...' : 'Excluir'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-3.5 rounded-xl border border-white/5 bg-slate-900/80 p-3.5 text-xs font-semibold leading-relaxed text-slate-300">
+                      <p className="whitespace-pre-line">{tpl.message}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3 text-[11px] font-semibold text-slate-500">
+                    <span>
+                      {tpl.createdAt ? `Criado em ${new Date(tpl.createdAt).toLocaleDateString('pt-BR')}` : 'Salvo no banco'}
+                    </span>
+                    <span className="text-emerald-400/80 font-bold">DisponÃ­vel na transmissÃ£o âœ“</span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Modal de Criacao / Edicao */}
+      {modalOpen ? createPortal(
+        <div className="fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/80 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
+          <form className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.7)]" onSubmit={handleSubmit}>
+            <div className="flex items-center justify-between border-b border-white/10 bg-[linear-gradient(135deg,#075e54,#008069,#00a884)] p-5 text-white">
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-100">Modelo WhatsApp Â· VPS</span>
+                <h2 className="mt-1 text-2xl font-black">{editingTemplate ? 'Editar modelo de mensagem' : 'Novo modelo de mensagem'}</h2>
+              </div>
+              <button aria-label="Fechar" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 transition hover:bg-white/25" onClick={() => setModalOpen(false)} type="button">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="max-h-[75vh] overflow-y-auto p-6 grid gap-4">
+              <label className="grid gap-1.5 text-sm font-black text-slate-200">
+                Nome do modelo *
+                <input
+                  className="h-11 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm font-bold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/15"
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex.: Boa noite â€” reativaÃ§Ã£o de estudos"
+                  required
+                  value={name}
+                />
+              </label>
+
+              <div>
+                <span className="text-sm font-black text-slate-200">SaudaÃ§Ã£o padrÃ£o</span>
+                <div className="mt-2 flex gap-2">
+                  {[['bom-dia', 'Bom dia'], ['boa-tarde', 'Boa tarde'], ['boa-noite', 'Boa noite']].map(([val, lbl]) => (
+                    <button
+                      className={`rounded-xl border px-4 py-2 text-xs font-black transition ${greeting === val ? 'border-[#00a884] bg-[#00a884] text-white' : 'border-white/15 bg-slate-900 text-slate-300 hover:border-emerald-500/50'}`}
+                      key={val}
+                      onClick={() => handleGreetingChange(val)}
+                      type="button"
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="grid gap-1.5 text-sm font-black text-slate-200">
+                Mensagem do WhatsApp *
+                <textarea
+                  className="min-h-36 rounded-xl border border-white/10 bg-slate-900 p-4 text-sm font-semibold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/15"
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Escreva a mensagem aqui..."
+                  required
+                  rows={6}
+                  value={message}
+                />
+              </label>
+
+              <div>
+                <span className="text-xs font-bold text-slate-400">Clique para inserir variÃ¡veis dinÃ¢micas:</span>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {['{{PRIMEIRO_NOME}}', '{{NOME}}', '{{TEMA}}', '{{MATERIAL}}', '{{DISTRITO}}'].map((tag) => (
+                    <button
+                      className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20"
+                      key={tag}
+                      onClick={() => insertVariable(tag)}
+                      type="button"
+                    >
+                      +{tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Previa ao vivo */}
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-4">
+                <span className="text-[11px] font-black uppercase tracking-wide text-emerald-400">PrÃ©via de envio com dados de exemplo</span>
+                <div className="mt-2 rounded-xl bg-white p-3 text-xs font-semibold leading-relaxed text-slate-800">
+                  <p className="whitespace-pre-line">{samplePreview}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-white/10 bg-slate-900/90 p-4">
+              <button
+                className="h-10 rounded-xl border border-white/15 px-4 text-xs font-black text-slate-300 transition hover:bg-white/10"
+                onClick={() => setModalOpen(false)}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-xs font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-[#008069] disabled:opacity-50"
+                disabled={saving || !name.trim() || !message.trim()}
+                type="submit"
+              >
+                {saving ? 'Salvando no banco...' : editingTemplate ? 'Atualizar modelo no banco' : 'Salvar modelo no banco da VPS'}
+              </button>
+            </div>
+          </form>
+        </div>,
+        document.body
+      ) : null}
+    </div>
+  );
+}
+
 function AdminGeneralView({
   associations,
   data,
@@ -6227,6 +6527,10 @@ function AdminGeneralView({
   auditEvents,
   onAddUser,
   onAddCampaign,
+  messageTemplates = [],
+  onAddTemplate,
+  onUpdateTemplate,
+  onDeleteTemplate,
   initialSection = 'overview'
 }) {
   const [section, setSection] = useState(initialSection);
@@ -6284,6 +6588,7 @@ function AdminGeneralView({
     ['territories', 'Territórios', Building2],
     ['campaigns', 'Campanhas', Radio],
     ['distribution', 'Distribuição', ClipboardList],
+    ['templates', 'Modelos de Mensagem', MessageCircle],
     ['audit', 'Auditoria', ShieldCheck],
     ['ml', 'Governança ML', Sparkles]
   ];
@@ -6913,15 +7218,25 @@ function AdminGeneralView({
                   Mensagens recebidas pelo WAHA, indicadores, segmentos, recência, critérios, alertas e relatórios calculados com a base real.
                 </p>
               </div>
-              <button
-                className={primaryButtonClass}
-                disabled={whatsappSyncing}
-                onClick={() => refreshWhatsappConversations({ sync: true })}
-                type="button"
-              >
-                <RefreshCw size={18} />
-                {whatsappSyncing ? 'Atualizando...' : 'Atualizar conversas'}
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 text-sm font-bold text-emerald-300 transition hover:bg-emerald-500/20"
+                  onClick={() => setSection('templates')}
+                  type="button"
+                >
+                  <MessageCircle size={18} />
+                  Biblioteca de Mensagens ({messageTemplates.length})
+                </button>
+                <button
+                  className={primaryButtonClass}
+                  disabled={whatsappSyncing}
+                  onClick={() => refreshWhatsappConversations({ sync: true })}
+                  type="button"
+                >
+                  <RefreshCw size={18} />
+                  {whatsappSyncing ? 'Atualizando...' : 'Atualizar conversas'}
+                </button>
+              </div>
             </div>
             <div className="mt-6 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
               {[
@@ -7392,6 +7707,14 @@ function AdminGeneralView({
         </section>
       ) : null}
 
+      {section === 'templates' ? (
+        <WhatsAppTemplateLibrary
+          templates={messageTemplates}
+          onAddTemplate={onAddTemplate}
+          onUpdateTemplate={onUpdateTemplate}
+          onDeleteTemplate={onDeleteTemplate}
+        />
+      ) : null}
       {section === 'audit' ? (
         <section className={`${panelClass} p-6`}>
           <span className={labelClass}>Auditoria administrativa</span>
@@ -7564,7 +7887,7 @@ function AdminGeneralView({
                       </label>
                       <label className="grid gap-2 text-sm font-black text-slate-200">
                         Mensagem de disparo WhatsApp
-                        <textarea className="min-h-32 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-green-300 focus:ring-4 focus:ring-green-500/15" name="whatsappDispatchMessage" placeholder="Boa noite, {"{PRIMEIRO_NOME}"}! Tudo bem? Eu sou a Ana, agente da Novo Tempo..." />
+                        <textarea className="min-h-32 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-green-300 focus:ring-4 focus:ring-green-500/15" name="whatsappDispatchMessage" placeholder="Boa noite, {{PRIMEIRO_NOME}}! Tudo bem? Eu sou a Ana, agente da Novo Tempo..." />
                       </label>
                     </div>
                   </section>
@@ -8054,6 +8377,19 @@ function WhatsAppBroadcastModal({
   const totalAllocated = batches.reduce((sum, b) => sum + (Number(b.count) || 0), 0);
   const batchRemaining = recipients.length - totalAllocated;
   const [activeGreeting, setActiveGreeting] = useState('boa-noite');
+  const [selectedCampaignId, setSelectedCampaignId] = useState(() => (campaigns.length === 1 ? campaigns[0].id : ''));
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+
+  useEffect(() => {
+    if (campaigns.length === 1) {
+      const camp = campaigns[0];
+      setSelectedCampaignId(camp.id);
+      if (camp?.whatsappDispatchMessage && (!message || message === defaultBroadcastMessage)) {
+        onMessageChange(camp.whatsappDispatchMessage);
+        setActiveGreeting(camp.whatsappDispatchGreeting || 'boa-noite');
+      }
+    }
+  }, [campaigns]);
 
   function addBatch() { setBatches((c) => [...c, { count: '', date: '', time: '' }]); }
   function removeBatch(i) { setBatches((c) => c.filter((_, idx) => idx !== i)); }
@@ -8113,15 +8449,18 @@ function WhatsAppBroadcastModal({
                   <span className="text-xs font-bold text-slate-300">Campanha</span>
                   <select
                     className="h-11 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm font-bold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10"
+                    value={selectedCampaignId}
                     onChange={(e) => {
-                      const camp = campaigns.find((camp) => camp.id === e.target.value);
+                      const id = e.target.value;
+                      setSelectedCampaignId(id);
+                      const camp = campaigns.find((camp) => camp.id === id);
                       if (camp?.whatsappDispatchMessage) {
                         onMessageChange(camp.whatsappDispatchMessage);
                         setActiveGreeting(camp.whatsappDispatchGreeting || 'boa-noite');
                       }
                     }}
                   >
-                    <option value="">-- Escolha uma campanha --</option>
+                    {campaigns.length > 1 ? <option value="">-- Escolha uma campanha --</option> : null}
                     {campaigns.map((camp) => <option key={camp.id} value={camp.id}>{camp.name}</option>)}
                   </select>
                 </label>
@@ -8131,8 +8470,11 @@ function WhatsAppBroadcastModal({
                   <span className="text-xs font-bold text-slate-300">Mensagem salva</span>
                   <select
                     className="h-11 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm font-bold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10"
+                    value={selectedTemplateId}
                     onChange={(e) => {
-                      const tpl = messageTemplates.find((t) => t.id === e.target.value);
+                      const id = e.target.value;
+                      setSelectedTemplateId(id);
+                      const tpl = messageTemplates.find((t) => t.id === id);
                       if (tpl) { onMessageChange(tpl.message); setActiveGreeting(tpl.greeting || 'boa-noite'); }
                     }}
                   >
@@ -11883,6 +12225,61 @@ export default function CrmApp({ payload: initialPayload = null }) {
       ...current
     ]);
   };
+  const addWhatsAppTemplate = async (templateData) => {
+    try {
+      const response = await apiFetch('/api/whatsapp/message-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(templateData)
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Erro ao criar modelo.');
+      setWhatsappTemplates((current) => [payload.template, ...current]);
+      toast.success('Modelo de mensagem salvo', {
+        description: `"${payload.template.name}" foi salvo com sucesso no banco de dados.`
+      });
+      return payload.template;
+    } catch (error) {
+      toast.error('Falha ao salvar modelo', { description: error.message });
+      throw error;
+    }
+  };
+
+  const updateWhatsAppTemplate = async (id, templateData) => {
+    try {
+      const response = await apiFetch(`/api/whatsapp/message-templates/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(templateData)
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Erro ao atualizar modelo.');
+      setWhatsappTemplates((current) => current.map((t) => (t.id === id ? payload.template : t)));
+      toast.success('Modelo atualizado', {
+        description: `"${payload.template.name}" foi atualizado com sucesso.`
+      });
+      return payload.template;
+    } catch (error) {
+      toast.error('Falha ao atualizar modelo', { description: error.message });
+      throw error;
+    }
+  };
+
+  const deleteWhatsAppTemplate = async (id) => {
+    try {
+      const response = await apiFetch(`/api/whatsapp/message-templates/${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Erro ao excluir modelo.');
+      setWhatsappTemplates((current) => current.filter((t) => t.id !== id));
+      toast.success('Modelo excluído do banco de dados');
+    } catch (error) {
+      toast.error('Falha ao excluir modelo', { description: error.message });
+      throw error;
+    }
+  };
+
   const adminGeneralProps = {
     associations: filteredAssociations,
     auditEvents,
@@ -11891,7 +12288,11 @@ export default function CrmApp({ payload: initialPayload = null }) {
     onAddCampaign: addAdminCampaign,
     onAddUser: addAdminUser,
     records,
-    users: adminUsers
+    users: adminUsers,
+    messageTemplates: whatsappTemplates,
+    onAddTemplate: addWhatsAppTemplate,
+    onUpdateTemplate: updateWhatsAppTemplate,
+    onDeleteTemplate: deleteWhatsAppTemplate
   };
   const requestedView = canOpenView(user, view) ? view : defaultViewForUser(user);
   const deferredContentView = deferredView === 'details' ? requestedView : deferredView;
