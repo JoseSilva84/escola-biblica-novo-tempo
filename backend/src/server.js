@@ -4735,7 +4735,12 @@ app.get('/api/auth/me', (request, response) => {
     response.status(401).json({ user: null });
     return;
   }
-  response.json({ user });
+  response.json({
+    user: {
+      ...user,
+      id: user.id || user.sub
+    }
+  });
 });
 
 app.get('/api/dashboard', requireAuth, async (request, response) => {

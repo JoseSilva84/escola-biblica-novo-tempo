@@ -12194,6 +12194,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [campaignsError, setCampaignsError] = useState('');
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+  const authenticatedUserId = user?.id || user?.sub;
 
   const loadCampaigns = useCallback(async ({ showToast = false } = {}) => {
     setCampaignsLoading(true);
@@ -12216,7 +12217,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
   }, []);
 
   useEffect(() => {
-    if (!user?.id) return undefined;
+    if (!authenticatedUserId) return undefined;
     let active = true;
 
     loadCampaigns({ showToast: true }).catch(() => {});
@@ -12226,7 +12227,7 @@ export default function CrmApp({ payload: initialPayload = null }) {
       .catch(() => {});
 
     return () => { active = false; };
-  }, [loadCampaigns, user?.id]);
+  }, [authenticatedUserId, loadCampaigns]);
   const [auditEvents, setAuditEvents] = useState([
     { id: 'audit-login', action: 'Login administrativo', user: 'Admin geral', detail: 'Sessão aberta com perfil ADMIN_GERAL', when: 'Agora' },
     { id: 'audit-export', action: 'Exportação controlada', user: 'Gestão Paulistana', detail: 'Relatório de distritos filtrados disponível', when: 'Hoje' },
