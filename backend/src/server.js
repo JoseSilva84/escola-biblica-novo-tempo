@@ -6687,17 +6687,50 @@ app.patch('/api/campaigns/:id', requireAuth, async (request, response) => {
   const statusMap = { Planejada: 'PLANEJADA', Ativa: 'ATIVA', Pausada: 'PAUSADA', Finalizada: 'FINALIZADA' };
   try {
     const data = {};
-    if (request.body?.name !== undefined) data.name = String(request.body.name).trim();
+    if (request.body?.name !== undefined) {
+      data.name = String(request.body.name).trim();
+      if (!data.name) return response.status(400).json({ ok: false, message: 'Nome da campanha e obrigatorio.' });
+    }
+    if (request.body?.associationId !== undefined) {
+      const associationReference = String(request.body.associationId || '').trim();
+      const association = await prisma.association.findFirst({
+        where: { OR: [{ id: associationReference }, { slug: associationReference.toLowerCase() }] },
+        select: { id: true }
+      });
+      if (!association) return response.status(400).json({ ok: false, message: 'A associacao selecionada nao foi encontrada no banco de dados.' });
+      data.associationId = association.id;
+    }
     if (request.body?.status !== undefined) data.status = statusMap[request.body.status] || request.body.status;
-    if (request.body?.whatsappDispatchMessage !== undefined) data.whatsappDispatchMessage = String(request.body.whatsappDispatchMessage).trim() || null;
+    if (request.body?.whatsappDispatchMessage !== undefined) {
+      data.whatsappDispatchMessage = String(request.body.whatsappDispatchMessage).trim();
+      if (!data.whatsappDispatchMessage) return response.status(400).json({ ok: false, message: 'Mensagem de disparo da campanha e obrigatoria.' });
+    }
     if (request.body?.whatsappDispatchGreeting !== undefined) data.whatsappDispatchGreeting = String(request.body.whatsappDispatchGreeting).trim();
     if (request.body?.owner !== undefined) data.owner = String(request.body.owner).trim() || null;
     if (request.body?.goal !== undefined) data.goal = Number(request.body.goal) || 0;
     if (request.body?.proposal !== undefined) data.proposal = String(request.body.proposal).trim() || null;
     if (request.body?.objective !== undefined) data.objective = String(request.body.objective).trim() || null;
+    if (request.body?.audience !== undefined) data.audience = String(request.body.audience).trim() || null;
+    if (request.body?.context !== undefined) data.context = String(request.body.context).trim() || null;
+    if (request.body?.message !== undefined) data.message = String(request.body.message).trim() || null;
+    if (request.body?.callToAction !== undefined) data.callToAction = String(request.body.callToAction).trim() || null;
     if (request.body?.channels !== undefined) data.channels = Array.isArray(request.body.channels) ? request.body.channels.map(String) : [];
-    const campaign = await prisma.campaign.update({ where: { id }, data });
-    return response.json({ ok: true, campaign });
+    if (request.body?.startDate !== undefined) data.startDate = request.body.startDate ? new Date(request.body.startDate) : null;
+    if (request.body?.endDate !== undefined) data.endDate = request.body.endDate ? new Date(request.body.endDate) : null;
+    if (request.body?.budget !== undefined) data.budget = request.body.budget === '' || request.body.budget === null ? null : Number(request.body.budget);
+    if (request.body?.kpis !== undefined) data.kpis = String(request.body.kpis).trim() || null;
+    if (request.body?.risks !== undefined) data.risks = String(request.body.risks).trim() || null;
+    if (request.body?.stakeholders !== undefined) data.stakeholders = String(request.body.stakeholders).trim() || null;
+    const campaign = await prisma.campaign.update({
+      where: { id },
+      data,
+      include: { association: { select: { name: true, slug: true } } }
+    });
+    const { association, ...campaignData } = campaign;
+    return response.json({
+      ok: true,
+      campaign: { ...campaignData, association: association.name, associationSlug: association.slug }
+    });
   } catch (error) {
     console.error('[campaigns:update:error]', error.message);
     return response.status(500).json({ ok: false, message: 'Erro ao atualizar campanha.' });
@@ -6711,6 +6744,9 @@ app.delete('/api/campaigns/:id', requireAuth, async (request, response) => {
     return response.json({ ok: true });
   } catch (error) {
     console.error('[campaigns:delete:error]', error.message);
+    if (error?.code === 'P2003') {
+      return response.status(409).json({ ok: false, message: 'Esta campanha possui leads ou automacoes vinculadas. Finalize a campanha antes de tentar exclui-la.' });
+    }
     return response.status(500).json({ ok: false, message: 'Erro ao excluir campanha.' });
   }
 });

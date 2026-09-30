@@ -48,6 +48,7 @@ import {
   Paperclip,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   PieChart,
   Plus,
   Radio,
@@ -58,6 +59,7 @@ import {
   ShieldCheck,
   Sparkles,
   Sun,
+  Trash2,
   UploadCloud,
   UsersRound,
   WandSparkles,
@@ -6557,6 +6559,154 @@ function WhatsAppTemplateLibrary({
   );
 }
 
+function CampaignDetailModal({ associations = [], campaign, onClose, onDelete, onUpdate }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  if (!campaign) return null;
+
+  const dateValue = (value) => value ? String(value).slice(0, 10) : '';
+  const displayValue = (value) => String(value ?? '').trim() || 'Não informado';
+  const inputClass = 'h-11 rounded-xl border border-white/10 bg-slate-950/75 px-3 text-sm font-bold text-white outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15';
+  const textareaClass = 'min-h-24 rounded-xl border border-white/10 bg-slate-950/75 px-3 py-2.5 text-sm font-semibold text-white outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-500/15';
+  const channels = ['WhatsApp', 'E-mail', 'Telefone', 'Redes sociais', 'Evento presencial', 'Visita', 'Material impresso'];
+
+  async function submit(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const startDate = String(form.get('startDate') || '');
+    const endDate = String(form.get('endDate') || '');
+    if (startDate && endDate && endDate < startDate) {
+      toast.error('Período inválido', { description: 'A data final deve ser igual ou posterior à data inicial.' });
+      return;
+    }
+    setSaving(true);
+    try {
+      await onUpdate(campaign.id, {
+        name: String(form.get('name') || '').trim(),
+        associationId: String(form.get('associationId') || '').trim(),
+        owner: String(form.get('owner') || '').trim(),
+        status: String(form.get('status') || 'Planejada'),
+        context: String(form.get('context') || '').trim(),
+        proposal: String(form.get('proposal') || '').trim(),
+        objective: String(form.get('objective') || '').trim(),
+        audience: String(form.get('audience') || '').trim(),
+        message: String(form.get('message') || '').trim(),
+        callToAction: String(form.get('callToAction') || '').trim(),
+        channels: form.getAll('channels').map(String),
+        whatsappDispatchGreeting: String(form.get('whatsappDispatchGreeting') || 'boa-noite'),
+        whatsappDispatchMessage: String(form.get('whatsappDispatchMessage') || '').trim(),
+        startDate,
+        endDate,
+        goal: Number(form.get('goal') || 0),
+        budget: String(form.get('budget') || ''),
+        kpis: String(form.get('kpis') || '').trim(),
+        stakeholders: String(form.get('stakeholders') || '').trim(),
+        risks: String(form.get('risks') || '').trim()
+      });
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeCampaign() {
+    const confirmed = window.confirm(`Excluir permanentemente a campanha "${campaign.name}"? Esta ação não poderá ser desfeita.`);
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await onDelete(campaign.id);
+      onClose();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const details = [
+    ['Associação', campaign.association],
+    ['Responsável', campaign.owner],
+    ['Situação', campaign.status],
+    ['Meta', campaign.goal],
+    ['Início', dateValue(campaign.startDate)],
+    ['Término', dateValue(campaign.endDate)],
+    ['Orçamento', campaign.budget !== null && campaign.budget !== undefined ? `R$ ${Number(campaign.budget).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null]
+  ];
+  const narratives = [
+    ['Contexto', campaign.context],
+    ['Proposta', campaign.proposal],
+    ['Objetivo', campaign.objective],
+    ['Público prioritário', campaign.audience],
+    ['Mensagem central', campaign.message],
+    ['Chamada para ação', campaign.callToAction],
+    ['Indicadores de sucesso', campaign.kpis],
+    ['Equipe e parceiros', campaign.stakeholders],
+    ['Riscos e restrições', campaign.risks],
+    ['Mensagem de disparo WhatsApp', campaign.whatsappDispatchMessage]
+  ];
+
+  return createPortal(
+    <div className="theme-modal-backdrop fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/80 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="campaign-detail-title">
+      <div className="theme-modal-surface flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.55)]">
+        <header className="theme-modal-header flex shrink-0 items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-emerald-600/25 via-slate-900 to-blue-600/20 p-6">
+          <div>
+            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-200">Visão completa da campanha</span>
+            <h2 className="mt-2 text-3xl font-black text-white" id="campaign-detail-title">{campaign.name}</h2>
+            <p className="mt-2 text-sm font-semibold text-slate-300">Confira tudo o que foi cadastrado, edite informações ou exclua uma campanha criada por engano.</p>
+          </div>
+          <button aria-label="Fechar campanha" className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white transition hover:bg-white/20" onClick={onClose} type="button"><X size={19} /></button>
+        </header>
+
+        {editing ? (
+          <form className="min-h-0 flex-1 overflow-y-auto p-6" onSubmit={submit}>
+            <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
+              <label className="grid gap-1.5 text-sm font-black">Nome *<input className={inputClass} defaultValue={campaign.name || ''} name="name" required /></label>
+              <label className="grid gap-1.5 text-sm font-black">Associação *<select className={inputClass} defaultValue={campaign.associationSlug || campaign.associationId || associations[0]?.id} name="associationId" required>{associations.map((association) => <option key={association.id} value={association.id}>{association.name}</option>)}</select></label>
+              <label className="grid gap-1.5 text-sm font-black">Responsável<input className={inputClass} defaultValue={campaign.owner || ''} name="owner" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Situação<select className={inputClass} defaultValue={campaign.status || 'Planejada'} name="status"><option>Planejada</option><option>Ativa</option><option>Pausada</option><option>Finalizada</option></select></label>
+              <label className="grid gap-1.5 text-sm font-black">Contexto<textarea className={textareaClass} defaultValue={campaign.context || ''} name="context" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Proposta<textarea className={textareaClass} defaultValue={campaign.proposal || ''} name="proposal" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Objetivo<textarea className={textareaClass} defaultValue={campaign.objective || ''} name="objective" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Público prioritário<textarea className={textareaClass} defaultValue={campaign.audience || ''} name="audience" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Mensagem central<textarea className={textareaClass} defaultValue={campaign.message || ''} name="message" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Chamada para ação<textarea className={textareaClass} defaultValue={campaign.callToAction || ''} name="callToAction" /></label>
+            </div>
+            <fieldset className="mt-4 rounded-2xl border border-white/10 p-4">
+              <legend className="px-2 text-sm font-black">Canais</legend>
+              <div className="flex flex-wrap gap-2">{channels.map((channel) => <label className="inline-flex items-center gap-2 rounded-xl bg-white/8 px-3 py-2 text-xs font-black" key={channel}><input defaultChecked={(campaign.channels || []).includes(channel)} name="channels" type="checkbox" value={channel} />{channel}</label>)}</div>
+            </fieldset>
+            <div className="mt-4 grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-md:grid-cols-1">
+              <label className="grid gap-1.5 text-sm font-black">Data inicial<input className={inputClass} defaultValue={dateValue(campaign.startDate)} name="startDate" type="date" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Data final<input className={inputClass} defaultValue={dateValue(campaign.endDate)} name="endDate" type="date" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Meta<input className={inputClass} defaultValue={campaign.goal || 0} min="0" name="goal" type="number" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Orçamento (R$)<input className={inputClass} defaultValue={campaign.budget ?? ''} min="0" name="budget" step="0.01" type="number" /></label>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-4 max-lg:grid-cols-1">
+              <label className="grid gap-1.5 text-sm font-black">Indicadores<textarea className={textareaClass} defaultValue={campaign.kpis || ''} name="kpis" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Equipe e parceiros<textarea className={textareaClass} defaultValue={campaign.stakeholders || ''} name="stakeholders" /></label>
+              <label className="grid gap-1.5 text-sm font-black">Riscos<textarea className={textareaClass} defaultValue={campaign.risks || ''} name="risks" /></label>
+            </div>
+            <section className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-950/20 p-4">
+              <label className="grid gap-1.5 text-sm font-black">Saudação<select className={inputClass} defaultValue={campaign.whatsappDispatchGreeting || 'boa-noite'} name="whatsappDispatchGreeting"><option value="bom-dia">Bom dia</option><option value="boa-tarde">Boa tarde</option><option value="boa-noite">Boa noite</option></select></label>
+              <label className="mt-4 grid gap-1.5 text-sm font-black">Mensagem de disparo WhatsApp *<textarea className={`${textareaClass} min-h-36`} defaultValue={campaign.whatsappDispatchMessage || ''} name="whatsappDispatchMessage" required /></label>
+            </section>
+            <div className="mt-6 flex flex-wrap justify-end gap-2"><button className={ghostButtonClass} onClick={() => setEditing(false)} type="button">Cancelar edição</button><button className={primaryButtonClass} disabled={saving} type="submit"><Pencil size={17} />{saving ? 'Salvando...' : 'Salvar alterações'}</button></div>
+          </form>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
+            <div className="grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">{details.map(([label, value]) => <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4" key={label}><span className="text-[11px] font-black uppercase tracking-wide text-slate-400">{label}</span><strong className="mt-2 block text-sm text-white">{displayValue(value)}</strong></div>)}</div>
+            <div className="mt-5 grid grid-cols-2 gap-4 max-lg:grid-cols-1">{narratives.map(([label, value]) => <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4" key={label}><span className="text-[11px] font-black uppercase tracking-wide text-blue-300">{label}</span><p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-200">{displayValue(value)}</p></section>)}</div>
+            <section className="mt-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4"><span className="text-[11px] font-black uppercase tracking-wide text-emerald-300">Canais previstos</span><p className="mt-2 text-sm font-semibold text-slate-200">{campaign.channels?.length ? campaign.channels.join(' · ') : 'Não informado'}</p></section>
+          </div>
+        )}
+
+        {!editing ? <footer className="theme-modal-header flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-slate-900/95 px-6 py-4"><button className="inline-flex h-11 items-center gap-2 rounded-xl border border-red-400/35 bg-red-500/12 px-4 text-sm font-black text-red-200 transition hover:bg-red-500/25" disabled={deleting} onClick={removeCampaign} type="button"><Trash2 size={17} />{deleting ? 'Excluindo...' : 'Excluir campanha'}</button><div className="flex gap-2"><button className={ghostButtonClass} onClick={onClose} type="button">Fechar</button><button className={primaryButtonClass} onClick={() => setEditing(true)} type="button"><Pencil size={17} />Editar campanha</button></div></footer> : null}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function AdminGeneralView({
   associations,
   data,
@@ -6566,6 +6716,8 @@ function AdminGeneralView({
   auditEvents,
   onAddUser,
   onAddCampaign,
+  onUpdateCampaign,
+  onDeleteCampaign,
   messageTemplates = [],
   onAddTemplate,
   onUpdateTemplate,
@@ -6589,6 +6741,7 @@ function AdminGeneralView({
   const [conversationModalOpen, setConversationModalOpen] = useState(false);
   const [selectedAdminLead, setSelectedAdminLead] = useState(null);
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [campaignSaving, setCampaignSaving] = useState(false);
   const [campaignDispatchMessage, setCampaignDispatchMessage] = useState(defaultBroadcastMessage);
   const [leadFilters, setLeadFilters] = useState({
@@ -7262,14 +7415,14 @@ function AdminGeneralView({
                 </div>
               ) : null}
               {campaigns.length ? campaigns.map((campaign, index) => (
-                <div className={`interactive-card grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/30 bg-gradient-to-br ${campaignColors[index % campaignColors.length]} p-5 text-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]`} key={campaign.id}>
+                <button className={`interactive-card grid w-full grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-white/30 bg-gradient-to-br ${campaignColors[index % campaignColors.length]} p-5 text-left text-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]`} key={campaign.id} onClick={() => setSelectedCampaignId(campaign.id)} type="button">
                   <div>
                     <strong className="text-xl font-semibold text-white">{campaign.name}</strong>
                     <span className="mt-2 block text-sm text-white/80">{campaign.association} · {campaign.owner} · meta {formatNumber(campaign.goal)}</span>
                     {campaign.objective ? <span className="mt-2 block text-sm font-semibold text-white/90">Objetivo: {campaign.objective}</span> : null}
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${campaign.status === 'Ativa' ? 'bg-emerald-400 text-emerald-950' : 'bg-white/22 text-white'}`}>{campaign.status}</span>
-                </div>
+                  <span className="grid justify-items-end gap-2"><span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${campaign.status === 'Ativa' ? 'bg-emerald-400 text-emerald-950' : 'bg-white/22 text-white'}`}>{campaign.status}</span><span className="text-xs font-black text-white/85">Abrir detalhes →</span></span>
+                </button>
               )) : !campaignsError && !campaignsLoading ? (
                 <div className="rounded-2xl border border-dashed border-white/15 bg-slate-950/35 p-8 text-center">
                   <Radio className="mx-auto text-blue-300" size={30} />
@@ -7843,6 +7996,13 @@ function AdminGeneralView({
           </article>
         </section>
       ) : null}
+      <CampaignDetailModal
+        associations={associations}
+        campaign={campaigns.find((campaign) => campaign.id === selectedCampaignId) || null}
+        onClose={() => setSelectedCampaignId(null)}
+        onDelete={onDeleteCampaign}
+        onUpdate={onUpdateCampaign}
+      />
       {campaignModalOpen ? createPortal(
         <div className="theme-modal-backdrop fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="campaign-modal-title">
           <div className="campaign-briefing-modal theme-modal-surface max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.52)]">
@@ -12364,6 +12524,47 @@ export default function CrmApp({ payload: initialPayload = null }) {
       throw error;
     }
   };
+  const updateAdminCampaign = async (id, changes) => {
+    try {
+      const response = await apiFetch(`/api/campaigns/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changes)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || 'Erro ao atualizar campanha.');
+      const saved = normalizeCampaigns([payload.campaign])[0];
+      setAdminCampaigns((current) => current.map((campaign) => campaign.id === id ? saved : campaign));
+      setCampaignsError('');
+      setAuditEvents((current) => [
+        { id: `audit-${Date.now()}`, action: 'Campanha atualizada', user: user?.name || 'Admin geral', detail: saved.name, when: 'Agora' },
+        ...current
+      ]);
+      toast.success('Campanha atualizada', { description: `As alterações de "${saved.name}" foram salvas no banco de dados.` });
+      return saved;
+    } catch (error) {
+      toast.error('Falha ao atualizar campanha', { description: error.message });
+      throw error;
+    }
+  };
+  const deleteAdminCampaign = async (id) => {
+    const campaign = adminCampaigns.find((item) => item.id === id);
+    try {
+      const response = await apiFetch(`/api/campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || 'Erro ao excluir campanha.');
+      setAdminCampaigns((current) => current.filter((item) => item.id !== id));
+      setCampaignsError('');
+      setAuditEvents((current) => [
+        { id: `audit-${Date.now()}`, action: 'Campanha excluída', user: user?.name || 'Admin geral', detail: campaign?.name || id, when: 'Agora' },
+        ...current
+      ]);
+      toast.success('Campanha excluída do banco de dados');
+    } catch (error) {
+      toast.error('Falha ao excluir campanha', { description: error.message });
+      throw error;
+    }
+  };
   const addAdminUser = (nextUser) => {
     setAdminUsers((current) => [nextUser, ...current]);
     setAuditEvents((current) => [
@@ -12432,6 +12633,8 @@ export default function CrmApp({ payload: initialPayload = null }) {
     campaigns: adminCampaigns,
     data,
     onAddCampaign: addAdminCampaign,
+    onUpdateCampaign: updateAdminCampaign,
+    onDeleteCampaign: deleteAdminCampaign,
     onAddUser: addAdminUser,
     records,
     users: adminUsers,
