@@ -6580,7 +6580,9 @@ function AdminGeneralView({
       budget: Number(form.get('budget') || 0),
       kpis: String(form.get('kpis') || '').trim(),
       risks: String(form.get('risks') || '').trim(),
-      stakeholders: String(form.get('stakeholders') || '').trim()
+      stakeholders: String(form.get('stakeholders') || '').trim(),
+      whatsappDispatchMessage: String(form.get('whatsappDispatchMessage') || '').trim(),
+      whatsappDispatchGreeting: String(form.get('whatsappDispatchGreeting') || 'boa-noite').trim()
     });
     event.currentTarget.reset();
     setCampaignModalOpen(false);
@@ -7545,6 +7547,29 @@ function AdminGeneralView({
                   </section>
 
                   <section className="theme-modal-card rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-green-300">3b. Disparo WhatsApp</span>
+                    <h3 className="mt-1 text-xl font-black text-white">Mensagem de disparo para esta campanha</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-400">Esta mensagem sera pre-preenchida ao abrir a lista de transmissao para esta campanha.</p>
+                    <div className="mt-4 grid gap-4">
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Saudacao inicial
+                        <div className="flex gap-2">
+                          {[['bom-dia', 'Bom dia'], ['boa-tarde', 'Boa tarde'], ['boa-noite', 'Boa noite']].map(([val, lbl]) => (
+                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-slate-950/65 px-3 py-2 text-xs font-black text-slate-200 transition hover:border-green-300/45" key={val}>
+                              <input className="h-4 w-4 accent-green-500" defaultChecked={val === 'boa-noite'} name="whatsappDispatchGreeting" type="radio" value={val} />
+                              {lbl}
+                            </label>
+                          ))}
+                        </div>
+                      </label>
+                      <label className="grid gap-2 text-sm font-black text-slate-200">
+                        Mensagem de disparo WhatsApp
+                        <textarea className="min-h-32 rounded-xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-green-300 focus:ring-4 focus:ring-green-500/15" name="whatsappDispatchMessage" placeholder="Boa noite, {"{PRIMEIRO_NOME}"}! Tudo bem? Eu sou a Ana, agente da Novo Tempo..." />
+                      </label>
+                    </div>
+                  </section>
+
+                  <section className="theme-modal-card rounded-2xl border border-white/10 bg-white/[0.045] p-5">
                     <span className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-300">4. Execução e mensuração</span>
                     <h3 className="mt-1 text-xl font-black text-white">Quando, com quais recursos e como o sucesso será medido?</h3>
                     <div className="mt-5 grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-md:grid-cols-1">
@@ -8012,7 +8037,9 @@ function WhatsAppBroadcastModal({
   onScheduleBatches,
   onSubmit,
   recipients = [],
-  sending = false
+  sending = false,
+  campaigns = [],
+  messageTemplates = []
 }) {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
@@ -8026,6 +8053,7 @@ function WhatsAppBroadcastModal({
   const [batches, setBatches] = useState([{ count: '', date: '', time: '' }]);
   const totalAllocated = batches.reduce((sum, b) => sum + (Number(b.count) || 0), 0);
   const batchRemaining = recipients.length - totalAllocated;
+  const [activeGreeting, setActiveGreeting] = useState('boa-noite');
 
   function addBatch() { setBatches((c) => [...c, { count: '', date: '', time: '' }]); }
   function removeBatch(i) { setBatches((c) => c.filter((_, idx) => idx !== i)); }
@@ -8077,6 +8105,66 @@ function WhatsAppBroadcastModal({
           <button aria-label="Fechar" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 transition hover:bg-white/25" onClick={onClose} type="button"><X size={20} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {(campaigns.length > 0 || messageTemplates.length > 0) ? (
+            <div className="mb-4 grid gap-3 rounded-2xl border border-emerald-200/30 bg-emerald-950/20 p-4">
+              <span className="text-[11px] font-black uppercase tracking-wide text-emerald-400">Selecionar pre-configuracao</span>
+              {campaigns.length > 0 ? (
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-bold text-slate-300">Campanha</span>
+                  <select
+                    className="h-11 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm font-bold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10"
+                    onChange={(e) => {
+                      const camp = campaigns.find((camp) => camp.id === e.target.value);
+                      if (camp?.whatsappDispatchMessage) {
+                        onMessageChange(camp.whatsappDispatchMessage);
+                        setActiveGreeting(camp.whatsappDispatchGreeting || 'boa-noite');
+                      }
+                    }}
+                  >
+                    <option value="">-- Escolha uma campanha --</option>
+                    {campaigns.map((camp) => <option key={camp.id} value={camp.id}>{camp.name}</option>)}
+                  </select>
+                </label>
+              ) : null}
+              {messageTemplates.length > 0 ? (
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-bold text-slate-300">Mensagem salva</span>
+                  <select
+                    className="h-11 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm font-bold text-white outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10"
+                    onChange={(e) => {
+                      const tpl = messageTemplates.find((t) => t.id === e.target.value);
+                      if (tpl) { onMessageChange(tpl.message); setActiveGreeting(tpl.greeting || 'boa-noite'); }
+                    }}
+                  >
+                    <option value="">-- Escolha uma mensagem salva --</option>
+                    {messageTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </label>
+              ) : null}
+              <div>
+                <span className="text-xs font-bold text-slate-300">Saudacao</span>
+                <div className="mt-1.5 flex gap-2">
+                  {[['bom-dia', 'Bom dia'], ['boa-tarde', 'Boa tarde'], ['boa-noite', 'Boa noite']].map(([val, lbl]) => (
+                    <button
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-black transition ${activeGreeting === val ? 'border-[#00a884] bg-[#00a884] text-white' : 'border-white/20 bg-white/5 text-slate-300 hover:border-[#00a884]/50'}`}
+                      key={val}
+                      onClick={() => {
+                        setActiveGreeting(val);
+                        const greetMap = { 'bom-dia': 'Bom dia', 'boa-tarde': 'Boa tarde', 'boa-noite': 'Boa noite' };
+                        const current = message || '';
+                        const newGreet = greetMap[val];
+                        const replaced = current.replace(/^(Bom dia|Boa tarde|Boa noite)/i, newGreet);
+                        onMessageChange(replaced !== current ? replaced : newGreet + (current ? ', ' + current.replace(/^[^,]+,\s*/, '') : ''));
+                      }}
+                      type="button"
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
           <label className="grid gap-1.5">
             <span className="text-xs font-black uppercase tracking-wide text-slate-600">Nome da transmissao *</span>
             <input className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-4 focus:ring-emerald-500/10" onChange={(event) => onListNameChange(event.target.value)} placeholder="Ex.: Reativacao estudo de Daniel" required value={listName} />
@@ -9975,6 +10063,8 @@ function ConversationsView({ records = [] }) {
           onSchedule={scheduleBroadcast}
           onScheduleBatches={scheduleBroadcastBatches}
           onSubmit={submitBroadcast}
+          campaigns={adminCampaigns}
+          messageTemplates={whatsappTemplates}
           recipients={broadcastSelectedLeads}
           sending={broadcastSending}
         />
@@ -10011,6 +10101,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   const [exportingGroupKey, setExportingGroupKey] = useState('');
   const [anaSummary, setAnaSummary] = useState(null);
   const [selectedDistrict, setSelectedDistrict] = useState(null);
+  const [selectedCampaignId, setSelectedCampaignId] = useState(() => campaigns.length === 1 ? campaigns[0].id : '');
   const [anaLoading, setAnaLoading] = useState(true);
   const hotWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
   const studyWhatsapp = records.filter((lead) => lead.t && lead.e).length;
@@ -10338,7 +10429,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
   async function loadAnaSummary(options = {}) {
     const { silent = false, activeRequest = () => true } = options;
     if (!silent) setAnaLoading(true);
-    apiFetch('/api/ai/ana/summary?limit=500')
+    apiFetch(`/api/ai/ana/summary?limit=500` + (selectedCampaignId ? `&campaignId=` + selectedCampaignId : ''))
       .then((response) => response.ok ? response.json() : null)
       .then((payload) => {
         if (activeRequest() && payload) {
@@ -10367,7 +10458,7 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
       activeRequest = false;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [selectedCampaignId]);
 
   return (
     <div className="ai-agent-view grid gap-6">
@@ -10459,6 +10550,27 @@ function AIAgentView({ associations = [], campaigns = [], data, records = [], on
         </div>
       </section>
 
+
+      {campaigns.length > 1 ? (
+        <section className="rounded-2xl border border-white/10 bg-slate-900/50 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-black uppercase tracking-wide text-slate-400">Campanha</span>
+            <select
+              className="h-10 rounded-xl border border-white/10 bg-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
+              onChange={(e) => setSelectedCampaignId(e.target.value)}
+              value={selectedCampaignId}
+            >
+              <option value="">Todas as campanhas</option>
+              {campaigns.map((camp) => <option key={camp.id} value={camp.id}>{camp.name}</option>)}
+            </select>
+            {selectedCampaignId ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-600/20 px-3 py-1 text-xs font-black text-blue-300">
+                {campaigns.find((camp) => camp.id === selectedCampaignId)?.name}
+              </span>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
       {tab === 'overview' ? (
         <div className="grid gap-4">
           {districtNames.length > 0 ? (
@@ -11465,6 +11577,22 @@ export default function CrmApp({ payload: initialPayload = null }) {
   const [associations, setAssociations] = useState(() => initialAssociations);
   const [adminUsers, setAdminUsers] = useState(() => buildAdminUsers(initialAssociations));
   const [adminCampaigns, setAdminCampaigns] = useState(() => buildAdminCampaigns(initialAssociations));
+  const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+  useEffect(() => {
+    apiFetch('/api/campaigns', { cache: 'no-store' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((payload) => {
+        if (payload?.campaigns) {
+          const statusLabels = { PLANEJADA: 'Planejada', ATIVA: 'Ativa', PAUSADA: 'Pausada', FINALIZADA: 'Finalizada' };
+          setAdminCampaigns(payload.campaigns.map((c) => ({ ...c, status: statusLabels[c.status] || c.status })));
+        }
+      })
+      .catch(() => {});
+    apiFetch('/api/whatsapp/message-templates', { cache: 'no-store' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((payload) => { if (payload?.templates) setWhatsappTemplates(payload.templates); })
+      .catch(() => {});
+  }, []);
   const [auditEvents, setAuditEvents] = useState([
     { id: 'audit-login', action: 'Login administrativo', user: 'Admin geral', detail: 'Sessão aberta com perfil ADMIN_GERAL', when: 'Agora' },
     { id: 'audit-export', action: 'Exportação controlada', user: 'Gestão Paulistana', detail: 'Relatório de distritos filtrados disponível', when: 'Hoje' },
@@ -11726,12 +11854,27 @@ export default function CrmApp({ payload: initialPayload = null }) {
     );
   }
 
-  const addAdminCampaign = (campaign) => {
-    setAdminCampaigns((current) => [campaign, ...current]);
-    setAuditEvents((current) => [
-      { id: `audit-${Date.now()}`, action: 'Campanha criada', user: user?.name || 'Admin geral', detail: campaign.name, when: 'Agora' },
-      ...current
-    ]);
+  const addAdminCampaign = async (campaign) => {
+    const assoc = filteredAssociations.find((a) => a.name === campaign.association || a.id === campaign.association);
+    const associationId = assoc?.id || filteredAssociations[0]?.id || 'paulistana';
+    try {
+      const response = await apiFetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...campaign, associationId })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Erro ao salvar campanha.');
+      const statusLabels = { PLANEJADA: 'Planejada', ATIVA: 'Ativa', PAUSADA: 'Pausada', FINALIZADA: 'Finalizada' };
+      const saved = { ...payload.campaign, status: statusLabels[payload.campaign.status] || payload.campaign.status };
+      setAdminCampaigns((current) => [saved, ...current]);
+      setAuditEvents((current) => [
+        { id: `audit-${Date.now()}`, action: 'Campanha criada', user: user?.name || 'Admin geral', detail: campaign.name, when: 'Agora' },
+        ...current
+      ]);
+    } catch (error) {
+      toast.error('Falha ao salvar campanha', { description: error.message });
+    }
   };
   const addAdminUser = (nextUser) => {
     setAdminUsers((current) => [nextUser, ...current]);

@@ -101,6 +101,23 @@ model Campaign {
   association   Association          @relation(fields: [associationId], references: [id])
   leads         CampaignLead[]
   sequences     AutomationSequence[]
+  owner                    String?
+  goal                     Int             @default(0)
+  proposal                 String?
+  objective                String?
+  audience                 String?
+  context                  String?
+  message                  String?
+  callToAction             String?
+  channels                 String[]        @default([])
+  startDate                DateTime?       @db.Date
+  endDate                  DateTime?       @db.Date
+  budget                   Decimal?        @db.Decimal(12, 2)
+  kpis                     String?
+  risks                    String?
+  stakeholders             String?
+  whatsappDispatchMessage  String?
+  whatsappDispatchGreeting String?         @default("boa-noite")
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
@@ -359,4 +376,17 @@ model Visit {
   scheduledAt DateTime?
   finishedAt  DateTime?
   createdAt   DateTime  @default(now())
+}
+
+model WhatsAppMessageTemplate {
+  id            String   @id @default(cuid())
+  name          String
+  message       String
+  greeting      String   @default("boa-noite")
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([createdAt])
 }

@@ -6574,6 +6574,156 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
   }
 });
 
+// ── Campaigns CRUD ──────────────────────────────────────────────────────────
+app.get('/api/campaigns', requireAuth, async (request, response) => {
+  try {
+    const campaigns = await prisma.campaign.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, name: true, slug: true, status: true, associationId: true,
+        owner: true, goal: true, proposal: true, objective: true, audience: true,
+        context: true, message: true, callToAction: true, channels: true,
+        startDate: true, endDate: true, budget: true, kpis: true, risks: true,
+        stakeholders: true, whatsappDispatchMessage: true, whatsappDispatchGreeting: true,
+        createdAt: true, updatedAt: true
+      }
+    });
+    return response.json({ ok: true, campaigns });
+  } catch (error) {
+    console.error('[campaigns:list:error]', error.message);
+    return response.status(500).json({ ok: false, message: 'Erro ao listar campanhas.' });
+  }
+});
+
+app.post('/api/campaigns', requireAuth, async (request, response) => {
+  const name = String(request.body?.name || '').trim();
+  const associationId = String(request.body?.associationId || '').trim();
+  if (!name) return response.status(400).json({ ok: false, message: 'Nome da campanha e obrigatorio.' });
+  if (!associationId) return response.status(400).json({ ok: false, message: 'Associacao e obrigatoria.' });
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
+  const statusMap = { Planejada: 'PLANEJADA', Ativa: 'ATIVA', Pausada: 'PAUSADA', Finalizada: 'FINALIZADA' };
+  try {
+    const campaign = await prisma.campaign.create({
+      data: {
+        name, slug, associationId,
+        status: statusMap[request.body?.status] || 'PLANEJADA',
+        owner: String(request.body?.owner || '').trim() || null,
+        goal: Number(request.body?.goal) || 0,
+        proposal: String(request.body?.proposal || '').trim() || null,
+        objective: String(request.body?.objective || '').trim() || null,
+        audience: String(request.body?.audience || '').trim() || null,
+        context: String(request.body?.context || '').trim() || null,
+        message: String(request.body?.message || '').trim() || null,
+        callToAction: String(request.body?.callToAction || '').trim() || null,
+        channels: Array.isArray(request.body?.channels) ? request.body.channels.map(String) : [],
+        startDate: request.body?.startDate ? new Date(request.body.startDate) : null,
+        endDate: request.body?.endDate ? new Date(request.body.endDate) : null,
+        budget: request.body?.budget ? Number(request.body.budget) : null,
+        kpis: String(request.body?.kpis || '').trim() || null,
+        risks: String(request.body?.risks || '').trim() || null,
+        stakeholders: String(request.body?.stakeholders || '').trim() || null,
+        whatsappDispatchMessage: String(request.body?.whatsappDispatchMessage || '').trim() || null,
+        whatsappDispatchGreeting: String(request.body?.whatsappDispatchGreeting || 'boa-noite').trim()
+      }
+    });
+    return response.status(201).json({ ok: true, campaign });
+  } catch (error) {
+    console.error('[campaigns:create:error]', error.message);
+    return response.status(500).json({ ok: false, message: 'Erro ao criar campanha.' });
+  }
+});
+
+app.patch('/api/campaigns/:id', requireAuth, async (request, response) => {
+  const { id } = request.params;
+  const statusMap = { Planejada: 'PLANEJADA', Ativa: 'ATIVA', Pausada: 'PAUSADA', Finalizada: 'FINALIZADA' };
+  try {
+    const data = {};
+    if (request.body?.name !== undefined) data.name = String(request.body.name).trim();
+    if (request.body?.status !== undefined) data.status = statusMap[request.body.status] || request.body.status;
+    if (request.body?.whatsappDispatchMessage !== undefined) data.whatsappDispatchMessage = String(request.body.whatsappDispatchMessage).trim() || null;
+    if (request.body?.whatsappDispatchGreeting !== undefined) data.whatsappDispatchGreeting = String(request.body.whatsappDispatchGreeting).trim();
+    if (request.body?.owner !== undefined) data.owner = String(request.body.owner).trim() || null;
+    if (request.body?.goal !== undefined) data.goal = Number(request.body.goal) || 0;
+    if (request.body?.proposal !== undefined) data.proposal = String(request.body.proposal).trim() || null;
+    if (request.body?.objective !== undefined) data.objective = String(request.body.objective).trim() || null;
+    if (request.body?.channels !== undefined) data.channels = Array.isArray(request.body.channels) ? request.body.channels.map(String) : [];
+    const campaign = await prisma.campaign.update({ where: { id }, data });
+    return response.json({ ok: true, campaign });
+  } catch (error) {
+    console.error('[campaigns:update:error]', error.message);
+    return response.status(500).json({ ok: false, message: 'Erro ao atualizar campanha.' });
+  }
+});
+
+app.delete('/api/campaigns/:id', requireAuth, async (request, response) => {
+  const { id } = request.params;
+  try {
+    await prisma.campaign.delete({ where: { id } });
+    return response.json({ ok: true });
+  } catch (error) {
+    console.error('[campaigns:delete:error]', error.message);
+    return response.status(500).json({ ok: false, message: 'Erro ao excluir campanha.' });
+  }
+});
+
+// ── WhatsApp Message Templates CRUD ─────────────────────────────────────────
+app.get('/api/whatsapp/message-templates', requireAuth, async (_request, response) => {
+  try {
+    const templates = await prisma.whatsAppMessageTemplate.findMany({ orderBy: { createdAt: 'desc' } });
+    return response.json({ ok: true, templates });
+  } catch (error) {
+    console.error('[message-templates:list:error]', error.message);
+    return response.status(500).json({ ok: false, message: 'Erro ao listar templates.' });
+  }
+});
+
+app.post('/api/whatsapp/message-templates', requireAuth, async (request, response) => {
+  const name = String(request.body?.name || '').trim();
+  const message = String(request.body?.message || '').trim();
+  if (!name) return response.status(400).json({ ok: false, message: 'Nome do template e obrigatorio.' });
+  if (!message) return response.status(400).json({ ok: false, message: 'Mensagem do template e obrigatoria.' });
+  try {
+    const template = await prisma.whatsAppMessageTemplate.create({
+      data: {
+        name, message,
+        greeting: String(request.body?.greeting || 'boa-noite').trim(),
+        createdById: request.user?.sub || null,
+        createdByName: request.user?.email || request.user?.name || null
+      }
+    });
+    return response.status(201).json({ ok: true, template });
+  } catch (error) {
+    console.error('[message-templates:create:error]', error.message);
+    return response.status(500).json({ ok: false, message: 'Erro ao criar template.' });
+  }
+});
+
+app.patch('/api/whatsapp/message-templates/:id', requireAuth, async (request, response) => {
+  const { id } = request.params;
+  try {
+    const data = {};
+    if (request.body?.name !== undefined) data.name = String(request.body.name).trim();
+    if (request.body?.message !== undefined) data.message = String(request.body.message).trim();
+    if (request.body?.greeting !== undefined) data.greeting = String(request.body.greeting).trim();
+    const template = await prisma.whatsAppMessageTemplate.update({ where: { id }, data });
+    return response.json({ ok: true, template });
+  } catch (error) {
+    console.error('[message-templates:update:error]', error.message);
+    return response.status(500).json({ ok: false, message: 'Erro ao atualizar template.' });
+  }
+});
+
+app.delete('/api/whatsapp/message-templates/:id', requireAuth, async (request, response) => {
+  const { id } = request.params;
+  try {
+    await prisma.whatsAppMessageTemplate.delete({ where: { id } });
+    return response.json({ ok: true });
+  } catch (error) {
+    console.error('[message-templates:delete:error]', error.message);
+    return response.status(500).json({ ok: false, message: 'Erro ao excluir template.' });
+  }
+});
+
 app.get('/api/webhooks/zpro/whatsapp', (request, response) => {
   response.status(410).json({ ok: false, provider: 'zpro-baileys', webhook: 'disabled' });
   return;
