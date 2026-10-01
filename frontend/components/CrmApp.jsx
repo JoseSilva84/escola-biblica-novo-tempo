@@ -4557,6 +4557,12 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
         const L = await import('leaflet');
         if (!active) return;
 
+        if (mapInstanceRef.current && mapInstanceRef.current.getContainer() !== mapRef.current) {
+          markersRef.current = [];
+          mapInstanceRef.current.remove();
+          mapInstanceRef.current = null;
+        }
+
         const map = mapInstanceRef.current || L.map(mapRef.current, {
           center: cityMapCenters['sao-paulo'],
           zoom: 10,
@@ -4656,18 +4662,15 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
 
     renderMap();
     return () => { active = false; };
-  }, [churchPoints, mappableLeads, onLeadDetails]);
+  }, [churchPoints, mapMaximized, mappableLeads, onLeadDetails]);
 
-  return (
-    <>
-    {mapMaximized ? (
-      <button
-        aria-label="Minimizar mapa"
-        className="fixed inset-0 z-[2147483644] cursor-default bg-slate-950/80 backdrop-blur-sm"
-        onClick={() => setMapMaximized(false)}
-        type="button"
-      />
-    ) : null}
+  useEffect(() => () => {
+    markersRef.current = [];
+    mapInstanceRef.current?.remove();
+    mapInstanceRef.current = null;
+  }, []);
+
+  const mapSection = (
     <section
       aria-label="Mapa dos leads filtrados"
       aria-modal={mapMaximized ? 'true' : undefined}
@@ -4741,7 +4744,20 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
         </div>
       </div>
     </section>
-    </>
+  );
+
+  if (!mapMaximized) return mapSection;
+  return createPortal(
+    <div className="fixed inset-0 z-[2147483644] bg-slate-950/82 p-3 backdrop-blur-md max-md:p-0" role="presentation">
+      <button
+        aria-label="Minimizar mapa"
+        className="absolute inset-0 cursor-default"
+        onClick={() => setMapMaximized(false)}
+        type="button"
+      />
+      {mapSection}
+    </div>,
+    document.body
   );
 }
 
