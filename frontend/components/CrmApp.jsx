@@ -4491,6 +4491,7 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
   const markersRef = useRef([]);
   const [status, setStatus] = useState('idle');
   const [activeMapPriority, setActiveMapPriority] = useState('');
+  const [mapMaximized, setMapMaximized] = useState(false);
   const priorityCounts = useMemo(() => leads.reduce((counts, lead) => {
     const priority = leadMapPriorityStyles[lead.p] ? lead.p : 'Cold';
     return { ...counts, [priority]: (counts[priority] || 0) + 1 };
@@ -4518,6 +4519,31 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
       }));
   }, [churches, mappableLeads]);
   const sampleLead = mappableLeads[0];
+
+  useEffect(() => {
+    const resizeMap = () => mapInstanceRef.current?.invalidateSize({ pan: false });
+    const animationFrame = window.requestAnimationFrame(resizeMap);
+    const resizeTimer = window.setTimeout(resizeMap, 120);
+    if (!mapMaximized) {
+      return () => {
+        window.cancelAnimationFrame(animationFrame);
+        window.clearTimeout(resizeTimer);
+      };
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const minimizeOnEscape = (event) => {
+      if (event.key === 'Escape') setMapMaximized(false);
+    };
+    window.addEventListener('keydown', minimizeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', minimizeOnEscape);
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(resizeTimer);
+    };
+  }, [mapMaximized]);
 
   useEffect(() => {
     let active = true;
@@ -4633,7 +4659,21 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
   }, [churchPoints, mappableLeads, onLeadDetails]);
 
   return (
-    <section className="leads-map-card overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)]">
+    <>
+    {mapMaximized ? (
+      <button
+        aria-label="Minimizar mapa"
+        className="fixed inset-0 z-[2147483644] cursor-default bg-slate-950/80 backdrop-blur-sm"
+        onClick={() => setMapMaximized(false)}
+        type="button"
+      />
+    ) : null}
+    <section
+      aria-label="Mapa dos leads filtrados"
+      aria-modal={mapMaximized ? 'true' : undefined}
+      className={`leads-map-card overflow-hidden border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)] ${mapMaximized ? 'fixed inset-3 z-[2147483645] flex flex-col rounded-3xl max-md:inset-0 max-md:rounded-none' : 'rounded-3xl'}`}
+      role={mapMaximized ? 'dialog' : undefined}
+    >
       <div className="leads-map-header flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-white via-blue-50/70 to-emerald-50/70 p-5">
         <div>
           <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Mapa dos leads filtrados</span>
@@ -4666,14 +4706,25 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
             <span className="leads-map-church-count rounded-full bg-white px-2 py-0.5 text-[10px] text-emerald-700">{formatNumber(churchPoints.length)}</span>
           </span>
         </div>
-        {sampleLead ? (
-          <a className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800" href={openStreetMapSearchUrl(sampleLead.lead)} rel="noreferrer" target="_blank">
-            <MapPin size={18} />
-            Abrir no OSM
-          </a>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {sampleLead ? (
+            <a className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800" href={openStreetMapSearchUrl(sampleLead.lead)} rel="noreferrer" target="_blank">
+              <MapPin size={18} />
+              Abrir no OSM
+            </a>
+          ) : null}
+          <button
+            aria-label={mapMaximized ? 'Minimizar tela do mapa' : 'Maximizar tela do mapa'}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-600 px-4 text-sm font-black text-white shadow-[0_12px_28px_rgba(37,99,235,0.24)] transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+            onClick={() => setMapMaximized((current) => !current)}
+            type="button"
+          >
+            {mapMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            {mapMaximized ? 'Minimizar tela' : 'Maximizar tela'}
+          </button>
+        </div>
       </div>
-      <div className="relative h-[28rem] bg-slate-100">
+      <div className={`relative bg-slate-100 ${mapMaximized ? 'min-h-0 flex-1' : 'h-[28rem]'}`}>
         <div className="h-full w-full" ref={mapRef} />
         {status === 'loading' ? (
           <div className="absolute inset-x-4 top-4 rounded-2xl border border-blue-200 bg-white/92 px-4 py-3 text-sm font-bold text-blue-900 shadow-lg backdrop-blur">
@@ -4690,6 +4741,7 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
         </div>
       </div>
     </section>
+    </>
   );
 }
 
