@@ -397,6 +397,12 @@ function formatNumber(value) {
   return Number(value || 0).toLocaleString('pt-BR');
 }
 
+function compactCampaignName(value, maxLength = 22) {
+  const name = String(value || 'Campanha').trim().replace(/\s+/g, ' ');
+  if (name.length <= maxLength) return name;
+  return `${name.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
 function initialCrmTheme() {
   if (typeof window === 'undefined') return 'light';
   try {
@@ -8556,17 +8562,15 @@ function WhatsAppLeadPickerModal({
                           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-800">
                             <MessageCircle size={12} /> {formatNumber(lead.whatsappContactCount || 0)} {Number(lead.whatsappContactCount) === 1 ? 'contato' : 'contatos'}
                           </span>
+                          {lead.campaignContacts?.map((campaignContact) => (
+                            <span className="inline-flex max-w-[11.5rem] items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-800" key={campaignContact.campaignId} title={`${campaignContact.campaignName}: ${campaignContact.count} contato(s)`}>
+                              <Megaphone className="shrink-0" size={11} />
+                              <span className="truncate">{compactCampaignName(campaignContact.campaignName)}</span>
+                              <span className="shrink-0 rounded-full bg-blue-700 px-1.5 py-0.5 text-[9px] text-white">{formatNumber(campaignContact.count)}</span>
+                            </span>
+                          ))}
                           {lead.birthDate && lead.birthDate !== 'N/I' ? <span className="text-[11px] font-bold text-emerald-800">Aniversário: {lead.birthDate}</span> : null}
                         </span>
-                        {lead.campaignContacts?.length ? (
-                          <span className="mt-1.5 flex max-w-full gap-1 overflow-x-auto pb-0.5" title="Contatos realizados por campanha">
-                            {lead.campaignContacts.map((campaignContact) => (
-                              <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-800" key={campaignContact.campaignId} title={`${campaignContact.campaignName}: ${campaignContact.count} contato(s)`}>
-                                <Megaphone size={10} /> {campaignContact.campaignName}: {formatNumber(campaignContact.count)}
-                              </span>
-                            ))}
-                          </span>
-                        ) : null}
                       </span>
                       <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border ${selected ? 'border-[#008069] bg-[#008069] text-white' : 'border-slate-300 bg-white text-slate-400'}`}>{selected ? <Check size={16} /> : <Plus size={16} />}</span>
                     </button>
