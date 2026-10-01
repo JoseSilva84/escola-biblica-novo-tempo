@@ -4592,6 +4592,7 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
   const [status, setStatus] = useState('idle');
   const [activeMapPriority, setActiveMapPriority] = useState('');
   const [mapMaximized, setMapMaximized] = useState(false);
+  const [mapToolsCollapsed, setMapToolsCollapsed] = useState(false);
   const priorityCounts = useMemo(() => leads.reduce((counts, lead) => {
     const priority = leadMapPriorityStyles[lead.p] ? lead.p : 'Cold';
     return { ...counts, [priority]: (counts[priority] || 0) + 1 };
@@ -4658,7 +4659,7 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
       window.cancelAnimationFrame(animationFrame);
       window.clearTimeout(resizeTimer);
     };
-  }, [mapMaximized]);
+  }, [mapMaximized, mapToolsCollapsed]);
 
   useEffect(() => {
     let active = true;
@@ -4729,9 +4730,13 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
             ${escapeMapHtml(lead.tel || 'sem telefone')}<br>
             <small>${escapeMapHtml(precisionLabel)}</small><br>
             ${assignment ? `
-              <span style="display:block;margin-top:8px;padding:8px;border-radius:9px;background:#ecfdf5;color:#065f46;font-weight:800">
-                Igreja: ${escapeMapHtml(assignment.churchName)}<br>
-                ${escapeMapHtml(formatChurchDistance(assignment.distanceMeters))} de distância · ${escapeMapHtml(assignment.distancePrecision.toLowerCase())}
+              <span style="display:block;margin:10px 0 4px;padding:12px 13px;border:1px solid #a7f3d0;border-radius:14px;background:linear-gradient(135deg,#ecfdf5 0%,#f0fdfa 100%);color:#064e3b;font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;box-shadow:0 7px 18px rgba(5,150,105,.10)">
+                <span style="display:block;margin-bottom:4px;color:#047857;font-size:10px;font-weight:800;line-height:1.2;letter-spacing:.12em;text-transform:uppercase">Igreja afiliada</span>
+                <span style="display:block;color:#052e2b;font-size:15px;font-weight:800;line-height:1.35;letter-spacing:-.015em">${escapeMapHtml(assignment.churchName)}</span>
+                <span style="display:flex;align-items:baseline;gap:7px;margin-top:7px">
+                  <span style="color:#047857;font-size:17px;font-weight:850;line-height:1;font-variant-numeric:tabular-nums">${escapeMapHtml(formatChurchDistance(assignment.distanceMeters))}</span>
+                  <span style="color:#64748b;font-size:11px;font-weight:650;line-height:1.25">de distância · ${escapeMapHtml(assignment.distancePrecision.toLowerCase())}</span>
+                </span>
               </span>
             ` : '<small style="display:block;margin-top:8px;color:#b45309;font-weight:700">Nenhuma igreja geolocalizada neste distrito.</small>'}
             ${needsGoogleCheck ? `<small style="display:block;color:#b45309;font-weight:700;max-width:260px">${escapeMapHtml(precisionWarning)}</small>` : ''}
@@ -4818,6 +4823,7 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
       className={`leads-map-card overflow-hidden border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)] ${mapMaximized ? 'fixed inset-3 z-[2147483645] flex flex-col rounded-3xl max-md:inset-0 max-md:rounded-none' : 'rounded-3xl'}`}
       role={mapMaximized ? 'dialog' : undefined}
     >
+      {!mapToolsCollapsed ? (
       <div className="leads-map-header flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-white via-blue-50/70 to-emerald-50/70 p-5">
         <div>
           <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Mapa dos leads filtrados</span>
@@ -4865,6 +4871,16 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
           </label>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            aria-label="Ocultar ferramentas do mapa"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900"
+            onClick={() => setMapToolsCollapsed(true)}
+            title="Encolher o cabeçalho e ampliar a área do mapa"
+            type="button"
+          >
+            <ChevronUp size={18} />
+            Ocultar ferramentas
+          </button>
           {sampleLead ? (
             <a className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800" href={openStreetMapSearchUrl(sampleLead.lead)} rel="noreferrer" target="_blank">
               <MapPin size={18} />
@@ -4882,8 +4898,30 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
           </button>
         </div>
       </div>
-      <div className={`relative bg-slate-100 ${mapMaximized ? 'min-h-0 flex-1' : 'h-[28rem]'}`}>
+      ) : null}
+      <div className={`relative bg-slate-100 ${mapMaximized ? 'min-h-0 flex-1' : mapToolsCollapsed ? 'h-[36rem]' : 'h-[28rem]'}`}>
         <div className="h-full w-full" ref={mapRef} />
+        {mapToolsCollapsed ? (
+          <div className="absolute right-4 top-4 z-[700] flex flex-wrap justify-end gap-2">
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-300/70 bg-slate-950/92 px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(15,23,42,0.28)] backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+              onClick={() => setMapToolsCollapsed(false)}
+              type="button"
+            >
+              <ChevronDown size={18} />
+              Mostrar ferramentas
+            </button>
+            <button
+              aria-label={mapMaximized ? 'Minimizar tela do mapa' : 'Maximizar tela do mapa'}
+              className="grid h-11 w-11 place-items-center rounded-xl border border-blue-300/70 bg-blue-600 text-white shadow-[0_14px_34px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+              onClick={() => setMapMaximized((current) => !current)}
+              title={mapMaximized ? 'Minimizar tela' : 'Maximizar tela'}
+              type="button"
+            >
+              {mapMaximized ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
+            </button>
+          </div>
+        ) : null}
         {status === 'loading' ? (
           <div className="absolute inset-x-4 top-4 rounded-2xl border border-blue-200 bg-white/92 px-4 py-3 text-sm font-bold text-blue-900 shadow-lg backdrop-blur">
             Montando mapa sem custo por API...
