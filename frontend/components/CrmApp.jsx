@@ -4680,7 +4680,7 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
       <div className="leads-map-header flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-white via-blue-50/70 to-emerald-50/70 p-5">
         <div>
           <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Mapa dos leads filtrados</span>
-          <h3 className="leads-map-title mt-1 text-2xl font-black text-slate-950">Pontos com Leads</h3>
+          <h3 className="leads-map-title mt-1 text-2xl font-black text-black">Pontos com Leads</h3>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {Object.entries(leadMapPriorityStyles).map(([key, item]) => (
