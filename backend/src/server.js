@@ -4871,6 +4871,41 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
     }
 
     const limit = Math.min(Math.max(Number(request.query?.limit) || 200, 1), 500);
+    const selectedCampaignId = String(request.query?.campaignId || '').trim();
+    let campaignScope = null;
+    if (selectedCampaignId) {
+      const associationSlug = userAssociationSlug(request.user);
+      const selectedCampaignWhere = isAdminGeralUser(request.user)
+        ? { id: selectedCampaignId }
+        : request.user?.associationId
+          ? { id: selectedCampaignId, associationId: request.user.associationId }
+          : { id: selectedCampaignId, association: { is: { slug: associationSlug } } };
+      const selectedCampaign = await prisma.campaign.findFirst({
+        where: selectedCampaignWhere,
+        select: { id: true, name: true, associationId: true, createdAt: true }
+      });
+      if (!selectedCampaign) {
+        response.status(404).json({ message: 'Campanha não encontrada ou indisponível para este usuário.' });
+        return;
+      }
+      const campaignTimeline = await prisma.campaign.findMany({
+        where: { associationId: selectedCampaign.associationId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, createdAt: true }
+      });
+      const campaignIds = new Set(campaignTimeline.map((campaign) => campaign.id));
+      const broadcasts = await prisma.whatsAppBroadcast.findMany({
+        select: { broadcastKey: true, campaignId: true, createdAt: true }
+      });
+      campaignScope = {
+        selectedCampaign,
+        campaignTimeline,
+        campaignIds,
+        campaignIdByBroadcastKey: new Map(broadcasts
+          .filter((broadcast) => broadcast.campaignId && campaignIds.has(broadcast.campaignId))
+          .map((broadcast) => [broadcast.broadcastKey, broadcast.campaignId]))
+      };
+    }
     let dashboardRecordsById = new Map();
     try {
       const dashboardRecords = getDashboardData()?.records || [];
@@ -4904,7 +4939,37 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       }
     });
 
-    const chronologicalConversations = conversations;
+    const chronologicalConversations = campaignScope
+      ? conversations.map((conversation) => {
+        const firstCampaign = campaignScope.campaignTimeline[0] || null;
+        const secondCampaign = campaignScope.campaignTimeline[1] || null;
+        const historicalCampaignId = (contactedAt) => {
+          if (!firstCampaign) return null;
+          if (campaignScope.campaignTimeline.length === 1) return firstCampaign.id;
+          const contactDate = new Date(contactedAt || 0);
+          return secondCampaign && !Number.isNaN(contactDate.getTime()) && contactDate < new Date(secondCampaign.createdAt)
+            ? firstCampaign.id
+            : null;
+        };
+        let activeCampaignId = null;
+        let hasSelectedOutbound = false;
+        const scopedMessages = [];
+        for (const message of conversation.messages || []) {
+          const metadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+          if (message.direction === 'OUTBOUND') {
+            const broadcastCampaignId = campaignScope.campaignIdByBroadcastKey.get(String(metadata.broadcastId || ''));
+            const explicitCampaignId = campaignScope.campaignIds.has(String(metadata.campaignId || ''))
+              ? String(metadata.campaignId)
+              : broadcastCampaignId;
+            if (explicitCampaignId) activeCampaignId = explicitCampaignId;
+            else if (!activeCampaignId) activeCampaignId = historicalCampaignId(message.sentAt || message.createdAt);
+            if (activeCampaignId === selectedCampaignId) hasSelectedOutbound = true;
+          }
+          if (activeCampaignId === selectedCampaignId) scopedMessages.push(message);
+        }
+        return hasSelectedOutbound ? { ...conversation, messages: scopedMessages } : null;
+      }).filter(Boolean)
+      : conversations;
     const managedConversations = chronologicalConversations.filter((conversation) => (
       !isAnaTestConversation(conversation)
       && (
@@ -4967,8 +5032,10 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
       });
     }
     const funnel = {
-      transmissions: trackedReport?.funnel?.transmissions
-        || new Set(successfulBatchMessages.map((message) => message.broadcastId)).size,
+      transmissions: selectedCampaignId
+        ? new Set(successfulBatchMessages.map((message) => message.broadcastId)).size
+        : trackedReport?.funnel?.transmissions
+          || new Set(successfulBatchMessages.map((message) => message.broadcastId)).size,
       dispatches,
       messagesSent: dispatches,
       responses,
@@ -5002,6 +5069,7 @@ app.get('/api/ai/ana/summary', requireAuth, async (request, response) => {
 
     response.json({
       agent: anaConfig(),
+      selectedCampaign: campaignScope?.selectedCampaign || null,
       training,
       metrics: {
         conversations: reportConversations.length,

@@ -11006,7 +11006,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
   const [exportingGroupKey, setExportingGroupKey] = useState('');
   const [anaSummary, setAnaSummary] = useState(null);
   const [selectedDistrict, setSelectedDistrict] = useState(null);
-  const [selectedCampaignId, setSelectedCampaignId] = useState(() => campaigns.length === 1 ? campaigns[0].id : '');
+  const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [anaLoading, setAnaLoading] = useState(true);
   const hotWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
   const studyWhatsapp = records.filter((lead) => lead.t && lead.e).length;
@@ -11365,6 +11365,12 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
     };
   }, [selectedCampaignId]);
 
+  useEffect(() => {
+    if (selectedCampaignId && !campaigns.some((campaign) => campaign.id === selectedCampaignId)) {
+      setSelectedCampaignId('');
+    }
+  }, [campaigns, selectedCampaignId]);
+
   return (
     <div className="ai-agent-view grid gap-6">
       <section className={`${panelClass} overflow-hidden p-6`}>
@@ -11377,6 +11383,23 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <label className="grid gap-1">
+              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Campanha</span>
+              <select
+                aria-label="Filtrar painel por campanha"
+                className="h-11 min-w-64 rounded-xl border border-slate-300 bg-white px-4 text-sm font-black text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!campaigns.length}
+                onChange={(event) => {
+                  setSelectedCampaignId(event.target.value);
+                  setSelectedDistrict(null);
+                }}
+                title={campaignsError || 'Selecione a campanha cujos dados deseja visualizar'}
+                value={selectedCampaignId}
+              >
+                <option value="">Todas as campanhas</option>
+                {campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
+              </select>
+            </label>
             <div className={`inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-black ${geminiSynchronized ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
               <WandSparkles size={18} />
               {geminiSynchronized ? 'Ana conectada' : 'Aguardando configuração da Ana'}
@@ -11454,28 +11477,6 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
           ))}
         </div>
       </section>
-
-
-      {campaigns.length > 1 ? (
-        <section className="rounded-2xl border border-white/10 bg-slate-900/50 p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-black uppercase tracking-wide text-slate-400">Campanha</span>
-            <select
-              className="h-10 rounded-xl border border-white/10 bg-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
-              onChange={(e) => setSelectedCampaignId(e.target.value)}
-              value={selectedCampaignId}
-            >
-              <option value="">Todas as campanhas</option>
-              {campaigns.map((camp) => <option key={camp.id} value={camp.id}>{camp.name}</option>)}
-            </select>
-            {selectedCampaignId ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-600/20 px-3 py-1 text-xs font-black text-blue-300">
-                {campaigns.find((camp) => camp.id === selectedCampaignId)?.name}
-              </span>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
       {tab === 'overview' ? (
         <div className="grid gap-4">
           {districtNames.length > 0 ? (
