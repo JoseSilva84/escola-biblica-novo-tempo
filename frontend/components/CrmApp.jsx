@@ -1206,7 +1206,7 @@ function InboxConversationModal({ item, question, answer, onClose }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[2147483646] grid place-items-center bg-slate-950/78 p-4 backdrop-blur-md" role="dialog" aria-modal="true">
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-white/12 bg-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.56)]">
+      <div className="inbox-conversation-modal max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-white/12 bg-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.56)]">
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_52%,#0f172a_100%)] p-6 text-white">
           <div className="min-w-0">
             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">Conversa do lead</span>
@@ -1228,7 +1228,7 @@ function InboxConversationModal({ item, question, answer, onClose }) {
             {messages.map((message, index) => {
               const outbound = message.direction === 'OUTBOUND';
               return (
-                <article className={`rounded-2xl border p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${outbound ? 'border-blue-200 bg-blue-50' : 'border-emerald-200 bg-white'}`} key={message.id || `${message.direction}-${index}`}>
+                <article className={`inbox-conversation-message ${outbound ? 'inbox-message-outgoing' : 'inbox-message-incoming'} rounded-2xl border p-4 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${outbound ? 'border-blue-200 bg-blue-50' : 'border-emerald-200 bg-white'}`} key={message.id || `${message.direction}-${index}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <strong className="text-sm font-black text-slate-950">{outbound ? `Enviada para ${phone}` : `Recebida de ${phone}`}</strong>
                     <span className="text-xs font-bold text-slate-500">{message.createdAt ? new Date(message.createdAt).toLocaleString('pt-BR') : item.when}</span>
@@ -9080,6 +9080,10 @@ function WhatsAppBroadcastModal({
 }
 function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
   const [selectedBreakdown, setSelectedBreakdown] = useState(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyTransmissions, setHistoryTransmissions] = useState([]);
+  const [historyError, setHistoryError] = useState('');
   const metricDefinitions = [
     { key: 'sent', label: 'Enviados', icon: Send, color: '#00a884', track: '#d9fdd3' },
     { key: 'delivered', label: 'Receberam', icon: CheckCheck, color: '#0284c7', track: '#e0f2fe' },
@@ -9098,9 +9102,29 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
     })
     : [];
 
+  async function openBroadcastHistory() {
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    setHistoryError('');
+    setHistoryTransmissions(Array.isArray(transmissions) ? transmissions : []);
+    try {
+      const response = await apiFetch(`/api/whatsapp/broadcast-analytics?history=all&_=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Não foi possível carregar o histórico.');
+      setHistoryTransmissions(Array.isArray(payload.transmissions) ? payload.transmissions : []);
+    } catch (error) {
+      setHistoryError(error.message || 'Não foi possível carregar o histórico.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   return (
     <>
-    <section className={`${panelClass} overflow-hidden p-6`}>
+    <section className={`${panelClass} broadcast-analytics-panel overflow-hidden p-6`}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <span className={labelClass}>Desempenho das transmissões</span>
@@ -9109,7 +9133,10 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
             Cada envio é medido separadamente com o nome da transmissão e os destinatários escolhidos.
           </p>
         </div>
-        <button className={`${ghostButtonClass} h-10 px-4`} onClick={onRefresh} type="button">Atualizar painel</button>
+        <div className="grid gap-2">
+          <button className={`${ghostButtonClass} h-10 px-4`} onClick={onRefresh} type="button"><RefreshCw size={16} /> Atualizar painel</button>
+          <button className={`${ghostButtonClass} h-10 px-4`} onClick={openBroadcastHistory} type="button"><Clock3 size={16} /> Histórico de transmissões</button>
+        </div>
       </div>
 
       {loading ? (
@@ -9188,6 +9215,72 @@ function BroadcastAnalyticsPanel({ loading, transmissions, onRefresh }) {
         </div>
       )}
     </section>
+    {historyOpen ? createPortal(
+      <div
+        className="fixed inset-0 z-[2147483646] grid place-items-center bg-[#111b21]/78 p-4 backdrop-blur-sm"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setHistoryOpen(false);
+        }}
+        role="presentation"
+      >
+        <section
+          aria-labelledby="broadcast-history-title"
+          aria-modal="true"
+          className="broadcast-history-modal flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-[#d1d7db] bg-[#f0f2f5] shadow-[0_34px_110px_rgba(0,0,0,0.52)]"
+          role="dialog"
+        >
+          <header className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,#075e54,#00a884)] px-6 py-5 text-white">
+            <div>
+              <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">Do primeiro ao mais recente</span>
+              <h3 className="mt-1 text-2xl font-black text-white" id="broadcast-history-title">Histórico de transmissões</h3>
+              <p className="mt-1 text-sm font-semibold text-emerald-50">
+                {historyLoading ? 'Carregando todo o histórico...' : `${formatNumber(historyTransmissions.length)} transmissão(ões) registrada(s)`}
+              </p>
+            </div>
+            <button aria-label="Fechar histórico" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/30 bg-white/15 text-white transition hover:bg-white/25" onClick={() => setHistoryOpen(false)} type="button">
+              <X size={21} />
+            </button>
+          </header>
+          <div className="conversation-tools-scroll min-h-0 flex-1 overflow-y-auto p-5">
+            {historyError ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{historyError}</div>
+            ) : null}
+            {!historyLoading && !historyTransmissions.length ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-bold text-slate-600">Nenhuma transmissão foi encontrada.</div>
+            ) : (
+              <div className="grid gap-3">
+                {historyTransmissions.map((transmission, index) => {
+                  const createdLabel = transmission.createdAt
+                    ? new Date(transmission.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+                    : 'Data não informada';
+                  return (
+                    <article className="broadcast-history-item rounded-2xl border border-[#d1d7db] bg-white p-4 shadow-[0_10px_30px_rgba(11,20,26,0.08)]" key={transmission.id || `${transmission.name}-${index}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <strong className="block break-words text-base font-black text-[#111b21]">{transmission.name || 'Transmissão sem nome'}</strong>
+                          <span className="mt-1 block text-xs font-bold text-[#667781]">{createdLabel}</span>
+                        </div>
+                        <span className="rounded-full bg-[#075e54] px-3 py-1 text-xs font-black text-white">{formatNumber(transmission.targeted || 0)} destinatários</span>
+                      </div>
+                      <div className="mt-4 grid grid-cols-4 gap-2 max-md:grid-cols-2">
+                        {metricDefinitions.map((metric) => (
+                          <div className="rounded-xl border border-[#e9edef] bg-[#f8fafc] px-3 py-2" key={metric.key}>
+                            <span className="block text-[10px] font-black uppercase tracking-wide text-[#667781]">{metric.label}</span>
+                            <strong className="mt-1 block text-lg font-black text-[#111b21]">{formatNumber(Number(transmission[metric.key]) || 0)}</strong>
+                          </div>
+                        ))}
+                      </div>
+                      {transmission.message ? <p className="mt-3 line-clamp-2 text-sm font-semibold leading-relaxed text-[#3b4a54]">{transmission.message}</p> : null}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>,
+      document.body
+    ) : null}
     {selectedBreakdown && selectedMetric ? createPortal(
       <div
         className="fixed inset-0 z-[180] grid place-items-center bg-[#111b21]/70 p-4 backdrop-blur-sm"
@@ -11565,8 +11658,8 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
 
             <article className={`${panelClass} p-6`}>
               <span className={labelClass}>Tempo entre solicitação e aceite</span>
-              <h2 className="mt-2 text-2xl font-black text-slate-50">Da solicitação do material até o aceite do brinde</h2>
-              <p className="mt-2 text-sm font-semibold text-slate-400">Quantidade e percentual das pessoas que aceitaram, separados pelo tempo desde o pedido do material.</p>
+              <h2 className="mt-2 text-2xl font-black text-slate-50">Do contato NT até o aceite do brinde/visita</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-400">Quantidade e percentual das pessoas que aceitaram, separados pelo tempo desde que teve o último contato com a NT.</p>
               <div className="mt-5 divide-y divide-white/10 border-y border-white/10">
                 {filteredRequestAgeBuckets.map((bucket) => (
                   <div className="grid grid-cols-[minmax(150px,1fr)_minmax(100px,1.2fr)_auto] items-center gap-3 py-2.5 max-sm:grid-cols-[1fr_auto]" key={bucket.id}>

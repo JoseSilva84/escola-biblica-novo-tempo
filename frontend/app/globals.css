@@ -238,6 +238,31 @@
   color: rgb(186 200 214) !important;
 }
 
+/* The inbox detail is rendered in a portal. Its pale message cards keep dark
+   typography in dark mode so the saved text never disappears into the card. */
+html[data-crm-theme="dark"] .inbox-conversation-modal .inbox-message-outgoing,
+html[data-crm-theme="dark"] .inbox-conversation-modal .inbox-message-incoming {
+  color: #111b21 !important;
+}
+
+html[data-crm-theme="dark"] .inbox-conversation-modal .inbox-message-outgoing {
+  border-color: rgb(191 219 254) !important;
+  background: rgb(239 246 255) !important;
+}
+
+html[data-crm-theme="dark"] .inbox-conversation-modal .inbox-message-incoming {
+  border-color: rgb(167 243 208) !important;
+  background: #ffffff !important;
+}
+
+html[data-crm-theme="dark"] .inbox-conversation-modal .inbox-conversation-message :is(strong, p) {
+  color: #111827 !important;
+}
+
+html[data-crm-theme="dark"] .inbox-conversation-modal .inbox-conversation-message span {
+  color: #475569 !important;
+}
+
 .app-dark .whatsapp-tools-scroll > div:last-child {
   border-color: rgba(52, 211, 153, 0.25) !important;
   background: rgba(6, 78, 59, 0.30) !important;
@@ -517,6 +542,33 @@ html[data-crm-theme="dark"] [role="dialog"] .leads-map-church-count {
   color: rgb(203 213 225) !important;
 }
 
+/* Broadcast analytics lives on the Conversations screen. Keep metric values
+   readable against its dark cards (the older rule only covered Agente IA). */
+.app-dark .broadcast-analytics-panel .broadcast-metric-card {
+  border-color: rgba(226, 232, 240, 0.72) !important;
+  background-color: rgba(8, 17, 31, 0.94) !important;
+}
+
+.app-dark .broadcast-analytics-panel .broadcast-metric-card:hover,
+.app-dark .broadcast-analytics-panel .broadcast-metric-card:focus {
+  border-color: rgba(45, 212, 191, 0.78) !important;
+  background-color: rgba(15, 23, 42, 0.99) !important;
+}
+
+.app-dark .broadcast-analytics-panel .broadcast-metric-value {
+  color: rgb(248 250 252) !important;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.36);
+}
+
+.app-dark .broadcast-analytics-panel .broadcast-metric-card :is(.text-\[\#667781\], .text-\[\#111b21\]) {
+  color: rgb(203 213 225) !important;
+}
+
+html[data-crm-theme="dark"] .broadcast-history-modal .broadcast-history-item,
+html[data-crm-theme="dark"] .broadcast-history-modal .broadcast-history-item > div > div {
+  color: #111b21;
+}
+
 .app-dark .ai-agent-view :is(input, textarea, select) {
   border-color: rgba(148, 163, 184, 0.24) !important;
   background: rgba(8, 17, 31, 0.94) !important;
@@ -564,6 +616,31 @@ html[data-crm-theme="dark"] [role="dialog"] :is(input:not([type="checkbox"]), te
 html[data-crm-theme="dark"] [role="dialog"] option {
   background: #0f172a;
   color: rgb(241 245 249);
+}
+
+/* Light information cards inside dark dialogs need their original dark ink. */
+html[data-crm-theme="dark"] [role="dialog"] .inbox-conversation-message {
+  color: #111b21 !important;
+}
+
+html[data-crm-theme="dark"] [role="dialog"] .inbox-message-outgoing {
+  border-color: rgb(191 219 254) !important;
+  background: rgb(239 246 255) !important;
+}
+
+html[data-crm-theme="dark"] [role="dialog"] .inbox-message-incoming,
+html[data-crm-theme="dark"] [role="dialog"] .broadcast-history-item {
+  background: #ffffff !important;
+}
+
+html[data-crm-theme="dark"] [role="dialog"] .inbox-conversation-message :is(strong, p),
+html[data-crm-theme="dark"] [role="dialog"] .broadcast-history-item :is(strong, p) {
+  color: #111827 !important;
+}
+
+html[data-crm-theme="dark"] [role="dialog"] .inbox-conversation-message span,
+html[data-crm-theme="dark"] [role="dialog"] .broadcast-history-item span:not(.text-white) {
+  color: #475569 !important;
 }
 
 html[data-crm-theme="dark"] .lead-operational-summary .lead-operational-summary-text {

@@ -6603,9 +6603,10 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
   }
 
   try {
+    const includeFullHistory = String(request.query?.history || '').toLowerCase() === 'all';
     const savedBroadcasts = await prisma.whatsAppBroadcast.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      ...(includeFullHistory ? {} : { take: 50 }),
       include: {
         recipients: {
           orderBy: { createdAt: 'asc' }
@@ -6616,7 +6617,7 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
     if (savedBroadcasts.length) {
       const chronological = [...savedBroadcasts].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
       const requestedCutoff = chronological.find((broadcast) => normalizedIntentName(broadcast.name) === 'teste disparo');
-      const relevantBroadcasts = requestedCutoff
+      const relevantBroadcasts = !includeFullHistory && requestedCutoff
         ? savedBroadcasts.filter((broadcast) => new Date(broadcast.createdAt) >= new Date(requestedCutoff.createdAt))
         : savedBroadcasts;
       const relevantChronological = [...relevantBroadcasts].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
@@ -6757,7 +6758,7 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
             responded: recipients.filter((recipient) => recipient.repliedAt).length,
             failed: recipients.filter((recipient) => recipient.status === 'FALHA').length,
             lastError: broadcast.lastError || recipients.find((recipient) => recipient.status === 'FALHA' && recipient.error)?.error || null,
-            recipients
+            ...(includeFullHistory ? {} : { recipients })
           };
         })
       });
@@ -6767,7 +6768,7 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
     const outboundMessages = await prisma.whatsAppMessage.findMany({
       where: { direction: 'OUTBOUND' },
       orderBy: { createdAt: 'desc' },
-      take: 20000,
+      ...(includeFullHistory ? {} : { take: 20000 }),
       select: {
         id: true,
         conversationId: true,
@@ -6848,9 +6849,9 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
       });
     }
 
-    const recentTransmissions = Array.from(transmissions.values())
-      .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
-      .slice(0, 12);
+    const orderedTransmissions = Array.from(transmissions.values())
+      .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
+    const recentTransmissions = includeFullHistory ? orderedTransmissions : orderedTransmissions.slice(0, 12);
     const recentIds = new Set(recentTransmissions.map((item) => item.id));
     const conversationIds = Array.from(new Set(recentTransmissions.flatMap((item) => Array.from(item.recipients))));
     const conversationIdSet = new Set(conversationIds);
@@ -6901,10 +6902,12 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
         delivered: transmission.delivered.size,
         responded: transmission.responded.size,
         failed: transmission.failed.size,
-        recipients: Array.from(transmission.recipientRows.values()).map((recipient) => ({
-          ...recipient,
-          delivered: recipient.delivered || transmission.delivered.has(recipient.conversationId)
-        }))
+        ...(includeFullHistory ? {} : {
+          recipients: Array.from(transmission.recipientRows.values()).map((recipient) => ({
+            ...recipient,
+            delivered: recipient.delivered || transmission.delivered.has(recipient.conversationId)
+          }))
+        })
       }))
     });
   } catch (error) {
