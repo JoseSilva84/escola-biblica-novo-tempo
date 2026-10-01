@@ -26,36 +26,22 @@ const ANA_TRAINING_FILES = [
   ['08_PROMPT_MESTRE_ANA_GEMINI.md', 'Personalidade, segurança e fluxo operacional da Ana no Gemini'],
   ['07_ESTUDOS_BIBLICOS_ADVENTISTAS.md', 'Base bíblica adventista oficial para acompanhamento']
 ];
-const ANA_GIFT_CAMPAIGN_START_DATE = String(process.env.ANA_GIFT_CAMPAIGN_START_DATE || '2026-10-03').trim();
-const ANA_GIFT_CAMPAIGN_START_LABEL = formatAnaCampaignDate(ANA_GIFT_CAMPAIGN_START_DATE);
+const ANA_GIFT_DELIVERY_WINDOW = 'nos próximos dias';
 let anaSequenceGuideCache = { cacheKey: null, text: '', sources: [], loadedAt: 0 };
 
-function formatAnaCampaignDate(value) {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return '3 de outubro de 2026';
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
-  if (Number.isNaN(date.getTime())) return '3 de outubro de 2026';
-  if (date.getUTCFullYear() !== Number(match[1])
-    || date.getUTCMonth() !== Number(match[2]) - 1
-    || date.getUTCDate() !== Number(match[3])) return '3 de outubro de 2026';
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC'
-  }).format(date);
-}
-
 function enforceActiveAnaCampaignDate(value) {
+  const monthNames = 'janeiro|fevereiro|março|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro';
+  const writtenDate = `(?:dia\\s*)?0?[1-9]|(?:dia\\s*)?[12]\\d|(?:dia\\s*)?3[01]`;
+  const fullWrittenDate = `(?:${writtenDate})\\s+de\\s+(?:${monthNames})(?:\\s+de\\s+\\d{4})?`;
   return String(value || '')
-    .replace(/a partir do dia 19 de setembro(?: de 2026)?/gi, (match) => `${match[0] === 'A' ? 'A' : 'a'} partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}`)
-    .replace(/a partir de 19 de setembro(?: de 2026)?/gi, (match) => `${match[0] === 'A' ? 'A' : 'a'} partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}`)
-    .replace(/(?:no\s+)?s[aá]bado,?\s*(?:dia\s*)?19 de setembro(?: de 2026)?/gi, `a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}`)
-    .replace(/(?:dia\s*)?19 de setembro(?: de 2026)?/gi, ANA_GIFT_CAMPAIGN_START_LABEL)
-    .replace(/\b19\/09\/2026\b/g, ANA_GIFT_CAMPAIGN_START_LABEL)
-    .replace(/\b19\/09\b/g, ANA_GIFT_CAMPAIGN_START_LABEL)
-    .replace(/(?:dia\s*)?0?3 de outubro de 2026/gi, ANA_GIFT_CAMPAIGN_START_LABEL)
-    .replace(/\b0?3\/10\/2026\b/g, ANA_GIFT_CAMPAIGN_START_LABEL);
+    .replace(new RegExp(`a partir\\s+(?:do\\s+dia|de)\\s+${fullWrittenDate}`, 'gi'), (match) => `${match[0] === 'A' ? 'A' : 'a'} partir dos próximos dias`)
+    .replace(/a partir\s+(?:do\s+dia|de)\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/gi, (match) => `${match[0] === 'A' ? 'A' : 'a'} partir dos próximos dias`)
+    .replace(new RegExp(`\\bpara\\s+${fullWrittenDate}\\b`, 'gi'), 'para os próximos dias')
+    .replace(/\bpara\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi, 'para os próximos dias')
+    .replace(new RegExp(`\\b(?:em|no\\s+dia|na\\s+data\\s+de)\\s+${fullWrittenDate}\\b`, 'gi'), 'nos próximos dias')
+    .replace(/\b(?:em|no\s+dia|na\s+data\s+de)\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/gi, 'nos próximos dias')
+    .replace(new RegExp(`\\b${fullWrittenDate}\\b`, 'gi'), ANA_GIFT_DELIVERY_WINDOW)
+    .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, ANA_GIFT_DELIVERY_WINDOW);
 }
 
 function resolveDatasetDir() {
@@ -1208,8 +1194,8 @@ function anaVisitCancellationReply(name) {
 
 function anaGiftOfferReply(name) {
   const firstName = String(name || '').trim().split(/\s+/)[0];
-  const greetingName = firstName ? `${firstName}, ` : '';
-  return `${greetingName}a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, um representante da equipe Novo Tempo poderá entregar a você um brinde especial: um material de estudo. Você gostaria de recebê-lo?`;
+  const opening = firstName ? `${firstName}, a` : 'A';
+  return `${opening} partir dos próximos dias, um representante da equipe Novo Tempo poderá entregar a você um brinde especial: um material de estudo. Você gostaria de recebê-lo?`;
 }
 
 function anaAddressConfirmationReply(name) {
@@ -1296,7 +1282,7 @@ async function anaIntentReply(event) {
     return {
       action: deliveryState.deliveryConfirmed ? 'DELIVERY_ALREADY_CONFIRMED' : 'CONFIRM_GIFT_DELIVERY',
       reply: deliveryState.deliveryConfirmed
-        ? `Tudo certo${greetingName}. A entrega do seu material de estudo está registrada para ocorrer a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}; nossa equipe entrará em contato para combinar.`
+        ? `Tudo certo${greetingName}. A entrega do seu material de estudo está registrada para os próximos dias; nossa equipe entrará em contato para combinar.`
         : finalDeliveryReply,
       leadFound: Boolean(lead),
       hasRegisteredAddress: true,
@@ -3015,9 +3001,9 @@ function buildAnaPrompt({ conversation, inboundMessage, guideText }) {
     'Faça no máximo uma pergunta principal.',
     'Se não houver nome confiável, não invente nome e não use "Oi" como nome.',
     'Responda primeiro, com sensibilidade, ao que a pessoa realmente disse ou perguntou.',
-    `DATA VIGENTE DA CAMPANHA: ${ANA_GIFT_CAMPAIGN_START_LABEL}. Esta é a única data válida para novas entregas.`,
-    'A data de 19 de setembro de 2026 está vencida e não pode ser apresentada como data atual. Se ela aparecer no histórico, informe apenas que a entrega foi atualizada para a data vigente.',
-    `Se o brinde ainda não foi oferecido, conduza naturalmente a conversa para informar que, a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, um representante da equipe Novo Tempo entregará um brinde especial, que é um material de estudo, e pergunte se a pessoa deseja recebê-lo.`,
+    'REGRA OBRIGATÓRIA DA CAMPANHA: nunca mencione datas, dias, meses ou anos para a entrega do brinde.',
+    'Mesmo que uma data apareça no histórico, não a repita nem informe outra data. Diga apenas "a partir dos próximos dias".',
+    'Se o brinde ainda não foi oferecido, conduza naturalmente a conversa para informar que, a partir dos próximos dias, um representante da equipe Novo Tempo poderá entregar um brinde especial, que é um material de estudo, e pergunte se a pessoa deseja recebê-lo.',
     'Não prometa dia, horário ou visita já marcada. A equipe ainda entrará em contato para combinar a forma da entrega.',
     'Se a pessoa pedir para cancelar ou desmarcar a visita ou a entrega, confirme o cancelamento com empatia. Nunca interprete "pode cancelar" como aceite.',
     'Se a pessoa já aceitou o brinde, não volte a perguntar se ela o deseja. Pergunte se o endereço é o mesmo que está cadastrado na Novo Tempo ou se ela deseja informar outro; só peça o endereço completo quando ela disser que é outro, que mudou ou que não é o mesmo.',
@@ -3216,7 +3202,7 @@ async function guardAnaReply(message, { conversation, inboundMessage }) {
 
 function anaDeliveryFinalReply(name) {
   const suffix = name ? `, ${name}` : '';
-  return `Muito obrigado pela confirmação${suffix}. A partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, nossa equipe entrará em contato e um representante irá até você para entregar seu brinde especial, um material de estudo. Deus abençoe você e sua família.`;
+  return `Muito obrigado pela confirmação${suffix}. A partir dos próximos dias, nossa equipe entrará em contato e um representante irá até você para entregar seu brinde especial, um material de estudo. Deus abençoe você e sua família.`;
 }
 
 async function recordAnaAddressDecision({ lead, address, confirmedExisting = false }) {
@@ -3628,7 +3614,7 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     return anaDeliveryFinalReply(name);
   }
   if (deniedAddress) {
-    return `Obrigado por avisar${anaNameSuffix(name)}. Para eu registrar corretamente a entrega do material de estudo a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, você pode me enviar seu endereço completo atual?`;
+    return `Obrigado por avisar${anaNameSuffix(name)}. Para eu registrar corretamente a entrega do material de estudo, você pode me enviar seu endereço completo atual?`;
   }
   if (sentAddress) {
     return anaDeliveryFinalReply(name);
@@ -3651,9 +3637,9 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
       return `Tudo bem${anaNameSuffix(name)}. Vou deixar seu retorno registrado com carinho para a equipe da Novo Tempo.`;
     }
     return pickUnusedAnaReply([
-      `Que bom que você deseja continuar${anaNameSuffix(name)}. A partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, um representante da equipe Novo Tempo entregará um brinde especial, um material de estudo.\n\nVocê gostaria de recebê-lo?`,
-      `${anaNameText(name)}fico feliz em saber disso. A partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, nossa equipe fará a entrega de um brinde especial: um material de estudo.\n\nVocê deseja recebê-lo?`,
-      `Perfeito${anaNameSuffix(name)}. A Novo Tempo preparou um material de estudo como brinde especial, com entregas a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}.\n\nVocê gostaria de receber?`
+      `Que bom que você deseja continuar${anaNameSuffix(name)}. A partir dos próximos dias, um representante da equipe Novo Tempo poderá entregar um brinde especial, um material de estudo.\n\nVocê gostaria de recebê-lo?`,
+      `${anaNameText(name)}fico feliz em saber disso. A partir dos próximos dias, nossa equipe poderá entregar um brinde especial: um material de estudo.\n\nVocê deseja recebê-lo?`,
+      `Perfeito${anaNameSuffix(name)}. A Novo Tempo preparou um material de estudo como brinde especial, com entregas previstas para os próximos dias.\n\nVocê gostaria de receber?`
     ], fullHistory);
   }
   if (alreadyOfferedGift && !alreadyAskedAddress && isNegativeReply(inboundText)) {
@@ -3686,9 +3672,9 @@ function buildAnaFallbackReply({ conversation, inboundMessage }) {
     }
     if (!alreadyOfferedGift) {
       return pickUnusedAnaReply([
-        `Que bom que você deseja continuar${anaNameSuffix(name)}. A partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, um representante da equipe Novo Tempo entregará um brinde especial, um material de estudo.\n\nVocê gostaria de recebê-lo?`,
-        `${anaNameText(name)}fico feliz em saber disso. A partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}, nossa equipe fará a entrega de um brinde especial: um material de estudo.\n\nVocê deseja recebê-lo?`,
-        `Perfeito${anaNameSuffix(name)}. A Novo Tempo preparou um material de estudo como brinde especial, com entregas a partir de ${ANA_GIFT_CAMPAIGN_START_LABEL}.\n\nVocê gostaria de receber?`
+        `Que bom que você deseja continuar${anaNameSuffix(name)}. A partir dos próximos dias, um representante da equipe Novo Tempo poderá entregar um brinde especial, um material de estudo.\n\nVocê gostaria de recebê-lo?`,
+        `${anaNameText(name)}fico feliz em saber disso. A partir dos próximos dias, nossa equipe poderá entregar um brinde especial: um material de estudo.\n\nVocê deseja recebê-lo?`,
+        `Perfeito${anaNameSuffix(name)}. A Novo Tempo preparou um material de estudo como brinde especial, com entregas previstas para os próximos dias.\n\nVocê gostaria de receber?`
       ], fullHistory);
     }
     return `Perfeito${anaNameSuffix(name)}. Vou deixar isso registrado para a equipe da Novo Tempo acompanhar com carinho.`;

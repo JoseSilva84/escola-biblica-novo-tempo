@@ -60,24 +60,28 @@ test('calcula uma pausa humana proporcional ao tamanho da resposta', () => {
 
 test('identifica a pergunta de aceite do brinde', () => {
   assert.equal(
-    anaDeliveryQuestion('A partir de 3 de outubro, temos um brinde especial. Você gostaria de receber esse brinde?'),
+    anaDeliveryQuestion('A partir dos próximos dias, temos um brinde especial. Você gostaria de receber esse brinde?'),
     'GIFT_ACCEPTANCE'
   );
 });
 
-test('usa somente a data vigente e descreve o brinde como material de estudo', () => {
+test('não menciona datas e descreve o brinde como material de estudo', () => {
   const offer = anaGiftOfferReply('Veronica Sabrina');
   const confirmation = anaDeliveryFinalReply('Veronica');
-  assert.match(offer, /3 de outubro de 2026/i);
+  assert.match(offer, /próximos dias/i);
   assert.match(offer, /material de estudo/i);
-  assert.match(confirmation, /3 de outubro de 2026/i);
+  assert.match(confirmation, /próximos dias/i);
   assert.match(confirmation, /representante/i);
-  assert.doesNotMatch(`${offer} ${confirmation}`, /19 de setembro/i);
+  assert.doesNotMatch(`${offer} ${confirmation}`, /\b\d{1,2}(?:\/\d{1,2}| de [a-zç]+)(?: de \d{4})?\b/i);
 });
 
-test('bloqueia a data vencida mesmo se o modelo tentar reutilizá-la', () => {
+test('remove uma data específica mesmo se o modelo tentar reutilizá-la', () => {
   const corrected = enforceActiveAnaCampaignDate('A partir do dia 19 de setembro de 2026, faremos a entrega.');
-  assert.equal(corrected, 'A partir de 3 de outubro de 2026, faremos a entrega.');
+  assert.equal(corrected, 'A partir dos próximos dias, faremos a entrega.');
+  assert.equal(
+    enforceActiveAnaCampaignDate('A entrega ficou para 12/11/2026.'),
+    'A entrega ficou para os próximos dias.'
+  );
 });
 
 test('cancelar visita nunca é interpretado como confirmação', () => {
