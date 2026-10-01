@@ -404,7 +404,32 @@ function compactCampaignName(value, maxLength = 22) {
 }
 
 function normalizedCampaignReference(value) {
-  return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\{\{[^}]+\}\}/g, ' ')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+const ignoredCampaignReferenceTokens = new Set([
+  'a', 'ao', 'aos', 'as', 'boa', 'bom', 'com', 'como', 'da', 'das', 'de', 'do', 'dos',
+  'e', 'em', 'eu', 'no', 'nos', 'o', 'os', 'ola', 'para', 'pela', 'pelo', 'por', 'sou',
+  'tarde', 'tudo', 'um', 'uma', 'voce', 'dia', 'noite'
+]);
+
+function campaignReferenceSimilarity(leftValue, rightValue) {
+  const tokensFor = (value) => new Set(normalizedCampaignReference(value)
+    .split(' ')
+    .filter((token) => token.length > 2 && !ignoredCampaignReferenceTokens.has(token)));
+  const left = tokensFor(leftValue);
+  const right = tokensFor(rightValue);
+  if (!left.size || !right.size) return 0;
+  let common = 0;
+  left.forEach((token) => { if (right.has(token)) common += 1; });
+  return Math.max(common / Math.min(left.size, right.size), (2 * common) / (left.size + right.size));
 }
 
 function initialCrmTheme() {
@@ -9951,6 +9976,29 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
       if (!campaignId) {
         const nameMatches = campaignIdsByName.get(normalizedCampaignReference(transmission.name)) || [];
         if (nameMatches.length === 1) campaignId = nameMatches[0];
+      }
+      if (!campaignId) {
+        const normalizedTransmissionName = normalizedCampaignReference(transmission.name);
+        const scoredCampaigns = campaigns.map((campaign) => {
+          const normalizedCampaignName = normalizedCampaignReference(campaign.name);
+          const nameScore = normalizedTransmissionName && normalizedCampaignName
+            ? (normalizedTransmissionName === normalizedCampaignName
+              ? 1
+              : normalizedTransmissionName.includes(normalizedCampaignName)
+                || normalizedCampaignName.includes(normalizedTransmissionName)
+                ? 0.9
+                : campaignReferenceSimilarity(transmission.name, campaign.name))
+            : 0;
+          const messageScore = campaignReferenceSimilarity(transmission.message, campaign.whatsappDispatchMessage);
+          return { campaignId: campaign.id, score: Math.max(nameScore, messageScore) };
+        }).sort((left, right) => right.score - left.score);
+        const best = scoredCampaigns[0];
+        const runnerUp = scoredCampaigns[1];
+        if (best?.score >= 0.72 && (!runnerUp || best.score - runnerUp.score >= 0.08)) {
+          campaignId = best.campaignId;
+        } else if (campaigns.length === 1 && best?.score >= 0.45) {
+          campaignId = campaigns[0].id;
+        }
       }
       const campaign = campaignId ? campaignById.get(campaignId) : null;
       if (!campaign || !Array.isArray(transmission.recipients)) return;

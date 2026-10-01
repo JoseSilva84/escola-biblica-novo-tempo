@@ -5456,7 +5456,32 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
       select: { id: true, name: true, whatsappDispatchMessage: true }
     });
     const campaignById = new Map(campaigns.map((campaign) => [campaign.id, campaign]));
-    const normalizeMessage = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+    const normalizeMessage = (value) => String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\{\{[^}]+\}\}/g, ' ')
+      .replace(/[^a-zA-Z0-9]+/g, ' ')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+    const ignoredReferenceTokens = new Set([
+      'a', 'ao', 'aos', 'as', 'boa', 'bom', 'com', 'como', 'da', 'das', 'de', 'do', 'dos',
+      'e', 'em', 'eu', 'no', 'nos', 'o', 'os', 'ola', 'para', 'pela', 'pelo', 'por', 'sou',
+      'tarde', 'tudo', 'um', 'uma', 'voce', 'dia', 'noite'
+    ]);
+    const referenceTokens = (value) => new Set(normalizeMessage(value)
+      .split(' ')
+      .filter((token) => token.length > 2 && !ignoredReferenceTokens.has(token)));
+    const referenceSimilarity = (leftValue, rightValue) => {
+      const left = referenceTokens(leftValue);
+      const right = referenceTokens(rightValue);
+      if (!left.size || !right.size) return 0;
+      let common = 0;
+      for (const token of left) if (right.has(token)) common += 1;
+      const containment = common / Math.min(left.size, right.size);
+      const dice = (2 * common) / (left.size + right.size);
+      return Math.max(containment, dice);
+    };
     const campaignIdsByMessage = new Map();
     for (const campaign of campaigns) {
       const key = normalizeMessage(campaign.whatsappDispatchMessage);
@@ -5470,6 +5495,7 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
       prisma.whatsAppBroadcast.findMany({
         select: {
           broadcastKey: true,
+          name: true,
           campaignId: true,
           messageTemplate: true,
           recipients: {
@@ -5500,10 +5526,28 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
     const countedMessageIds = new Set();
     const countedBroadcastPhones = new Set();
     const broadcastByKey = new Map(broadcasts.map((broadcast) => [broadcast.broadcastKey, broadcast]));
-    const resolvedCampaignId = (explicitCampaignId, templateMessage) => {
+    const resolvedCampaignId = (explicitCampaignId, templateMessage, transmissionName = '') => {
       if (explicitCampaignId && campaignById.has(explicitCampaignId)) return explicitCampaignId;
       const inferredIds = campaignIdsByMessage.get(normalizeMessage(templateMessage)) || [];
-      return inferredIds.length === 1 ? inferredIds[0] : null;
+      if (inferredIds.length === 1) return inferredIds[0];
+
+      const normalizedName = normalizeMessage(transmissionName);
+      const scoredCampaigns = campaigns.map((campaign) => {
+        const normalizedCampaignName = normalizeMessage(campaign.name);
+        const nameScore = normalizedName && normalizedCampaignName
+          ? (normalizedName === normalizedCampaignName
+            ? 1
+            : normalizedName.includes(normalizedCampaignName) || normalizedCampaignName.includes(normalizedName)
+              ? 0.9
+              : referenceSimilarity(transmissionName, campaign.name))
+          : 0;
+        const messageScore = referenceSimilarity(templateMessage, campaign.whatsappDispatchMessage);
+        return { campaignId: campaign.id, score: Math.max(nameScore, messageScore) };
+      }).sort((left, right) => right.score - left.score);
+      const best = scoredCampaigns[0];
+      const runnerUp = scoredCampaigns[1];
+      if (best?.score >= 0.72 && (!runnerUp || best.score - runnerUp.score >= 0.08)) return best.campaignId;
+      return campaigns.length === 1 && best?.score >= 0.45 ? campaigns[0].id : null;
     };
     const addCampaignContact = ({ phone: rawPhone, campaignId, contactedAt }) => {
       const phone = normalizePhone(rawPhone);
@@ -5525,7 +5569,7 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
     };
 
     for (const broadcast of broadcasts) {
-      const campaignId = resolvedCampaignId(broadcast.campaignId, broadcast.messageTemplate);
+      const campaignId = resolvedCampaignId(broadcast.campaignId, broadcast.messageTemplate, broadcast.name);
       if (!campaignId) continue;
       for (const recipient of broadcast.recipients) {
         const phone = normalizePhone(recipient.phone);
@@ -5544,7 +5588,8 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
       const broadcast = broadcastKey ? broadcastByKey.get(broadcastKey) : null;
       const campaignId = resolvedCampaignId(
         metadata.campaignId || broadcast?.campaignId,
-        metadata.templateMessage || broadcast?.messageTemplate || message.body
+        metadata.templateMessage || broadcast?.messageTemplate || message.body,
+        metadata.listName || broadcast?.name || ''
       );
       addCampaignContact({
         phone,
@@ -6623,11 +6668,14 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
       select: {
         id: true,
         conversationId: true,
+        leadId: true,
+        externalLeadId: true,
         body: true,
         providerStatus: true,
         metadata: true,
         createdAt: true,
-        sentAt: true
+        sentAt: true,
+        conversation: { select: { phone: true, leadName: true, district: true } }
       }
     });
     const transmissionIdFor = (messageItem) => {
@@ -6651,11 +6699,13 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
       if (!transmissions.has(transmissionId)) {
         transmissions.set(transmissionId, {
           id: transmissionId,
+          campaignId: metadata.campaignId || null,
           name: metadata.listName || 'Transmissão sem nome',
-          message: messageItem.body,
+          message: metadata.templateMessage || messageItem.body,
           createdAt: messageItem.sentAt || messageItem.createdAt,
           recipientTarget: Number(metadata.recipientTotal) || 0,
           recipients: new Set(),
+          recipientRows: new Map(),
           sent: new Set(),
           delivered: new Set(),
           failed: new Set(),
@@ -6666,6 +6716,7 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
       const transmission = transmissions.get(transmissionId);
       const status = String(messageItem.providerStatus || 'ACCEPTED').toUpperCase();
       const conversationId = messageItem.conversationId;
+      if (!transmission.campaignId && metadata.campaignId) transmission.campaignId = metadata.campaignId;
       transmission.recipientTarget = Math.max(transmission.recipientTarget, Number(metadata.recipientTotal) || 0);
       transmission.recipients.add(conversationId);
       if (status.startsWith('FAILED')) {
@@ -6676,6 +6727,22 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
       if (['DELIVERED', 'READ', 'PLAYED', 'DELIVERED_BY_REPLY'].includes(status)) {
         transmission.delivered.add(conversationId);
       }
+      transmission.recipientRows.set(conversationId, {
+        id: messageItem.id,
+        conversationId,
+        leadId: messageItem.leadId,
+        externalLeadId: messageItem.externalLeadId,
+        name: messageItem.conversation?.leadName || 'Contato sem nome',
+        phone: messageItem.conversation?.phone || '',
+        district: messageItem.conversation?.district || null,
+        material: metadata.material || metadata.theme || null,
+        status: status.startsWith('FAILED') ? 'FALHA' : 'ENVIADO',
+        deliveryStatus: messageItem.providerStatus,
+        sentAt: messageItem.sentAt || messageItem.createdAt,
+        repliedAt: null,
+        delivered: ['DELIVERED', 'READ', 'PLAYED', 'DELIVERED_BY_REPLY'].includes(status),
+        sent: !status.startsWith('FAILED')
+      });
     }
 
     const recentTransmissions = Array.from(transmissions.values())
@@ -6722,6 +6789,7 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
     response.json({
       transmissions: recentTransmissions.map((transmission) => ({
         id: transmission.id,
+        campaignId: transmission.campaignId,
         name: transmission.name,
         message: transmission.message,
         createdAt: transmission.createdAt,
@@ -6729,7 +6797,11 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
         sent: transmission.sent.size,
         delivered: transmission.delivered.size,
         responded: transmission.responded.size,
-        failed: transmission.failed.size
+        failed: transmission.failed.size,
+        recipients: Array.from(transmission.recipientRows.values()).map((recipient) => ({
+          ...recipient,
+          delivered: recipient.delivered || transmission.delivered.has(recipient.conversationId)
+        }))
       }))
     });
   } catch (error) {
