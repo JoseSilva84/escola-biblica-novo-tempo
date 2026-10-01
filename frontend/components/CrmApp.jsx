@@ -1270,6 +1270,9 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
       .filter((church) => (church.districtSlug || slugifyDistrictName(church.districtName)) === districtSlug)
       .map((church) => ({ church, point: churchMapPoint(church, districtLeadPoints) }));
   }, [churches, lead]);
+  const assignedChurch = lead?.churchAssignment
+    ? visibleChurches.find(({ church }) => churchAssignmentKey(church) === lead.churchAssignment.churchKey)
+    : null;
   const leadMapSignature = lead ? [
     lead.id,
     lead.n,
@@ -1327,7 +1330,8 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
           <strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>
           <strong style="color:${priorityStyle.color}">${escapeMapHtml(priorityStyle.label)}</strong><br>
           ${escapeMapHtml(leadStreetAndNumber(lead))}<br>
-          ${escapeMapHtml(leadNeighborhood(lead))} - ${escapeMapHtml(lead.d || '')}
+          ${escapeMapHtml(leadNeighborhood(lead))} - ${escapeMapHtml(lead.d || '')}<br>
+          ${lead.churchAssignment ? `<strong style="color:#047857">${escapeMapHtml(lead.churchAssignment.churchName)} · ${escapeMapHtml(formatChurchDistance(lead.churchAssignment.distanceMeters))}</strong>` : ''}
         `);
 
       for (const { church, point: churchPoint } of visibleChurches) {
@@ -1349,6 +1353,16 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
             <a href="${churchMapSearchUrl(church, 'osm')}" target="_blank" rel="noreferrer">Abrir igreja no OSM</a>
           `);
       }
+      if (assignedChurch) {
+        L.polyline(
+          [[point.lat, point.lng], [assignedChurch.point.lat, assignedChurch.point.lng]],
+          { color: '#059669', dashArray: '8 8', opacity: 0.82, weight: 3 }
+        ).addTo(map).bindTooltip(`${lead.churchAssignment.churchName}: ${formatChurchDistance(lead.churchAssignment.distanceMeters)}`);
+        map.fitBounds(
+          L.latLngBounds([[point.lat, point.lng], [assignedChurch.point.lat, assignedChurch.point.lng]]).pad(0.3),
+          { maxZoom: 16 }
+        );
+      }
       window.setTimeout(() => map?.invalidateSize(), 80);
     }
 
@@ -1357,7 +1371,7 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
       active = false;
       if (map) map.remove();
     };
-  }, [leadMapSignature, churchMapSignature]);
+  }, [leadMapSignature, churchMapSignature, lead?.churchAssignment?.churchKey, lead?.churchAssignment?.distanceMeters]);
 
   if (!lead) return null;
   const point = approximateLeadPoint(lead);
@@ -1368,6 +1382,12 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
         <div>
           <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Localização do lead</span>
           <p className="mt-1 text-sm font-bold text-slate-800">{leadStreetAndNumber(lead)} - {leadNeighborhood(lead)}</p>
+          {lead.churchAssignment ? (
+            <p className="mt-2 text-sm font-black text-emerald-800">
+              <Church className="mr-1.5 inline" size={15} />
+              {lead.churchAssignment.churchName} · {formatChurchDistance(lead.churchAssignment.distanceMeters)} ({lead.churchAssignment.distancePrecision.toLowerCase()})
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700">
@@ -1438,6 +1458,9 @@ function LeadDetailModal({ churches = EMPTY_CHURCHES, lead, onClose }) {
     ['WhatsApp', lead.tel || 'Não informado'],
     ['E-mail', lead.em || 'Não informado'],
     ['Distrito', lead.d],
+    ['Igreja afiliada', lead.churchAssignment?.churchName || 'Nenhuma igreja geolocalizada no distrito'],
+    ['Distância até a igreja', lead.churchAssignment ? `${formatChurchDistance(lead.churchAssignment.distanceMeters)} (${lead.churchAssignment.distancePrecision.toLowerCase()})` : 'Não calculada'],
+    ['Critério de distribuição', lead.churchAssignment?.method || 'Não atribuído'],
     ['Endereço completo', `${leadStreetAndNumber(lead)} - Bairro: ${leadNeighborhood(lead)}`],
     ['Idade', lead.a || 'Não informada'],
     ['Data de aniversário', lead.birthDate || 'Não informada'],
@@ -4485,7 +4508,84 @@ function churchMapPoint(church, districtLeadPoints = {}) {
   };
 }
 
-function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
+function churchAssignmentKey(church) {
+  const district = church?.districtSlug || slugifyDistrictName(church?.districtName);
+  const name = slugForMap(church?.name || 'igreja-adventista');
+  const address = slugForMap(church?.address || 'sem-endereco');
+  return `${district}::${name}::${address}`;
+}
+
+function distanceBetweenMapPoints(first, second) {
+  if (!first || !second) return Number.POSITIVE_INFINITY;
+  const earthRadiusMeters = 6371000;
+  const toRadians = (value) => Number(value) * (Math.PI / 180);
+  const latitudeDelta = toRadians(second.lat - first.lat);
+  const longitudeDelta = toRadians(second.lng - first.lng);
+  const firstLatitude = toRadians(first.lat);
+  const secondLatitude = toRadians(second.lat);
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(firstLatitude) * Math.cos(secondLatitude) * Math.sin(longitudeDelta / 2) ** 2;
+  return earthRadiusMeters * (2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)));
+}
+
+function formatChurchDistance(distanceMeters) {
+  const meters = Number(distanceMeters);
+  if (!Number.isFinite(meters)) return 'Distância não calculada';
+  if (meters < 1000) return `${formatNumber(Math.max(1, Math.round(meters)))} m`;
+  return `${(meters / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1, minimumFractionDigits: meters < 10000 ? 1 : 0 })} km`;
+}
+
+function assignNearestChurchesByDistrict(records = [], churches = []) {
+  const districtLeadPoints = records.reduce((map, lead) => {
+    const district = slugifyDistrictName(lead?.d);
+    if (!district) return map;
+    if (!map[district]) map[district] = [];
+    map[district].push(approximateLeadPoint(lead));
+    return map;
+  }, {});
+  const churchEntries = churches.map((church) => ({
+    church,
+    key: churchAssignmentKey(church),
+    point: churchMapPoint(church, districtLeadPoints),
+    district: church?.districtSlug || slugifyDistrictName(church?.districtName)
+  }));
+  const churchesByDistrict = churchEntries.reduce((map, entry) => {
+    if (!map.has(entry.district)) map.set(entry.district, []);
+    map.get(entry.district).push(entry);
+    return map;
+  }, new Map());
+
+  return records.map((lead) => {
+    const leadPoint = approximateLeadPoint(lead);
+    const candidates = churchesByDistrict.get(slugifyDistrictName(lead?.d)) || [];
+    let nearest = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const candidate of candidates) {
+      const distance = distanceBetweenMapPoints(leadPoint, candidate.point);
+      if (distance < nearestDistance) {
+        nearest = candidate;
+        nearestDistance = distance;
+      }
+    }
+    if (!nearest) return { ...lead, churchAssignment: null };
+    const approximate = leadPoint.precision !== 'Endereco' || nearest.point.precision !== 'Endereco';
+    return {
+      ...lead,
+      churchAssignment: {
+        churchKey: nearest.key,
+        churchName: nearest.church.name || 'Igreja Adventista',
+        churchAddress: nearest.church.address || '',
+        churchLat: nearest.point.lat,
+        churchLng: nearest.point.lng,
+        distanceMeters: Math.round(nearestDistance),
+        distancePrecision: approximate ? 'Aproximada' : 'Por endereço',
+        method: 'Igreja mais próxima no mesmo distrito'
+      }
+    };
+  });
+}
+
+function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches = [], leads = [], onChurchFilterChange, onLeadDetails }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -4498,27 +4598,42 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
   }, {}), [leads]);
   const mappableLeads = useMemo(() => leads
     .filter((lead) => !activeMapPriority || lead.p === activeMapPriority || (activeMapPriority === 'Cold' && !leadMapPriorityStyles[lead.p]))
+    .filter((lead) => !activeChurchKey || lead.churchAssignment?.churchKey === activeChurchKey)
     .slice(0, 300)
     .map((lead) => ({
     lead,
     point: approximateLeadPoint(lead)
-  })), [activeMapPriority, leads]);
+  })), [activeChurchKey, activeMapPriority, leads]);
   const churchPoints = useMemo(() => {
-    const districtLeadPoints = mappableLeads.reduce((map, item) => {
+    const allLeadPoints = leads.map((lead) => ({ lead, point: approximateLeadPoint(lead) }));
+    const districtLeadPoints = allLeadPoints.reduce((map, item) => {
       const slug = slugifyDistrictName(item.lead?.d);
       if (!map[slug]) map[slug] = [];
       map[slug].push(item.point);
       return map;
     }, {});
-    const visibleDistricts = new Set(mappableLeads.map((item) => slugifyDistrictName(item.lead?.d)).filter(Boolean));
+    const visibleDistricts = new Set(allLeadPoints.map((item) => slugifyDistrictName(item.lead?.d)).filter(Boolean));
+    const assignedCounts = leads.reduce((counts, lead) => {
+      const key = lead.churchAssignment?.churchKey;
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+      return counts;
+    }, new Map());
     return churches
       .filter((church) => !visibleDistricts.size || visibleDistricts.has(church.districtSlug || slugifyDistrictName(church.districtName)))
       .map((church) => ({
         church,
-        point: churchMapPoint(church, districtLeadPoints)
+        key: churchAssignmentKey(church),
+        point: churchMapPoint(church, districtLeadPoints),
+        assignedCount: churchOptions.find((option) => option.key === churchAssignmentKey(church))?.count
+          ?? assignedCounts.get(churchAssignmentKey(church))
+          ?? 0
       }));
-  }, [churches, mappableLeads]);
+  }, [churchOptions, churches, leads]);
   const sampleLead = mappableLeads[0];
+
+  useEffect(() => {
+    if (activeChurchKey && !churchOptions.some((item) => item.key === activeChurchKey)) onChurchFilterChange?.('');
+  }, [activeChurchKey, churchOptions, onChurchFilterChange]);
 
   useEffect(() => {
     const resizeMap = () => mapInstanceRef.current?.invalidateSize({ pan: false });
@@ -4597,6 +4712,14 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
             popupAnchor: [0, -(markerSize / 2)]
           });
           const marker = L.marker([point.lat, point.lng], { icon: leadIcon }).addTo(map);
+          const assignment = lead.churchAssignment;
+          if (activeChurchKey && assignment && Number.isFinite(Number(assignment.churchLat)) && Number.isFinite(Number(assignment.churchLng))) {
+            const affiliationLine = L.polyline(
+              [[point.lat, point.lng], [Number(assignment.churchLat), Number(assignment.churchLng)]],
+              { color: '#059669', dashArray: '6 8', opacity: 0.28, weight: 2 }
+            ).addTo(map);
+            markersRef.current.push(affiliationLine);
+          }
           marker.bindPopup(`
             <strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>
             <strong style="color:${priorityStyle.color}">${escapeMapHtml(priorityStyle.label)}</strong><br>
@@ -4605,6 +4728,12 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
             <span>${escapeMapHtml(fullAddress)}</span><br>
             ${escapeMapHtml(lead.tel || 'sem telefone')}<br>
             <small>${escapeMapHtml(precisionLabel)}</small><br>
+            ${assignment ? `
+              <span style="display:block;margin-top:8px;padding:8px;border-radius:9px;background:#ecfdf5;color:#065f46;font-weight:800">
+                Igreja: ${escapeMapHtml(assignment.churchName)}<br>
+                ${escapeMapHtml(formatChurchDistance(assignment.distanceMeters))} de distância · ${escapeMapHtml(assignment.distancePrecision.toLowerCase())}
+              </span>
+            ` : '<small style="display:block;margin-top:8px;color:#b45309;font-weight:700">Nenhuma igreja geolocalizada neste distrito.</small>'}
             ${needsGoogleCheck ? `<small style="display:block;color:#b45309;font-weight:700;max-width:260px">${escapeMapHtml(precisionWarning)}</small>` : ''}
             <a href="${openStreetMapSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereço no OSM</a><br>
             <a href="${googleMapsSearchUrl(lead)}" target="_blank" rel="noreferrer">Abrir endereço no Google Maps (precisão)</a><br>
@@ -4624,7 +4753,7 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
           bounds.extend([point.lat, point.lng]);
         }
 
-        for (const { church, point } of churchPoints) {
+        for (const { church, key, point, assignedCount } of churchPoints) {
           const precisionLabel = point.precision === 'Endereco' ? 'Endereço exato' : 'Distrito aproximado';
           const churchIcon = L.divIcon({
             className: 'church-map-marker',
@@ -4640,9 +4769,21 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
             ${escapeMapHtml(church.districtName || '')}<br>
             ${church.address ? `${escapeMapHtml(church.address)}<br>` : ''}
             <small>${escapeMapHtml(precisionLabel)}</small><br>
+            <strong style="display:block;margin-top:6px;color:#065f46">${escapeMapHtml(formatNumber(assignedCount))} lead(s) afiliado(s)</strong>
             <a href="${churchMapSearchUrl(church, 'osm')}" target="_blank" rel="noreferrer">Abrir igreja no OSM</a><br>
-            <a href="${churchMapSearchUrl(church, 'google')}" target="_blank" rel="noreferrer">Abrir igreja no Google Maps (precisão)</a>
+            <a href="${churchMapSearchUrl(church, 'google')}" target="_blank" rel="noreferrer">Abrir igreja no Google Maps (precisão)</a><br>
+            <button type="button" data-church-filter style="width:100%;margin-top:10px;padding:9px 12px;border:0;border-radius:10px;background:#059669;color:#fff;font-weight:800;cursor:pointer">
+              Ver somente estes leads
+            </button>
           `);
+          churchMarker.on('popupopen', (event) => {
+            const filterButton = event.popup.getElement()?.querySelector('[data-church-filter]');
+            if (!filterButton) return;
+            filterButton.onclick = () => {
+              onChurchFilterChange?.(key);
+              map.closePopup();
+            };
+          });
           markersRef.current.push(churchMarker);
           bounds.extend([point.lat, point.lng]);
         }
@@ -4662,7 +4803,7 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
 
     renderMap();
     return () => { active = false; };
-  }, [churchPoints, mapMaximized, mappableLeads, onLeadDetails]);
+  }, [activeChurchKey, churchPoints, mapMaximized, mappableLeads, onLeadDetails]);
 
   useEffect(() => () => {
     markersRef.current = [];
@@ -4708,6 +4849,20 @@ function LeadsOpenStreetMap({ leads = [], churches = [], onLeadDetails }) {
             Igrejas
             <span className="leads-map-church-count rounded-full bg-white px-2 py-0.5 text-[10px] text-emerald-700">{formatNumber(churchPoints.length)}</span>
           </span>
+          <label className="inline-flex min-w-[16rem] items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 text-xs font-black text-emerald-900 shadow-sm">
+            <Church size={15} className="shrink-0" />
+            <select
+              aria-label="Filtrar leads por igreja afiliada"
+              className="h-10 min-w-0 flex-1 bg-transparent font-black text-slate-800 outline-none"
+              onChange={(event) => onChurchFilterChange?.(event.target.value)}
+              value={activeChurchKey}
+            >
+              <option value="">Todas as igrejas ({formatNumber(churchOptions.reduce((sum, item) => sum + item.count, 0))})</option>
+              {churchOptions.map(({ count, key, name }) => (
+                <option key={key} value={key}>{name} ({formatNumber(count)})</option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {sampleLead ? (
@@ -5261,6 +5416,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   });
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
+  const [churchFilterKey, setChurchFilterKey] = useState('');
   const [visibleLeadLimit, setVisibleLeadLimit] = useState(80);
   const [geocodeInfo, setGeocodeInfo] = useState(null);
   const [geocodeLoading, setGeocodeLoading] = useState(false);
@@ -5296,6 +5452,10 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       });
     });
   }, [churchesByDistrict, officialDistricts]);
+  const recordsWithChurchAssignment = useMemo(
+    () => assignNearestChurchesByDistrict(records, churchesForMap),
+    [churchesForMap, records]
+  );
 
   const districts = useMemo(
     () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -5400,11 +5560,37 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
     ]
   }), [recordsForToggleOptions]);
 
-  const filteredLeads = useMemo(() => {
-    return records
+  const leadsBeforeChurchFilter = useMemo(() => {
+    return recordsWithChurchAssignment
       .filter((lead) => leadMatchesFilterGroup(lead, filters))
       .sort((a, b) => (b.s || 0) - (a.s || 0));
-  }, [filters, records]);
+  }, [filters, recordsWithChurchAssignment]);
+  const churchFilterOptions = useMemo(() => {
+    const counts = leadsBeforeChurchFilter.reduce((map, lead) => {
+      const key = lead.churchAssignment?.churchKey;
+      if (key) map.set(key, (map.get(key) || 0) + 1);
+      return map;
+    }, new Map());
+    const visibleDistricts = new Set(leadsBeforeChurchFilter.map((lead) => slugifyDistrictName(lead.d)).filter(Boolean));
+    return churchesForMap
+      .filter((church) => visibleDistricts.has(church.districtSlug || slugifyDistrictName(church.districtName)))
+      .map((church) => ({
+        count: counts.get(churchAssignmentKey(church)) || 0,
+        key: churchAssignmentKey(church),
+        name: church.name
+      }))
+      .sort((first, second) => first.name.localeCompare(second.name));
+  }, [churchesForMap, leadsBeforeChurchFilter]);
+  const filteredLeads = useMemo(
+    () => churchFilterKey
+      ? leadsBeforeChurchFilter.filter((lead) => lead.churchAssignment?.churchKey === churchFilterKey)
+      : leadsBeforeChurchFilter,
+    [churchFilterKey, leadsBeforeChurchFilter]
+  );
+
+  useEffect(() => {
+    if (churchFilterKey && !churchFilterOptions.some((option) => option.key === churchFilterKey)) setChurchFilterKey('');
+  }, [churchFilterKey, churchFilterOptions]);
 
   const leadPdfScopeOptions = useMemo(() => ([
     { value: 'filtered', label: 'Todos os resultados filtrados', count: filteredLeads.length },
@@ -5524,6 +5710,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   }
 
   function clearAllFilters() {
+    setChurchFilterKey('');
     setFilters({
       association: 'paulistana',
       districts: [],
@@ -6110,7 +6297,14 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         </div>
 
         <div className="mt-5" ref={leadsMapExportRef}>
-          <LeadsOpenStreetMap churches={churchesForMap} leads={mapLeads} onLeadDetails={setSelectedLead} />
+          <LeadsOpenStreetMap
+            activeChurchKey={churchFilterKey}
+            churchOptions={churchFilterOptions}
+            churches={churchesForMap}
+            leads={mapLeads}
+            onChurchFilterChange={setChurchFilterKey}
+            onLeadDetails={setSelectedLead}
+          />
         </div>
 
         {canRunGeocode ? (
@@ -6204,7 +6398,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
               title="Abrir detalhes do primeiro lead visível ou selecionado"
             >
               <tr className="bg-slate-950/85 text-left transition hover:bg-slate-900">
-                {['Selecionar', 'Nome', 'WhatsApp', 'Distrito', 'Bairro', 'Material', 'Religião', 'Idade', 'Gênero', 'Prioridade ML', 'Status', 'Score', 'Ações'].map((head) => (
+                {['Selecionar', 'Nome', 'WhatsApp', 'Distrito', 'Igreja afiliada', 'Bairro', 'Material', 'Religião', 'Idade', 'Gênero', 'Prioridade ML', 'Status', 'Score', 'Ações'].map((head) => (
                   <th className="sticky top-0 z-[1] whitespace-nowrap border-b border-white/[0.12] bg-slate-950/95 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-white/80" key={head}>{head}</th>
                 ))}
               </tr>
@@ -6225,6 +6419,14 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                     </td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black tabular-nums text-emerald-400">{phoneDigits(lead.tel) || 'sem telefone'}</td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-bold text-slate-300">{lead.d}</td>
+                    <td className="max-w-[18rem] border-b border-white/[0.04] px-4 py-3">
+                      {lead.churchAssignment ? (
+                        <div title={`${lead.churchAssignment.churchName} · ${lead.churchAssignment.distancePrecision}`}>
+                          <strong className="block truncate text-emerald-300">{lead.churchAssignment.churchName}</strong>
+                          <span className="text-xs font-bold text-slate-400">{formatChurchDistance(lead.churchAssignment.distanceMeters)}</span>
+                        </div>
+                      ) : <span className="text-xs font-semibold text-amber-300">Sem igreja geolocalizada</span>}
+                    </td>
                     <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-400">{leadNeighborhood(lead)}</td>
                     <td className="max-w-[16rem] truncate border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-400">{leadMaterial(lead)}</td>
                     <td className="max-w-[12rem] truncate border-b border-white/[0.04] px-4 py-3 font-semibold text-slate-300">{lead.r || 'Não informado'}</td>
