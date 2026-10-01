@@ -1,0 +1,28 @@
+[
+  {
+    "route": "/",
+    "firstLoadUncompressedJsBytes": 1456349,
+    "firstLoadChunkPaths": [
+      ".next-campaign-history-verify\\static\\chunks\\256whwvw_y7jv.js",
+      ".next-campaign-history-verify\\static\\chunks\\3cdrsj0ajuirr.js",
+      ".next-campaign-history-verify\\static\\chunks\\2xt1qq9-vtjzl.js",
+      ".next-campaign-history-verify\\static\\chunks\\1pukk62b3881k.js",
+      ".next-campaign-history-verify\\static\\chunks\\3l2cn98nr6ga3.js",
+      ".next-campaign-history-verify\\static\\chunks\\2u9d2k9nx7w0l.js",
+      ".next-campaign-history-verify\\static\\chunks\\25o46h8mdjlrg.js",
+      ".next-campaign-history-verify\\static\\chunks\\turbopack-2ou-0h1svkn8f.js"
+    ]
+  },
+  {
+    "route": "/_not-found",
+    "firstLoadUncompressedJsBytes": 516008,
+    "firstLoadChunkPaths": [
+      ".next-campaign-history-verify\\static\\chunks\\256whwvw_y7jv.js",
+      ".next-campaign-history-verify\\static\\chunks\\3cdrsj0ajuirr.js",
+      ".next-campaign-history-verify\\static\\chunks\\3l2cn98nr6ga3.js",
+      ".next-campaign-history-verify\\static\\chunks\\2u9d2k9nx7w0l.js",
+      ".next-campaign-history-verify\\static\\chunks\\25o46h8mdjlrg.js",
+      ".next-campaign-history-verify\\static\\chunks\\turbopack-2ou-0h1svkn8f.js"
+    ]
+  }
+]

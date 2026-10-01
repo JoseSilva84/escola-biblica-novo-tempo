@@ -403,6 +403,10 @@ function compactCampaignName(value, maxLength = 22) {
   return `${name.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
+function normalizedCampaignReference(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+}
+
 function initialCrmTheme() {
   if (typeof window === 'undefined') return 'light';
   try {
@@ -9924,6 +9928,66 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
     return () => window.clearInterval(interval);
   }, [phoneSearch]);
 
+  const analyticsCampaignContactCounts = useMemo(() => {
+    const campaignById = new Map(campaigns.map((campaign) => [campaign.id, campaign]));
+    const campaignIdsByMessage = new Map();
+    const campaignIdsByName = new Map();
+    campaigns.forEach((campaign) => {
+      const messageKey = normalizedCampaignReference(campaign.whatsappDispatchMessage);
+      const nameKey = normalizedCampaignReference(campaign.name);
+      if (messageKey) campaignIdsByMessage.set(messageKey, [...(campaignIdsByMessage.get(messageKey) || []), campaign.id]);
+      if (nameKey) campaignIdsByName.set(nameKey, [...(campaignIdsByName.get(nameKey) || []), campaign.id]);
+    });
+
+    const countsByPhone = new Map();
+    broadcastAnalytics.forEach((transmission) => {
+      let campaignId = transmission.campaignId && campaignById.has(transmission.campaignId)
+        ? transmission.campaignId
+        : null;
+      if (!campaignId) {
+        const messageMatches = campaignIdsByMessage.get(normalizedCampaignReference(transmission.message)) || [];
+        if (messageMatches.length === 1) campaignId = messageMatches[0];
+      }
+      if (!campaignId) {
+        const nameMatches = campaignIdsByName.get(normalizedCampaignReference(transmission.name)) || [];
+        if (nameMatches.length === 1) campaignId = nameMatches[0];
+      }
+      const campaign = campaignId ? campaignById.get(campaignId) : null;
+      if (!campaign || !Array.isArray(transmission.recipients)) return;
+
+      transmission.recipients.forEach((recipient) => {
+        const successful = recipient.sent
+          || recipient.delivered
+          || String(recipient.status || '').toUpperCase() === 'ENVIADO';
+        const phone = phoneDigits(recipient.phone);
+        if (!successful || !phone) return;
+        const phoneKey = phone.slice(-10);
+        if (!countsByPhone.has(phoneKey)) countsByPhone.set(phoneKey, new Map());
+        const campaignCounts = countsByPhone.get(phoneKey);
+        const current = campaignCounts.get(campaignId) || {
+          campaignId,
+          campaignName: campaign.name,
+          count: 0,
+          lastContactAt: null
+        };
+        current.count += 1;
+        const contactedAt = recipient.sentAt || transmission.createdAt || null;
+        if (contactedAt && (!current.lastContactAt || new Date(contactedAt) > new Date(current.lastContactAt))) {
+          current.lastContactAt = contactedAt;
+        }
+        campaignCounts.set(campaignId, current);
+      });
+    });
+
+    const result = {};
+    countsByPhone.forEach((campaignCounts, phoneKey) => {
+      const contacts = Array.from(campaignCounts.values());
+      result[`phone:${phoneKey}`] = contacts;
+      result[`suffix:${phoneKey.slice(-8)}`] = contacts;
+    });
+    return result;
+  }, [broadcastAnalytics, campaigns]);
+
   const contactFilterRecords = useMemo(() => {
     const byPhone = new Map();
     leadDirectory.forEach((lead) => {
@@ -9932,9 +9996,13 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
       const recordedCount = whatsappContactCounts[`phone:${phone.slice(-10)}`]
         ?? whatsappContactCounts[`suffix:${phone.slice(-8)}`]
         ?? 0;
-      const campaignContacts = campaignContactCounts[`phone:${phone.slice(-10)}`]
-        ?? campaignContactCounts[`suffix:${phone.slice(-8)}`]
-        ?? [];
+      const savedCampaignContacts = campaignContactCounts[`phone:${phone.slice(-10)}`]
+        ?? campaignContactCounts[`suffix:${phone.slice(-8)}`];
+      const campaignContacts = savedCampaignContacts?.length
+        ? savedCampaignContacts
+        : analyticsCampaignContactCounts[`phone:${phone.slice(-10)}`]
+          ?? analyticsCampaignContactCounts[`suffix:${phone.slice(-8)}`]
+          ?? [];
       byPhone.set(phone.slice(-10), {
         id: `directory-${lead.id}`,
         n: lead.name,
@@ -9961,10 +10029,14 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
         const recordedCount = whatsappContactCounts[`phone:${key}`]
           ?? whatsappContactCounts[`suffix:${phone.slice(-8)}`]
           ?? 0;
-        const campaignContacts = campaignContactCounts[`phone:${key}`]
-          ?? campaignContactCounts[`suffix:${phone.slice(-8)}`]
-          ?? directoryLead?.campaignContacts
-          ?? [];
+        const savedCampaignContacts = campaignContactCounts[`phone:${key}`]
+          ?? campaignContactCounts[`suffix:${phone.slice(-8)}`];
+        const campaignContacts = savedCampaignContacts?.length
+          ? savedCampaignContacts
+          : analyticsCampaignContactCounts[`phone:${key}`]
+            ?? analyticsCampaignContactCounts[`suffix:${phone.slice(-8)}`]
+            ?? directoryLead?.campaignContacts
+            ?? [];
         byPhone.set(key, {
           ...lead,
           whatsappContactCount: Number(directoryLead?.whatsappContactCount || recordedCount),
@@ -9976,7 +10048,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
       }
     });
     return Array.from(byPhone.values());
-  }, [campaignContactCounts, leadDirectory, records, whatsappContactCounts]);
+  }, [analyticsCampaignContactCounts, campaignContactCounts, leadDirectory, records, whatsappContactCounts]);
 
   const deferredContactFilters = useDeferredValue(contactFilters);
   const contactAudiencePhoneSet = useMemo(

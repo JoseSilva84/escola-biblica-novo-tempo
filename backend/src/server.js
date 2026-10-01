@@ -5466,47 +5466,91 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
       campaignIdsByMessage.set(key, current);
     }
 
-    const broadcasts = await prisma.whatsAppBroadcast.findMany({
-      where: { recipients: { some: { status: 'ENVIADO' } } },
-      select: {
-        campaignId: true,
-        messageTemplate: true,
-        recipients: {
-          where: { status: 'ENVIADO' },
-          select: { phone: true, sentAt: true, updatedAt: true }
+    const [broadcasts, legacyBroadcastMessages] = await Promise.all([
+      prisma.whatsAppBroadcast.findMany({
+        select: {
+          broadcastKey: true,
+          campaignId: true,
+          messageTemplate: true,
+          recipients: {
+            where: { status: 'ENVIADO' },
+            select: { phone: true, messageId: true, sentAt: true, updatedAt: true }
+          }
         }
-      }
-    });
+      }),
+      prisma.whatsAppMessage.findMany({
+        where: {
+          direction: 'OUTBOUND',
+          OR: [
+            { providerStatus: null },
+            { providerStatus: { notIn: ['FAILED', 'FAILED_463'] } }
+          ]
+        },
+        select: {
+          id: true,
+          body: true,
+          metadata: true,
+          sentAt: true,
+          createdAt: true,
+          conversation: { select: { phone: true } }
+        }
+      })
+    ]);
     const countsByPhone = new Map();
-    for (const broadcast of broadcasts) {
-      let campaignId = broadcast.campaignId && campaignById.has(broadcast.campaignId)
-        ? broadcast.campaignId
-        : null;
-      if (!campaignId) {
-        const inferredIds = campaignIdsByMessage.get(normalizeMessage(broadcast.messageTemplate)) || [];
-        if (inferredIds.length === 1) campaignId = inferredIds[0];
-      }
+    const countedMessageIds = new Set();
+    const countedBroadcastPhones = new Set();
+    const broadcastByKey = new Map(broadcasts.map((broadcast) => [broadcast.broadcastKey, broadcast]));
+    const resolvedCampaignId = (explicitCampaignId, templateMessage) => {
+      if (explicitCampaignId && campaignById.has(explicitCampaignId)) return explicitCampaignId;
+      const inferredIds = campaignIdsByMessage.get(normalizeMessage(templateMessage)) || [];
+      return inferredIds.length === 1 ? inferredIds[0] : null;
+    };
+    const addCampaignContact = ({ phone: rawPhone, campaignId, contactedAt }) => {
+      const phone = normalizePhone(rawPhone);
       const campaign = campaignId ? campaignById.get(campaignId) : null;
-      if (!campaign) continue;
+      if (!phone || !campaign) return;
+      if (!countsByPhone.has(phone)) countsByPhone.set(phone, new Map());
+      const campaignsForPhone = countsByPhone.get(phone);
+      const current = campaignsForPhone.get(campaignId) || {
+        campaignId,
+        campaignName: campaign.name,
+        count: 0,
+        lastContactAt: null
+      };
+      current.count += 1;
+      if (contactedAt && (!current.lastContactAt || new Date(contactedAt) > new Date(current.lastContactAt))) {
+        current.lastContactAt = contactedAt;
+      }
+      campaignsForPhone.set(campaignId, current);
+    };
 
+    for (const broadcast of broadcasts) {
+      const campaignId = resolvedCampaignId(broadcast.campaignId, broadcast.messageTemplate);
+      if (!campaignId) continue;
       for (const recipient of broadcast.recipients) {
         const phone = normalizePhone(recipient.phone);
-        if (!phone) continue;
-        if (!countsByPhone.has(phone)) countsByPhone.set(phone, new Map());
-        const campaignsForPhone = countsByPhone.get(phone);
-        const current = campaignsForPhone.get(campaignId) || {
-          campaignId,
-          campaignName: campaign.name,
-          count: 0,
-          lastContactAt: null
-        };
-        current.count += 1;
-        const contactedAt = recipient.sentAt || recipient.updatedAt;
-        if (contactedAt && (!current.lastContactAt || new Date(contactedAt) > new Date(current.lastContactAt))) {
-          current.lastContactAt = contactedAt;
-        }
-        campaignsForPhone.set(campaignId, current);
+        addCampaignContact({ phone, campaignId, contactedAt: recipient.sentAt || recipient.updatedAt });
+        if (recipient.messageId) countedMessageIds.add(recipient.messageId);
+        if (phone) countedBroadcastPhones.add(`${broadcast.broadcastKey}:${phone.slice(-10)}`);
       }
+    }
+
+    for (const message of legacyBroadcastMessages) {
+      const metadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+      if (!metadata.batch || countedMessageIds.has(message.id)) continue;
+      const phone = normalizePhone(message.conversation?.phone);
+      const broadcastKey = String(metadata.broadcastId || '');
+      if (phone && broadcastKey && countedBroadcastPhones.has(`${broadcastKey}:${phone.slice(-10)}`)) continue;
+      const broadcast = broadcastKey ? broadcastByKey.get(broadcastKey) : null;
+      const campaignId = resolvedCampaignId(
+        metadata.campaignId || broadcast?.campaignId,
+        metadata.templateMessage || broadcast?.messageTemplate || message.body
+      );
+      addCampaignContact({
+        phone,
+        campaignId,
+        contactedAt: message.sentAt || message.createdAt
+      });
     }
 
     response.json({
