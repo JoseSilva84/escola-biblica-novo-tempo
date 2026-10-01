@@ -6386,9 +6386,9 @@ function WhatsAppTemplateLibrary({
               <MessageCircle size={32} />
             </div>
             <strong className="mt-4 block text-xl font-bold text-white">Nenhum modelo cadastrado no banco</strong>
-            <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
+            {/* <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
               Crie opções de mensagens (ex.: &ldquo;Boa noite — reativação&rdquo;, &ldquo;Convite estudo Daniel&rdquo;) para selecionar diretamente no disparo.
-            </p>
+            </p> */}
             <button
               className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-[#008069]"
               onClick={openCreate}
@@ -6647,7 +6647,7 @@ function CampaignDetailModal({ associations = [], campaign, onClose, onDelete, o
 
   return createPortal(
     <div className="theme-modal-backdrop fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/80 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="campaign-detail-title">
-      <div className="theme-modal-surface flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.55)]">
+      <div className="campaign-detail-modal theme-modal-surface flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-slate-950 text-slate-100 shadow-[0_34px_110px_rgba(0,0,0,0.55)]">
         <header className="theme-modal-header flex shrink-0 items-start justify-between gap-4 border-b border-white/10 bg-gradient-to-r from-emerald-600/25 via-slate-900 to-blue-600/20 p-6">
           <div>
             <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-200">Visão completa da campanha</span>
@@ -6694,9 +6694,9 @@ function CampaignDetailModal({ associations = [], campaign, onClose, onDelete, o
           </form>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto p-6">
-            <div className="grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">{details.map(([label, value]) => <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4" key={label}><span className="text-[11px] font-black uppercase tracking-wide text-slate-400">{label}</span><strong className="mt-2 block text-sm text-white">{displayValue(value)}</strong></div>)}</div>
-            <div className="mt-5 grid grid-cols-2 gap-4 max-lg:grid-cols-1">{narratives.map(([label, value]) => <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4" key={label}><span className="text-[11px] font-black uppercase tracking-wide text-blue-300">{label}</span><p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-200">{displayValue(value)}</p></section>)}</div>
-            <section className="mt-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4"><span className="text-[11px] font-black uppercase tracking-wide text-emerald-300">Canais previstos</span><p className="mt-2 text-sm font-semibold text-slate-200">{campaign.channels?.length ? campaign.channels.join(' · ') : 'Não informado'}</p></section>
+            <div className="grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">{details.map(([label, value]) => <div className="campaign-detail-card rounded-2xl border border-white/10 bg-white/[0.055] p-4" key={label}><span className="text-[11px] font-black uppercase tracking-wide text-slate-400">{label}</span><strong className="campaign-detail-value mt-2 block text-sm text-white">{displayValue(value)}</strong></div>)}</div>
+            <div className="mt-5 grid grid-cols-2 gap-4 max-lg:grid-cols-1">{narratives.map(([label, value]) => <section className="campaign-detail-card rounded-2xl border border-white/10 bg-white/[0.045] p-4" key={label}><span className="text-[11px] font-black uppercase tracking-wide text-blue-300">{label}</span><p className="campaign-detail-value mt-2 whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-200">{displayValue(value)}</p></section>)}</div>
+            <section className="campaign-detail-card mt-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4"><span className="text-[11px] font-black uppercase tracking-wide text-emerald-300">Canais previstos</span><p className="campaign-detail-value mt-2 text-sm font-semibold text-slate-200">{campaign.channels?.length ? campaign.channels.join(' · ') : 'Não informado'}</p></section>
           </div>
         )}
 

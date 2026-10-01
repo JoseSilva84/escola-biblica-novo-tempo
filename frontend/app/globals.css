@@ -891,6 +891,18 @@ html[data-crm-theme='light'] .theme-modal-surface .text-emerald-300 {
   color: rgb(4 120 87) !important;
 }
 
+/* Campaign details are authored with dark-theme utility colors. On the light
+   glass surface, keep the field labels accented and render their values with
+   strong, accessible contrast. */
+html[data-crm-theme='light'] .campaign-detail-modal .campaign-detail-card {
+  border-color: rgba(71, 85, 105, 0.13) !important;
+  background: rgba(255, 255, 255, 0.34) !important;
+}
+
+html[data-crm-theme='light'] .campaign-detail-modal .campaign-detail-value {
+  color: rgb(15 23 42) !important;
+}
+
 html[data-crm-theme='light'] .theme-modal-card .bg-slate-950,
 html[data-crm-theme='light'] .theme-modal-card .bg-slate-900 {
   background: rgba(203, 213, 225, 0.72) !important;
