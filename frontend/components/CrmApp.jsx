@@ -76,6 +76,7 @@ const panelClass = 'premium-panel rounded-2xl border border-white/[0.08] bg-slat
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 const CRM_THEME_STORAGE_KEY = 'amigos-nt-theme';
 const GEOCODE_CHURCHES_VALUE = '__churches__';
+const EMPTY_CHURCHES = Object.freeze([]);
 const adminNavItems = [
   ['admin', 'Dashboard', LayoutDashboard],
   ['associations', 'Associa\u00e7\u00f5es', Building2],
@@ -1258,7 +1259,7 @@ function InboxConversationModal({ item, question, answer, onClose }) {
   );
 }
 
-function LeadDetailOsmMap({ captureRef, churches = [], lead }) {
+function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
   const mapElementRef = useRef(null);
   const visibleChurches = useMemo(() => {
     if (!lead) return [];
@@ -1269,6 +1270,23 @@ function LeadDetailOsmMap({ captureRef, churches = [], lead }) {
       .filter((church) => (church.districtSlug || slugifyDistrictName(church.districtName)) === districtSlug)
       .map((church) => ({ church, point: churchMapPoint(church, districtLeadPoints) }));
   }, [churches, lead]);
+  const leadMapSignature = lead ? [
+    lead.id,
+    lead.n,
+    lead.d,
+    lead.p,
+    leadStreetAndNumber(lead),
+    leadNeighborhood(lead),
+    approximateLeadPoint(lead).lat,
+    approximateLeadPoint(lead).lng
+  ].join('|') : '';
+  const churchMapSignature = visibleChurches.map(({ church, point }) => [
+    church.id,
+    church.name,
+    church.address,
+    point.lat,
+    point.lng
+  ].join(':')).join('|');
 
   useEffect(() => {
     if (!lead || !mapElementRef.current) return undefined;
@@ -1339,7 +1357,7 @@ function LeadDetailOsmMap({ captureRef, churches = [], lead }) {
       active = false;
       if (map) map.remove();
     };
-  }, [lead, visibleChurches]);
+  }, [leadMapSignature, churchMapSignature]);
 
   if (!lead) return null;
   const point = approximateLeadPoint(lead);
@@ -1377,7 +1395,7 @@ function LeadDetailOsmMap({ captureRef, churches = [], lead }) {
   );
 }
 
-function LeadDetailModal({ churches = [], lead, onClose }) {
+function LeadDetailModal({ churches = EMPTY_CHURCHES, lead, onClose }) {
   const [exportingDetailPdf, setExportingDetailPdf] = useState(false);
   const [whatsappContactCount, setWhatsappContactCount] = useState(null);
   const detailMapCaptureRef = useRef(null);
