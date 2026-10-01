@@ -41,6 +41,7 @@ import {
   LogOut,
   MapPin,
   Maximize2,
+  Megaphone,
   Menu,
   MessageCircle,
   Minimize2,
@@ -8557,6 +8558,15 @@ function WhatsAppLeadPickerModal({
                           </span>
                           {lead.birthDate && lead.birthDate !== 'N/I' ? <span className="text-[11px] font-bold text-emerald-800">Aniversário: {lead.birthDate}</span> : null}
                         </span>
+                        {lead.campaignContacts?.length ? (
+                          <span className="mt-1.5 flex max-w-full gap-1 overflow-x-auto pb-0.5" title="Contatos realizados por campanha">
+                            {lead.campaignContacts.map((campaignContact) => (
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-800" key={campaignContact.campaignId} title={`${campaignContact.campaignName}: ${campaignContact.count} contato(s)`}>
+                                <Megaphone size={10} /> {campaignContact.campaignName}: {formatNumber(campaignContact.count)}
+                              </span>
+                            ))}
+                          </span>
+                        ) : null}
                       </span>
                       <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border ${selected ? 'border-[#008069] bg-[#008069] text-white' : 'border-slate-300 bg-white text-slate-400'}`}>{selected ? <Check size={16} /> : <Plus size={16} />}</span>
                     </button>
@@ -8627,18 +8637,29 @@ function WhatsAppBroadcastModal({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
-  const previewLead = recipients[0] || null;
-  const previewMessage = renderPreviewTemplate(message || defaultBroadcastMessage, previewLead || {});
   const minimumScheduleDate = new Date().toLocaleDateString('en-CA');
 
   // Batch split
   const [batchMode, setBatchMode] = useState(false);
   const [batches, setBatches] = useState([{ count: '', date: '', time: '' }]);
-  const totalAllocated = batches.reduce((sum, b) => sum + (Number(b.count) || 0), 0);
-  const batchRemaining = recipients.length - totalAllocated;
   const [activeGreeting, setActiveGreeting] = useState('boa-noite');
   const [selectedCampaignId, setSelectedCampaignId] = useState(() => (campaigns.length === 1 ? campaigns[0].id : ''));
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [recipientMode, setRecipientMode] = useState('all');
+  const selectedCampaign = campaigns.find((campaign) => campaign.id === selectedCampaignId) || null;
+  const campaignContactFor = (lead) => (lead.campaignContacts || []).find((item) => (
+    item.campaignId === selectedCampaignId && Number(item.count) > 0
+  ));
+  const contactedRecipientCount = selectedCampaignId
+    ? recipients.filter((lead) => campaignContactFor(lead)).length
+    : 0;
+  const targetRecipients = selectedCampaignId && recipientMode === 'not-contacted'
+    ? recipients.filter((lead) => !campaignContactFor(lead))
+    : recipients;
+  const previewLead = targetRecipients[0] || null;
+  const previewMessage = renderPreviewTemplate(message || defaultBroadcastMessage, previewLead || {});
+  const totalAllocated = batches.reduce((sum, b) => sum + (Number(b.count) || 0), 0);
+  const batchRemaining = targetRecipients.length - totalAllocated;
 
   useEffect(() => {
     if (campaigns.length === 1) {
@@ -8669,10 +8690,10 @@ function WhatsAppBroadcastModal({
       if (!batches[i].date || !batches[i].time) { toast.error(`Lote ${i + 1}: informe a data e o horario.`); return; }
       const scheduledAt = new Date(`${batches[i].date}T${batches[i].time}`);
       if (Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) { toast.error(`Lote ${i + 1}: escolha um horario futuro.`); return; }
-      batchDefs.push({ recipients: recipients.slice(offset, offset + count), scheduledAt: scheduledAt.toISOString() });
+      batchDefs.push({ recipients: targetRecipients.slice(offset, offset + count), scheduledAt: scheduledAt.toISOString() });
       offset += count;
     }
-    onScheduleBatches(batchDefs);
+    onScheduleBatches(batchDefs, { campaignId: selectedCampaignId });
   }
 
   function confirmSchedule(event) {
@@ -8686,17 +8707,17 @@ function WhatsAppBroadcastModal({
       toast.error('Escolha um horario futuro para o envio.');
       return;
     }
-    onSchedule(scheduledAt.toISOString());
+    onSchedule(scheduledAt.toISOString(), { campaignId: selectedCampaignId, recipients: targetRecipients });
   }
 
   return createPortal(
     <div className="whatsapp-broadcast-modal-backdrop fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/82 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="whatsapp-broadcast-title">
-      <form className="whatsapp-broadcast-modal flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#f0f2f5] shadow-[0_34px_110px_rgba(0,0,0,0.6)]" onSubmit={onSubmit}>
+      <form className="whatsapp-broadcast-modal flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#f0f2f5] shadow-[0_34px_110px_rgba(0,0,0,0.6)]" onSubmit={(event) => onSubmit(event, { campaignId: selectedCampaignId, recipients: targetRecipients })}>
         <div className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,#075e54,#008069,#00a884)] p-6 text-white">
           <div>
             <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">WhatsApp</span>
             <h2 className="mt-2 text-2xl font-black" id="whatsapp-broadcast-title">Lista de transmissao</h2>
-            <p className="mt-1 text-sm font-semibold text-emerald-50">A mesma mensagem sera enviada individualmente para {recipients.length} contatos.</p>
+            <p className="mt-1 text-sm font-semibold text-emerald-50">A mesma mensagem sera enviada individualmente para {targetRecipients.length} contatos.</p>
           </div>
           <button aria-label="Fechar" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 transition hover:bg-white/25" onClick={onClose} type="button"><X size={20} /></button>
         </div>
@@ -8710,8 +8731,10 @@ function WhatsAppBroadcastModal({
                   disabled={!campaigns.length}
                   value={selectedCampaignId}
                   onChange={(e) => {
-                    const id = e.target.value;
-                    setSelectedCampaignId(id);
+                     const id = e.target.value;
+                     setSelectedCampaignId(id);
+                     setRecipientMode('all');
+                     setBatches([{ count: '', date: '', time: '' }]);
                     const camp = campaigns.find((campaign) => campaign.id === id);
                     if (camp?.whatsappDispatchMessage) {
                       onMessageChange(camp.whatsappDispatchMessage);
@@ -8735,8 +8758,35 @@ function WhatsAppBroadcastModal({
                     {campaignsError ? 'A consulta ao banco falhou. Tente novamente na tela de Campanhas.' : 'Cadastre uma campanha para disponibilizar seu texto de disparo nesta tela.'}
                   </span>
                 ) : null}
-              </label>
-              {messageTemplates.length > 0 ? (
+               </label>
+               {selectedCampaign ? (
+                 <fieldset className="grid gap-2 rounded-xl border border-emerald-300/25 bg-white/10 p-3">
+                   <legend className="broadcast-campaign-copy px-1 text-[11px] font-black uppercase tracking-wide text-slate-300">Quem deve receber nesta campanha?</legend>
+                   <div className="grid gap-2 sm:grid-cols-2">
+                     <button
+                       aria-checked={recipientMode === 'all'}
+                       className={`rounded-xl border px-3 py-2.5 text-left transition ${recipientMode === 'all' ? 'border-emerald-300 bg-[#00a884] text-white shadow-md' : 'border-white/20 bg-white/5 text-slate-200 hover:border-emerald-300/60'}`}
+                       onClick={() => { setRecipientMode('all'); setBatches([{ count: '', date: '', time: '' }]); }}
+                       role="radio"
+                       type="button"
+                     >
+                       <strong className="block text-xs font-black">Enviar para todos os contatos</strong>
+                       <span className="mt-1 block text-[11px] font-semibold opacity-90">{formatNumber(recipients.length)} selecionados · {formatNumber(contactedRecipientCount)} já contatados</span>
+                     </button>
+                     <button
+                       aria-checked={recipientMode === 'not-contacted'}
+                       className={`rounded-xl border px-3 py-2.5 text-left transition ${recipientMode === 'not-contacted' ? 'border-emerald-300 bg-[#00a884] text-white shadow-md' : 'border-white/20 bg-white/5 text-slate-200 hover:border-emerald-300/60'}`}
+                       onClick={() => { setRecipientMode('not-contacted'); setBatches([{ count: '', date: '', time: '' }]); }}
+                       role="radio"
+                       type="button"
+                     >
+                       <strong className="block text-xs font-black">Somente quem ainda não foi contatado</strong>
+                       <span className="mt-1 block text-[11px] font-semibold opacity-90">{formatNumber(recipients.length - contactedRecipientCount)} disponíveis para {selectedCampaign.name}</span>
+                     </button>
+                   </div>
+                 </fieldset>
+               ) : null}
+               {messageTemplates.length > 0 ? (
                 <label className="grid gap-1.5">
                   <span className="broadcast-campaign-copy text-xs font-bold text-slate-300">Mensagem salva</span>
                   <select
@@ -8785,16 +8835,21 @@ function WhatsAppBroadcastModal({
           <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-black uppercase tracking-wide text-slate-600">Destinatarios</span>
-              <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{formatNumber(recipients.length)}</span>
+              <span className="rounded-full bg-[#008069] px-2.5 py-1 text-[11px] font-black text-white">{formatNumber(targetRecipients.length)}</span>
             </div>
             <div className="mt-3 flex max-h-36 flex-wrap gap-2 overflow-y-auto pr-1">
-              {recipients.slice(0, 100).map((lead) => (
-                <span className="broadcast-recipient-chip inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-[#d9fdd3] py-1 pl-3 pr-1 text-xs font-bold text-slate-800" key={`${lead.id}-${lead.phone}`}>
-                  {lead.name}
-                  <button aria-label={`Remover ${lead.name}`} className="grid h-6 w-6 place-items-center rounded-full text-[#008069] transition hover:bg-white" onClick={() => onRemove(lead)} type="button"><X size={13} /></button>
-                </span>
-              ))}
-              {recipients.length > 100 ? <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">+ {formatNumber(recipients.length - 100)} demais contatos</span> : null}
+              {targetRecipients.slice(0, 100).map((lead) => {
+                const campaignContact = selectedCampaignId ? campaignContactFor(lead) : null;
+                return (
+                  <span className={`broadcast-recipient-chip inline-flex items-center gap-2 rounded-full border py-1 pl-3 pr-1 text-xs font-bold ${campaignContact ? 'border-red-700 bg-red-600 text-white' : 'border-emerald-200 bg-[#d9fdd3] text-slate-800'}`} data-contacted={Boolean(campaignContact)} key={`${lead.id}-${lead.phone}`}>
+                    {lead.name}
+                    {campaignContact ? <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide">Contactado</span> : null}
+                    <button aria-label={`Remover ${lead.name}`} className={`grid h-6 w-6 place-items-center rounded-full transition hover:bg-white ${campaignContact ? 'text-white hover:text-red-700' : 'text-[#008069]'}`} onClick={() => onRemove(lead)} type="button"><X size={13} /></button>
+                  </span>
+                );
+              })}
+              {targetRecipients.length > 100 ? <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">+ {formatNumber(targetRecipients.length - 100)} demais contatos</span> : null}
+              {!targetRecipients.length ? <span className="text-xs font-bold text-emerald-800">Todos os contatos selecionados já receberam mensagem nesta campanha.</span> : null}
             </div>
           </div>
           <label className="mt-4 grid gap-1.5">
@@ -8840,8 +8895,8 @@ function WhatsAppBroadcastModal({
                   {batches.map((batch, index) => {
                     const batchCount = Number(batch.count) || 0;
                     const prevAllocated = batches.slice(0, index).reduce((s, b) => s + (Number(b.count) || 0), 0);
-                    const thisRemaining = recipients.length - prevAllocated;
-                    const previewNames = recipients.slice(prevAllocated, prevAllocated + batchCount).slice(0, 3).map((r) => r.name || r.n);
+                    const thisRemaining = targetRecipients.length - prevAllocated;
+                    const previewNames = targetRecipients.slice(prevAllocated, prevAllocated + batchCount).slice(0, 3).map((r) => r.name || r.n);
                     return (
                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3" key={index}>
                         <div className="flex items-center gap-2">
@@ -8853,7 +8908,7 @@ function WhatsAppBroadcastModal({
                           <label className="grid gap-1">
                             <span className="text-[11px] font-black uppercase tracking-wide text-slate-500">Destinatarios</span>
                             <div className="flex gap-1">
-                              <input className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-2 focus:ring-emerald-500/10" min="1" max={recipients.length} onChange={(e) => updateBatch(index, 'count', e.target.value)} placeholder="Qtd." type="number" value={batch.count} />
+                            <input className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-950 outline-none focus:border-[#00a884] focus:ring-2 focus:ring-emerald-500/10" min="1" max={targetRecipients.length} onChange={(e) => updateBatch(index, 'count', e.target.value)} placeholder="Qtd." type="number" value={batch.count} />
                               {thisRemaining > 0 ? <button className="h-10 shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-2 text-[11px] font-black text-[#008069] transition hover:bg-[#d9fdd3]" onClick={() => updateBatch(index, 'count', String(thisRemaining))} title={`Usar os ${thisRemaining} restantes`} type="button">+{thisRemaining}</button> : null}
                             </div>
                           </label>
@@ -8872,13 +8927,13 @@ function WhatsAppBroadcastModal({
                   })}
                 </div>
                 <div className={`mt-3 rounded-xl px-3 py-2 text-xs font-bold ${batchRemaining < 0 ? 'bg-red-50 text-red-600' : batchRemaining > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-[#008069]'}`}>
-                  {batchRemaining < 0 ? `Os lotes excedem o total em ${Math.abs(batchRemaining)} pessoa(s).` : batchRemaining > 0 ? `${batchRemaining} destinatario(s) ainda sem lote.` : `Todos os ${recipients.length} destinatarios distribuidos.`}
+                  {batchRemaining < 0 ? `Os lotes excedem o total em ${Math.abs(batchRemaining)} pessoa(s).` : batchRemaining > 0 ? `${batchRemaining} destinatario(s) ainda sem lote.` : `Todos os ${targetRecipients.length} destinatarios distribuidos.`}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 transition hover:bg-slate-50" onClick={addBatch} type="button">
                     <svg fill="none" height="13" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" width="13"><path d="M12 5v14M5 12h14"/></svg> Adicionar lote
                   </button>
-                  <button className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#00a884] px-4 text-xs font-black text-white shadow-md shadow-emerald-500/20 transition hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !recipients.length || !listName.trim() || !message.trim() || batchRemaining !== 0} onClick={handleScheduleBatches} type="button">
+                  <button className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#00a884] px-4 text-xs font-black text-white shadow-md shadow-emerald-500/20 transition hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !targetRecipients.length || !listName.trim() || !message.trim() || batchRemaining !== 0} onClick={handleScheduleBatches} type="button">
                     <Clock3 size={14} /> {sending ? 'Agendando...' : `Agendar ${batches.length} lote${batches.length !== 1 ? 's' : ''}`}
                   </button>
                 </div>
@@ -8890,8 +8945,8 @@ function WhatsAppBroadcastModal({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white p-4">
           <button className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50" onClick={onClose} type="button">Cancelar</button>
-          <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#00a884] bg-white px-5 text-sm font-black text-[#008069] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !recipients.length || !listName.trim() || !message.trim()} onClick={() => setScheduleOpen(true)} type="button"><Clock3 size={18} /> Enviar agendado</button>
-          <button className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !recipients.length || !listName.trim() || !message.trim()} type="submit"><Send size={18} /> {sending ? 'Enviando...' : `Enviar para ${recipients.length}`}</button>
+          <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#00a884] bg-white px-5 text-sm font-black text-[#008069] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !targetRecipients.length || !listName.trim() || !message.trim()} onClick={() => setScheduleOpen(true)} type="button"><Clock3 size={18} /> Enviar agendado</button>
+          <button className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a884] px-5 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-[#008069] disabled:cursor-not-allowed disabled:opacity-50" disabled={sending || !targetRecipients.length || !listName.trim() || !message.trim()} type="submit"><Send size={18} /> {sending ? 'Enviando...' : `Enviar para ${targetRecipients.length}`}</button>
         </div>
       </form>
       {scheduleOpen ? (
@@ -8900,7 +8955,7 @@ function WhatsAppBroadcastModal({
             <div className="bg-[linear-gradient(135deg,#075e54,#00a884)] p-5 text-white">
               <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">Envio automatico</span>
               <h3 className="mt-1 text-2xl font-black" id="broadcast-schedule-title">Agendar transmissao</h3>
-              <p className="mt-1 text-sm font-semibold text-emerald-50">O servidor enviara a mensagem para {recipients.length} contatos mesmo que esta tela esteja fechada.</p>
+              <p className="mt-1 text-sm font-semibold text-emerald-50">O servidor enviara a mensagem para {targetRecipients.length} contatos mesmo que esta tela esteja fechada.</p>
             </div>
             <div className="grid gap-4 p-5 sm:grid-cols-2">
               <label className="grid gap-1.5">
@@ -9205,6 +9260,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
   const [leadDirectory, setLeadDirectory] = useState([]);
   const [leadDistricts, setLeadDistricts] = useState([]);
   const [whatsappContactCounts, setWhatsappContactCounts] = useState({});
+  const [campaignContactCounts, setCampaignContactCounts] = useState({});
   const [contactAudience, setContactAudience] = useState(null);
   const [leadDirectoryLoading, setLeadDirectoryLoading] = useState(false);
   const [contactFilters, setContactFilters] = useState({
@@ -9310,9 +9366,10 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
     setLeadDirectoryLoading(true);
     try {
       const params = new URLSearchParams({ limit: '250' });
-      const [response, countsResponse] = await Promise.all([
+      const [response, countsResponse, campaignCountsResponse] = await Promise.all([
         apiFetch(`/api/whatsapp/leads?${params.toString()}`, { cache: 'no-store' }),
-        apiFetch('/api/whatsapp/contact-counts', { cache: 'no-store' }).catch(() => null)
+        apiFetch('/api/whatsapp/contact-counts', { cache: 'no-store' }).catch(() => null),
+        apiFetch('/api/whatsapp/campaign-contact-counts', { cache: 'no-store' }).catch(() => null)
       ]);
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Não foi possível buscar os leads.');
@@ -9328,6 +9385,17 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
           nextCounts[suffixKey] = (nextCounts[suffixKey] || 0) + count;
         }
         setWhatsappContactCounts(nextCounts);
+      }
+      if (campaignCountsResponse?.ok) {
+        const campaignCountsPayload = await campaignCountsResponse.json();
+        const nextCampaignCounts = {};
+        for (const item of campaignCountsPayload.counts || []) {
+          const countPhone = phoneDigits(item.phone);
+          const campaignContacts = Array.isArray(item.campaigns) ? item.campaigns : [];
+          nextCampaignCounts[`phone:${countPhone.slice(-10)}`] = campaignContacts;
+          nextCampaignCounts[`suffix:${countPhone.slice(-8)}`] = campaignContacts;
+        }
+        setCampaignContactCounts(nextCampaignCounts);
       }
       const mergedLeads = new Map();
       [...fallbackLeads, ...(payload.leads || [])].forEach((lead) => {
@@ -9440,9 +9508,10 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
     });
   }
 
-  async function submitBroadcast(event) {
+  async function submitBroadcast(event, options = {}) {
     event.preventDefault();
-    if (!broadcastSelectedLeads.length) return;
+    const selectedRecipients = Array.isArray(options.recipients) ? options.recipients : broadcastSelectedLeads;
+    if (!selectedRecipients.length) return;
     if (!broadcastListName.trim()) {
       toast.error('Nome da transmissão obrigatório', { description: 'Dê um nome para acompanhar esse disparo depois.' });
       return;
@@ -9450,7 +9519,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
     if (!broadcastMessage.trim()) return;
     setBroadcastSending(true);
     try {
-      const recipients = broadcastSelectedLeads.map((lead) => ({
+      const recipients = selectedRecipients.map((lead) => ({
         id: lead.id,
         leadId: lead.id,
         externalLeadId: lead.externalId || null,
@@ -9476,6 +9545,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
             listName: broadcastListName.trim(),
             broadcastId,
             recipientTotal: recipients.length,
+            campaignId: options.campaignId || null,
             aiReplyEnabled: broadcastAiReplyEnabled
           })
         });
@@ -9513,11 +9583,12 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
     }
   }
 
-  async function scheduleBroadcast(scheduledAt) {
-    if (!broadcastSelectedLeads.length || !broadcastListName.trim() || !broadcastMessage.trim()) return;
+  async function scheduleBroadcast(scheduledAt, options = {}) {
+    const selectedRecipients = Array.isArray(options.recipients) ? options.recipients : broadcastSelectedLeads;
+    if (!selectedRecipients.length || !broadcastListName.trim() || !broadcastMessage.trim()) return;
     setBroadcastSending(true);
     try {
-      const recipients = broadcastSelectedLeads.map((lead) => ({
+      const recipients = selectedRecipients.map((lead) => ({
         id: lead.id,
         leadId: lead.id,
         externalLeadId: lead.externalId || null,
@@ -9537,6 +9608,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
           message: broadcastMessage.trim(),
           listName: broadcastListName.trim(),
           scheduledAt,
+          campaignId: options.campaignId || null,
           aiReplyEnabled: broadcastAiReplyEnabled
         })
       });
@@ -9559,7 +9631,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
     }
   }
 
-  async function scheduleBroadcastBatches(batchDefs) {
+  async function scheduleBroadcastBatches(batchDefs, options = {}) {
     if (!broadcastListName.trim() || !broadcastMessage.trim()) return;
     setBroadcastSending(true);
     let scheduled = 0;
@@ -9588,6 +9660,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
               message: broadcastMessage.trim(),
               listName: `${broadcastListName.trim()} - Lote ${i + 1}`,
               scheduledAt,
+              campaignId: options.campaignId || null,
               aiReplyEnabled: broadcastAiReplyEnabled
             })
           });
@@ -9855,6 +9928,9 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
       const recordedCount = whatsappContactCounts[`phone:${phone.slice(-10)}`]
         ?? whatsappContactCounts[`suffix:${phone.slice(-8)}`]
         ?? 0;
+      const campaignContacts = campaignContactCounts[`phone:${phone.slice(-10)}`]
+        ?? campaignContactCounts[`suffix:${phone.slice(-8)}`]
+        ?? [];
       byPhone.set(phone.slice(-10), {
         id: `directory-${lead.id}`,
         n: lead.name,
@@ -9869,7 +9945,8 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
         v: Boolean(lead.isVip),
         birthDate: lead.birthDate || null,
         whatsappContactCount: Number(lead.whatsappContactCount || recordedCount),
-        _directoryLead: lead
+        campaignContacts,
+        _directoryLead: { ...lead, campaignContacts }
       });
     });
     records.forEach((lead) => {
@@ -9880,17 +9957,22 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
         const recordedCount = whatsappContactCounts[`phone:${key}`]
           ?? whatsappContactCounts[`suffix:${phone.slice(-8)}`]
           ?? 0;
+        const campaignContacts = campaignContactCounts[`phone:${key}`]
+          ?? campaignContactCounts[`suffix:${phone.slice(-8)}`]
+          ?? directoryLead?.campaignContacts
+          ?? [];
         byPhone.set(key, {
           ...lead,
           whatsappContactCount: Number(directoryLead?.whatsappContactCount || recordedCount),
+          campaignContacts,
           _directoryLead: directoryLead
-            ? { ...dashboardLeadToWhatsAppLead(lead), ...directoryLead, whatsappContactCount: Number(directoryLead.whatsappContactCount || recordedCount) }
-            : { ...dashboardLeadToWhatsAppLead(lead), whatsappContactCount: Number(recordedCount) }
+            ? { ...dashboardLeadToWhatsAppLead(lead), ...directoryLead, whatsappContactCount: Number(directoryLead.whatsappContactCount || recordedCount), campaignContacts }
+            : { ...dashboardLeadToWhatsAppLead(lead), whatsappContactCount: Number(recordedCount), campaignContacts }
         });
       }
     });
     return Array.from(byPhone.values());
-  }, [leadDirectory, records, whatsappContactCounts]);
+  }, [campaignContactCounts, leadDirectory, records, whatsappContactCounts]);
 
   const deferredContactFilters = useDeferredValue(contactFilters);
   const contactAudiencePhoneSet = useMemo(

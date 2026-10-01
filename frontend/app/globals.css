@@ -643,6 +643,12 @@ html[data-crm-theme="dark"] .whatsapp-broadcast-modal .broadcast-recipient-chip 
   color: rgb(236 253 245) !important;
 }
 
+html[data-crm-theme="dark"] .whatsapp-broadcast-modal .broadcast-recipient-chip[data-contacted="true"] {
+  border-color: rgb(185 28 28) !important;
+  background: rgb(220 38 38) !important;
+  color: #ffffff !important;
+}
+
 html[data-crm-theme="dark"] .whatsapp-broadcast-modal > div:last-child {
   border-color: rgba(148, 163, 184, 0.18) !important;
   background: #0c1826 !important;

@@ -5438,6 +5438,91 @@ app.get('/api/whatsapp/contact-counts', requireAuth, async (request, response) =
   }
 });
 
+app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, response) => {
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.json({ counts: [] });
+    return;
+  }
+
+  try {
+    const associationSlug = userAssociationSlug(request.user);
+    const campaignWhere = isAdminGeralUser(request.user)
+      ? {}
+      : request.user?.associationId
+        ? { associationId: request.user.associationId }
+        : { association: { is: { slug: associationSlug } } };
+    const campaigns = await prisma.campaign.findMany({
+      where: campaignWhere,
+      select: { id: true, name: true, whatsappDispatchMessage: true }
+    });
+    const campaignById = new Map(campaigns.map((campaign) => [campaign.id, campaign]));
+    const normalizeMessage = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+    const campaignIdsByMessage = new Map();
+    for (const campaign of campaigns) {
+      const key = normalizeMessage(campaign.whatsappDispatchMessage);
+      if (!key) continue;
+      const current = campaignIdsByMessage.get(key) || [];
+      current.push(campaign.id);
+      campaignIdsByMessage.set(key, current);
+    }
+
+    const broadcasts = await prisma.whatsAppBroadcast.findMany({
+      where: { recipients: { some: { status: 'ENVIADO' } } },
+      select: {
+        campaignId: true,
+        messageTemplate: true,
+        recipients: {
+          where: { status: 'ENVIADO' },
+          select: { phone: true, sentAt: true, updatedAt: true }
+        }
+      }
+    });
+    const countsByPhone = new Map();
+    for (const broadcast of broadcasts) {
+      let campaignId = broadcast.campaignId && campaignById.has(broadcast.campaignId)
+        ? broadcast.campaignId
+        : null;
+      if (!campaignId) {
+        const inferredIds = campaignIdsByMessage.get(normalizeMessage(broadcast.messageTemplate)) || [];
+        if (inferredIds.length === 1) campaignId = inferredIds[0];
+      }
+      const campaign = campaignId ? campaignById.get(campaignId) : null;
+      if (!campaign) continue;
+
+      for (const recipient of broadcast.recipients) {
+        const phone = normalizePhone(recipient.phone);
+        if (!phone) continue;
+        if (!countsByPhone.has(phone)) countsByPhone.set(phone, new Map());
+        const campaignsForPhone = countsByPhone.get(phone);
+        const current = campaignsForPhone.get(campaignId) || {
+          campaignId,
+          campaignName: campaign.name,
+          count: 0,
+          lastContactAt: null
+        };
+        current.count += 1;
+        const contactedAt = recipient.sentAt || recipient.updatedAt;
+        if (contactedAt && (!current.lastContactAt || new Date(contactedAt) > new Date(current.lastContactAt))) {
+          current.lastContactAt = contactedAt;
+        }
+        campaignsForPhone.set(campaignId, current);
+      }
+    }
+
+    response.json({
+      counts: Array.from(countsByPhone, ([phone, campaignCounts]) => ({
+        phone,
+        campaigns: Array.from(campaignCounts.values()).sort((left, right) => (
+          left.campaignName.localeCompare(right.campaignName, 'pt-BR')
+        ))
+      }))
+    });
+  } catch (error) {
+    console.error('[whatsapp:campaign-contact-counts:error]', error.message);
+    response.status(500).json({ counts: [], message: 'Não foi possível consultar os contatos por campanha.' });
+  }
+});
+
 app.post('/api/whatsapp/leads', requireAuth, async (request, response) => {
   if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
     response.status(403).json({ message: 'Usuario sem permissao para cadastrar contatos.' });
@@ -5826,6 +5911,18 @@ function validBroadcastRecipients(values, limit = 50_000) {
   return Array.from(unique.values());
 }
 
+async function broadcastCampaignForUser(campaignId, user) {
+  const id = String(campaignId || '').trim();
+  if (!id) return null;
+  const associationSlug = userAssociationSlug(user);
+  const where = isAdminGeralUser(user)
+    ? { id }
+    : user?.associationId
+      ? { id, associationId: user.associationId }
+      : { id, association: { is: { slug: associationSlug } } };
+  return prisma.campaign.findFirst({ where, select: { id: true, name: true } });
+}
+
 async function dispatchScheduledBroadcast(broadcast) {
   const recipients = broadcast.recipients || [];
   const configuredDelay = Number(process.env.WAHA_BROADCAST_DELAY_MS);
@@ -5865,6 +5962,7 @@ async function dispatchScheduledBroadcast(broadcast) {
           scheduled: true,
           scheduledAt: broadcast.scheduledAt,
           broadcastId: broadcast.broadcastKey,
+          campaignId: broadcast.campaignId || null,
           listName: broadcast.name,
           recipientTotal: broadcast.recipientTotal,
           templateMessage: broadcast.messageTemplate,
@@ -5910,6 +6008,7 @@ async function dispatchScheduledBroadcast(broadcast) {
           scheduled: true,
           scheduledAt: broadcast.scheduledAt,
           broadcastId: broadcast.broadcastKey,
+          campaignId: broadcast.campaignId || null,
           listName: broadcast.name,
           recipientTotal: broadcast.recipientTotal,
           material: recipient.material || null
@@ -5983,6 +6082,7 @@ app.post('/api/whatsapp/schedule-broadcast', requireAuth, async (request, respon
   const listName = String(request.body?.listName || '').trim().slice(0, 120);
   const scheduledAt = new Date(request.body?.scheduledAt);
   const aiReplyEnabled = optionalBoolean(request.body?.aiReplyEnabled);
+  const requestedCampaignId = String(request.body?.campaignId || '').trim();
   if (!recipients.length) return response.status(400).json({ ok: false, message: 'Informe ao menos um destinatário válido.' });
   if (!listName) return response.status(400).json({ ok: false, message: 'Informe o nome da transmissão.' });
   if (message.length < 2) return response.status(400).json({ ok: false, message: 'Informe a mensagem da transmissão.' });
@@ -5991,6 +6091,10 @@ app.post('/api/whatsapp/schedule-broadcast', requireAuth, async (request, respon
   }
 
   try {
+    const campaign = await broadcastCampaignForUser(requestedCampaignId, request.user);
+    if (requestedCampaignId && !campaign) {
+      return response.status(400).json({ ok: false, message: 'A campanha selecionada não foi encontrada ou não está disponível para este usuário.' });
+    }
     const broadcastKey = randomUUID();
     const broadcastDbId = randomUUID();
     const recipientRows = recipients.map((recipient) => ({
@@ -6017,7 +6121,8 @@ app.post('/api/whatsapp/schedule-broadcast', requireAuth, async (request, respon
         createdByName: request.user?.email || request.user?.name || request.user?.sub || 'Sistema',
         status: 'AGENDADA',
         scheduledAt,
-        aiReplyEnabled
+        aiReplyEnabled,
+        campaignId: campaign?.id || null
       }
     })];
     for (let index = 0; index < recipientRows.length; index += 500) {
@@ -6047,6 +6152,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
   const broadcastId = String(request.body?.broadcastId || '').trim().slice(0, 120) || randomUUID();
   const recipientTotal = Math.max(Number(request.body?.recipientTotal) || recipients.length, recipients.length);
   const aiReplyEnabled = optionalBoolean(request.body?.aiReplyEnabled);
+  const requestedCampaignId = String(request.body?.campaignId || '').trim();
   if (!recipients.length) {
     response.status(400).json({ ok: false, message: 'Informe ao menos um destinatario.' });
     return;
@@ -6068,6 +6174,10 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
     : 1200;
   let broadcast = null;
   try {
+    const campaign = await broadcastCampaignForUser(requestedCampaignId, request.user);
+    if (requestedCampaignId && !campaign) {
+      return response.status(400).json({ ok: false, message: 'A campanha selecionada não foi encontrada ou não está disponível para este usuário.' });
+    }
     broadcast = await prisma.whatsAppBroadcast.upsert({
       where: { broadcastKey: broadcastId },
       create: {
@@ -6079,7 +6189,8 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         createdByName: request.user?.email || request.user?.name || request.user?.sub || 'Sistema',
         status: 'PROCESSANDO',
         startedAt: new Date(),
-        aiReplyEnabled
+        aiReplyEnabled,
+        campaignId: campaign?.id || null
       },
       update: {
         name: listName,
@@ -6088,6 +6199,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
         status: 'PROCESSANDO',
         startedAt: new Date(),
         aiReplyEnabled,
+        campaignId: campaign?.id || null,
         lastError: null
       }
     });
@@ -6157,6 +6269,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
           failure: true,
           batch: true,
           broadcastId,
+          campaignId: broadcast?.campaignId || requestedCampaignId || null,
           listName,
           recipientTotal,
           material: recipient.material || recipient.theme || null,
@@ -6209,6 +6322,7 @@ app.post('/api/whatsapp/send-batch', requireAuth, async (request, response) => {
             templateId: request.body?.templateId || null,
             batch: true,
             broadcastId,
+            campaignId: broadcast?.campaignId || requestedCampaignId || null,
             listName,
             recipientTotal,
             templateMessage: message,
@@ -6439,6 +6553,7 @@ app.get('/api/whatsapp/broadcast-analytics', requireAuth, async (request, respon
           }
           return {
             id: broadcast.broadcastKey,
+            campaignId: broadcast.campaignId || null,
             name: broadcast.name,
             message: broadcast.messageTemplate,
             createdAt: broadcast.createdAt,

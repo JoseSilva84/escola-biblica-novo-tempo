@@ -93,33 +93,34 @@ model Church {
 }
 
 model Campaign {
-  id            String               @id @default(cuid())
-  name          String
-  slug          String
-  status        CampaignStatus       @default(PLANEJADA)
-  associationId String
-  association   Association          @relation(fields: [associationId], references: [id])
-  leads         CampaignLead[]
-  sequences     AutomationSequence[]
+  id                       String               @id @default(cuid())
+  name                     String
+  slug                     String
+  status                   CampaignStatus       @default(PLANEJADA)
+  associationId            String
+  association              Association          @relation(fields: [associationId], references: [id])
+  leads                    CampaignLead[]
+  sequences                AutomationSequence[]
+  whatsAppBroadcasts       WhatsAppBroadcast[]
   owner                    String?
-  goal                     Int             @default(0)
+  goal                     Int                  @default(0)
   proposal                 String?
   objective                String?
   audience                 String?
   context                  String?
   message                  String?
   callToAction             String?
-  channels                 String[]        @default([])
-  startDate                DateTime?       @db.Date
-  endDate                  DateTime?       @db.Date
-  budget                   Decimal?        @db.Decimal(12, 2)
+  channels                 String[]             @default([])
+  startDate                DateTime?            @db.Date
+  endDate                  DateTime?            @db.Date
+  budget                   Decimal?             @db.Decimal(12, 2)
   kpis                     String?
   risks                    String?
   stakeholders             String?
   whatsappDispatchMessage  String?
-  whatsappDispatchGreeting String?         @default("boa-noite")
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  whatsappDispatchGreeting String?              @default("boa-noite")
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
 
   @@unique([associationId, slug])
 }
@@ -305,6 +306,8 @@ model WhatsAppBroadcast {
   startedAt       DateTime?
   completedAt     DateTime?
   aiReplyEnabled  Boolean?
+  campaignId      String?
+  campaign        Campaign?                    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   lastError       String?
   recipients      WhatsAppBroadcastRecipient[]
   createdAt       DateTime                     @default(now())
@@ -312,6 +315,7 @@ model WhatsAppBroadcast {
 
   @@index([createdAt])
   @@index([status, scheduledAt])
+  @@index([campaignId])
 }
 
 model WhatsAppBroadcastRecipient {
