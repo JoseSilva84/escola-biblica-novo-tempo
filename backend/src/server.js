@@ -5453,7 +5453,8 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
         : { association: { is: { slug: associationSlug } } };
     const campaigns = await prisma.campaign.findMany({
       where: campaignWhere,
-      select: { id: true, name: true, whatsappDispatchMessage: true }
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true, associationId: true, whatsappDispatchMessage: true, createdAt: true }
     });
     const campaignById = new Map(campaigns.map((campaign) => [campaign.id, campaign]));
     const normalizeMessage = (value) => String(value || '')
@@ -5498,6 +5499,7 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
           name: true,
           campaignId: true,
           messageTemplate: true,
+          createdAt: true,
           recipients: {
             where: { status: 'ENVIADO' },
             select: { phone: true, messageId: true, sentAt: true, updatedAt: true }
@@ -5512,8 +5514,10 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
             { providerStatus: { notIn: ['FAILED', 'FAILED_463'] } }
           ]
         },
+        orderBy: { createdAt: 'asc' },
         select: {
           id: true,
+          conversationId: true,
           body: true,
           metadata: true,
           sentAt: true,
@@ -5524,8 +5528,8 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
     ]);
     const countsByPhone = new Map();
     const countedMessageIds = new Set();
-    const countedBroadcastPhones = new Set();
     const broadcastByKey = new Map(broadcasts.map((broadcast) => [broadcast.broadcastKey, broadcast]));
+    const campaignIdByMessageId = new Map();
     const resolvedCampaignId = (explicitCampaignId, templateMessage, transmissionName = '') => {
       if (explicitCampaignId && campaignById.has(explicitCampaignId)) return explicitCampaignId;
       const inferredIds = campaignIdsByMessage.get(normalizeMessage(templateMessage)) || [];
@@ -5549,6 +5553,16 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
       if (best?.score >= 0.72 && (!runnerUp || best.score - runnerUp.score >= 0.08)) return best.campaignId;
       return campaigns.length === 1 && best?.score >= 0.45 ? campaigns[0].id : null;
     };
+    const firstCampaign = campaigns[0] || null;
+    const secondCampaign = campaigns[1] || null;
+    const historicalCampaignId = (contactedAt) => {
+      if (!firstCampaign) return null;
+      if (campaigns.length === 1) return firstCampaign.id;
+      const contactDate = new Date(contactedAt || 0);
+      return secondCampaign && !Number.isNaN(contactDate.getTime()) && contactDate < new Date(secondCampaign.createdAt)
+        ? firstCampaign.id
+        : null;
+    };
     const addCampaignContact = ({ phone: rawPhone, campaignId, contactedAt }) => {
       const phone = normalizePhone(rawPhone);
       const campaign = campaignId ? campaignById.get(campaignId) : null;
@@ -5569,33 +5583,54 @@ app.get('/api/whatsapp/campaign-contact-counts', requireAuth, async (request, re
     };
 
     for (const broadcast of broadcasts) {
-      const campaignId = resolvedCampaignId(broadcast.campaignId, broadcast.messageTemplate, broadcast.name);
+      const campaignId = resolvedCampaignId(broadcast.campaignId, broadcast.messageTemplate, broadcast.name)
+        || historicalCampaignId(broadcast.createdAt);
       if (!campaignId) continue;
       for (const recipient of broadcast.recipients) {
-        const phone = normalizePhone(recipient.phone);
-        addCampaignContact({ phone, campaignId, contactedAt: recipient.sentAt || recipient.updatedAt });
-        if (recipient.messageId) countedMessageIds.add(recipient.messageId);
-        if (phone) countedBroadcastPhones.add(`${broadcast.broadcastKey}:${phone.slice(-10)}`);
+        if (recipient.messageId) campaignIdByMessageId.set(recipient.messageId, campaignId);
       }
     }
 
+    const activeCampaignByConversation = new Map();
     for (const message of legacyBroadcastMessages) {
       const metadata = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
-      if (!metadata.batch || countedMessageIds.has(message.id)) continue;
       const phone = normalizePhone(message.conversation?.phone);
       const broadcastKey = String(metadata.broadcastId || '');
-      if (phone && broadcastKey && countedBroadcastPhones.has(`${broadcastKey}:${phone.slice(-10)}`)) continue;
       const broadcast = broadcastKey ? broadcastByKey.get(broadcastKey) : null;
-      const campaignId = resolvedCampaignId(
+      const directlyResolvedCampaignId = campaignIdByMessageId.get(message.id) || resolvedCampaignId(
         metadata.campaignId || broadcast?.campaignId,
         metadata.templateMessage || broadcast?.messageTemplate || message.body,
         metadata.listName || broadcast?.name || ''
       );
+      if (directlyResolvedCampaignId) {
+        activeCampaignByConversation.set(message.conversationId, directlyResolvedCampaignId);
+      }
+      let campaignId = directlyResolvedCampaignId
+        || activeCampaignByConversation.get(message.conversationId)
+        || historicalCampaignId(message.sentAt || message.createdAt);
+      if (campaignId && !activeCampaignByConversation.has(message.conversationId)) {
+        activeCampaignByConversation.set(message.conversationId, campaignId);
+      }
       addCampaignContact({
         phone,
         campaignId,
         contactedAt: message.sentAt || message.createdAt
       });
+      countedMessageIds.add(message.id);
+    }
+
+    for (const broadcast of broadcasts) {
+      const campaignId = resolvedCampaignId(broadcast.campaignId, broadcast.messageTemplate, broadcast.name)
+        || historicalCampaignId(broadcast.createdAt);
+      if (!campaignId) continue;
+      for (const recipient of broadcast.recipients) {
+        if (recipient.messageId && countedMessageIds.has(recipient.messageId)) continue;
+        addCampaignContact({
+          phone: recipient.phone,
+          campaignId,
+          contactedAt: recipient.sentAt || recipient.updatedAt || broadcast.createdAt
+        });
+      }
     }
 
     response.json({
