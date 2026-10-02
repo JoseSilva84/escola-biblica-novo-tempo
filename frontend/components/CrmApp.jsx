@@ -5518,6 +5518,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
   const [churchFilterKey, setChurchFilterKey] = useState('');
   const [acceptedVisitPhones, setAcceptedVisitPhones] = useState(() => new Set());
+  const acceptedVisitPhonesRef = useRef(null);
   const [visibleLeadLimit, setVisibleLeadLimit] = useState(80);
   const [geocodeInfo, setGeocodeInfo] = useState(null);
   const [geocodeLoading, setGeocodeLoading] = useState(false);
@@ -5534,12 +5535,19 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
     () => flattenChurchesByDistrict(churchesByDistrict, officialDistricts),
     [churchesByDistrict, officialDistricts]
   );
+  const assignedRecords = useMemo(
+    () => assignNearestChurchesByDistrict(records, churchesForMap),
+    [churchesForMap, records]
+  );
+  const assignedRecordsByPhone = useMemo(() => new Map(assignedRecords
+    .map((lead) => [phoneMatchKey(lead.tel), lead])
+    .filter(([phone]) => phone)), [assignedRecords]);
   const recordsWithChurchAssignment = useMemo(
-    () => assignNearestChurchesByDistrict(records, churchesForMap).map((lead) => ({
+    () => assignedRecords.map((lead) => ({
       ...lead,
       campaignVisitAccepted: acceptedVisitPhones.has(phoneMatchKey(lead.tel)) || lead.aceitouVisita === true
     })),
-    [acceptedVisitPhones, churchesForMap, records]
+    [acceptedVisitPhones, assignedRecords]
   );
 
   useEffect(() => {
@@ -5549,20 +5557,47 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
         .then((response) => response.ok ? response.json() : null)
         .then((summary) => {
           if (!activeRequest || !summary) return;
-          const phones = new Set((summary.acceptedConversations || [])
-            .map((conversation) => phoneMatchKey(conversation.phone))
-            .filter(Boolean));
-          setAcceptedVisitPhones(phones);
+          const acceptedConversations = summary.acceptedConversations || [];
+          const conversationsByPhone = new Map(acceptedConversations
+            .map((conversation) => [phoneMatchKey(conversation.phone), conversation])
+            .filter(([phone]) => phone));
+          const phones = new Set(conversationsByPhone.keys());
+          const previousPhones = acceptedVisitPhonesRef.current;
+
+          if (previousPhones === null) {
+            acceptedVisitPhonesRef.current = phones;
+            setAcceptedVisitPhones(phones);
+            return;
+          }
+
+          const newPhones = Array.from(phones).filter((phone) => !previousPhones.has(phone));
+          if (!newPhones.length) return;
+
+          const nextPhones = new Set([...previousPhones, ...phones]);
+          acceptedVisitPhonesRef.current = nextPhones;
+          setAcceptedVisitPhones(nextPhones);
+
+          newPhones.forEach((phone) => {
+            const conversation = conversationsByPhone.get(phone);
+            const lead = assignedRecordsByPhone.get(phone);
+            const leadName = conversation?.leadName || lead?.n || 'Lead sem nome';
+            const districtName = conversation?.district || lead?.d || 'não vinculado';
+            const churchName = lead?.churchAssignment?.churchName || 'não vinculada';
+            toast.success('Novo aceite de visita', {
+              description: `${leadName} · Distrito: ${districtName} · Igreja: ${churchName}`,
+              duration: 12000
+            });
+          });
         })
         .catch(() => {});
     };
     loadAcceptedVisits();
-    const timer = window.setInterval(loadAcceptedVisits, 20000);
+    const timer = window.setInterval(loadAcceptedVisits, 30000);
     return () => {
       activeRequest = false;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [assignedRecordsByPhone]);
 
   const districts = useMemo(
     () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
