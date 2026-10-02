@@ -2752,6 +2752,8 @@ function summarizeAnaConversation(conversation, dashboardRecordsById = new Map()
 
   return {
     id: conversation.id,
+    leadId: conversation.leadId || conversation.lead?.id || null,
+    externalLeadId: conversation.externalLeadId || conversation.lead?.externalId || null,
     phone: conversation.phone,
     leadName: conversation.leadName || conversation.lead?.name || 'Contato sem nome',
     district: conversation.district || conversation.lead?.district?.name || 'Distrito não vinculado',

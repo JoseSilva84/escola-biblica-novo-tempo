@@ -4614,6 +4614,59 @@ function phoneMatchKey(value) {
   return digits ? digits.slice(-10) : '';
 }
 
+function leadNameDistrictMatchKey(name, district) {
+  const normalizedName = slugForMap(name || '');
+  const normalizedDistrict = slugifyDistrictName(district || '');
+  return normalizedName && normalizedDistrict ? `${normalizedDistrict}::${normalizedName}` : '';
+}
+
+function buildAssignedLeadLookup(records = []) {
+  const byId = new Map();
+  const byPhone = new Map();
+  const byNameDistrict = new Map();
+  for (const lead of records) {
+    if (lead?.id !== null && lead?.id !== undefined) byId.set(String(lead.id), lead);
+    const phone = phoneMatchKey(lead?.tel);
+    if (phone) byPhone.set(phone, lead);
+    const nameDistrict = leadNameDistrictMatchKey(lead?.n, lead?.d);
+    if (nameDistrict && !byNameDistrict.has(nameDistrict)) byNameDistrict.set(nameDistrict, lead);
+  }
+  return { byId, byPhone, byNameDistrict };
+}
+
+function findAssignedLeadForConversation(conversation, lookup) {
+  const idCandidates = [conversation?.externalLeadId, conversation?.leadId]
+    .filter((value) => value !== null && value !== undefined && value !== '')
+    .map(String);
+  for (const id of idCandidates) {
+    const lead = lookup?.byId?.get(id);
+    if (lead) return lead;
+  }
+  const phone = phoneMatchKey(conversation?.phone);
+  if (phone && lookup?.byPhone?.has(phone)) return lookup.byPhone.get(phone);
+  const nameDistrict = leadNameDistrictMatchKey(conversation?.leadName, conversation?.district);
+  return nameDistrict ? lookup?.byNameDistrict?.get(nameDistrict) || null : null;
+}
+
+function conversationAsMapLead(conversation) {
+  return {
+    id: `accepted-${conversation?.id || phoneMatchKey(conversation?.phone) || stableHash(JSON.stringify(conversation || {}))}`,
+    n: conversation?.leadName || 'Lead sem nome',
+    tel: conversation?.phone || '',
+    d: conversation?.district || 'Distrito não vinculado',
+    end: conversation?.delivery?.address || '',
+    addr: conversation?.delivery?.address || '',
+    p: conversation?.priority || 'Warm',
+    t: Boolean(phoneDigits(conversation?.phone)),
+    campaignVisitAccepted: true,
+    acceptedConversationId: conversation?.id || null
+  };
+}
+
+function conversationMatchKey(conversation) {
+  return String(conversation?.id || phoneMatchKey(conversation?.phone) || leadNameDistrictMatchKey(conversation?.leadName, conversation?.district));
+}
+
 const acceptedVisitMapStyle = {
   color: '#7c3aed',
   label: 'Aceitou a visita'
@@ -5517,7 +5570,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
   const [churchFilterKey, setChurchFilterKey] = useState('');
-  const [acceptedVisitPhones, setAcceptedVisitPhones] = useState(() => new Set());
+  const [acceptedVisitConversations, setAcceptedVisitConversations] = useState([]);
   const acceptedVisitPhonesRef = useRef(null);
   const [visibleLeadLimit, setVisibleLeadLimit] = useState(80);
   const [geocodeInfo, setGeocodeInfo] = useState(null);
@@ -5542,13 +5595,28 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const assignedRecordsByPhone = useMemo(() => new Map(assignedRecords
     .map((lead) => [phoneMatchKey(lead.tel), lead])
     .filter(([phone]) => phone)), [assignedRecords]);
+  const assignedLeadLookup = useMemo(() => buildAssignedLeadLookup(assignedRecords), [assignedRecords]);
+  const acceptedVisitResolution = useMemo(() => {
+    const matchedLeadIds = new Set();
+    const unmatchedConversations = [];
+    for (const conversation of acceptedVisitConversations) {
+      const matchedLead = findAssignedLeadForConversation(conversation, assignedLeadLookup);
+      const matchedId = matchedLead?.id !== null && matchedLead?.id !== undefined ? String(matchedLead.id) : '';
+      if (matchedLead && matchedId && !matchedLeadIds.has(matchedId)) matchedLeadIds.add(matchedId);
+      else unmatchedConversations.push(conversation);
+    }
+    return { matchedLeadIds, unmatchedConversations };
+  }, [acceptedVisitConversations, assignedLeadLookup]);
   const recordsWithChurchAssignment = useMemo(
     () => assignedRecords.map((lead) => ({
       ...lead,
-      campaignVisitAccepted: acceptedVisitPhones.has(phoneMatchKey(lead.tel)) || lead.aceitouVisita === true
+      campaignVisitAccepted: acceptedVisitResolution.matchedLeadIds.has(String(lead.id))
     })),
-    [acceptedVisitPhones, assignedRecords]
+    [acceptedVisitResolution, assignedRecords]
   );
+  const acceptedMapFallbackLeads = useMemo(() => {
+    return assignNearestChurchesByDistrict(acceptedVisitResolution.unmatchedConversations.map(conversationAsMapLead), churchesForMap);
+  }, [acceptedVisitResolution, churchesForMap]);
 
   useEffect(() => {
     let activeRequest = true;
@@ -5566,7 +5634,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
 
           if (previousPhones === null) {
             acceptedVisitPhonesRef.current = phones;
-            setAcceptedVisitPhones(phones);
+            setAcceptedVisitConversations(acceptedConversations);
             return;
           }
 
@@ -5575,11 +5643,18 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
 
           const nextPhones = new Set([...previousPhones, ...phones]);
           acceptedVisitPhonesRef.current = nextPhones;
-          setAcceptedVisitPhones(nextPhones);
+          setAcceptedVisitConversations((current) => {
+            const byPhone = new Map(current.map((conversation) => [phoneMatchKey(conversation.phone), conversation]));
+            acceptedConversations.forEach((conversation) => {
+              const phone = phoneMatchKey(conversation.phone);
+              if (phone) byPhone.set(phone, conversation);
+            });
+            return Array.from(byPhone.values());
+          });
 
           newPhones.forEach((phone) => {
             const conversation = conversationsByPhone.get(phone);
-            const lead = assignedRecordsByPhone.get(phone);
+            const lead = findAssignedLeadForConversation(conversation, assignedLeadLookup) || assignedRecordsByPhone.get(phone);
             const leadName = conversation?.leadName || lead?.n || 'Lead sem nome';
             const districtName = conversation?.district || lead?.d || 'não vinculado';
             const churchName = lead?.churchAssignment?.churchName || 'não vinculada';
@@ -5597,7 +5672,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       activeRequest = false;
       window.clearInterval(timer);
     };
-  }, [assignedRecordsByPhone]);
+  }, [assignedLeadLookup, assignedRecordsByPhone]);
 
   const districts = useMemo(
     () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -5703,10 +5778,10 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   }), [recordsForToggleOptions]);
 
   const leadsBeforeChurchFilter = useMemo(() => {
-    return recordsWithChurchAssignment
+    return [...recordsWithChurchAssignment, ...acceptedMapFallbackLeads]
       .filter((lead) => leadMatchesFilterGroup(lead, filters))
       .sort((a, b) => (b.s || 0) - (a.s || 0));
-  }, [filters, recordsWithChurchAssignment]);
+  }, [acceptedMapFallbackLeads, filters, recordsWithChurchAssignment]);
   const churchFilterOptions = useMemo(() => {
     const counts = leadsBeforeChurchFilter.reduce((map, lead) => {
       const key = lead.churchAssignment?.churchKey;
@@ -11546,20 +11621,37 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
     () => flattenChurchesByDistrict(churchesByDistrict, officialDistricts),
     [churchesByDistrict, officialDistricts]
   );
-  const agentLeadAssignmentsByPhone = useMemo(() => {
-    const entries = assignNearestChurchesByDistrict(records, churchesForAgent)
-      .map((lead) => [phoneMatchKey(lead.tel), lead.churchAssignment])
-      .filter(([phone, assignment]) => phone && assignment);
-    return new Map(entries);
-  }, [churchesForAgent, records]);
+  const agentConversationAssignments = useMemo(() => {
+    const assignedRecords = assignNearestChurchesByDistrict(records, churchesForAgent);
+    const lookup = buildAssignedLeadLookup(assignedRecords);
+    const conversationsByKey = new Map([...rawAnaConversations, ...rawAcceptedConversations]
+      .map((conversation) => [conversationMatchKey(conversation), conversation])
+      .filter(([key]) => key));
+    const assignments = new Map();
+    const unmatched = [];
+
+    for (const [key, conversation] of conversationsByKey) {
+      const matchedLead = findAssignedLeadForConversation(conversation, lookup);
+      if (matchedLead?.churchAssignment) {
+        assignments.set(key, matchedLead.churchAssignment);
+      } else {
+        unmatched.push({ ...conversationAsMapLead(conversation), acceptedConversationId: key });
+      }
+    }
+
+    assignNearestChurchesByDistrict(unmatched, churchesForAgent).forEach((lead) => {
+      if (lead.churchAssignment) assignments.set(lead.acceptedConversationId, lead.churchAssignment);
+    });
+    return assignments;
+  }, [churchesForAgent, rawAcceptedConversations, rawAnaConversations, records]);
   const anaConversations = useMemo(() => rawAnaConversations.map((conversation) => ({
     ...conversation,
-    churchAssignment: agentLeadAssignmentsByPhone.get(phoneMatchKey(conversation.phone)) || null
-  })), [agentLeadAssignmentsByPhone, rawAnaConversations]);
+    churchAssignment: agentConversationAssignments.get(conversationMatchKey(conversation)) || null
+  })), [agentConversationAssignments, rawAnaConversations]);
   const acceptedConversations = useMemo(() => rawAcceptedConversations.map((conversation) => ({
     ...conversation,
-    churchAssignment: agentLeadAssignmentsByPhone.get(phoneMatchKey(conversation.phone)) || null
-  })), [agentLeadAssignmentsByPhone, rawAcceptedConversations]);
+    churchAssignment: agentConversationAssignments.get(conversationMatchKey(conversation)) || null
+  })), [agentConversationAssignments, rawAcceptedConversations]);
   const anaConversationGroups = useMemo(() => {
     const preferredOrder = [
       'Brinde confirmado',
