@@ -29,14 +29,14 @@
 | Caucaia do Alto | R. Inocêncio Pires de Oliveira, 901 | Caucaia do Alto | 06725-105 | Cotia |
 | Central de Cotia | R. Safira, 66 | Jd. Nomura | 06717-081 | Cotia |
 | Central de São Paulo | R. Taguá, 88 | Liberdade | 01508-010 | São Paulo |
-| Cidade Ariston | R. Uruguaiana, 780 | Cidade Ariston | 06395-050 | Carapicuíba |
+| Cidade Ariston | R. Uruguaiana, 780 | Cidade Ariston | 06395-050 | Carapicuíba | -23.5344947 | -46.8502158 | endereco-confirmado |
 | Cidade das Flores | R. Marechal Edgar de Oliveira, 1384 | Quitaúna | 06186-012 | Osasco |
 | Cidade Munhoz | R. Pardinho, 1804 | Munhoz Junior | 06240-010 | Osasco |
 | Cidade Rochdale | R. Belém, 353 | Rochdale | 06226-070 | Osasco |
 | Cidade São Pedro | R. Rio Negro, 146 | Cidade São Pedro | 06535-105 | Santana de Parnaíba |
 | Clínica | Estrada do Paraíso, lote 40 | Pavão | 18145-656 | São Roque |
 | Cohab II | R. Pernambuco, 19 | Cohab II | 06326-070 | Carapicuíba |
-| Cohab V | Av. Antônio Faustino dos Santos, 640 | Conjunto Hab. Pres. Castelo Branco | 06328-150 | Carapicuíba |
+| Cohab V | Av. Antônio Faustino dos Santos, 640 | Conjunto Hab. Pres. Castelo Branco | 06328-150 | Carapicuíba | -23.5341151 | -46.8239893 | endereco-confirmado |
 | Colinas D'Oeste | R. Padre Josimo Tavares, 12 | Portal D'Oeste | 06264-340 | Osasco |
 | Colinas da Anhanguera | R. Osvaldo Goeldi, 339 | Colinas da Anhanguera | 06537-160 | Santana de Parnaíba |
 | Comunid. Adv. Jovens Universitários (CAJU) | R. Professor Campos de Almeida, 28 | Butantã | 05591-045 | São Paulo |
@@ -96,7 +96,7 @@
 | Jd. Santa Maria | Estrada das Margaridas, 148 | Jd. Santa Maria | 06150-490 | Osasco |
 | Jd. Santa Monica | R. José Roberto Berti Biziko, 61 | Jd. Santa Mônica | 06435-180 | Barueri |
 | Jd. São Carlos | R. Dourado, 21 | Jd. São Carlos | 06694-410 | Itapevi |
-| Jd. São Daniel | R. Alvorada, 157 | Jd. Rosa Maria | 06331-060 | Carapicuíba |
+| Jd. São Daniel | R. Alvorada, 157 | Jd. Rosa Maria | 06331-060 | Carapicuíba | -23.5437561 | -46.8249077 | endereco-confirmado |
 | Jd. São Silvestre | R. Tupi, 634 | Jd. São Silvestre | 06417-030 | Barueri |
 | Jd. Silveira | R. Terca, 91 | Jd. Audir | 06433-030 | Barueri |
 | Jd. Silviania | R. Jacob Csipak, 130 | Vila Silviania | 06322-670 | Carapicuíba | -23.5353172 | -46.8347079 | endereco-confirmado |
@@ -132,7 +132,7 @@
 | Pq. Imperial | R. Raposo Tavares, 50 | Pq. Imperial | 06462-070 | Barueri |
 | Pq. Ipê/Butantã | R. Santiago Ferrer, 204 | Pq. Ipê-Butantã | 05571-140 | São Paulo |
 | Pq. Jaguara | R. Engenheiro Ernesto Markgraf, 439 | Vila dos Remédios | 05103-030 | São Paulo |
-| Pq. Jandaia | R. Ercilio Lincoln, 100 | Pq. Jandaia | 06333-120 | Carapicuíba |
+| Pq. Jandaia | R. Ercilio Lincoln, 100 | Pq. Jandaia | 06333-120 | Carapicuíba | -23.5592718 | -46.8291755 | logradouro-aproximado |
 | Pq. Miguel Mirizola | R. Burgos, 23 | Pq. Miguel Mirizola | 06704-245 | Cotia |
 | Pq. Monjolo | R. do Engenho, 877 | Pq. Monjolo | 06704-145 | Cotia |
 | Pq. Santa Teresa | R. Nicolau Mayevsky, 940 | Jd. Velho Sanazar | 06620-080 | Jandira |

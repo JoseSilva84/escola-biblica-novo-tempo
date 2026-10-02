@@ -558,7 +558,15 @@ function applyChurchAddressesToTerritory(territory, addressBook, geocodeCache = 
         const addressInfo = addressBook.byName.get(churchLookupKey(church.name));
         if (!addressInfo) return church;
         const cached = geocodeCache[geocodeKey(addressInfo.address)];
-        const registeredCoordinates = Number.isFinite(Number(addressInfo.lat)) && Number.isFinite(Number(addressInfo.lng))
+        const hasRegisteredCoordinates = addressInfo.lat !== null
+          && addressInfo.lat !== undefined
+          && addressInfo.lat !== ''
+          && addressInfo.lng !== null
+          && addressInfo.lng !== undefined
+          && addressInfo.lng !== ''
+          && Number.isFinite(Number(addressInfo.lat))
+          && Number.isFinite(Number(addressInfo.lng));
+        const registeredCoordinates = hasRegisteredCoordinates
           ? {
               lat: Number(addressInfo.lat),
               lng: Number(addressInfo.lng),

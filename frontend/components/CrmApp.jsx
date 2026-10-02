@@ -4513,7 +4513,7 @@ function churchMapPoint(church, districtLeadPoints = {}) {
         districtPoints.reduce((sum, point) => sum + point.lat, 0) / districtPoints.length,
         districtPoints.reduce((sum, point) => sum + point.lng, 0) / districtPoints.length
       ]
-    : (cityMapCenters[slugForMap(church?.districtName)] || cityMapCenters['sao-paulo']);
+    : (cityMapCenters[slugForMap(church?.city)] || cityMapCenters[slugForMap(church?.districtName)] || cityMapCenters['sao-paulo']);
   const hash = stableHash(`${church?.districtName}|${church?.name}`);
   const angle = (hash % 360) * (Math.PI / 180);
   const radius = 0.002 + ((hash % 450) / 100000);
@@ -4613,6 +4613,7 @@ function flattenChurchesByDistrict(churchesByDistrict = {}, officialDistricts = 
       const church = typeof entry === 'string' ? { name: entry } : entry;
       return {
         address: church.address || '',
+        city: church.city || '',
         districtName,
         districtSlug,
         geoDisplayName: church.geoDisplayName || '',
@@ -4720,15 +4721,12 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
       map[slug].push(item.point);
       return map;
     }, {});
-    const visibleDistricts = new Set(allLeadPoints.map((item) => slugifyDistrictName(item.lead?.d)).filter(Boolean));
     const assignedCounts = leads.reduce((counts, lead) => {
       const key = lead.churchAssignment?.churchKey;
       if (key) counts.set(key, (counts.get(key) || 0) + 1);
       return counts;
     }, new Map());
-    return churches
-      .filter((church) => !visibleDistricts.size || visibleDistricts.has(churchDistrictSlug(church)))
-      .map((church) => ({
+    return churches.map((church) => ({
         church,
         key: churchAssignmentKey(church),
         point: churchMapPoint(church, districtLeadPoints),
@@ -5807,10 +5805,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       if (key) map.set(key, (map.get(key) || 0) + 1);
       return map;
     }, new Map());
-    const visibleDistricts = new Set(leadsBeforeChurchFilter.map((lead) => slugifyDistrictName(lead.d)).filter(Boolean));
-    return churchesForMap
-      .filter((church) => visibleDistricts.has(churchDistrictSlug(church)))
-      .map((church) => ({
+    return churchesForMap.map((church) => ({
         count: counts.get(churchAssignmentKey(church)) || 0,
         districtName: church.districtName,
         key: churchAssignmentKey(church),
