@@ -373,6 +373,10 @@ function slugifyDistrictName(value) {
   return aliases[slug] || slug;
 }
 
+function churchDistrictSlug(church) {
+  return slugifyDistrictName(church?.districtSlug || church?.districtName);
+}
+
 function AppToaster({ theme = 'light' }) {
   const [mounted, setMounted] = useState(false);
 
@@ -1279,7 +1283,7 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
     const districtSlug = slugifyDistrictName(lead.d);
     const districtLeadPoints = districtSlug ? { [districtSlug]: [leadPoint] } : {};
     return churches
-      .filter((church) => (church.districtSlug || slugifyDistrictName(church.districtName)) === districtSlug)
+      .filter((church) => churchDistrictSlug(church) === districtSlug)
       .map((church) => ({ church, point: churchMapPoint(church, districtLeadPoints) }));
   }, [churches, lead]);
   const assignedChurch = lead?.churchAssignment
@@ -4502,7 +4506,7 @@ function churchMapPoint(church, districtLeadPoints = {}) {
       precision: precisionText.includes('aproximado') ? 'Aproximado' : 'Endereco'
     };
   }
-  const districtSlug = church?.districtSlug || slugifyDistrictName(church?.districtName);
+  const districtSlug = churchDistrictSlug(church);
   const districtPoints = districtLeadPoints[districtSlug] || [];
   const center = districtPoints.length
     ? [
@@ -4521,7 +4525,7 @@ function churchMapPoint(church, districtLeadPoints = {}) {
 }
 
 function churchAssignmentKey(church) {
-  const district = church?.districtSlug || slugifyDistrictName(church?.districtName);
+  const district = churchDistrictSlug(church);
   const name = slugForMap(church?.name || 'igreja-adventista');
   const address = slugForMap(church?.address || 'sem-endereco');
   return `${district}::${name}::${address}`;
@@ -4559,7 +4563,7 @@ function assignNearestChurchesByDistrict(records = [], churches = []) {
     church,
     key: churchAssignmentKey(church),
     point: churchMapPoint(church, districtLeadPoints),
-    district: church?.districtSlug || slugifyDistrictName(church?.districtName)
+    district: churchDistrictSlug(church)
   }));
   const churchesByDistrict = churchEntries.reduce((map, entry) => {
     if (!map.has(entry.district)) map.set(entry.district, []);
@@ -4600,9 +4604,10 @@ function assignNearestChurchesByDistrict(records = [], churches = []) {
 function flattenChurchesByDistrict(churchesByDistrict = {}, officialDistricts = []) {
   const districtNamesBySlug = officialDistricts.reduce((map, district) => ({
     ...map,
-    [district.slug || slugifyDistrictName(district.name)]: district.name
+    [slugifyDistrictName(district.slug || district.name)]: district.name
   }), {});
-  return Object.entries(churchesByDistrict || {}).flatMap(([districtSlug, entries]) => {
+  return Object.entries(churchesByDistrict || {}).flatMap(([rawDistrictSlug, entries]) => {
+    const districtSlug = slugifyDistrictName(rawDistrictSlug);
     const districtName = districtNamesBySlug[districtSlug] || districtSlug;
     return (entries || []).map((entry) => {
       const church = typeof entry === 'string' ? { name: entry } : entry;
@@ -4722,7 +4727,7 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
       return counts;
     }, new Map());
     return churches
-      .filter((church) => !visibleDistricts.size || visibleDistricts.has(church.districtSlug || slugifyDistrictName(church.districtName)))
+      .filter((church) => !visibleDistricts.size || visibleDistricts.has(churchDistrictSlug(church)))
       .map((church) => ({
         church,
         key: churchAssignmentKey(church),
@@ -5120,10 +5125,11 @@ function geoStatusForItem(item) {
 function buildGeolocationDistricts(records = [], churchesByDistrict = {}, officialDistricts = []) {
   const districtNamesBySlug = officialDistricts.reduce((map, district) => ({
     ...map,
-    [district.slug || slugifyDistrictName(district.name)]: district.name
+    [slugifyDistrictName(district.slug || district.name)]: district.name
   }), {});
   const byDistrict = new Map();
-  const ensureDistrict = (name, slug = slugifyDistrictName(name)) => {
+  const ensureDistrict = (name, rawSlug = slugifyDistrictName(name)) => {
+    const slug = slugifyDistrictName(rawSlug);
     const districtName = name || districtNamesBySlug[slug] || 'Sem distrito';
     if (!byDistrict.has(slug)) {
       byDistrict.set(slug, {
@@ -5139,7 +5145,7 @@ function buildGeolocationDistricts(records = [], churchesByDistrict = {}, offici
   };
 
   for (const district of officialDistricts || []) {
-    ensureDistrict(district.name, district.slug || slugifyDistrictName(district.name));
+    ensureDistrict(district.name, district.slug || district.name);
   }
 
   for (const lead of records) {
@@ -5155,7 +5161,8 @@ function buildGeolocationDistricts(records = [], churchesByDistrict = {}, offici
     } else district.leadStats.pending += 1;
   }
 
-  for (const [districtSlug, churches] of Object.entries(churchesByDistrict || {})) {
+  for (const [rawDistrictSlug, churches] of Object.entries(churchesByDistrict || {})) {
+    const districtSlug = slugifyDistrictName(rawDistrictSlug);
     const district = ensureDistrict(districtNamesBySlug[districtSlug] || districtSlug, districtSlug);
     for (const church of churches || []) {
       const status = geoStatusForItem(church);
@@ -5802,7 +5809,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
     }, new Map());
     const visibleDistricts = new Set(leadsBeforeChurchFilter.map((lead) => slugifyDistrictName(lead.d)).filter(Boolean));
     return churchesForMap
-      .filter((church) => visibleDistricts.has(church.districtSlug || slugifyDistrictName(church.districtName)))
+      .filter((church) => visibleDistricts.has(churchDistrictSlug(church)))
       .map((church) => ({
         count: counts.get(churchAssignmentKey(church)) || 0,
         districtName: church.districtName,
