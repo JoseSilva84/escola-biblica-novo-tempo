@@ -520,16 +520,21 @@ export function readChurchAddressBook() {
   const rows = [];
   for (const line of text.split(/\r?\n/)) {
     if (!/^\s*\|/.test(line) || /^\s*\|\s*-+/.test(line) || /Igreja\s*\|/i.test(line)) continue;
-    const [name, street, neighborhood, cep, city] = splitMarkdownTableLine(line);
+    const [name, street, neighborhood, cep, city, latitude, longitude, geoPrecision] = splitMarkdownTableLine(line);
     if (!name || !street || !city) continue;
     const address = [street, neighborhood, cep, city, 'SP', 'Brasil'].filter(Boolean).join(', ');
+    const lat = latitude !== '' && Number.isFinite(Number(latitude)) ? Number(latitude) : null;
+    const lng = longitude !== '' && Number.isFinite(Number(longitude)) ? Number(longitude) : null;
     rows.push({
       name,
       street,
       neighborhood,
       cep,
       city,
-      address
+      address,
+      lat,
+      lng,
+      geoPrecision: geoPrecision || ''
     });
   }
 
@@ -553,6 +558,15 @@ function applyChurchAddressesToTerritory(territory, addressBook, geocodeCache = 
         const addressInfo = addressBook.byName.get(churchLookupKey(church.name));
         if (!addressInfo) return church;
         const cached = geocodeCache[geocodeKey(addressInfo.address)];
+        const registeredCoordinates = Number.isFinite(Number(addressInfo.lat)) && Number.isFinite(Number(addressInfo.lng))
+          ? {
+              lat: Number(addressInfo.lat),
+              lng: Number(addressInfo.lng),
+              geoSource: 'cadastro-oficial',
+              geoPrecision: addressInfo.geoPrecision || 'endereco',
+              geoDisplayName: addressInfo.address
+            }
+          : {};
         const cachedCoordinates = cached && !cached.notFound && Number.isFinite(Number(cached.lat)) && Number.isFinite(Number(cached.lng))
           ? {
               lat: Number(cached.lat),
@@ -569,6 +583,7 @@ function applyChurchAddressesToTerritory(territory, addressBook, geocodeCache = 
           neighborhood: addressInfo.neighborhood,
           cep: addressInfo.cep,
           city: addressInfo.city,
+          ...registeredCoordinates,
           ...cachedCoordinates
         };
       })
