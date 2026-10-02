@@ -1282,12 +1282,45 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
     const leadPoint = approximateLeadPoint(lead);
     const districtSlug = slugifyDistrictName(lead.d);
     const districtLeadPoints = districtSlug ? { [districtSlug]: [leadPoint] } : {};
-    return churches
+    const districtChurches = churches
       .filter((church) => churchDistrictSlug(church) === districtSlug)
-      .map((church) => ({ church, point: churchMapPoint(church, districtLeadPoints) }));
+      .map((church) => ({
+        church,
+        key: churchAssignmentKey(church),
+        point: churchMapPoint(church, districtLeadPoints)
+      }));
+    const assignment = lead.churchAssignment;
+    const assignmentLatitude = Number(assignment?.churchLat);
+    const assignmentLongitude = Number(assignment?.churchLng);
+    const hasAssignedCoordinates = assignment?.churchLat !== null
+      && assignment?.churchLat !== undefined
+      && assignment?.churchLat !== ''
+      && assignment?.churchLng !== null
+      && assignment?.churchLng !== undefined
+      && assignment?.churchLng !== ''
+      && Number.isFinite(assignmentLatitude)
+      && Number.isFinite(assignmentLongitude);
+    const alreadyIncluded = assignment?.churchKey
+      && districtChurches.some(({ key }) => key === assignment.churchKey);
+    if (!assignment || alreadyIncluded || !hasAssignedCoordinates) return districtChurches;
+    return [...districtChurches, {
+      key: assignment.churchKey,
+      church: {
+        address: assignment.churchAddress || '',
+        districtName: lead.d,
+        lat: assignmentLatitude,
+        lng: assignmentLongitude,
+        name: assignment.churchName || 'Igreja Adventista'
+      },
+      point: {
+        lat: assignmentLatitude,
+        lng: assignmentLongitude,
+        precision: assignment.distancePrecision === 'Por endereço' ? 'Endereco' : 'Aproximado'
+      }
+    }];
   }, [churches, lead]);
   const assignedChurch = lead?.churchAssignment
-    ? visibleChurches.find(({ church }) => churchAssignmentKey(church) === lead.churchAssignment.churchKey)
+    ? visibleChurches.find(({ church, key }) => (key || churchAssignmentKey(church)) === lead.churchAssignment.churchKey)
     : null;
   const leadMapSignature = lead ? [
     lead.id,
@@ -1399,10 +1432,14 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
           <span className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Localização do lead</span>
           <p className="mt-1 text-sm font-bold text-slate-800">{leadStreetAndNumber(lead)} - {leadNeighborhood(lead)}</p>
           {lead.churchAssignment ? (
-            <p className="mt-2 text-sm font-black text-emerald-800">
-              <Church className="mr-1.5 inline" size={15} />
-              {lead.churchAssignment.churchName} · {formatChurchDistance(lead.churchAssignment.distanceMeters)} ({lead.churchAssignment.distancePrecision.toLowerCase()})
-            </p>
+            <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900">
+              <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Igreja afiliada mais próxima</span>
+              <p className="mt-0.5 text-sm font-black">
+                <Church className="mr-1.5 inline" size={15} />
+                {lead.churchAssignment.churchName} · {formatChurchDistance(lead.churchAssignment.distanceMeters)}
+              </p>
+              <span className="block text-[11px] font-bold text-emerald-700">Distrito {lead.d} · distância {lead.churchAssignment.distancePrecision.toLowerCase()}</span>
+            </div>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -4526,6 +4563,7 @@ function churchMapPoint(church, districtLeadPoints = {}) {
 
 function addCoincidentMarkerOffsets(items = []) {
   const totals = items.reduce((map, item) => {
+    if (!item.lead?.campaignVisitAccepted) return map;
     const key = `${Number(item.point?.lat).toFixed(4)}:${Number(item.point?.lng).toFixed(4)}`;
     map.set(key, (map.get(key) || 0) + 1);
     return map;
@@ -4533,6 +4571,7 @@ function addCoincidentMarkerOffsets(items = []) {
   const positions = new Map();
 
   return items.map((item) => {
+    if (!item.lead?.campaignVisitAccepted) return { ...item, markerOffset: { x: 0, y: 0 } };
     const key = `${Number(item.point?.lat).toFixed(4)}:${Number(item.point?.lng).toFixed(4)}`;
     const total = totals.get(key) || 1;
     if (total < 2) return { ...item, markerOffset: { x: 0, y: 0 } };
@@ -4843,7 +4882,7 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
           const markerSize = lead.campaignVisitAccepted || lead.p === 'Hot' ? 20 : 18;
           const leadIcon = L.divIcon({
             className: 'lead-map-marker-shell',
-            html: `<span class="lead-map-marker" style="background-color:${markerStyle.color};${lead.campaignVisitAccepted ? 'box-shadow:0 0 0 3px #ede9fe,0 2px 8px rgba(76,29,149,.42)' : ''}">${lead.campaignVisitAccepted ? '<span aria-hidden="true" style="display:grid;height:100%;place-items:center;color:white;font-size:12px;font-weight:900">✓</span>' : ''}</span>`,
+            html: `<span class="lead-map-marker" style="background-color:${markerStyle.color};${lead.campaignVisitAccepted ? 'box-shadow:0 0 0 3px #ede9fe' : ''}">${lead.campaignVisitAccepted ? '<span aria-hidden="true" style="display:grid;height:100%;place-items:center;color:white;font-size:12px;font-weight:900">✓</span>' : ''}</span>`,
             iconSize: [markerSize, markerSize],
             iconAnchor: [(markerSize / 2) - markerOffset.x, (markerSize / 2) - markerOffset.y],
             popupAnchor: [markerOffset.x, markerOffset.y - (markerSize / 2)]
