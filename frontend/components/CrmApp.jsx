@@ -4526,20 +4526,24 @@ function churchMapPoint(church, districtLeadPoints = {}) {
 
 function addCoincidentMarkerOffsets(items = []) {
   const totals = items.reduce((map, item) => {
-    const key = `${Number(item.point?.lat).toFixed(5)}:${Number(item.point?.lng).toFixed(5)}`;
+    const key = `${Number(item.point?.lat).toFixed(4)}:${Number(item.point?.lng).toFixed(4)}`;
     map.set(key, (map.get(key) || 0) + 1);
     return map;
   }, new Map());
   const positions = new Map();
 
   return items.map((item) => {
-    const key = `${Number(item.point?.lat).toFixed(5)}:${Number(item.point?.lng).toFixed(5)}`;
+    const key = `${Number(item.point?.lat).toFixed(4)}:${Number(item.point?.lng).toFixed(4)}`;
     const total = totals.get(key) || 1;
     if (total < 2) return { ...item, markerOffset: { x: 0, y: 0 } };
     const index = positions.get(key) || 0;
     positions.set(key, index + 1);
-    const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / total);
-    const radius = total > 4 ? 18 : 15;
+    const ring = Math.floor(index / 8);
+    const ringStart = ring * 8;
+    const itemsInRing = Math.min(8, total - ringStart);
+    const positionInRing = index - ringStart;
+    const angle = (-Math.PI / 2) + ((Math.PI * 2 * positionInRing) / itemsInRing);
+    const radius = 16 + (ring * 18);
     return {
       ...item,
       markerOffset: {
@@ -4846,7 +4850,7 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
           });
           const marker = L.marker([point.lat, point.lng], {
             icon: leadIcon,
-            zIndexOffset: lead.campaignVisitAccepted ? 1200 : 0
+            zIndexOffset: lead.campaignVisitAccepted ? (acceptedVisitOnly ? 2400 : 1200) : 0
           }).addTo(map);
           const assignment = lead.churchAssignment;
           if (activeChurchKey && assignment && Number.isFinite(Number(assignment.churchLat)) && Number.isFinite(Number(assignment.churchLng))) {
