@@ -11647,7 +11647,12 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
     };
   }).sort((left, right) => left.districtName.localeCompare(right.districtName, 'pt-BR') || left.name.localeCompare(right.name, 'pt-BR')), [anaConversations, churchesForAgent]);
 
-  const territoryStats = territoryGrouping === 'church' ? churchStats : districtStats;
+  const isChurchGrouping = territoryGrouping.startsWith('church');
+  const territoryStats = territoryGrouping === 'church-accepted'
+    ? churchStats.filter((stat) => stat.accepted > 0)
+    : territoryGrouping === 'church-all'
+      ? churchStats
+      : districtStats;
   const selectedTerritoryStat = territoryStats.find((stat) => stat.key === selectedTerritoryKey) || null;
 
   useEffect(() => {
@@ -11658,19 +11663,19 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
 
   const filteredConversations = useMemo(() => (
     selectedTerritoryKey
-      ? anaConversations.filter((conversation) => territoryGrouping === 'church'
+      ? anaConversations.filter((conversation) => isChurchGrouping
         ? conversation.churchAssignment?.churchKey === selectedTerritoryKey
         : conversation.district === selectedTerritoryKey)
       : anaConversations
-  ), [anaConversations, selectedTerritoryKey, territoryGrouping]);
+  ), [anaConversations, isChurchGrouping, selectedTerritoryKey]);
 
   const filteredAcceptedConversations = useMemo(() => (
     selectedTerritoryKey
-      ? acceptedConversations.filter((conversation) => territoryGrouping === 'church'
+      ? acceptedConversations.filter((conversation) => isChurchGrouping
         ? conversation.churchAssignment?.churchKey === selectedTerritoryKey
         : conversation.district === selectedTerritoryKey)
       : acceptedConversations
-  ), [acceptedConversations, selectedTerritoryKey, territoryGrouping]);
+  ), [acceptedConversations, isChurchGrouping, selectedTerritoryKey]);
 
   const filteredFunnel = useMemo(() => {
     if (!selectedTerritoryKey) return anaFunnel;
@@ -11706,7 +11711,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
     return anaConversationGroups
       .map((group) => ({
         ...group,
-        conversations: group.conversations.filter((conversation) => territoryGrouping === 'church'
+        conversations: group.conversations.filter((conversation) => isChurchGrouping
           ? conversation.churchAssignment?.churchKey === selectedTerritoryKey
           : conversation.district === selectedTerritoryKey)
       }))
@@ -11723,7 +11728,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
             .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'pt-BR'))
         };
       });
-  }, [anaConversationGroups, selectedTerritoryKey, territoryGrouping]);
+  }, [anaConversationGroups, isChurchGrouping, selectedTerritoryKey]);
   // ─────────────────────────────────────────────────────────────────────────
 
   const largestRequestAgeBucket = Math.max(1, ...filteredRequestAgeBuckets.map((bucket) => Number(bucket.count) || 0));
@@ -11787,7 +11792,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
     const recipientsByPhone = new Map();
     anaConversations
       .filter((conversation) => (
-        (territoryGrouping === 'church'
+        (isChurchGrouping
           ? conversation.churchAssignment?.churchKey === stat.key
           : conversation.district === stat.key)
         && conversation.delivery?.accepted
@@ -11813,8 +11818,8 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
       return;
     }
     window.localStorage.setItem('open-whatsapp-district-request', JSON.stringify({
-      district: territoryGrouping === 'church' ? stat.districtName : stat.name,
-      church: territoryGrouping === 'church' ? stat.name : null,
+      district: isChurchGrouping ? stat.districtName : stat.name,
+      church: isChurchGrouping ? stat.name : null,
       audience: 'accepted-visit',
       audienceLabel: `Aceitaram a visita · ${stat.name}`,
       recipients,
@@ -12040,7 +12045,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
                   <label className={`${labelClass} flex items-center gap-2`}>
                     Agrupar leads por
                     <select
-                      aria-label="Agrupar leads por distrito ou igreja"
+                      aria-label="Escolher distritos ou igrejas para exibição"
                       className="h-9 rounded-lg border border-white/15 bg-slate-900 px-3 text-xs font-black normal-case tracking-normal text-white outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/15"
                       onChange={(event) => {
                         setTerritoryGrouping(event.target.value);
@@ -12048,16 +12053,19 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
                       }}
                       value={territoryGrouping}
                     >
-                      <option value="district">Distrito</option>
-                      <option value="church">Igreja</option>
+                      <option value="district">Todos os distritos</option>
+                      <option value="church-all">Todas as igrejas</option>
+                      <option value="church-accepted">Igrejas com visitas aceitas</option>
                     </select>
                   </label>
                   <h2 className="mt-1 text-xl font-black text-slate-50">
                     {selectedTerritoryStat
-                      ? `${territoryGrouping === 'church' ? 'Igreja' : 'Distrito'}: ${selectedTerritoryStat.name}`
-                      : territoryGrouping === 'church' ? 'Todas as igrejas' : 'Todos os distritos'}
+                      ? `${isChurchGrouping ? 'Igreja' : 'Distrito'}: ${selectedTerritoryStat.name}`
+                      : territoryGrouping === 'church-accepted'
+                        ? 'Igrejas com visitas aceitas'
+                        : isChurchGrouping ? 'Todas as igrejas' : 'Todos os distritos'}
                   </h2>
-                  {selectedTerritoryStat && territoryGrouping === 'church' ? (
+                  {selectedTerritoryStat && isChurchGrouping ? (
                     <p className="mt-1 text-xs font-bold text-slate-400">Distrito {selectedTerritoryStat.districtName}</p>
                   ) : null}
                 </div>
@@ -12081,7 +12089,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
                     >
                       <button className="w-full text-left focus:outline-none" onClick={() => setSelectedTerritoryKey(isActive ? '' : stat.key)} type="button">
                         <strong className={`block truncate text-sm font-black transition-colors ${isActive ? 'text-white' : 'text-slate-900 group-hover:text-black'}`}>{stat.name}</strong>
-                        {territoryGrouping === 'church' ? (
+                        {isChurchGrouping ? (
                           <span className={`mt-1 block truncate text-[10px] font-black uppercase tracking-wide ${isActive ? 'text-blue-100' : 'text-blue-700'}`}>
                             Distrito {stat.districtName}
                           </span>
