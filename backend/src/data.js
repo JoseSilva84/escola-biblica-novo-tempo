@@ -583,8 +583,8 @@ function applyChurchAddressesToTerritory(territory, addressBook, geocodeCache = 
           neighborhood: addressInfo.neighborhood,
           cep: addressInfo.cep,
           city: addressInfo.city,
-          ...registeredCoordinates,
-          ...cachedCoordinates
+          ...cachedCoordinates,
+          ...registeredCoordinates
         };
       })
     ])
