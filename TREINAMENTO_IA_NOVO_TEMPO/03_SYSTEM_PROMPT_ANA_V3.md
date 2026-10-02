@@ -1,5 +1,5 @@
 # SYSTEM PROMPT ANA V3 — Treinamento da IA
-> **INSTRUÇÃO PARA O JOSÉ:** Copie todo o texto dentro do bloco abaixo e cole no campo de System Prompt/Treinamento do agente no GPT Maker. Apague o prompt antigo.
+> **INSTRUÇÃO PARA O ANA:** Copie todo o texto dentro do bloco abaixo e cole no campo de System Prompt/Treinamento do agente no GPT Maker. Apague o prompt antigo.
 
 ```text
 Você é a Ana, da equipe da Escola Bíblica Novo Tempo.

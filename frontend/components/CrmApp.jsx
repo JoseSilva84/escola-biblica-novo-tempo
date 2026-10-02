@@ -4585,26 +4585,63 @@ function assignNearestChurchesByDistrict(records = [], churches = []) {
   });
 }
 
+function flattenChurchesByDistrict(churchesByDistrict = {}, officialDistricts = []) {
+  const districtNamesBySlug = officialDistricts.reduce((map, district) => ({
+    ...map,
+    [district.slug || slugifyDistrictName(district.name)]: district.name
+  }), {});
+  return Object.entries(churchesByDistrict || {}).flatMap(([districtSlug, entries]) => {
+    const districtName = districtNamesBySlug[districtSlug] || districtSlug;
+    return (entries || []).map((entry) => {
+      const church = typeof entry === 'string' ? { name: entry } : entry;
+      return {
+        address: church.address || '',
+        districtName,
+        districtSlug,
+        geoDisplayName: church.geoDisplayName || '',
+        geoPrecision: church.geoPrecision || '',
+        geoSource: church.geoSource || '',
+        lat: church.lat,
+        lng: church.lng,
+        name: church.name || 'Igreja Adventista'
+      };
+    });
+  });
+}
+
+function phoneMatchKey(value) {
+  const digits = phoneDigits(value);
+  return digits ? digits.slice(-10) : '';
+}
+
+const acceptedVisitMapStyle = {
+  color: '#7c3aed',
+  label: 'Aceitou a visita'
+};
+
 function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches = [], leads = [], onChurchFilterChange, onLeadDetails }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const [status, setStatus] = useState('idle');
   const [activeMapPriority, setActiveMapPriority] = useState('');
+  const [acceptedVisitOnly, setAcceptedVisitOnly] = useState(false);
   const [mapMaximized, setMapMaximized] = useState(false);
   const [mapToolsCollapsed, setMapToolsCollapsed] = useState(false);
   const priorityCounts = useMemo(() => leads.reduce((counts, lead) => {
     const priority = leadMapPriorityStyles[lead.p] ? lead.p : 'Cold';
     return { ...counts, [priority]: (counts[priority] || 0) + 1 };
   }, {}), [leads]);
+  const acceptedVisitCount = useMemo(() => leads.filter((lead) => lead.campaignVisitAccepted).length, [leads]);
   const mappableLeads = useMemo(() => leads
+    .filter((lead) => !acceptedVisitOnly || lead.campaignVisitAccepted)
     .filter((lead) => !activeMapPriority || lead.p === activeMapPriority || (activeMapPriority === 'Cold' && !leadMapPriorityStyles[lead.p]))
     .filter((lead) => !activeChurchKey || lead.churchAssignment?.churchKey === activeChurchKey)
     .slice(0, 300)
     .map((lead) => ({
     lead,
     point: approximateLeadPoint(lead)
-  })), [activeChurchKey, activeMapPriority, leads]);
+  })), [acceptedVisitOnly, activeChurchKey, activeMapPriority, leads]);
   const churchPoints = useMemo(() => {
     const allLeadPoints = leads.map((lead) => ({ lead, point: approximateLeadPoint(lead) }));
     const districtLeadPoints = allLeadPoints.reduce((map, item) => {
@@ -4704,10 +4741,11 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
             ? 'Coordenada não encontrada no OSM. Conferir ou corrigir endereço pelo Google Maps.'
             : 'Coordenada aproximada. Conferir precisão no Google Maps.';
           const priorityStyle = leadMapPriorityStyle(lead.p);
-          const markerSize = lead.p === 'Hot' ? 20 : 18;
+          const markerStyle = lead.campaignVisitAccepted ? acceptedVisitMapStyle : priorityStyle;
+          const markerSize = lead.campaignVisitAccepted || lead.p === 'Hot' ? 20 : 18;
           const leadIcon = L.divIcon({
             className: 'lead-map-marker-shell',
-            html: `<span class="lead-map-marker" style="background-color:${priorityStyle.color}"></span>`,
+            html: `<span class="lead-map-marker" style="background-color:${markerStyle.color};${lead.campaignVisitAccepted ? 'box-shadow:0 0 0 3px #ede9fe,0 2px 8px rgba(76,29,149,.42)' : ''}">${lead.campaignVisitAccepted ? '<span aria-hidden="true" style="display:grid;height:100%;place-items:center;color:white;font-size:12px;font-weight:900">✓</span>' : ''}</span>`,
             iconSize: [markerSize, markerSize],
             iconAnchor: [markerSize / 2, markerSize / 2],
             popupAnchor: [0, -(markerSize / 2)]
@@ -4723,7 +4761,8 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
           }
           marker.bindPopup(`
             <strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>
-            <strong style="color:${priorityStyle.color}">${escapeMapHtml(priorityStyle.label)}</strong><br>
+            ${lead.campaignVisitAccepted ? `<strong style="color:${acceptedVisitMapStyle.color}">${escapeMapHtml(acceptedVisitMapStyle.label)} · brinde da campanha</strong><br>` : ''}
+            <strong style="color:${priorityStyle.color}">Tipo de lead: ${escapeMapHtml(priorityStyle.label)}</strong><br>
             ${escapeMapHtml(lead.d || '')}<br>
             ${escapeMapHtml(leadNeighborhood(lead))}<br>
             <span>${escapeMapHtml(fullAddress)}</span><br>
@@ -4835,7 +4874,10 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
               key={key}
               type="button"
               aria-pressed={activeMapPriority === key}
-              onClick={() => setActiveMapPriority((current) => (current === key ? '' : key))}
+              onClick={() => {
+                setAcceptedVisitOnly(false);
+                setActiveMapPriority((current) => (current === key ? '' : key));
+              }}
               className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-black shadow-sm transition ${
                 activeMapPriority === key
                   ? 'border-slate-900 bg-slate-950 text-white'
@@ -4850,6 +4892,26 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
               </span>
             </button>
           ))}
+          <button
+            type="button"
+            aria-pressed={acceptedVisitOnly}
+            onClick={() => {
+              setActiveMapPriority('');
+              setAcceptedVisitOnly((current) => !current);
+            }}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-black shadow-sm transition ${
+              acceptedVisitOnly
+                ? 'border-violet-900 bg-violet-700 text-white'
+                : 'border-violet-200 bg-violet-50 text-violet-900 hover:border-violet-400 hover:bg-violet-100'
+            }`}
+            title={acceptedVisitOnly ? 'Clique para mostrar todos' : 'Mostrar somente quem aceitou a visita para receber o brinde'}
+          >
+            <span className="grid h-4 w-4 place-items-center rounded-full bg-violet-600 text-[10px] text-white">✓</span>
+            {acceptedVisitMapStyle.label}
+            <span className={`rounded-full px-2 py-0.5 text-[10px] ${acceptedVisitOnly ? 'bg-white/15 text-white' : 'bg-white text-violet-700'}`}>
+              {formatNumber(acceptedVisitCount)}
+            </span>
+          </button>
           <span className="leads-map-churches inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 shadow-sm">
             <Church size={14} />
             Igrejas
@@ -4864,8 +4926,8 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
               value={activeChurchKey}
             >
               <option value="">Todas as igrejas ({formatNumber(churchOptions.reduce((sum, item) => sum + item.count, 0))})</option>
-              {churchOptions.map(({ count, key, name }) => (
-                <option key={key} value={key}>{name} ({formatNumber(count)})</option>
+              {churchOptions.map(({ count, districtName, key, name }) => (
+                <option key={key} value={key}>{name} · Distrito {districtName} ({formatNumber(count)})</option>
               ))}
             </select>
           </label>
@@ -5455,6 +5517,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
   const [churchFilterKey, setChurchFilterKey] = useState('');
+  const [acceptedVisitPhones, setAcceptedVisitPhones] = useState(() => new Set());
   const [visibleLeadLimit, setVisibleLeadLimit] = useState(80);
   const [geocodeInfo, setGeocodeInfo] = useState(null);
   const [geocodeLoading, setGeocodeLoading] = useState(false);
@@ -5467,33 +5530,39 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
   const [exportingAdvancedFiltersPdf, setExportingAdvancedFiltersPdf] = useState(false);
   const geocodeWasRunningRef = useRef(false);
   const leadsMapExportRef = useRef(null);
-  const churchesForMap = useMemo(() => {
-    const districtNamesBySlug = officialDistricts.reduce((map, district) => ({
-      ...map,
-      [district.slug || slugifyDistrictName(district.name)]: district.name
-    }), {});
-    return Object.entries(churchesByDistrict || {}).flatMap(([districtSlug, entries]) => {
-      const districtName = districtNamesBySlug[districtSlug] || districtSlug;
-      return (entries || []).map((entry) => {
-        const church = typeof entry === 'string' ? { name: entry } : entry;
-        return {
-          address: church.address || '',
-          districtName,
-          districtSlug,
-          geoDisplayName: church.geoDisplayName || '',
-          geoPrecision: church.geoPrecision || '',
-          geoSource: church.geoSource || '',
-          lat: church.lat,
-          lng: church.lng,
-          name: church.name || 'Igreja Adventista'
-        };
-      });
-    });
-  }, [churchesByDistrict, officialDistricts]);
-  const recordsWithChurchAssignment = useMemo(
-    () => assignNearestChurchesByDistrict(records, churchesForMap),
-    [churchesForMap, records]
+  const churchesForMap = useMemo(
+    () => flattenChurchesByDistrict(churchesByDistrict, officialDistricts),
+    [churchesByDistrict, officialDistricts]
   );
+  const recordsWithChurchAssignment = useMemo(
+    () => assignNearestChurchesByDistrict(records, churchesForMap).map((lead) => ({
+      ...lead,
+      campaignVisitAccepted: acceptedVisitPhones.has(phoneMatchKey(lead.tel)) || lead.aceitouVisita === true
+    })),
+    [acceptedVisitPhones, churchesForMap, records]
+  );
+
+  useEffect(() => {
+    let activeRequest = true;
+    const loadAcceptedVisits = () => {
+      apiFetch('/api/ai/ana/summary?limit=500', { cache: 'no-store' })
+        .then((response) => response.ok ? response.json() : null)
+        .then((summary) => {
+          if (!activeRequest || !summary) return;
+          const phones = new Set((summary.acceptedConversations || [])
+            .map((conversation) => phoneMatchKey(conversation.phone))
+            .filter(Boolean));
+          setAcceptedVisitPhones(phones);
+        })
+        .catch(() => {});
+    };
+    loadAcceptedVisits();
+    const timer = window.setInterval(loadAcceptedVisits, 20000);
+    return () => {
+      activeRequest = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const districts = useMemo(
     () => Array.from(new Set(records.map((lead) => lead.d).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -5614,6 +5683,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       .filter((church) => visibleDistricts.has(church.districtSlug || slugifyDistrictName(church.districtName)))
       .map((church) => ({
         count: counts.get(churchAssignmentKey(church)) || 0,
+        districtName: church.districtName,
         key: churchAssignmentKey(church),
         name: church.name
       }))
@@ -11416,7 +11486,7 @@ function anaGiftDecisionLabel(value) {
   }[value] || 'Brinde ainda não oferecido';
 }
 
-function AIAgentView({ associations = [], campaigns = [], campaignsError = '', data, records = [], onNavigate }) {
+function AIAgentView({ associations = [], campaigns = [], campaignsError = '', churchesByDistrict = {}, data, officialDistricts = [], records = [], onNavigate }) {
   const [tab, setTab] = useState('overview');
   const [selectedReviewLead, setSelectedReviewLead] = useState(null);
   const [selectedAcceptedConversation, setSelectedAcceptedConversation] = useState(null);
@@ -11424,7 +11494,8 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
   const [selectedGroupConversation, setSelectedGroupConversation] = useState(null);
   const [exportingGroupKey, setExportingGroupKey] = useState('');
   const [anaSummary, setAnaSummary] = useState(null);
-  const [selectedDistrict, setSelectedDistrict] = useState(null);
+  const [territoryGrouping, setTerritoryGrouping] = useState('district');
+  const [selectedTerritoryKey, setSelectedTerritoryKey] = useState('');
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [anaLoading, setAnaLoading] = useState(true);
   const hotWhatsapp = records.filter((lead) => lead.t && lead.p === 'Hot').length;
@@ -11434,8 +11505,26 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
   const anaFunnel = anaSummary?.funnel || {};
   const anaAnalysis = anaSummary?.analysis || {};
   const requestAgeBuckets = anaSummary?.requestAgeBuckets || [];
-  const anaConversations = anaSummary?.conversations || [];
-  const acceptedConversations = anaSummary?.acceptedConversations || anaConversations.filter((conversation) => conversation.delivery?.accepted);
+  const rawAnaConversations = anaSummary?.conversations || [];
+  const rawAcceptedConversations = anaSummary?.acceptedConversations || rawAnaConversations.filter((conversation) => conversation.delivery?.accepted);
+  const churchesForAgent = useMemo(
+    () => flattenChurchesByDistrict(churchesByDistrict, officialDistricts),
+    [churchesByDistrict, officialDistricts]
+  );
+  const agentLeadAssignmentsByPhone = useMemo(() => {
+    const entries = assignNearestChurchesByDistrict(records, churchesForAgent)
+      .map((lead) => [phoneMatchKey(lead.tel), lead.churchAssignment])
+      .filter(([phone, assignment]) => phone && assignment);
+    return new Map(entries);
+  }, [churchesForAgent, records]);
+  const anaConversations = useMemo(() => rawAnaConversations.map((conversation) => ({
+    ...conversation,
+    churchAssignment: agentLeadAssignmentsByPhone.get(phoneMatchKey(conversation.phone)) || null
+  })), [agentLeadAssignmentsByPhone, rawAnaConversations]);
+  const acceptedConversations = useMemo(() => rawAcceptedConversations.map((conversation) => ({
+    ...conversation,
+    churchAssignment: agentLeadAssignmentsByPhone.get(phoneMatchKey(conversation.phone)) || null
+  })), [agentLeadAssignmentsByPhone, rawAcceptedConversations]);
   const anaConversationGroups = useMemo(() => {
     const preferredOrder = [
       'Brinde confirmado',
@@ -11523,7 +11612,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
     });
   }, [anaConversations]);
 
-  // ── District filter computed values ──────────────────────────────────────
+  // ── District/church filter computed values ───────────────────────────────
   const districtNames = useMemo(() => {
     const ds = new Set();
     for (const c of anaConversations) {
@@ -11537,29 +11626,64 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
     const responded = dc.filter((c) => c.hasLeadReply).length;
     const accepted = dc.filter((c) => c.delivery?.accepted).length;
     const pct = (a, b) => (b > 0 ? Number(((a / b) * 100).toFixed(1)) : 0);
-    return { name: district, total: dc.length, responded, accepted, responseRate: pct(responded, dc.length), conversionRate: pct(accepted, responded) };
+    return { key: district, name: district, districtName: district, total: dc.length, responded, accepted, responseRate: pct(responded, dc.length), conversionRate: pct(accepted, responded) };
   }), [districtNames, anaConversations]);
 
+  const churchStats = useMemo(() => churchesForAgent.map((church) => {
+    const key = churchAssignmentKey(church);
+    const conversations = anaConversations.filter((conversation) => conversation.churchAssignment?.churchKey === key);
+    const responded = conversations.filter((conversation) => conversation.hasLeadReply).length;
+    const accepted = conversations.filter((conversation) => conversation.delivery?.accepted).length;
+    const pct = (value, total) => (total > 0 ? Number(((value / total) * 100).toFixed(1)) : 0);
+    return {
+      key,
+      name: church.name,
+      districtName: church.districtName,
+      total: conversations.length,
+      responded,
+      accepted,
+      responseRate: pct(responded, conversations.length),
+      conversionRate: pct(accepted, responded)
+    };
+  }).sort((left, right) => left.districtName.localeCompare(right.districtName, 'pt-BR') || left.name.localeCompare(right.name, 'pt-BR')), [anaConversations, churchesForAgent]);
+
+  const territoryStats = territoryGrouping === 'church' ? churchStats : districtStats;
+  const selectedTerritoryStat = territoryStats.find((stat) => stat.key === selectedTerritoryKey) || null;
+
+  useEffect(() => {
+    if (selectedTerritoryKey && !territoryStats.some((stat) => stat.key === selectedTerritoryKey)) {
+      setSelectedTerritoryKey('');
+    }
+  }, [selectedTerritoryKey, territoryStats]);
+
   const filteredConversations = useMemo(() => (
-    selectedDistrict ? anaConversations.filter((c) => c.district === selectedDistrict) : anaConversations
-  ), [anaConversations, selectedDistrict]);
+    selectedTerritoryKey
+      ? anaConversations.filter((conversation) => territoryGrouping === 'church'
+        ? conversation.churchAssignment?.churchKey === selectedTerritoryKey
+        : conversation.district === selectedTerritoryKey)
+      : anaConversations
+  ), [anaConversations, selectedTerritoryKey, territoryGrouping]);
 
   const filteredAcceptedConversations = useMemo(() => (
-    selectedDistrict ? acceptedConversations.filter((c) => c.district === selectedDistrict) : acceptedConversations
-  ), [acceptedConversations, selectedDistrict]);
+    selectedTerritoryKey
+      ? acceptedConversations.filter((conversation) => territoryGrouping === 'church'
+        ? conversation.churchAssignment?.churchKey === selectedTerritoryKey
+        : conversation.district === selectedTerritoryKey)
+      : acceptedConversations
+  ), [acceptedConversations, selectedTerritoryKey, territoryGrouping]);
 
   const filteredFunnel = useMemo(() => {
-    if (!selectedDistrict) return anaFunnel;
+    if (!selectedTerritoryKey) return anaFunnel;
     const dc = filteredConversations;
     const total = dc.length;
     const responded = dc.filter((c) => c.hasLeadReply).length;
     const converted = dc.filter((c) => c.delivery?.accepted).length;
     const pct = (a, b) => (b > 0 ? Number(((a / b) * 100).toFixed(1)) : 0);
     return { ...anaFunnel, dispatches: total, responses: responded, conversions: converted, responseRate: pct(responded, total), conversionRate: pct(converted, responded), overallConversionRate: pct(converted, total) };
-  }, [anaFunnel, filteredConversations, selectedDistrict]);
+  }, [anaFunnel, filteredConversations, selectedTerritoryKey]);
 
   const filteredRequestAgeBuckets = useMemo(() => {
-    if (!selectedDistrict) return requestAgeBuckets;
+    if (!selectedTerritoryKey) return requestAgeBuckets;
     const dc = filteredAcceptedConversations;
     const counts = {};
     let unknown = 0;
@@ -11575,12 +11699,17 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
       .map((b) => ({ ...b, count: counts[b.id] || 0, percentage: pct(counts[b.id] || 0) }));
     if (unknown > 0) base.push({ id: 'unknown', label: 'Data não informada', count: unknown, percentage: pct(unknown) });
     return base;
-  }, [requestAgeBuckets, filteredAcceptedConversations, selectedDistrict]);
+  }, [requestAgeBuckets, filteredAcceptedConversations, selectedTerritoryKey]);
 
   const filteredConversationGroups = useMemo(() => {
-    if (!selectedDistrict) return anaConversationGroups;
+    if (!selectedTerritoryKey) return anaConversationGroups;
     return anaConversationGroups
-      .map((group) => ({ ...group, conversations: group.conversations.filter((c) => c.district === selectedDistrict) }))
+      .map((group) => ({
+        ...group,
+        conversations: group.conversations.filter((conversation) => territoryGrouping === 'church'
+          ? conversation.churchAssignment?.churchKey === selectedTerritoryKey
+          : conversation.district === selectedTerritoryKey)
+      }))
       .filter((group) => group.conversations.length > 0)
       .map((group) => {
         const districtCounts = new Map();
@@ -11594,7 +11723,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
             .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'pt-BR'))
         };
       });
-  }, [anaConversationGroups, selectedDistrict]);
+  }, [anaConversationGroups, selectedTerritoryKey, territoryGrouping]);
   // ─────────────────────────────────────────────────────────────────────────
 
   const largestRequestAgeBucket = Math.max(1, ...filteredRequestAgeBuckets.map((bucket) => Number(bucket.count) || 0));
@@ -11653,11 +11782,16 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
     onNavigate?.('conversations');
   }
 
-  function openDistrictBroadcast(district) {
-    if (!district) return;
+  function openTerritoryBroadcast(stat) {
+    if (!stat?.key) return;
     const recipientsByPhone = new Map();
     anaConversations
-      .filter((conversation) => conversation.district === district && conversation.delivery?.accepted)
+      .filter((conversation) => (
+        (territoryGrouping === 'church'
+          ? conversation.churchAssignment?.churchKey === stat.key
+          : conversation.district === stat.key)
+        && conversation.delivery?.accepted
+      ))
       .forEach((conversation) => {
         const phone = phoneDigits(conversation.phone);
         if (!phone) return;
@@ -11665,7 +11799,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
           id: conversation.id,
           name: conversation.leadName || `Contato ${phone.slice(-4)}`,
           phone,
-          district: conversation.district || district,
+          district: conversation.district || stat.districtName,
           priority: conversation.priority || null,
           material: conversation.delivery?.material || null,
           whatsappContactCount: Math.max(Number(conversation.outboundCount || 0), 1)
@@ -11674,14 +11808,15 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
     const recipients = Array.from(recipientsByPhone.values());
     if (!recipients.length) {
       toast.error('Nenhum aceite encontrado', {
-        description: `Não há pessoas com aceite registrado em ${district}.`
+        description: `Não há pessoas com aceite registrado em ${stat.name}.`
       });
       return;
     }
     window.localStorage.setItem('open-whatsapp-district-request', JSON.stringify({
-      district,
+      district: territoryGrouping === 'church' ? stat.districtName : stat.name,
+      church: territoryGrouping === 'church' ? stat.name : null,
       audience: 'accepted-visit',
-      audienceLabel: 'Aceitaram a visita',
+      audienceLabel: `Aceitaram a visita · ${stat.name}`,
       recipients,
       requestedAt: new Date().toISOString()
     }));
@@ -11810,7 +11945,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
                 disabled={!campaigns.length}
                 onChange={(event) => {
                   setSelectedCampaignId(event.target.value);
-                  setSelectedDistrict(null);
+                  setSelectedTerritoryKey('');
                 }}
                 title={campaignsError || 'Selecione a campanha cujos dados deseja visualizar'}
                 value={selectedCampaignId}
@@ -11898,19 +12033,38 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
       </section>
       {tab === 'overview' ? (
         <div className="grid gap-4">
-          {districtNames.length > 0 ? (
+          {territoryStats.length > 0 ? (
             <section className={`${panelClass} p-6`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <span className={labelClass}>Filtrar por distrito</span>
+                  <label className={`${labelClass} flex items-center gap-2`}>
+                    Agrupar leads por
+                    <select
+                      aria-label="Agrupar leads por distrito ou igreja"
+                      className="h-9 rounded-lg border border-white/15 bg-slate-900 px-3 text-xs font-black normal-case tracking-normal text-white outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/15"
+                      onChange={(event) => {
+                        setTerritoryGrouping(event.target.value);
+                        setSelectedTerritoryKey('');
+                      }}
+                      value={territoryGrouping}
+                    >
+                      <option value="district">Distrito</option>
+                      <option value="church">Igreja</option>
+                    </select>
+                  </label>
                   <h2 className="mt-1 text-xl font-black text-slate-50">
-                    {selectedDistrict ? `Distrito: ${selectedDistrict}` : 'Todos os distritos'}
+                    {selectedTerritoryStat
+                      ? `${territoryGrouping === 'church' ? 'Igreja' : 'Distrito'}: ${selectedTerritoryStat.name}`
+                      : territoryGrouping === 'church' ? 'Todas as igrejas' : 'Todos os distritos'}
                   </h2>
+                  {selectedTerritoryStat && territoryGrouping === 'church' ? (
+                    <p className="mt-1 text-xs font-bold text-slate-400">Distrito {selectedTerritoryStat.districtName}</p>
+                  ) : null}
                 </div>
-                {selectedDistrict ? (
+                {selectedTerritoryKey ? (
                   <button
                     className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/20 px-4 text-xs font-black text-slate-300 transition hover:border-white/40 hover:text-white"
-                    onClick={() => setSelectedDistrict(null)}
+                    onClick={() => setSelectedTerritoryKey('')}
                     type="button"
                   >
                     <X size={13} /> Ver todos
@@ -11918,15 +12072,20 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
                 ) : null}
               </div>
               <div className="mt-4 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
-                {districtStats.map((stat) => {
-                  const isActive = selectedDistrict === stat.name;
+                {territoryStats.map((stat) => {
+                  const isActive = selectedTerritoryKey === stat.key;
                   return (
                     <article
                       className={`group grid items-start gap-1 rounded-xl border p-4 text-left transition-all duration-300 ${isActive ? 'border-blue-600 bg-blue-600 text-white shadow-[0_8px_30px_rgba(37,99,235,0.4)]' : 'border-slate-200 bg-slate-100 text-slate-900 shadow-sm hover:-translate-y-1 hover:border-slate-300 hover:bg-slate-200 hover:shadow-[0_10px_40px_rgba(0,0,0,0.08)]'}`}
-                      key={stat.name}
+                      key={stat.key}
                     >
-                      <button className="w-full text-left focus:outline-none" onClick={() => setSelectedDistrict(isActive ? null : stat.name)} type="button">
+                      <button className="w-full text-left focus:outline-none" onClick={() => setSelectedTerritoryKey(isActive ? '' : stat.key)} type="button">
                         <strong className={`block truncate text-sm font-black transition-colors ${isActive ? 'text-white' : 'text-slate-900 group-hover:text-black'}`}>{stat.name}</strong>
+                        {territoryGrouping === 'church' ? (
+                          <span className={`mt-1 block truncate text-[10px] font-black uppercase tracking-wide ${isActive ? 'text-blue-100' : 'text-blue-700'}`}>
+                            Distrito {stat.districtName}
+                          </span>
+                        ) : null}
                         <span className={`mt-2 block text-2xl font-black transition-colors ${isActive ? 'text-white' : 'text-emerald-600 group-hover:text-emerald-700'}`}>{formatNumber(stat.accepted)}</span>
                         <span className={`text-[11px] font-bold uppercase tracking-wide transition-colors ${isActive ? 'text-blue-200' : 'text-slate-500 group-hover:text-slate-600'}`}>aceitaram a visita</span>
                         <div className={`mt-4 grid grid-cols-2 gap-2 border-t pt-3 text-[11px] font-semibold transition-colors ${isActive ? 'border-blue-500/50 text-blue-100' : 'border-slate-200 text-slate-500 group-hover:border-slate-300 group-hover:text-slate-700'}`}>
@@ -11936,7 +12095,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
                       </button>
                       <button
                         className={`mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg text-xs font-black shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 ${isActive ? 'bg-white text-blue-800 hover:bg-emerald-50' : 'bg-[#00a884] text-white hover:bg-[#008069]'}`}
-                        onClick={() => openDistrictBroadcast(stat.name)}
+                        onClick={() => openTerritoryBroadcast(stat)}
                         type="button"
                       >
                         <Send size={14} /> Disparar novo aviso
@@ -11953,7 +12112,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', d
               <h2 className="mt-2 text-2xl font-black text-slate-50">Funil dos atendimentos</h2>
               <div className="mt-6 divide-y divide-white/10 border-y border-white/10">
                 {[
-                  ['Contatos abordados', filteredFunnel.dispatches, selectedDistrict ? `${formatNumber(filteredFunnel.dispatches || 0)} conversa(s) neste distrito` : `${formatNumber(anaFunnel.transmissions || 0)} transmissão(ões) registrada(s)`, Send],
+                  ['Contatos abordados', filteredFunnel.dispatches, selectedTerritoryKey ? `${formatNumber(filteredFunnel.dispatches || 0)} conversa(s) nesta seleção` : `${formatNumber(anaFunnel.transmissions || 0)} transmissão(ões) registrada(s)`, Send],
                   ['Pessoas que responderam', filteredFunnel.responses, `${filteredFunnel.responseRate || 0}% dos contatos abordados`, MessageCircle],
                   ['Pessoas que aceitaram', filteredFunnel.conversions, `${filteredFunnel.conversionRate || 0}% das respostas`, CheckCircle2]
                 ].map(([label, value, detail, Icon]) => (
@@ -13494,7 +13653,18 @@ export default function CrmApp({ payload: initialPayload = null }) {
       />
     );
   } else if (effectiveView === 'ai-agent') {
-    content = <AIAgentView associations={filteredAssociations} campaigns={adminCampaigns} campaignsError={campaignsError} data={data} onNavigate={navigateView} records={records} />;
+    content = (
+      <AIAgentView
+        associations={filteredAssociations}
+        campaigns={adminCampaigns}
+        campaignsError={campaignsError}
+        churchesByDistrict={payload?.meta?.territory?.churchesByDistrict || {}}
+        data={data}
+        officialDistricts={payload?.meta?.territory?.districts || []}
+        onNavigate={navigateView}
+        records={records}
+      />
+    );
   } else if (effectiveView === 'reports') {
     content = isAdminUser(user)
       ? <AdminGeneralView {...adminGeneralProps} initialSection="audit" />
