@@ -4524,6 +4524,32 @@ function churchMapPoint(church, districtLeadPoints = {}) {
   };
 }
 
+function addCoincidentMarkerOffsets(items = []) {
+  const totals = items.reduce((map, item) => {
+    const key = `${Number(item.point?.lat).toFixed(5)}:${Number(item.point?.lng).toFixed(5)}`;
+    map.set(key, (map.get(key) || 0) + 1);
+    return map;
+  }, new Map());
+  const positions = new Map();
+
+  return items.map((item) => {
+    const key = `${Number(item.point?.lat).toFixed(5)}:${Number(item.point?.lng).toFixed(5)}`;
+    const total = totals.get(key) || 1;
+    if (total < 2) return { ...item, markerOffset: { x: 0, y: 0 } };
+    const index = positions.get(key) || 0;
+    positions.set(key, index + 1);
+    const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / total);
+    const radius = total > 4 ? 18 : 15;
+    return {
+      ...item,
+      markerOffset: {
+        x: Math.round(Math.cos(angle) * radius),
+        y: Math.round(Math.sin(angle) * radius)
+      }
+    };
+  });
+}
+
 function churchAssignmentKey(church) {
   const district = churchDistrictSlug(church);
   const name = slugForMap(church?.name || 'igreja-adventista');
@@ -4704,15 +4730,15 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
     return { ...counts, [priority]: (counts[priority] || 0) + 1 };
   }, {}), [leads]);
   const acceptedVisitCount = useMemo(() => leads.filter((lead) => lead.campaignVisitAccepted).length, [leads]);
-  const mappableLeads = useMemo(() => leads
+  const mappableLeads = useMemo(() => addCoincidentMarkerOffsets(leads
     .filter((lead) => !acceptedVisitOnly || lead.campaignVisitAccepted)
     .filter((lead) => !activeMapPriority || lead.p === activeMapPriority || (activeMapPriority === 'Cold' && !leadMapPriorityStyles[lead.p]))
     .filter((lead) => !activeChurchKey || lead.churchAssignment?.churchKey === activeChurchKey)
     .slice(0, 300)
     .map((lead) => ({
-    lead,
-    point: approximateLeadPoint(lead)
-  })), [acceptedVisitOnly, activeChurchKey, activeMapPriority, leads]);
+      lead,
+      point: approximateLeadPoint(lead)
+    }))), [acceptedVisitOnly, activeChurchKey, activeMapPriority, leads]);
   const churchPoints = useMemo(() => {
     const allLeadPoints = leads.map((lead) => ({ lead, point: approximateLeadPoint(lead) }));
     const districtLeadPoints = allLeadPoints.reduce((map, item) => {
@@ -4801,7 +4827,7 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
         markersRef.current = [];
         const bounds = L.latLngBounds([]);
 
-        for (const { lead, point } of mappableLeads) {
+        for (const { lead, markerOffset, point } of mappableLeads) {
           const fullAddress = fullLeadAddress(lead);
           const precisionLabel = point.precision === 'Endereco' ? 'Endereço exato' : 'Ponto aproximado';
           const needsGoogleCheck = point.precision !== 'Endereco' || lead.geoNotFound;
@@ -4815,10 +4841,13 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
             className: 'lead-map-marker-shell',
             html: `<span class="lead-map-marker" style="background-color:${markerStyle.color};${lead.campaignVisitAccepted ? 'box-shadow:0 0 0 3px #ede9fe,0 2px 8px rgba(76,29,149,.42)' : ''}">${lead.campaignVisitAccepted ? '<span aria-hidden="true" style="display:grid;height:100%;place-items:center;color:white;font-size:12px;font-weight:900">✓</span>' : ''}</span>`,
             iconSize: [markerSize, markerSize],
-            iconAnchor: [markerSize / 2, markerSize / 2],
-            popupAnchor: [0, -(markerSize / 2)]
+            iconAnchor: [(markerSize / 2) - markerOffset.x, (markerSize / 2) - markerOffset.y],
+            popupAnchor: [markerOffset.x, markerOffset.y - (markerSize / 2)]
           });
-          const marker = L.marker([point.lat, point.lng], { icon: leadIcon }).addTo(map);
+          const marker = L.marker([point.lat, point.lng], {
+            icon: leadIcon,
+            zIndexOffset: lead.campaignVisitAccepted ? 1200 : 0
+          }).addTo(map);
           const assignment = lead.churchAssignment;
           if (activeChurchKey && assignment && Number.isFinite(Number(assignment.churchLat)) && Number.isFinite(Number(assignment.churchLng))) {
             const affiliationLine = L.polyline(
@@ -4874,7 +4903,7 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
             iconAnchor: [14, 14],
             popupAnchor: [0, -14]
           });
-          const churchMarker = L.marker([point.lat, point.lng], { icon: churchIcon }).addTo(map);
+          const churchMarker = L.marker([point.lat, point.lng], { icon: churchIcon, zIndexOffset: 200 }).addTo(map);
           churchMarker.bindPopup(`
             <strong>${escapeMapHtml(church.name || 'Igreja Adventista')}</strong><br>
             <strong style="color:#16a34a">Igreja Adventista</strong><br>
