@@ -61,7 +61,7 @@
 | Jaguaré | R. Cangati, 154 | Vila Lajeado | 05343-050 | São Paulo |
 | Jaguari | R. Órbita, 1159 | Chácara do Solar II | 06531-095 | Santana de Parnaíba |
 | Jandira | R. Monteiro Lobato, 432 | Jd. Cristino | 06606-170 | Jandira |
-| Jd. Ana Maria | R. Vitória, 560 | Jd. Ana Maria | 06386-210 | Carapicuíba | -23.5328054 | -46.8391285 | logradouro-aproximado |
+| Jd. Ana Maria | R. Vitória, 560 | Jd. Ana Maria | 06386-210 | Carapicuíba | -23.5327042 | -46.8415055 | endereco-confirmado |
 | Jd. Angelica | R. Los Angeles, 59 | Parque Flórida | 06365-335 | Carapicuíba |
 | Jd. Arpoador | R. Major Walter Carlson, 780 | Jd. Arpoador | 05565-210 | São Paulo |
 | Jd. Baronesa | R. Rosa Mirassol Baeza, 587 | Baronesa | 06266-000 | Osasco |
@@ -75,7 +75,7 @@
 | Jd. da Graça | R. Torquato Neto, 187 | Jd. N. Senhora das Graças | 06719-380 | Cotia |
 | Jd. D'Abril | R. Padre Adolfo Moran, 74 | Jd. D'Abril | 05576-100 | São Paulo |
 | Jd. das Oliveiras | R. Urucuí, 26 | Jd. das Oliveiras | 06727-090 | Cotia |
-| Jd. das Palmeiras | Estrada do Aderno, 98 | Vila dos Pássaros | 06390-070 | Carapicuíba | -23.5411866 | -46.8478775 | logradouro-aproximado |
+| Jd. das Palmeiras | Estr. do Aderno, 835 - 701 | Vila Menk | 06390-070 | Carapicuíba | -23.5430190 | -46.8493526 | endereco-confirmado |
 | Jd. Domitila | Av. Eduardo Pereira Ramos, 165 | Jd. São Jorge | 04432-000 | São Paulo |
 | Jd. Esmeralda | Av. Eng. Heitor Antonio Eiras Garcia, 7052 | Jd. Esmeralda | 05564-200 | São Paulo |
 | Jd. Ester | R. Inácio Manuel Álvares, 650 | Vila Antônio | 05372-111 | São Paulo |
@@ -99,7 +99,7 @@
 | Jd. São Daniel | R. Alvorada, 157 | Jd. Rosa Maria | 06331-060 | Carapicuíba |
 | Jd. São Silvestre | R. Tupi, 634 | Jd. São Silvestre | 06417-030 | Barueri |
 | Jd. Silveira | R. Terca, 91 | Jd. Audir | 06433-030 | Barueri |
-| Jd. Silviania | R. Jacob Csipak, 130 | Vila Silviania | 06322-670 | Carapicuíba | -23.5347227 | -46.8326766 | logradouro-aproximado |
+| Jd. Silviania | R. Jacob Csipak, 130 | Vila Silviania | 06322-670 | Carapicuíba | -23.5353172 | -46.8347079 | endereco-confirmado |
 | Jd. Tonato | R. Ascurra, 100 | Jd. Tonato | 06365-100 | Carapicuíba |
 | Jd. Tupã | R. Fagundes Varela, 190 | Jd. Tupã | 06435-090 | Barueri |
 | Jd. Ubirajara | R. José Fugulin, 268 | Jd. Ubirajara | 04455-390 | São Paulo |
