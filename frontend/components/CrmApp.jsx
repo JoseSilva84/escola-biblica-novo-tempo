@@ -11613,7 +11613,6 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
   const vipWhatsapp = records.filter((lead) => lead.t && lead.v).length;
   const anaMetrics = anaSummary?.metrics || {};
   const anaFunnel = anaSummary?.funnel || {};
-  const anaAnalysis = anaSummary?.analysis || {};
   const requestAgeBuckets = anaSummary?.requestAgeBuckets || [];
   const rawAnaConversations = anaSummary?.conversations || [];
   const rawAcceptedConversations = anaSummary?.acceptedConversations || rawAnaConversations.filter((conversation) => conversation.delivery?.accepted);
@@ -11781,6 +11780,13 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
       ? churchStats
       : districtStats;
   const selectedTerritoryStat = territoryStats.find((stat) => stat.key === selectedTerritoryKey) || null;
+  const visibleTerritoryKeys = useMemo(() => new Set(territoryStats.map((stat) => stat.key)), [territoryStats]);
+  const territoryContextActive = Boolean(selectedTerritoryKey || territoryGrouping !== 'district');
+  const territoryContextLabel = selectedTerritoryStat
+    ? `${isChurchGrouping ? 'Igreja' : 'Distrito'}: ${selectedTerritoryStat.name}`
+    : territoryGrouping === 'church-accepted'
+      ? 'Igrejas com visitas aceitas'
+      : territoryGrouping === 'church-all' ? 'Todas as igrejas' : 'Todos os distritos';
 
   useEffect(() => {
     if (selectedTerritoryKey && !territoryStats.some((stat) => stat.key === selectedTerritoryKey)) {
@@ -11788,34 +11794,44 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
     }
   }, [selectedTerritoryKey, territoryStats]);
 
+  useEffect(() => {
+    setSelectedConversationGroup(null);
+    setSelectedGroupConversation(null);
+    setSelectedAcceptedConversation(null);
+  }, [selectedTerritoryKey, territoryGrouping]);
+
   const filteredConversations = useMemo(() => (
     selectedTerritoryKey
       ? anaConversations.filter((conversation) => isChurchGrouping
         ? conversation.churchAssignment?.churchKey === selectedTerritoryKey
         : conversation.district === selectedTerritoryKey)
-      : anaConversations
-  ), [anaConversations, isChurchGrouping, selectedTerritoryKey]);
+      : territoryGrouping === 'church-accepted'
+        ? anaConversations.filter((conversation) => visibleTerritoryKeys.has(conversation.churchAssignment?.churchKey))
+        : anaConversations
+  ), [anaConversations, isChurchGrouping, selectedTerritoryKey, territoryGrouping, visibleTerritoryKeys]);
 
   const filteredAcceptedConversations = useMemo(() => (
     selectedTerritoryKey
       ? acceptedConversations.filter((conversation) => isChurchGrouping
         ? conversation.churchAssignment?.churchKey === selectedTerritoryKey
         : conversation.district === selectedTerritoryKey)
-      : acceptedConversations
-  ), [acceptedConversations, isChurchGrouping, selectedTerritoryKey]);
+      : territoryGrouping === 'church-accepted'
+        ? acceptedConversations.filter((conversation) => visibleTerritoryKeys.has(conversation.churchAssignment?.churchKey))
+        : acceptedConversations
+  ), [acceptedConversations, isChurchGrouping, selectedTerritoryKey, territoryGrouping, visibleTerritoryKeys]);
 
   const filteredFunnel = useMemo(() => {
-    if (!selectedTerritoryKey) return anaFunnel;
+    if (!selectedTerritoryKey && territoryGrouping === 'district') return anaFunnel;
     const dc = filteredConversations;
     const total = dc.length;
     const responded = dc.filter((c) => c.hasLeadReply).length;
     const converted = dc.filter((c) => c.delivery?.accepted).length;
     const pct = (a, b) => (b > 0 ? Number(((a / b) * 100).toFixed(1)) : 0);
     return { ...anaFunnel, dispatches: total, responses: responded, conversions: converted, responseRate: pct(responded, total), conversionRate: pct(converted, responded), overallConversionRate: pct(converted, total) };
-  }, [anaFunnel, filteredConversations, selectedTerritoryKey]);
+  }, [anaFunnel, filteredConversations, selectedTerritoryKey, territoryGrouping]);
 
   const filteredRequestAgeBuckets = useMemo(() => {
-    if (!selectedTerritoryKey) return requestAgeBuckets;
+    if (!selectedTerritoryKey && territoryGrouping === 'district') return requestAgeBuckets;
     const dc = filteredAcceptedConversations;
     const counts = {};
     let unknown = 0;
@@ -11831,31 +11847,63 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
       .map((b) => ({ ...b, count: counts[b.id] || 0, percentage: pct(counts[b.id] || 0) }));
     if (unknown > 0) base.push({ id: 'unknown', label: 'Data não informada', count: unknown, percentage: pct(unknown) });
     return base;
-  }, [requestAgeBuckets, filteredAcceptedConversations, selectedTerritoryKey]);
+  }, [requestAgeBuckets, filteredAcceptedConversations, selectedTerritoryKey, territoryGrouping]);
 
   const filteredConversationGroups = useMemo(() => {
-    if (!selectedTerritoryKey) return anaConversationGroups;
+    const visibleConversationIds = new Set(filteredConversations.map((conversation) => conversation.id));
     return anaConversationGroups
       .map((group) => ({
         ...group,
-        conversations: group.conversations.filter((conversation) => isChurchGrouping
-          ? conversation.churchAssignment?.churchKey === selectedTerritoryKey
-          : conversation.district === selectedTerritoryKey)
+        conversations: group.conversations.filter((conversation) => visibleConversationIds.has(conversation.id))
       }))
       .filter((group) => group.conversations.length > 0)
       .map((group) => {
-        const districtCounts = new Map();
-        for (const c of group.conversations) {
-          const d = c.district || 'Distrito não vinculado';
-          districtCounts.set(d, (districtCounts.get(d) || 0) + 1);
+        const territoryCounts = new Map();
+        for (const conversation of group.conversations) {
+          const territoryName = isChurchGrouping
+            ? `${conversation.churchAssignment?.churchName || 'Igreja não vinculada'} · ${conversation.district || 'Distrito não vinculado'}`
+            : conversation.district || 'Distrito não vinculado';
+          territoryCounts.set(territoryName, (territoryCounts.get(territoryName) || 0) + 1);
         }
         return {
           ...group,
-          districts: Array.from(districtCounts, ([name, count]) => ({ name, count }))
-            .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'pt-BR'))
+          breakdownLabel: isChurchGrouping ? 'Igrejas' : 'Distritos',
+          breakdownLabelLower: isChurchGrouping ? 'igrejas' : 'distritos',
+          districts: Array.from(territoryCounts, ([name, count]) => ({ name, count }))
+            .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, 'pt-BR'))
         };
       });
-  }, [anaConversationGroups, isChurchGrouping, selectedTerritoryKey]);
+  }, [anaConversationGroups, filteredConversations, isChurchGrouping]);
+
+  const filteredAnalysisGroups = useMemo(() => {
+    const visibleConversationIds = new Set(filteredConversations.map((conversation) => conversation.id));
+    return anaAnalysisGroups.map((group) => {
+      const conversations = group.conversations.filter((conversation) => visibleConversationIds.has(conversation.id));
+      const territoryCounts = new Map();
+      for (const conversation of conversations) {
+        const territoryName = isChurchGrouping
+          ? `${conversation.churchAssignment?.churchName || 'Igreja não vinculada'} · ${conversation.district || 'Distrito não vinculado'}`
+          : conversation.district || 'Distrito não vinculado';
+        territoryCounts.set(territoryName, (territoryCounts.get(territoryName) || 0) + 1);
+      }
+      return {
+        ...group,
+        conversations,
+        breakdownLabel: isChurchGrouping ? 'Igrejas' : 'Distritos',
+        breakdownLabelLower: isChurchGrouping ? 'igrejas' : 'distritos',
+        districts: Array.from(territoryCounts, ([name, count]) => ({ name, count }))
+          .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, 'pt-BR'))
+      };
+    });
+  }, [anaAnalysisGroups, filteredConversations, isChurchGrouping]);
+
+  const filteredAnalysis = useMemo(() => ({
+    materialReceived: filteredConversations.filter((conversation) => conversation.delivery?.materialStatus === 'RECEIVED').length,
+    materialNotReceived: filteredConversations.filter((conversation) => conversation.delivery?.materialStatus === 'NOT_RECEIVED').length,
+    materialPending: filteredConversations.filter((conversation) => conversation.delivery?.materialStatus === 'PENDING').length,
+    giftOffered: filteredConversations.filter((conversation) => conversation.delivery?.giftOffered).length,
+    giftPending: filteredConversations.filter((conversation) => conversation.delivery?.pendingGiftDecision).length
+  }), [filteredConversations]);
   // ─────────────────────────────────────────────────────────────────────────
 
   const largestRequestAgeBucket = Math.max(1, ...filteredRequestAgeBuckets.map((bucket) => Number(bucket.count) || 0));
@@ -11864,8 +11912,8 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
   const active = Boolean(anaAgent?.configured && anaAgent?.autoReplyEnabled);
   const geminiSynchronized = Boolean(anaMetrics.aiProviderEvents || anaMetrics.gptMakerEvents || anaAgent?.configured);
   const anaGroupCounts = useMemo(() => Object.fromEntries(
-    anaConversationGroups.map((group) => [group.label, group.conversations.length])
-  ), [anaConversationGroups]);
+    filteredConversationGroups.map((group) => [group.label, group.conversations.length])
+  ), [filteredConversationGroups]);
   const toneClasses = {
     blue: 'bg-blue-50 text-blue-700 border-blue-100',
     green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -11981,13 +12029,13 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
       pdf.setFontSize(10);
       pdf.text(`${group.conversations.length} pessoa(s) | Gerado em ${new Date().toLocaleString('pt-BR')}`, margin, y);
       y += 7;
-      pdf.text(`Distritos: ${group.districts.map((district) => `${district.name} (${district.count})`).join(', ')}`, margin, y, { maxWidth: contentWidth });
+      pdf.text(`${group.breakdownLabel || 'Distritos'}: ${group.districts.map((district) => `${district.name} (${district.count})`).join(', ')}`, margin, y, { maxWidth: contentWidth });
       y += 10;
 
       group.conversations.forEach((conversation, index) => {
         const detailLines = [
           `${index + 1}. ${conversation.leadName || 'Contato sem nome'}`,
-          `Distrito: ${conversation.district || 'Distrito não vinculado'} | Telefone: ${conversation.phone || 'Não informado'}`,
+          `${isChurchGrouping ? `Igreja: ${conversation.churchAssignment?.churchName || 'Não vinculada'} | ` : ''}Distrito: ${conversation.district || 'Distrito não vinculado'} | Telefone: ${conversation.phone || 'Não informado'}`,
           `Situação: ${conversation.classification?.label || group.label}`,
           `Material: ${anaMaterialStatusLabel(conversation.delivery?.materialStatus)}`,
           `Brinde: ${anaGiftDecisionLabel(conversation.delivery?.giftDecisionStatus)}`,
@@ -12098,11 +12146,11 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
       </section>
 
       <section className="grid grid-cols-6 gap-4 max-2xl:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
-        <MetricCard detail={`${formatNumber(anaFunnel.transmissions || 0)} transmissão(ões) registrada(s)`} icon={Send} label="Receberam contato" tone="blue" value={anaLoading ? '...' : formatNumber(anaFunnel.dispatches || 0)} />
-        <MetricCard detail={`${anaFunnel.responseRate || 0}% dos contatos abordados`} icon={MessageCircle} label="Responderam" tone="orange" value={anaLoading ? '...' : formatNumber(anaFunnel.responses || 0)} />
-        <MetricCard detail={`${anaFunnel.conversionRate || 0}% das respostas`} icon={CheckCircle2} label="Aceitaram o brinde" tone="green" value={anaLoading ? '...' : formatNumber(anaFunnel.conversions || 0)} />
+        <MetricCard detail={territoryContextActive ? territoryContextLabel : `${formatNumber(filteredFunnel.transmissions || 0)} transmissão(ões) registrada(s)`} icon={Send} label="Receberam contato" tone="blue" value={anaLoading ? '...' : formatNumber(filteredFunnel.dispatches || 0)} />
+        <MetricCard detail={`${filteredFunnel.responseRate || 0}% dos contatos abordados`} icon={MessageCircle} label="Responderam" tone="orange" value={anaLoading ? '...' : formatNumber(filteredFunnel.responses || 0)} />
+        <MetricCard detail={`${filteredFunnel.conversionRate || 0}% das respostas`} icon={CheckCircle2} label="Aceitaram o brinde" tone="green" value={anaLoading ? '...' : formatNumber(filteredFunnel.conversions || 0)} />
         <MetricCard detail="aguardando qualificação" icon={Sparkles} label="Triagens" tone="violet" value={anaLoading ? '...' : formatNumber(anaGroupCounts.Triagem || 0)} />
-        <MetricCard detail="recusaram o recebimento" icon={X} label="Não aceitaram" tone="orange" value={anaLoading ? '...' : formatNumber(anaGroupCounts['Brinde recusado'] || anaGroupCounts['Não aceitou a visita'] || 0)} />
+        <MetricCard detail="recusaram o recebimento" icon={X} label="Não aceitaram" tone="orange" value={anaLoading ? '...' : formatNumber((anaGroupCounts['Brinde recusado'] || 0) + (anaGroupCounts['Não aceitou a visita'] || 0))} />
         <MetricCard detail="precisam receber ou reenviar" icon={ClipboardList} label="Enviar material" value={anaLoading ? '...' : formatNumber(anaGroupCounts['Enviar material'] || 0)} />
       </section>
 
@@ -12111,11 +12159,12 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
           <div>
             <span className={labelClass}>Situação do acompanhamento</span>
             <h2 className="mt-2 text-2xl font-black text-slate-50">Resultado das conversas</h2>
+            <p className="mt-1 text-xs font-bold text-slate-400">{territoryContextLabel}</p>
           </div>
-          <span className="text-xs font-bold text-slate-400">{formatNumber(anaMetrics.conversations || 0)} conversas analisadas</span>
+          <span className="text-xs font-bold text-slate-400">{formatNumber(filteredConversations.length)} conversas analisadas</span>
         </div>
         <div className="mt-5 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
-          {anaAnalysisGroups.map((group, index) => {
+          {filteredAnalysisGroups.map((group, index) => {
             const Icon = index === 0 ? CheckCheck : index === 1 ? AlertTriangle : index === 2 ? MessageCircle : Gauge;
             const colorClasses = [
               'border-emerald-300 bg-emerald-100 text-emerald-950 hover:bg-emerald-200 focus:ring-emerald-500/40',
@@ -12123,12 +12172,12 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
               'border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-200 focus:ring-amber-500/40',
               'border-blue-300 bg-blue-100 text-blue-950 hover:bg-blue-200 focus:ring-blue-500/40'
             ];
-            const storedCounts = [anaAnalysis.materialReceived, anaAnalysis.materialNotReceived, anaAnalysis.materialPending, anaAnalysis.giftPending];
+            const storedCounts = [filteredAnalysis.materialReceived, filteredAnalysis.materialNotReceived, filteredAnalysis.materialPending, filteredAnalysis.giftPending];
             const count = Number(storedCounts[index]);
-            const materialTotal = Number(anaAnalysis.materialReceived || 0)
-              + Number(anaAnalysis.materialNotReceived || 0)
-              + Number(anaAnalysis.materialPending || 0);
-            const denominator = index < 3 ? materialTotal : Number(anaAnalysis.giftOffered || 0);
+            const materialTotal = Number(filteredAnalysis.materialReceived || 0)
+              + Number(filteredAnalysis.materialNotReceived || 0)
+              + Number(filteredAnalysis.materialPending || 0);
+            const denominator = index < 3 ? materialTotal : Number(filteredAnalysis.giftOffered || 0);
             const rate = denominator > 0 ? Number((((Number.isFinite(count) ? count : group.conversations.length) / denominator) * 100).toFixed(1)) : 0;
             return (
               <button
@@ -12186,11 +12235,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
                     </select>
                   </label>
                   <h2 className="mt-1 text-xl font-black text-slate-50">
-                    {selectedTerritoryStat
-                      ? `${isChurchGrouping ? 'Igreja' : 'Distrito'}: ${selectedTerritoryStat.name}`
-                      : territoryGrouping === 'church-accepted'
-                        ? 'Igrejas com visitas aceitas'
-                        : isChurchGrouping ? 'Todas as igrejas' : 'Todos os distritos'}
+                    {territoryContextLabel}
                   </h2>
                   {selectedTerritoryStat && isChurchGrouping ? (
                     <p className="mt-1 text-xs font-bold text-slate-400">Distrito {selectedTerritoryStat.districtName}</p>
@@ -12314,7 +12359,11 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
                 >
                   <span className="min-w-0">
                     <strong className="block truncate text-sm font-black text-slate-950">{conversation.leadName}</strong>
-                    <span className="mt-1 block truncate text-xs font-bold uppercase text-slate-500">{conversation.district || 'Distrito não vinculado'}</span>
+                    <span className="mt-1 block truncate text-xs font-bold uppercase text-slate-500">
+                      {isChurchGrouping
+                        ? `${conversation.churchAssignment?.churchName || 'Igreja não vinculada'} · ${conversation.district || 'Distrito não vinculado'}`
+                        : conversation.district || 'Distrito não vinculado'}
+                    </span>
                     <span className={`mt-2 flex items-start gap-2 rounded-md px-2.5 py-2 text-xs font-semibold ${conversation.delivery?.address ? 'bg-emerald-100 text-emerald-950' : 'bg-amber-100 text-amber-950'}`}>
                       <MapPin className="mt-0.5 shrink-0" size={14} />
                       <span>
@@ -12387,7 +12436,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
                         </span>
                       ))}
                       {group.districts.length > 4 ? (
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">+{group.districts.length - 4} distritos</span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">+{group.districts.length - 4} {group.breakdownLabelLower || 'distritos'}</span>
                       ) : null}
                     </div>
                     <div className="ana-group-conversation-list mt-3 divide-y divide-slate-100 overflow-hidden rounded-md border border-slate-100 bg-slate-50">
@@ -12400,7 +12449,11 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
                         >
                           <span className="min-w-0">
                             <strong className="block truncate text-xs font-black text-slate-950">{conversation.leadName}</strong>
-                            <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-600">{conversation.district || 'Distrito não vinculado'}</span>
+                            <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-600">
+                              {isChurchGrouping
+                                ? `${conversation.churchAssignment?.churchName || 'Igreja não vinculada'} · ${conversation.district || 'Distrito não vinculado'}`
+                                : conversation.district || 'Distrito não vinculado'}
+                            </span>
                             {conversation.delivery?.accepted ? (
                               <span className={`mt-1.5 flex items-start gap-1.5 rounded px-2 py-1.5 text-[11px] font-semibold ${conversation.delivery?.address ? 'bg-emerald-100 text-emerald-950' : 'bg-amber-100 text-amber-950'}`}>
                                 <MapPin className="mt-0.5 shrink-0" size={12} />
@@ -12622,7 +12675,11 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
                 >
                   <span className="min-w-0">
                     <strong className="block truncate text-sm font-black text-slate-950">{conversation.leadName}</strong>
-                    <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{conversation.district || 'Distrito não vinculado'} · {conversation.phone}</span>
+                    <span className="mt-1 block truncate text-xs font-semibold text-slate-600">
+                      {isChurchGrouping
+                        ? `${conversation.churchAssignment?.churchName || 'Igreja não vinculada'} · ${conversation.district || 'Distrito não vinculado'}`
+                        : conversation.district || 'Distrito não vinculado'} · {conversation.phone}
+                    </span>
                     <span className="mt-1 block truncate text-xs text-slate-500">{conversation.lastLeadMessage}</span>
                   </span>
                   <ChevronRight className="text-blue-700" size={18} />
@@ -12642,7 +12699,10 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
               <div className="min-w-0">
                 <span className="text-[11px] font-black uppercase tracking-[0.14em] text-blue-700">{selectedGroupConversation.classification?.label || 'Triagem'}</span>
                 <h2 className="mt-1 truncate text-xl font-black" id="ana-conversation-detail-title">{selectedGroupConversation.leadName}</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-600">{selectedGroupConversation.district || 'Distrito não vinculado'} · {selectedGroupConversation.phone}</p>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  {isChurchGrouping ? `${selectedGroupConversation.churchAssignment?.churchName || 'Igreja não vinculada'} · ` : ''}
+                  {selectedGroupConversation.district || 'Distrito não vinculado'} · {selectedGroupConversation.phone}
+                </p>
               </div>
               <button aria-label="Fechar" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100" onClick={() => setSelectedGroupConversation(null)} type="button"><X size={18} /></button>
             </header>
@@ -12721,6 +12781,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
                 </div>
               </div>
               <div className="text-sm font-semibold text-slate-600">
+                {isChurchGrouping ? `${selectedAcceptedConversation.churchAssignment?.churchName || 'Igreja não vinculada'} · ` : ''}
                 {selectedAcceptedConversation.district} · {selectedAcceptedConversation.phone}
               </div>
               <button className={primaryButtonClass} onClick={() => {
