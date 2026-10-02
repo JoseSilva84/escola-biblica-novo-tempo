@@ -5605,6 +5605,16 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
     () => flattenChurchesByDistrict(churchesByDistrict, officialDistricts),
     [churchesByDistrict, officialDistricts]
   );
+  const selectedDistrictSlugs = useMemo(
+    () => new Set((filters.districts || []).map(slugifyDistrictName).filter(Boolean)),
+    [filters.districts]
+  );
+  const churchesForSelectedDistricts = useMemo(
+    () => selectedDistrictSlugs.size
+      ? churchesForMap.filter((church) => selectedDistrictSlugs.has(churchDistrictSlug(church)))
+      : churchesForMap,
+    [churchesForMap, selectedDistrictSlugs]
+  );
   const assignedRecords = useMemo(
     () => assignNearestChurchesByDistrict(records, churchesForMap),
     [churchesForMap, records]
@@ -5805,14 +5815,14 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
       if (key) map.set(key, (map.get(key) || 0) + 1);
       return map;
     }, new Map());
-    return churchesForMap.map((church) => ({
+    return churchesForSelectedDistricts.map((church) => ({
         count: counts.get(churchAssignmentKey(church)) || 0,
         districtName: church.districtName,
         key: churchAssignmentKey(church),
         name: church.name
       }))
       .sort((first, second) => first.name.localeCompare(second.name));
-  }, [churchesForMap, leadsBeforeChurchFilter]);
+  }, [churchesForSelectedDistricts, leadsBeforeChurchFilter]);
   const filteredLeads = useMemo(
     () => churchFilterKey
       ? leadsBeforeChurchFilter.filter((lead) => lead.churchAssignment?.churchKey === churchFilterKey)
@@ -6532,7 +6542,7 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
           <LeadsOpenStreetMap
             activeChurchKey={churchFilterKey}
             churchOptions={churchFilterOptions}
-            churches={churchesForMap}
+            churches={churchesForSelectedDistricts}
             leads={mapLeads}
             onChurchFilterChange={setChurchFilterKey}
             onLeadDetails={setSelectedLead}
