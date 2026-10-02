@@ -352,13 +352,25 @@ function associationSlugForUser(user = {}) {
 }
 
 function slugifyDistrictName(value) {
-  return String(value || '')
+  const slug = String(value || '')
     .trim()
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
+    .replace(/\bjd\b/g, 'jardim')
+    .replace(/\bpq\b/g, 'parque')
+    .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+  const aliases = {
+    'bairro-do-feital': 'feital',
+    barueri: 'barueri-central',
+    'central-de-cotia': 'cotia',
+    'central-de-sao-paulo': 'central-paulistana'
+  };
+
+  return aliases[slug] || slug;
 }
 
 function AppToaster({ theme = 'light' }) {
