@@ -1290,6 +1290,9 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
         point: churchMapPoint(church, districtLeadPoints)
       }));
     const assignment = lead.churchAssignment;
+    if (!assignment) return [];
+    const assignedDistrictChurch = districtChurches.find(({ key }) => key === assignment.churchKey);
+    if (assignedDistrictChurch) return [assignedDistrictChurch];
     const assignmentLatitude = Number(assignment?.churchLat);
     const assignmentLongitude = Number(assignment?.churchLng);
     const hasAssignedCoordinates = assignment?.churchLat !== null
@@ -1300,10 +1303,8 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
       && assignment?.churchLng !== ''
       && Number.isFinite(assignmentLatitude)
       && Number.isFinite(assignmentLongitude);
-    const alreadyIncluded = assignment?.churchKey
-      && districtChurches.some(({ key }) => key === assignment.churchKey);
-    if (!assignment || alreadyIncluded || !hasAssignedCoordinates) return districtChurches;
-    return [...districtChurches, {
+    if (!hasAssignedCoordinates) return [];
+    return [{
       key: assignment.churchKey,
       church: {
         address: assignment.churchAddress || '',
@@ -1380,7 +1381,7 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
           <strong style="color:${priorityStyle.color}">${escapeMapHtml(priorityStyle.label)}</strong><br>
           ${escapeMapHtml(leadStreetAndNumber(lead))}<br>
           ${escapeMapHtml(leadNeighborhood(lead))} - ${escapeMapHtml(lead.d || '')}<br>
-          ${lead.churchAssignment ? `<strong style="color:#047857">${escapeMapHtml(lead.churchAssignment.churchName)} · ${escapeMapHtml(formatChurchDistance(lead.churchAssignment.distanceMeters))}</strong>` : ''}
+          ${lead.churchAssignment ? `<strong style="color:#047857">${escapeMapHtml(lead.churchAssignment.churchName)} · ${escapeMapHtml(formatChurchDistanceMeters(lead.churchAssignment.distanceMeters))}</strong>` : ''}
         `);
 
       for (const { church, point: churchPoint } of visibleChurches) {
@@ -1406,7 +1407,7 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
         L.polyline(
           [[point.lat, point.lng], [assignedChurch.point.lat, assignedChurch.point.lng]],
           { color: '#059669', dashArray: '8 8', opacity: 0.82, weight: 3 }
-        ).addTo(map).bindTooltip(`${lead.churchAssignment.churchName}: ${formatChurchDistance(lead.churchAssignment.distanceMeters)}`);
+        ).addTo(map).bindTooltip(`${lead.churchAssignment.churchName}: ${formatChurchDistanceMeters(lead.churchAssignment.distanceMeters)}`);
         map.fitBounds(
           L.latLngBounds([[point.lat, point.lng], [assignedChurch.point.lat, assignedChurch.point.lng]]).pad(0.3),
           { maxZoom: 16 }
@@ -1436,7 +1437,7 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
               <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Igreja afiliada mais próxima</span>
               <p className="mt-0.5 text-sm font-black">
                 <Church className="mr-1.5 inline" size={15} />
-                {lead.churchAssignment.churchName} · {formatChurchDistance(lead.churchAssignment.distanceMeters)}
+                {lead.churchAssignment.churchName} · {formatChurchDistanceMeters(lead.churchAssignment.distanceMeters)}
               </p>
               <span className="block text-[11px] font-bold text-emerald-700">Distrito {lead.d} · distância {lead.churchAssignment.distancePrecision.toLowerCase()}</span>
             </div>
@@ -1468,7 +1469,11 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
   );
 }
 
-function LeadDetailModal({ churches = EMPTY_CHURCHES, lead, onClose }) {
+function LeadDetailModal({ churches = EMPTY_CHURCHES, lead: sourceLead, onClose }) {
+  const lead = useMemo(() => {
+    if (!sourceLead || sourceLead.churchAssignment || !churches.length) return sourceLead;
+    return assignNearestChurchesByDistrict([sourceLead], churches)[0] || sourceLead;
+  }, [churches, sourceLead]);
   const [exportingDetailPdf, setExportingDetailPdf] = useState(false);
   const [whatsappContactCount, setWhatsappContactCount] = useState(null);
   const detailMapCaptureRef = useRef(null);
@@ -1512,7 +1517,7 @@ function LeadDetailModal({ churches = EMPTY_CHURCHES, lead, onClose }) {
     ['E-mail', lead.em || 'Não informado'],
     ['Distrito', lead.d],
     ['Igreja afiliada', lead.churchAssignment?.churchName || 'Nenhuma igreja geolocalizada no distrito'],
-    ['Distância até a igreja', lead.churchAssignment ? `${formatChurchDistance(lead.churchAssignment.distanceMeters)} (${lead.churchAssignment.distancePrecision.toLowerCase()})` : 'Não calculada'],
+    ['Distância até a igreja', lead.churchAssignment ? `${formatChurchDistanceMeters(lead.churchAssignment.distanceMeters)} (${lead.churchAssignment.distancePrecision.toLowerCase()})` : 'Não calculada'],
     ['Critério de distribuição', lead.churchAssignment?.method || 'Não atribuído'],
     ['Endereço completo', `${leadStreetAndNumber(lead)} - Bairro: ${leadNeighborhood(lead)}`],
     ['Idade', lead.a || 'Não informada'],
@@ -4618,6 +4623,12 @@ function formatChurchDistance(distanceMeters) {
   if (!Number.isFinite(meters)) return 'Distância não calculada';
   if (meters < 1000) return `${formatNumber(Math.max(1, Math.round(meters)))} m`;
   return `${(meters / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1, minimumFractionDigits: meters < 10000 ? 1 : 0 })} km`;
+}
+
+function formatChurchDistanceMeters(distanceMeters) {
+  const meters = Number(distanceMeters);
+  if (!Number.isFinite(meters)) return 'Distância não calculada';
+  return `${formatNumber(Math.max(1, Math.round(meters)))} m`;
 }
 
 function assignNearestChurchesByDistrict(records = [], churches = []) {
@@ -10041,7 +10052,11 @@ function anaSummaryToConversationSnapshot(summary) {
   };
 }
 
-function ConversationsView({ campaigns = [], campaignsError = '', messageTemplates = [], records = [] }) {
+function ConversationsView({ campaigns = [], campaignsError = '', churchesByDistrict = {}, messageTemplates = [], officialDistricts = [], records = [] }) {
+  const churchesForConversations = useMemo(
+    () => flattenChurchesByDistrict(churchesByDistrict, officialDistricts),
+    [churchesByDistrict, officialDistricts]
+  );
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [phoneSearch, setPhoneSearch] = useState('');
@@ -11669,7 +11684,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', messageTemplat
           sending={broadcastSending}
         />
       ) : null}
-      <LeadDetailModal lead={selectedLeadDetails} onClose={() => setSelectedLeadDetails(null)} />
+      <LeadDetailModal churches={churchesForConversations} lead={selectedLeadDetails} onClose={() => setSelectedLeadDetails(null)} />
     </div>
   );
 }
@@ -12689,7 +12704,7 @@ function AIAgentView({ associations = [], campaigns = [], campaignsError = '', c
               </div>
             ))}
           </div>
-          <LeadDetailModal lead={selectedReviewLead} onClose={() => setSelectedReviewLead(null)} />
+          <LeadDetailModal churches={churchesForAgent} lead={selectedReviewLead} onClose={() => setSelectedReviewLead(null)} />
         </section>
       ) : null}
 
@@ -13940,7 +13955,9 @@ export default function CrmApp({ payload: initialPayload = null }) {
       <ConversationsView
         campaigns={adminCampaigns}
         campaignsError={campaignsError}
+        churchesByDistrict={payload?.meta?.territory?.churchesByDistrict || {}}
         messageTemplates={whatsappTemplates}
+        officialDistricts={payload?.meta?.territory?.districts || []}
         records={records}
       />
     );
