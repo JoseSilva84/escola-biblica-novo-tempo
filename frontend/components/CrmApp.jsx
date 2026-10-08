@@ -387,22 +387,152 @@ function leadMatchesNoteUpdate(lead, update) {
   return Boolean(leadPhone && updatePhone && leadPhone.endsWith(updatePhone.slice(-10)));
 }
 
-function LeadNoteBadge({ note, compact = false }) {
+function LeadNoteBadge({ note, compact = false, onClick = null }) {
   const text = String(note || '').trim();
-  if (!text) return null;
+  const interactive = typeof onClick === 'function';
+  if (!text && !interactive) return null;
+  const label = text ? `Anotação: ${text}` : 'Adicionar anotação';
   return (
     <span
-      aria-label={`Anotação: ${text}`}
-      className={`group/note relative inline-flex shrink-0 cursor-help items-center justify-center rounded-full border border-amber-300 bg-amber-100 font-black text-amber-800 shadow-sm ${compact ? 'h-6 w-6' : 'h-7 gap-1 px-2 text-[10px]'}`}
+      aria-label={label}
+      className={`group/note relative inline-flex shrink-0 items-center justify-center rounded-full border font-black shadow-sm transition ${text ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-blue-200 bg-blue-50 text-blue-700'} ${interactive ? 'cursor-pointer hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-100 focus:outline-none focus:ring-4 focus:ring-blue-500/15' : 'cursor-help'} ${compact ? 'h-7 w-7' : 'h-8 gap-1.5 px-3 text-[11px]'}`}
+      onClick={interactive ? (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      } : undefined}
+      onKeyDown={interactive ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          event.stopPropagation();
+          onClick();
+        }
+      } : undefined}
+      role={interactive ? 'button' : undefined}
       tabIndex={0}
-      title={text}
+      title={label}
     >
       <StickyNote size={compact ? 13 : 14} />
-      {!compact ? 'Nota' : null}
+      {!compact ? (text ? 'Nota' : 'Anotar') : null}
       <span className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-[2147483647] hidden w-64 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-left text-xs font-semibold leading-relaxed text-white shadow-2xl group-hover/note:block group-focus/note:block">
-        {text}
+        {text || 'Clique para escrever uma anotação sobre este lead.'}
       </span>
     </span>
+  );
+}
+
+function LeadNoteEditorModal({ lead, onClose, onSaved }) {
+  const [note, setNote] = useState(String(lead?.note || ''));
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const leadName = lead?.name || lead?.n || 'Lead';
+  const leadPhone = phoneDigits(lead?.phone || lead?.tel);
+  const leadDistrict = lead?.district || lead?.d || '';
+
+  useEffect(() => {
+    let active = true;
+    setNote(String(lead?.note || ''));
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (lead?.id) params.set('leadId', String(lead.id));
+    const numericExternalId = Number(lead?.externalId || lead?.id);
+    if (Number.isInteger(numericExternalId) && numericExternalId > 0) params.set('externalLeadId', String(numericExternalId));
+    if (leadPhone) params.set('phone', leadPhone);
+    if (!params.size) {
+      setLoading(false);
+      return () => { active = false; };
+    }
+    apiFetch(`/api/whatsapp/lead-note?${params.toString()}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || 'Não foi possível carregar a anotação.');
+        if (active) setNote(String(payload.note || ''));
+      })
+      .catch((error) => {
+        if (active) toast.error('Anotação indisponível', { description: error.message });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [lead?.externalId, lead?.id, lead?.note, leadPhone]);
+
+  if (!lead) return null;
+
+  async function saveNote() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const numericExternalId = Number(lead.externalId || lead.id);
+      const response = await apiFetch('/api/whatsapp/lead-note', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id || null,
+          externalLeadId: Number.isInteger(numericExternalId) && numericExternalId > 0 ? numericExternalId : null,
+          phone: leadPhone || null,
+          name: leadName,
+          district: leadDistrict || null,
+          note
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || 'Não foi possível salvar a anotação.');
+      const savedNote = String(payload.note || '');
+      setNote(savedNote);
+      onSaved?.({
+        externalLeadId: payload.externalLeadId || numericExternalId || null,
+        id: payload.leadId || lead.id || null,
+        note: savedNote,
+        phone: payload.phone || leadPhone
+      });
+      toast.success(savedNote ? 'Anotação salva' : 'Anotação removida', {
+        description: savedNote ? `A nota de ${leadName} ficará visível no atendimento.` : `A nota de ${leadName} foi removida.`
+      });
+      onClose();
+    } catch (error) {
+      toast.error('Falha ao salvar a anotação', { description: error.message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[2147483647] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="lead-note-editor-title">
+      <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/20 bg-white shadow-[0_34px_110px_rgba(0,0,0,0.58)]">
+        <div className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,#0f172a,#1d4ed8,#0f172a)] p-6 text-white">
+          <div>
+            <span className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-amber-200"><StickyNote size={16} /> Anotação do lead</span>
+            <h2 className="mt-2 text-2xl font-black" id="lead-note-editor-title">{leadName}</h2>
+            <p className="mt-1 text-sm font-semibold text-blue-100">{leadDistrict || 'Distrito não informado'}{leadPhone ? ` · ${leadPhone}` : ''}</p>
+          </div>
+          <button className="grid h-10 w-10 place-items-center rounded-xl border border-white/20 bg-white/10 transition hover:bg-white/20" onClick={onClose} aria-label="Fechar anotação" type="button"><X size={20} /></button>
+        </div>
+        <div className="p-6">
+          <label className="grid gap-2">
+            <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">Nota permanente</span>
+            <textarea
+              autoFocus
+              className="min-h-48 resize-y rounded-2xl border border-slate-300 bg-amber-50/60 p-4 text-sm font-semibold leading-relaxed text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15"
+              disabled={loading || saving}
+              maxLength={2000}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Ex.: faleceu, mudou de endereço, não deseja mais contato ou outra observação importante."
+              value={note}
+            />
+          </label>
+          <div className="mt-2 flex items-center justify-between gap-3 text-xs font-semibold text-slate-500">
+            <span>{loading ? 'Carregando anotação…' : 'Esta informação aparecerá junto ao lead.'}</span>
+            <span>{note.length}/2000</span>
+          </div>
+          <div className="mt-5 flex justify-end gap-3">
+            <button className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-black text-slate-700 transition hover:bg-slate-100" onClick={onClose} type="button">Cancelar</button>
+            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 text-sm font-black text-white shadow-lg transition hover:bg-amber-700 disabled:cursor-wait disabled:opacity-60" disabled={loading || saving} onClick={saveNote} type="button"><StickyNote size={17} /> {saving ? 'Salvando…' : 'Salvar anotação'}</button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -9150,6 +9280,7 @@ function WhatsAppLeadPickerModal({
   onClose,
   onFilterChange,
   onLeadDetails,
+  onLeadNote,
   onNewContactSubmit,
   onOpenBroadcast,
   onSearch,
@@ -9363,10 +9494,7 @@ function WhatsAppLeadPickerModal({
                     <button className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 text-left" onClick={() => onToggleSelect(lead)} type="button">
                       <ContactAvatar name={lead.name} phone={lead.phone} />
                       <span className="min-w-0 flex-1">
-                        <span className="flex min-w-0 items-center gap-2">
-                          <strong className="min-w-0 flex-1 truncate text-base font-black text-slate-950">{lead.name}</strong>
-                          <LeadNoteBadge compact note={lead.note} />
-                        </span>
+                        <strong className="block min-w-0 truncate text-base font-black text-slate-950">{lead.name}</strong>
                         <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{lead.district || 'Distrito não vinculado'} · {lead.phone}</span>
                         <span className="mt-1 block truncate text-xs font-semibold text-slate-500">Material: {leadMaterial(lead)}</span>
                         <span className="mt-2 flex flex-wrap items-center gap-2">
@@ -9409,6 +9537,7 @@ function WhatsAppLeadPickerModal({
                     <div className="grid shrink-0 gap-1.5">
                       <button className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-black text-[#008069] transition hover:border-[#00a884] hover:bg-emerald-50" onClick={() => onSelect(lead)} type="button">Conversar <ChevronRight size={15} /></button>
                       <button className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-black text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" onClick={() => onLeadDetails(lead)} type="button"><Eye size={14} /> Detalhes</button>
+                      <button className={`inline-flex h-8 items-center justify-center gap-1 rounded-lg border px-2.5 text-[11px] font-black transition ${lead.note ? 'border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200' : 'border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100'}`} onClick={() => onLeadNote(lead)} title={lead.note || 'Adicionar anotação'} type="button"><StickyNote size={14} /> {lead.note ? 'Nota' : 'Anotar'}</button>
                     </div>
                   </div>
                 );
@@ -10231,6 +10360,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
   const [broadcastAnalyticsLoading, setBroadcastAnalyticsLoading] = useState(true);
   const [selectedRecipientLead, setSelectedRecipientLead] = useState(null);
   const [selectedLeadDetails, setSelectedLeadDetails] = useState(null);
+  const [noteEditorLead, setNoteEditorLead] = useState(null);
   const [newContactMode, setNewContactMode] = useState(false);
   const [newContactSaving, setNewContactSaving] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', phone: '', district: '', priority: '' });
@@ -11573,7 +11703,15 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
                     <span className="min-w-0 flex-1">
                       <span className="flex min-w-0 items-center gap-2">
                         <strong className="min-w-0 flex-1 truncate text-sm font-black text-slate-950">{displayName}</strong>
-                        <LeadNoteBadge compact note={displayNote} />
+                        <LeadNoteBadge compact note={displayNote} onClick={() => setNoteEditorLead({
+                          ...(displayLead || {}),
+                          id: displayLead?.id || conversation.leadId || conversation.externalLeadId,
+                          externalId: displayLead?.externalId || conversation.externalLeadId,
+                          name: displayName,
+                          phone: conversation.phone,
+                          district: displayDistrict,
+                          note: displayNote
+                        })} />
                       </span>
                       <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{displayDistrict} · {whatsappPriorityLabels[displayPriority] || displayPriority || 'Sem tipo'}</span>
                       <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">{conversation.phone}</span>
@@ -11624,7 +11762,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
             <div className="flex items-center justify-between gap-3 border-b border-[#d1d7db] bg-white/85 px-4 py-2">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-xs font-black text-slate-700">{activeLeadName || activePhone || 'Atendimento'}</span>
-                <LeadNoteBadge compact note={activeLead?.note} />
+                <LeadNoteBadge compact note={activeLead?.note} onClick={() => activeLeadForDetails && setNoteEditorLead(activeLeadForDetails)} />
               </span>
               <button className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-black text-slate-700 transition hover:border-emerald-400 hover:text-emerald-700" onClick={() => setChatHeaderCollapsed(false)} title="Mostrar cabeçalho do atendimento" type="button">
                 <ChevronDown size={15} /> Mostrar cabeçalho
@@ -11639,7 +11777,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
                   <span className={labelClass}>Atendimento</span>
                 <span className="mt-1 flex min-w-0 items-center gap-2">
                   <h2 className={`min-w-0 truncate font-black text-slate-50 ${conversationExpanded ? 'text-3xl max-md:text-xl' : 'text-2xl'}`}>{activeLeadName || activePhone || 'Selecione um lead'}</h2>
-                  <LeadNoteBadge compact note={activeLead?.note} />
+                  <LeadNoteBadge compact note={activeLead?.note} onClick={() => activeLeadForDetails && setNoteEditorLead(activeLeadForDetails)} />
                 </span>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <p className="text-sm font-semibold text-slate-500">{activeLeadDistrict || 'Distrito não vinculado'}{activePhone ? ` · ${activePhone}` : ''}</p>
@@ -11830,7 +11968,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
             >
               <span className="flex items-center gap-2">
                 <strong className="block truncate text-sm font-black text-slate-950">{lead.n}</strong>
-                <LeadNoteBadge compact note={lead.note} />
+                <LeadNoteBadge compact note={lead.note} onClick={() => setNoteEditorLead(lead)} />
               </span>
               <span className="mt-1 block text-xs font-semibold text-slate-600">{phoneDigits(lead.tel)} · {lead.d}</span>
             </button>
@@ -11856,6 +11994,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
           onClose={() => setLeadPickerOpen(false)}
           onFilterChange={setContactFilter}
           onLeadDetails={openLeadDetails}
+          onLeadNote={setNoteEditorLead}
           onNewContactSubmit={submitNewContact}
           onOpenBroadcast={() => setBroadcastModalOpen(true)}
           onSearch={submitLeadSearch}
@@ -11885,6 +12024,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
         />
       ) : null}
       <LeadDetailModal churches={churchesForConversations} lead={selectedLeadDetails} onClose={() => setSelectedLeadDetails(null)} onNoteSaved={updateSavedLeadNote} />
+      {noteEditorLead ? <LeadNoteEditorModal lead={noteEditorLead} onClose={() => setNoteEditorLead(null)} onSaved={updateSavedLeadNote} /> : null}
     </div>
   );
 }
