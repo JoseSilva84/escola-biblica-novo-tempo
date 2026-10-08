@@ -175,6 +175,46 @@ function omitInterestDistrictPayloads(payload) {
   };
 }
 
+async function attachLeadNotesToDashboardPayload(payload, user = {}) {
+  if (!isAdminGeralUser(user) && userAssociationSlug(user) !== 'paulistana') return payload;
+
+  const savedNotes = await prisma.lead.findMany({
+    where: {
+      note: { not: null },
+      association: { is: { slug: 'paulistana' } }
+    },
+    select: { externalId: true, phone: true, note: true }
+  });
+  const notesByExternalId = new Map();
+  const notesByPhone = new Map();
+  for (const lead of savedNotes) {
+    const note = String(lead.note || '').trim();
+    if (!note) continue;
+    if (lead.externalId) notesByExternalId.set(String(lead.externalId), note);
+    for (const phone of normalizedPhonesFromValue(lead.phone)) {
+      notesByPhone.set(phone, note);
+      notesByPhone.set(phone.slice(-10), note);
+    }
+  }
+
+  const attachNote = (record) => {
+    if (!record) return record;
+    const externalNote = notesByExternalId.get(String(record.id));
+    const phone = normalizedPhonesFromValue(record.tel)[0] || '';
+    const phoneNote = phone ? notesByPhone.get(phone) || notesByPhone.get(phone.slice(-10)) : '';
+    return { ...record, note: externalNote || phoneNote || '' };
+  };
+  const attachNotes = (records = []) => records.map(attachNote);
+
+  return {
+    ...payload,
+    records: attachNotes(payload.records),
+    interestRecords: attachNotes(payload.interestRecords),
+    interestRecordsByDistrict: Object.fromEntries(Object.entries(payload.interestRecordsByDistrict || {})
+      .map(([slug, records]) => [slug, attachNotes(records)]))
+  };
+}
+
 async function sendDashboardJson(request, response, payload) {
   const body = JSON.stringify(payload);
   if (/\bgzip\b/i.test(String(request.headers['accept-encoding'] || ''))) {
@@ -930,7 +970,7 @@ function externalLeadId(value) {
 }
 
 async function findLeadReference({ leadId, phone }) {
-  const leadSelect = { id: true, externalId: true, name: true, phone: true, address: true, newAddress: true, district: { select: { name: true } } };
+  const leadSelect = { id: true, externalId: true, name: true, phone: true, address: true, newAddress: true, note: true, district: { select: { name: true } } };
   const numericLeadId = externalLeadId(leadId);
   if (numericLeadId) {
     const lead = await prisma.lead.findFirst({
@@ -1723,6 +1763,7 @@ const whatsappLeadSelect = {
   score: true,
   isVip: true,
   hasActiveStudy: true,
+  note: true,
   district: { select: { name: true } },
   association: { select: { name: true, slug: true } },
   _count: {
@@ -1796,6 +1837,7 @@ function serializeWhatsAppLead(lead, dashboardRecord = null) {
     band: dashboardRecord?.faixa || null,
     daysSinceLastContact: dashboardRecord?.c ?? null,
     lastContactDate: dashboardRecord?.lastContactDate || null,
+    note: lead?.note || null,
     whatsappContactCount: Number(lead?._count?.whatsAppMessages || 0),
     association: lead?.association || null
   };
@@ -4758,7 +4800,7 @@ app.get('/api/dashboard', requireAuth, async (request, response) => {
   } catch (error) {
     console.error('[dashboard:dataset-history:error]', error.message);
   }
-  const scopedPayload = scopedDashboardPayload(payload, request.user);
+  const scopedPayload = await attachLeadNotesToDashboardPayload(scopedDashboardPayload(payload, request.user), request.user);
   const shouldIncludeInterestDistricts = request.query?.includeInterestDistricts === '1';
   await sendDashboardJson(
     request,
@@ -4779,7 +4821,8 @@ app.get('/api/dashboard/district-interest/:slug', requireAuth, async (request, r
   }
 
   const payload = getDashboardData();
-  const records = payload.interestRecordsByDistrict?.[slug] || [];
+  const enrichedPayload = await attachLeadNotesToDashboardPayload(payload, request.user);
+  const records = enrichedPayload.interestRecordsByDistrict?.[slug] || [];
   response.json({ slug, records });
 });
 
@@ -5311,6 +5354,112 @@ app.get('/api/whatsapp/leads', requireAuth, async (request, response) => {
   } catch (error) {
     console.error('[whatsapp:leads:error]', error.message);
     response.status(500).json({ leads: [], districts: [], message: 'Nao foi possivel buscar os leads do banco.' });
+  }
+});
+
+app.get('/api/whatsapp/lead-note', requireAuth, async (request, response) => {
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.status(403).json({ message: 'Usuário sem permissão para consultar esta anotação.' });
+    return;
+  }
+
+  const requestedLeadId = String(request.query?.leadId || '').trim();
+  const requestedExternalLeadId = externalLeadId(request.query?.externalLeadId);
+  const phone = normalizePhone(request.query?.phone);
+  if (!requestedLeadId && !requestedExternalLeadId && !phone) {
+    response.status(400).json({ message: 'Informe o lead ou o telefone.' });
+    return;
+  }
+
+  try {
+    const lead = await findLeadReference({
+      leadId: requestedLeadId || requestedExternalLeadId || null,
+      phone
+    });
+    response.json({
+      leadId: lead?.id || null,
+      externalLeadId: lead?.externalId || requestedExternalLeadId || externalLeadId(requestedLeadId),
+      note: lead?.note || ''
+    });
+  } catch (error) {
+    console.error('[whatsapp:lead-note:get:error]', error.message);
+    response.status(500).json({ message: 'Não foi possível carregar a anotação deste lead.' });
+  }
+});
+
+app.patch('/api/whatsapp/lead-note', requireAuth, async (request, response) => {
+  if (!isAdminGeralUser(request.user) && userAssociationSlug(request.user) !== 'paulistana') {
+    response.status(403).json({ message: 'Usuário sem permissão para alterar esta anotação.' });
+    return;
+  }
+
+  const requestedLeadId = String(request.body?.leadId || '').trim();
+  const requestedExternalLeadId = externalLeadId(request.body?.externalLeadId) || externalLeadId(requestedLeadId);
+  const phone = normalizePhone(request.body?.phone);
+  const note = String(request.body?.note || '').trim().slice(0, 2000);
+  const name = String(request.body?.name || '').trim();
+  const districtName = String(request.body?.district || '').trim();
+  if (!requestedLeadId && !requestedExternalLeadId && !phone) {
+    response.status(400).json({ message: 'Informe o lead ou o telefone.' });
+    return;
+  }
+
+  try {
+    let lead = await findLeadReference({
+      leadId: requestedLeadId || requestedExternalLeadId || null,
+      phone
+    });
+
+    if (lead) {
+      lead = await prisma.lead.update({
+        where: { id: lead.id },
+        data: { note: note || null },
+        select: { id: true, externalId: true, phone: true, note: true }
+      });
+    } else {
+      const requestedAssociation = normalizeAssociationSlug(request.body?.association);
+      const associationSlug = isAdminGeralUser(request.user)
+        ? requestedAssociation || 'paulistana'
+        : userAssociationSlug(request.user);
+      const association = await prisma.association.findUnique({
+        where: { slug: associationSlug },
+        select: { id: true }
+      });
+      if (!association) {
+        response.status(400).json({ message: 'Associação não encontrada para salvar a anotação.' });
+        return;
+      }
+      const district = districtName
+        ? await prisma.district.upsert({
+          where: { associationId_name: { associationId: association.id, name: districtName } },
+          create: { associationId: association.id, name: districtName },
+          update: {},
+          select: { id: true }
+        })
+        : null;
+      lead = await prisma.lead.create({
+        data: {
+          associationId: association.id,
+          name: name || `Lead ${requestedExternalLeadId || phone?.slice(-4) || ''}`.trim(),
+          phone: phone || null,
+          externalId: requestedExternalLeadId,
+          note: note || null,
+          ...(district ? { districtId: district.id } : {})
+        },
+        select: { id: true, externalId: true, phone: true, note: true }
+      });
+    }
+
+    response.json({
+      ok: true,
+      leadId: lead.id,
+      externalLeadId: lead.externalId,
+      phone: lead.phone,
+      note: lead.note || ''
+    });
+  } catch (error) {
+    console.error('[whatsapp:lead-note:update:error]', error.message);
+    response.status(500).json({ message: 'Não foi possível salvar a anotação deste lead.' });
   }
 });
 

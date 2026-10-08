@@ -59,6 +59,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  StickyNote,
   Sun,
   Trash2,
   UploadCloud,
@@ -207,6 +208,7 @@ function dashboardLeadToWhatsAppLead(lead) {
     band: lead?.faixa || null,
     daysSinceLastContact: lead?.c ?? null,
     lastContactDate: lead?.lastContactDate || null,
+    note: lead?.note || '',
     whatsappContactCount: Number(lead?.whatsappContactCount || 0),
     source: 'dashboard'
   };
@@ -239,6 +241,7 @@ function whatsappLeadToDetailRecord(lead, records = []) {
       materialName: lead.materialName || lead.material || dashboardLead.materialName,
       m: Number(lead.materialCount ?? dashboardLead.m ?? 0),
       desc: lead.description || dashboardLead.desc,
+      note: lead.note || dashboardLead.note || '',
       whatsappContactCount: Number(lead.whatsappContactCount ?? dashboardLead.whatsappContactCount ?? 0),
       whatsappMessages: lead.whatsappMessages || dashboardLead.whatsappMessages || []
     };
@@ -263,6 +266,7 @@ function whatsappLeadToDetailRecord(lead, records = []) {
     materialName: lead.materialName || lead.material || lead.tm || 'Não informado',
     m: Number(lead.materialCount || lead.m || 0),
     desc: lead.description || lead.desc || 'N/I',
+    note: lead.note || '',
     p: priority,
     s: Number(lead.score ?? lead.s ?? 0),
     sim: Number(lead.similarity ?? lead.sim ?? 0),
@@ -371,6 +375,35 @@ function slugifyDistrictName(value) {
   };
 
   return aliases[slug] || slug;
+}
+
+function leadMatchesNoteUpdate(lead, update) {
+  if (!lead || !update) return false;
+  const leadIds = [lead.id, lead.externalId].filter((value) => value !== null && value !== undefined && value !== '').map(String);
+  const updateIds = [update.id, update.externalLeadId].filter((value) => value !== null && value !== undefined && value !== '').map(String);
+  if (leadIds.some((id) => updateIds.includes(id))) return true;
+  const leadPhone = phoneDigits(lead.phone || lead.tel);
+  const updatePhone = phoneDigits(update.phone);
+  return Boolean(leadPhone && updatePhone && leadPhone.endsWith(updatePhone.slice(-10)));
+}
+
+function LeadNoteBadge({ note, compact = false }) {
+  const text = String(note || '').trim();
+  if (!text) return null;
+  return (
+    <span
+      aria-label={`Anotação: ${text}`}
+      className={`group/note relative inline-flex shrink-0 cursor-help items-center justify-center rounded-full border border-amber-300 bg-amber-100 font-black text-amber-800 shadow-sm ${compact ? 'h-6 w-6' : 'h-7 gap-1 px-2 text-[10px]'}`}
+      tabIndex={0}
+      title={text}
+    >
+      <StickyNote size={compact ? 13 : 14} />
+      {!compact ? 'Nota' : null}
+      <span className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-[2147483647] hidden w-64 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-left text-xs font-semibold leading-relaxed text-white shadow-2xl group-hover/note:block group-focus/note:block">
+        {text}
+      </span>
+    </span>
+  );
 }
 
 function churchDistrictSlug(church) {
@@ -1469,14 +1502,38 @@ function LeadDetailOsmMap({ captureRef, churches = EMPTY_CHURCHES, lead }) {
   );
 }
 
-function LeadDetailModal({ churches = EMPTY_CHURCHES, lead: sourceLead, onClose }) {
+function LeadDetailModal({ churches = EMPTY_CHURCHES, lead: sourceLead, onClose, onNoteSaved }) {
   const lead = useMemo(() => {
     if (!sourceLead || sourceLead.churchAssignment || !churches.length) return sourceLead;
     return assignNearestChurchesByDistrict([sourceLead], churches)[0] || sourceLead;
   }, [churches, sourceLead]);
   const [exportingDetailPdf, setExportingDetailPdf] = useState(false);
   const [whatsappContactCount, setWhatsappContactCount] = useState(null);
+  const [leadNote, setLeadNote] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
   const detailMapCaptureRef = useRef(null);
+
+  useEffect(() => {
+    if (!lead) {
+      setLeadNote('');
+      return undefined;
+    }
+    let active = true;
+    setLeadNote(String(lead.note || ''));
+    const params = new URLSearchParams();
+    if (lead.id) params.set('leadId', String(lead.id));
+    const numericExternalId = Number(lead.externalId || lead.id);
+    if (Number.isInteger(numericExternalId) && numericExternalId > 0) params.set('externalLeadId', String(numericExternalId));
+    if (lead.tel) params.set('phone', phoneDigits(lead.tel));
+    if (!params.size) return () => { active = false; };
+    apiFetch(`/api/whatsapp/lead-note?${params.toString()}`, { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => {
+        if (active && payload) setLeadNote(String(payload.note || ''));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [lead?.externalId, lead?.id, lead?.note, lead?.tel]);
 
   useEffect(() => {
     if (!lead) {
@@ -1510,6 +1567,43 @@ function LeadDetailModal({ churches = EMPTY_CHURCHES, lead: sourceLead, onClose 
   }, [lead?.id, lead?.tel, lead?.whatsappContactCount]);
 
   if (!lead) return null;
+
+  async function saveLeadNote() {
+    if (noteSaving) return;
+    setNoteSaving(true);
+    try {
+      const numericExternalId = Number(lead.externalId || lead.id);
+      const response = await apiFetch('/api/whatsapp/lead-note', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id || null,
+          externalLeadId: Number.isInteger(numericExternalId) && numericExternalId > 0 ? numericExternalId : null,
+          phone: lead.tel || null,
+          name: lead.n || null,
+          district: lead.d || null,
+          note: leadNote
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Não foi possível salvar a anotação.');
+      const savedNote = String(payload.note || '');
+      setLeadNote(savedNote);
+      onNoteSaved?.({
+        externalLeadId: payload.externalLeadId || numericExternalId || null,
+        id: payload.leadId || lead.id || null,
+        note: savedNote,
+        phone: payload.phone || lead.tel || ''
+      });
+      toast.success(savedNote ? 'Anotação salva' : 'Anotação removida', {
+        description: savedNote ? 'A nota ficará visível sempre que este lead aparecer.' : 'O indicador de nota foi retirado deste lead.'
+      });
+    } catch (error) {
+      toast.error('Falha ao salvar a anotação', { description: error.message });
+    } finally {
+      setNoteSaving(false);
+    }
+  }
 
   const fields = [
     ['Nome', lead.n],
@@ -1690,6 +1784,7 @@ function LeadDetailModal({ churches = EMPTY_CHURCHES, lead: sourceLead, onClose 
               <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide ${priorityBadgeClasses(lead.p)}`}>{crmPriorityLabels[lead.p] || lead.p}</span>
               <span className="rounded-full border border-white/20 bg-white/12 px-3 py-1 text-xs font-bold text-white">{lead.d}</span>
               <span className="rounded-full border border-white/20 bg-white/12 px-3 py-1 text-xs font-bold text-white">Score {lead.s}</span>
+              <LeadNoteBadge note={leadNote} />
               {lead.v ? <span className="rounded-full border border-fuchsia-200/40 bg-fuchsia-500 px-3 py-1 text-xs font-black text-white">VIP</span> : null}
               {lead.e ? <span className="rounded-full border border-emerald-200/40 bg-emerald-600 px-3 py-1 text-xs font-black text-white">Estudo ativo</span> : null}
             </div>
@@ -1710,6 +1805,25 @@ function LeadDetailModal({ churches = EMPTY_CHURCHES, lead: sourceLead, onClose 
         <div className="grid max-h-[72vh] gap-5 overflow-y-auto bg-slate-100 p-6 lg:grid-cols-[1fr_0.9fr]">
           <section className="grid gap-3">
             <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Todos os dados</span>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-[0_10px_28px_rgba(217,119,6,0.08)]">
+              <div className="flex items-center gap-2 text-amber-900">
+                <StickyNote size={17} />
+                <strong className="text-sm">Anotação permanente do lead</strong>
+              </div>
+              <textarea
+                className="mt-3 min-h-24 w-full resize-y rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm font-semibold leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 focus:border-amber-400 focus:ring-4 focus:ring-amber-400/15"
+                maxLength={2000}
+                onChange={(event) => setLeadNote(event.target.value)}
+                placeholder="Ex.: faleceu, mudou de cidade, pediu para não receber contato..."
+                value={leadNote}
+              />
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span className="text-[11px] font-bold text-amber-800">{formatNumber(leadNote.length)}/2.000 caracteres</span>
+                <button className="inline-flex h-9 items-center gap-2 rounded-lg bg-amber-600 px-3 text-xs font-black text-white transition hover:bg-amber-700 disabled:cursor-wait disabled:opacity-60" disabled={noteSaving} onClick={saveLeadNote} type="button">
+                  <StickyNote size={14} /> {noteSaving ? 'Salvando…' : 'Salvar anotação'}
+                </button>
+              </div>
+            </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {fields.map(([label, value]) => (
                 <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.05)]" key={label}>
@@ -4911,7 +5025,7 @@ function LeadsOpenStreetMap({ activeChurchKey = '', churchOptions = [], churches
             markersRef.current.push(affiliationLine);
           }
           marker.bindPopup(`
-            <strong>${escapeMapHtml(lead.n || 'Lead')}</strong><br>
+            <strong>${escapeMapHtml(lead.n || 'Lead')}</strong>${lead.note ? ` <span title="${escapeMapHtml(lead.note)}" aria-label="Anotação: ${escapeMapHtml(lead.note)}" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:4px;border:1px solid #fcd34d;border-radius:999px;background:#fef3c7;color:#92400e;font-size:12px;vertical-align:middle">&#128221;</span>` : ''}<br>
             ${lead.campaignVisitAccepted ? `<strong style="color:${acceptedVisitMapStyle.color}">${escapeMapHtml(acceptedVisitMapStyle.label)} · brinde da campanha</strong><br>` : ''}
             <strong style="color:${priorityStyle.color}">Tipo de lead: ${escapeMapHtml(priorityStyle.label)}</strong><br>
             ${escapeMapHtml(lead.d || '')}<br>
@@ -5486,7 +5600,10 @@ function GeolocationView({ churchesByDistrict = {}, officialDistricts = [], onBa
                     {visibleLeads.slice(0, 500).map((lead) => (
                       <tr className="hover:bg-slate-50" key={lead.id}>
                         <td className="border-b border-slate-100 px-4 py-3">
-                          <strong className="block text-slate-950">{lead.n}</strong>
+                          <span className="flex items-center gap-2">
+                            <strong className="block text-slate-950">{lead.n}</strong>
+                            <LeadNoteBadge compact note={lead.note} />
+                          </span>
                           <span className="text-xs font-semibold text-slate-500">ID {lead.id} · {leadNeighborhood(lead)}</span>
                         </td>
                         <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3">
@@ -6738,7 +6855,10 @@ function LeadsView({ associations, churchesByDistrict = {}, data, datasetUpdateH
                     </td>
                     <td className="min-w-[15rem] border-b border-white/[0.04] px-4 py-3">
                       <button className="text-left" onClick={(event) => { event.stopPropagation(); selectLeadOnMap(lead); }} title={`Mostrar somente ${lead.n} no mapa`} type="button">
-                        <strong className="block text-slate-50">{lead.n}</strong>
+                        <span className="flex items-center gap-2">
+                          <strong className="block text-slate-50">{lead.n}</strong>
+                          <LeadNoteBadge compact note={lead.note} />
+                        </span>
                         <span className="text-xs font-semibold text-slate-500">ID {lead.id} · {lead.em || 'sem e-mail'}</span>
                       </button>
                     </td>
@@ -7774,8 +7894,8 @@ function AdminGeneralView({
       }
       setLastSend(payload);
       await refreshWhatsappConversations({ sync: true });
-      toast.success('Mensagem aceita pelo provedor', {
-        description: `Solicitação aceita para ${payload.phone}; aguardando confirmação de entrega.`
+      toast.success('Mensagem enviada', {
+        description: `Enviada para ${payload.phone}; aguardando confirmação de entrega.`
       });
     } catch (error) {
       toast.error('Falha no disparo', {
@@ -8418,7 +8538,7 @@ function AdminGeneralView({
             </form>
             {lastSend ? (
               <div className="rounded-2xl border border-emerald-300/45 bg-emerald-600/80 p-4 text-sm font-semibold text-white shadow-lg shadow-emerald-900/15">
-                Mensagem aceita pelo WAHA para {lastSend.phone}.
+                Mensagem enviada pelo WAHA para {lastSend.phone}.
               </div>
             ) : null}
             {sendError ? (
@@ -8550,7 +8670,10 @@ function AdminGeneralView({
                           <input aria-label={`Selecionar ${lead.n}`} checked={checked} className="h-4 w-4 accent-blue-600" onChange={() => selectLead(lead)} onClick={(event) => event.stopPropagation()} type="checkbox" />
                         </td>
                         <td className="min-w-[14rem] border-b border-white/[0.04] px-4 py-3">
-                          <strong className="block text-slate-50">{lead.n}</strong>
+                          <span className="flex items-center gap-2">
+                            <strong className="block text-slate-50">{lead.n}</strong>
+                            <LeadNoteBadge compact note={lead.note} />
+                          </span>
                           <span className="text-xs font-semibold text-slate-500">ID {lead.id}</span>
                         </td>
                         <td className="whitespace-nowrap border-b border-white/[0.04] px-4 py-3 font-black tabular-nums text-emerald-400">{phoneDigits(lead.tel)}</td>
@@ -9240,7 +9363,10 @@ function WhatsAppLeadPickerModal({
                     <button className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 text-left" onClick={() => onToggleSelect(lead)} type="button">
                       <ContactAvatar name={lead.name} phone={lead.phone} />
                       <span className="min-w-0 flex-1">
-                        <strong className="block truncate text-base font-black text-slate-950">{lead.name}</strong>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <strong className="min-w-0 flex-1 truncate text-base font-black text-slate-950">{lead.name}</strong>
+                          <LeadNoteBadge compact note={lead.note} />
+                        </span>
                         <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{lead.district || 'Distrito não vinculado'} · {lead.phone}</span>
                         <span className="mt-1 block truncate text-xs font-semibold text-slate-500">Material: {leadMaterial(lead)}</span>
                         <span className="mt-2 flex flex-wrap items-center gap-2">
@@ -10066,6 +10192,8 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
   const [conversationRefreshing, setConversationRefreshing] = useState(false);
   const [sending, setSending] = useState(false);
   const [conversationExpanded, setConversationExpanded] = useState(false);
+  const [chatHeaderCollapsed, setChatHeaderCollapsed] = useState(false);
+  const [chatComposerCollapsed, setChatComposerCollapsed] = useState(false);
   const [leadPickerOpen, setLeadPickerOpen] = useState(false);
   const [leadDirectory, setLeadDirectory] = useState([]);
   const [leadDistricts, setLeadDistricts] = useState([]);
@@ -10282,6 +10410,34 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
         description: `${error.message} Os dados já carregados foram mantidos.`
       });
     }
+  }
+
+  function updateSavedLeadNote(update) {
+    setLeadDirectory((current) => current.map((lead) => (
+      leadMatchesNoteUpdate(lead, update) ? { ...lead, note: update.note } : lead
+    )));
+    setConversations((current) => current.map((conversation) => {
+      const conversationLead = conversation.lead;
+      const conversationIdentity = conversationLead || {
+        externalId: conversation.externalLeadId,
+        id: conversation.leadId,
+        phone: conversation.phone
+      };
+      if (!leadMatchesNoteUpdate(conversationIdentity, update)) return conversation;
+      return {
+        ...conversation,
+        lead: conversationLead ? { ...conversationLead, note: update.note } : conversationLead
+      };
+    }));
+    setSelectedLeadDetails((current) => (
+      leadMatchesNoteUpdate(current, update) ? { ...current, note: update.note } : current
+    ));
+    setSelectedRecipientLead((current) => (
+      leadMatchesNoteUpdate(current, update) ? { ...current, note: update.note } : current
+    ));
+    setBroadcastSelectedLeads((current) => current.map((lead) => (
+      leadMatchesNoteUpdate(lead, update) ? { ...lead, note: update.note } : lead
+    )));
   }
 
   async function submitLeadSearch(event) {
@@ -11303,7 +11459,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
       if (attachmentInputRef.current) attachmentInputRef.current.value = '';
       setSending(false);
       toast.success('Mensagem enviada', {
-        description: `Mensagem aceita para ${payload.phone || phone}.`
+        description: `Enviada para ${payload.phone || phone}.`
       });
       await loadConversations(phone, { selectSearched: true });
       setSelectedId(payload.conversationId || selectedId);
@@ -11398,6 +11554,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
               );
               const displayDistrict = displayLead?.district || displayLead?.d || conversation.district || 'Distrito não vinculado';
               const displayPriority = displayLead?.priority || displayLead?.p || conversation.leadPriority || null;
+              const displayNote = displayLead?.note || conversation.lead?.note || '';
               return (
                 <div
                   className={`whatsapp-contact-card relative isolate overflow-hidden rounded-2xl border text-left transition hover:-translate-y-0.5 ${selectedConversation?.id === conversation.id ? 'whatsapp-contact-active border-[#25d366] ring-4 ring-[#25d366]/10' : 'border-[#e9edef]'}`}
@@ -11414,7 +11571,10 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
                   >
                     <ContactAvatar name={displayName} phone={conversation.phone} variant="whatsapp" />
                     <span className="min-w-0 flex-1">
-                      <strong className="block truncate text-sm font-black text-slate-950">{displayName}</strong>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <strong className="min-w-0 flex-1 truncate text-sm font-black text-slate-950">{displayName}</strong>
+                        <LeadNoteBadge compact note={displayNote} />
+                      </span>
                       <span className="mt-1 block truncate text-xs font-semibold text-slate-600">{displayDistrict} · {whatsappPriorityLabels[displayPriority] || displayPriority || 'Sem tipo'}</span>
                       <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">{conversation.phone}</span>
                       <span className="mt-2 block truncate text-xs font-bold text-slate-500">{currentLast?.body || 'Sem mensagens registradas'}</span>
@@ -11460,13 +11620,27 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
 
         {conversationExpanded ? <button aria-label="Fechar conversa ampliada" className="fixed inset-0 z-[2147483644] cursor-default bg-slate-950/75 backdrop-blur-sm" onClick={() => setConversationExpanded(false)} type="button" /> : null}
         <article className={`${panelClass} whatsapp-chat flex min-h-0 flex-col overflow-hidden transition-[width,height,top,left] duration-300 ${conversationExpanded ? 'conversation-expanded-panel !fixed top-[3vh] z-[2147483645] !h-[94vh] max-w-none rounded-[2rem] border border-white/40 shadow-[0_42px_140px_rgba(0,0,0,0.62)]' : 'h-full max-2xl:h-[46rem]'}`}>
+          {chatHeaderCollapsed ? (
+            <div className="flex items-center justify-between gap-3 border-b border-[#d1d7db] bg-white/85 px-4 py-2">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-xs font-black text-slate-700">{activeLeadName || activePhone || 'Atendimento'}</span>
+                <LeadNoteBadge compact note={activeLead?.note} />
+              </span>
+              <button className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-black text-slate-700 transition hover:border-emerald-400 hover:text-emerald-700" onClick={() => setChatHeaderCollapsed(false)} title="Mostrar cabeçalho do atendimento" type="button">
+                <ChevronDown size={15} /> Mostrar cabeçalho
+              </button>
+            </div>
+          ) : (
           <div className={`whatsapp-chat-header border-b border-[#d1d7db] p-5 ${conversationExpanded ? 'px-7 py-5' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-4">
                 <ContactAvatar name={activeLeadName} phone={activePhone} size="lg" variant="whatsapp" />
                 <span className="min-w-0">
                   <span className={labelClass}>Atendimento</span>
-                <h2 className={`mt-1 font-black text-slate-50 ${conversationExpanded ? 'text-3xl max-md:text-xl' : 'text-2xl'}`}>{activeLeadName || activePhone || 'Selecione um lead'}</h2>
+                <span className="mt-1 flex min-w-0 items-center gap-2">
+                  <h2 className={`min-w-0 truncate font-black text-slate-50 ${conversationExpanded ? 'text-3xl max-md:text-xl' : 'text-2xl'}`}>{activeLeadName || activePhone || 'Selecione um lead'}</h2>
+                  <LeadNoteBadge compact note={activeLead?.note} />
+                </span>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <p className="text-sm font-semibold text-slate-500">{activeLeadDistrict || 'Distrito não vinculado'}{activePhone ? ` · ${activePhone}` : ''}</p>
                   {activePhone ? (
@@ -11478,6 +11652,15 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  aria-label="Recolher cabeçalho do atendimento"
+                  className="grid h-10 w-10 place-items-center rounded-xl border border-[#d1d7db] bg-white text-[#54656f] shadow-sm transition hover:-translate-y-0.5 hover:border-[#00a884] hover:bg-[#d9fdd3] hover:text-[#006c5b]"
+                  onClick={() => setChatHeaderCollapsed(true)}
+                  title="Recolher cabeçalho para ampliar a conversa"
+                  type="button"
+                >
+                  <ChevronUp size={18} />
+                </button>
                 <span className="rounded-full bg-[#00a884] px-3 py-1 text-xs font-black uppercase tracking-wide text-white">
                   {lastMessage?.direction === 'INBOUND' ? 'Responder' : 'Em acompanhamento'}
                 </span>
@@ -11502,6 +11685,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
               </div>
             </div>
           </div>
+          )}
 
           <div className={`whatsapp-chat-history flex-1 overflow-auto ${conversationExpanded ? 'conversation-tools-scroll p-7 max-md:p-4' : 'p-5'}`}>
             <div className={`mx-auto grid gap-3 ${conversationExpanded ? 'w-full max-w-6xl' : ''}`}>
@@ -11534,7 +11718,19 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
             </div>
           </div>
 
+          {chatComposerCollapsed ? (
+            <div className="flex justify-end border-t border-[#d1d7db] bg-[#f0f2f5] px-4 py-2">
+              <button className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#d1d7db] bg-white px-2.5 text-[11px] font-black text-[#54656f] transition hover:border-[#00a884] hover:bg-[#d9fdd3] hover:text-[#006c5b]" onClick={() => setChatComposerCollapsed(false)} title="Mostrar campo de mensagem" type="button">
+                <ChevronUp size={15} /> Mostrar área de envio
+              </button>
+            </div>
+          ) : (
           <form className={`whatsapp-composer grid gap-3 border-t border-[#d1d7db] bg-[#f0f2f5] p-4 ${conversationExpanded ? 'px-7 py-5 shadow-[0_-16px_50px_rgba(11,20,26,0.10)] max-md:px-4' : ''}`} onSubmit={submitMessage}>
+            <div className="flex justify-end">
+              <button className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#d1d7db] bg-white px-2.5 text-[11px] font-black text-[#54656f] transition hover:border-[#00a884] hover:bg-[#d9fdd3] hover:text-[#006c5b]" onClick={() => setChatComposerCollapsed(true)} title="Recolher área de envio para ampliar a conversa" type="button">
+                <ChevronDown size={15} /> Recolher área de envio
+              </button>
+            </div>
             <textarea
               className="min-h-20 resize-none rounded-2xl border border-[#d1d7db] bg-white px-4 py-3 text-sm font-semibold leading-relaxed text-[#111b21] outline-none placeholder:text-[#667781] focus:border-[#00a884] focus:ring-4 focus:ring-[#00a884]/10"
               defaultValue="Ola! Aqui e da Escola Biblica Novo Tempo. Como posso ajudar voce hoje?"
@@ -11583,6 +11779,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
               </button>
             </div>
           </form>
+          )}
         </article>
 
         <aside className={`${panelClass} whatsapp-tools flex h-full min-h-0 flex-col overflow-hidden p-5 max-2xl:col-span-2 max-2xl:h-[46rem] max-lg:col-span-1`}>
@@ -11631,7 +11828,10 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
               }}
               type="button"
             >
-              <strong className="block truncate text-sm font-black text-slate-950">{lead.n}</strong>
+              <span className="flex items-center gap-2">
+                <strong className="block truncate text-sm font-black text-slate-950">{lead.n}</strong>
+                <LeadNoteBadge compact note={lead.note} />
+              </span>
               <span className="mt-1 block text-xs font-semibold text-slate-600">{phoneDigits(lead.tel)} · {lead.d}</span>
             </button>
           ))}
@@ -11684,7 +11884,7 @@ function ConversationsView({ campaigns = [], campaignsError = '', churchesByDist
           sending={broadcastSending}
         />
       ) : null}
-      <LeadDetailModal churches={churchesForConversations} lead={selectedLeadDetails} onClose={() => setSelectedLeadDetails(null)} />
+      <LeadDetailModal churches={churchesForConversations} lead={selectedLeadDetails} onClose={() => setSelectedLeadDetails(null)} onNoteSaved={updateSavedLeadNote} />
     </div>
   );
 }
@@ -13298,6 +13498,7 @@ function DistrictLeadScoreList({ records = [] }) {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong className="break-words text-base font-black text-slate-50">{lead.n || 'Lead sem nome'}</strong>
+                  <LeadNoteBadge compact note={lead.note} />
                   <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wide ${priority === 'Hot' ? 'bg-orange-600 text-white' : priority === 'Warm' ? 'bg-blue-600 text-white' : priority === 'Cool' ? 'bg-slate-600 text-white' : 'bg-slate-800 text-white'}`}>
                     {priorityText}
                   </span>

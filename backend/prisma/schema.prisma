@@ -139,6 +139,7 @@ model Lead {
   score                 Decimal?               @db.Decimal(5, 2)
   isVip                 Boolean                @default(false)
   hasActiveStudy        Boolean                @default(false)
+  note                  String?
   associationId         String
   association           Association            @relation(fields: [associationId], references: [id])
   districtId            String?
