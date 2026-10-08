@@ -390,34 +390,76 @@ function leadMatchesNoteUpdate(lead, update) {
 function LeadNoteBadge({ note, compact = false, onClick = null }) {
   const text = String(note || '').trim();
   const interactive = typeof onClick === 'function';
+  const anchorRef = useRef(null);
+  const [tooltipPosition, setTooltipPosition] = useState(null);
   if (!text && !interactive) return null;
   const label = text ? `Anotação: ${text}` : 'Adicionar anotação';
+
+  function showTooltip() {
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const tooltipWidth = Math.min(288, Math.max(220, window.innerWidth - 24));
+    const halfWidth = tooltipWidth / 2;
+    const left = Math.min(
+      window.innerWidth - halfWidth - 12,
+      Math.max(halfWidth + 12, rect.left + (rect.width / 2))
+    );
+    const showBelow = rect.top < 110;
+    setTooltipPosition({
+      left,
+      top: showBelow ? rect.bottom + 10 : rect.top - 10,
+      transform: showBelow ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+      width: tooltipWidth
+    });
+  }
+
   return (
+    <>
     <span
       aria-label={label}
       className={`group/note relative inline-flex shrink-0 items-center justify-center rounded-full border font-black shadow-sm transition ${text ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-blue-200 bg-blue-50 text-blue-700'} ${interactive ? 'cursor-pointer hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-100 focus:outline-none focus:ring-4 focus:ring-blue-500/15' : 'cursor-help'} ${compact ? 'h-7 w-7' : 'h-8 gap-1.5 px-3 text-[11px]'}`}
+      onBlur={() => setTooltipPosition(null)}
       onClick={interactive ? (event) => {
         event.preventDefault();
         event.stopPropagation();
+        setTooltipPosition(null);
         onClick();
       } : undefined}
+      onFocus={showTooltip}
       onKeyDown={interactive ? (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           event.stopPropagation();
+          setTooltipPosition(null);
           onClick();
         }
       } : undefined}
+      onMouseEnter={showTooltip}
+      onMouseLeave={() => setTooltipPosition(null)}
+      ref={anchorRef}
       role={interactive ? 'button' : undefined}
       tabIndex={0}
-      title={label}
     >
       <StickyNote size={compact ? 13 : 14} />
       {!compact ? (text ? 'Nota' : 'Anotar') : null}
-      <span className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-[2147483647] hidden w-64 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-left text-xs font-semibold leading-relaxed text-white shadow-2xl group-hover/note:block group-focus/note:block">
-        {text || 'Clique para escrever uma anotação sobre este lead.'}
-      </span>
     </span>
+    {tooltipPosition && typeof document !== 'undefined' ? createPortal(
+      <div
+        className="pointer-events-none fixed rounded-xl border border-white/10 bg-slate-950 px-3.5 py-3 text-left text-xs font-semibold leading-relaxed text-white shadow-[0_18px_50px_rgba(0,0,0,0.48)]"
+        role="tooltip"
+        style={{
+          left: tooltipPosition.left,
+          top: tooltipPosition.top,
+          transform: tooltipPosition.transform,
+          width: tooltipPosition.width,
+          zIndex: 2147483647
+        }}
+      >
+        {text || 'Clique para escrever uma anotação sobre este lead.'}
+      </div>,
+      document.body
+    ) : null}
+    </>
   );
 }
 
